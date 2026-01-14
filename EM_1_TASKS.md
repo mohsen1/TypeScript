@@ -5,122 +5,118 @@
 **Base Branch:** `rust`
 **Workers:** worker-1, worker-2, worker-3, worker-4
 
-*Last Updated: 2025-01-14*
+*Last Updated: 2026-01-14*
+*Director Review: Outstanding results - build on momentum*
 
 ---
 
-## Team Mission
+## Director's Top Priority for EM-1
 
-Keep `em-team-1` in sync with `rust`. Assign focused work to workers, merge their branches locally, validate, and escalate to the Director only when stable.
+**UNBLOCK WORKER-2 IMMEDIATELY** - Uncommitted work is blocking progress. Either:
+- Escalate commit request today, OR
+- Document specific blocker and request reassignment
+
+Your team has delivered excellent results (99.4% TS2304 reduction, ERROR type enforcement). Build on this momentum.
 
 ---
 
 ## Current Project Status (Phase 8)
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| **Exact Match** | 30.1% | 40% |
-| **Missing Errors** | 60.0% | <50% |
-| **TS2304 Extra Errors** | 343 | <50 |
-| **Parser False Positives** | 701 | <100 |
+| Metric | Current | Target | Owner |
+|--------|---------|--------|-------|
+| **TS2304 Extra Errors** | ~50 (post-Worker-1) | <10 | Binder |
+| **TS2564 Missing Errors** | 413 | <20 | CFA |
+| **Parser False Positives (TS1005/TS1109)** | 701 | <40 | EM-3 |
+| **Exact Match** | 30.1% | 80%+ | All |
 
-**Critical Issue:** "Error Poisoning" from `Any` type defaults. The compiler is too permissive—when binding fails, it defaults to `Any`, silencing downstream errors.
+**Critical Issue:** Parser noise (701 errors) blocks semantic accuracy. EM-3 owns this, but your team's Binder/Solver work is foundational.
 
 ---
 
-## Squad Assignments
+## Updated Squad Assignments (per Director Review)
 
-### Worker-1: Binder Squad (Critical Path)
+### Worker-1: Binder Squad - OUTSTANDING
 **Branch:** `worker-1`
-**Focus:** Global Scope and Lib Injection
-**Target:** Reduce TS2304 extra errors to <50
-
-**Tasks:**
-1. Debug why `console.log` fails to resolve (check `lib.dom.d.ts` loading)
-2. Verify `lib_loader.rs` correctly merges `lib.d.ts` symbols into root `SymbolTable`
-3. Fix module augmentation resolution (merging `interface Window` across files)
-4. Debug basic globals (`console`, `Array`, `Promise`) resolution failures
-
-**Key Files:**
-- `src/lib_loader.rs`
-- `src/thin_binder.rs`
+**Status:** COMPLETED (99.4% TS2304 reduction)
+**Impact:** Fixed lib.d.ts loading - root cause of global symbol poisoning
+**Next Steps:**
+- Validate lib loading across all test scenarios
+- Ensure module augmentation edge cases don't regress
+- **Escalate ready commits for merge**
+- Focus on integration validation, not new features
 
 ---
 
-### Worker-2: Binder Squad (Critical Path)
+### Worker-2: Binder Squad - BLOCKED (CRITICAL PATH)
 **Branch:** `worker-2`
-**Focus:** Scope Resolution and Symbol Table
-**Target:** Reduce TS2304 missing errors to <50
+**Status:** BLOCKED - Uncommitted work
+**Priority:** YOUR TOP CONCERN
+**Immediate Action Required:**
+1. Review current changes in worker-2 worktree
+2. Test against conformance suite
+3. **Escalate commit request OR document blocker**
+4. If blocked >1 day, request reassignment to Stability (Recursion Guards)
 
-**Tasks:**
-1. Fix `file_locals` population from library context
-2. Ensure global symbols are accessible in all files
-3. Debug namespace/import resolution edge cases
-4. Verify symbol table merging logic
-
-**Key Files:**
-- `src/thin_binder.rs`
-- `src/symbol_table.rs`
+**Director Note:** Uncommitted work wastes capacity. Resolve today.
 
 ---
 
-### Worker-3: Solver Squad (Strategic)
+### Worker-3: Solver Squad - EXCELLENT
 **Branch:** `worker-3`
-**Focus:** Strictness Enforcement
-**Target:** Switch from `Any` to `Unknown`/`Error` defaults
-
-**Tasks:**
-1. Change `lower_type` to return `Error` instead of `Any` on resolution failure
-2. Implement "Lawyer" layer from `specs/SOLVER.md` for TypeScript quirks
-3. Harden `solve_subtype` logic (function bivariance, void return exceptions)
-4. Convert "Missing TS2322" into either "Exact Match" or "Extra TS2322"
-
-**Key Files:**
-- `src/solver/mod.rs`
-- `specs/SOLVER.md`
+**Status:** COMPLETED (ERROR type enforcement)
+**Impact:** Implemented strictness by returning ERROR instead of ANY
+**Next Steps:**
+- Verify ERROR type propagation across all solver paths
+- Document any remaining `TypeId::ANY` fallbacks
+- Run conformance to measure Missing Error reduction
+- Focus on validation, not new solver features
 
 ---
 
-### Worker-4: Parser Squad (High Impact)
+### Worker-4: CFA Squad - PROGRESSING
 **Branch:** `worker-4`
-**Focus:** Reduce False Positives
-**Target:** Reduce TS1005/TS1109 false positives to <100
-
-**Tasks:**
-1. Audit TS1005 ("expected X") emission - likely over-triggering
-2. Audit TS1109 ("expression expected") - false positives on edge cases
-3. Implement better error recovery ("resynchronization")
-4. Ensure parser continues after minor syntax errors
+**Status:** IN PROGRESS (DECLARATION flow nodes implemented)
+**Priority Goal:** Knock out #1 missing error (TS2564 - 413 occurrences)
+**Action Items:**
+- Complete `strictPropertyInitialization` check in `thin_checker.rs`
+- Verify constructor initialization analysis
+- Coordinate with EM-2 Worker-8 to avoid duplication
+- Target: Reduce TS2564 missing errors from 413 to <20
 
 **Key Files:**
-- `src/thin_parser.rs`
+- `src/checker/thin_checker.rs`
+- `src/checker/control_flow.rs`
 
 ---
 
-## EM-1 Responsibilities
+## EM-1 Responsibilities (Updated)
 
 ### Daily Operations
-1. **Sync:** `git pull origin rust` and merge into `em-team-1`
-2. **Monitor:** Check worker branches for progress
-3. **Validate:** Run conformance tests on merged worker branches
-4. **Escalate:** Only push to Director when all worker branches merge cleanly
+1. **UNBLOCK WORKER-2** - This is your #1 priority today
+2. **Sync:** `git pull origin rust` and merge into `em-team-1`
+3. **Coordinate:** Ensure Worker-4 coordinates CFA work with EM-2 Worker-8
+4. **Validate:** Run conformance tests on merged worker branches
+5. **Escalate:** Push to Director when ready
 
 ### Validation Checklist Before Escalation
+- [ ] Worker-2 uncommitted work resolved (committed OR reassigned)
 - [ ] All 4 worker branches merge into `em-team-1` without conflicts
 - [ ] Conformance tests run: `npm run test:conformance`
 - [ ] No regressions in Exact Match score
-- [ ] TS2304 extra errors < 50 (Binder squad target)
-- [ ] Parser false positives < 100 (Parser squad target)
+- [ ] TS2304 extra errors remain <50 (maintain Worker-1 gains)
+- [ ] TS2564 missing errors show reduction (Worker-4 progress)
 
 ### Merge Workflow
 ```bash
 # Sync with base
 git checkout em-team-1
 git pull origin rust
-git merge worker-1 --no-ff -m "Merge worker-1: Binder fixes"
-git merge worker-2 --no-ff -m "Merge worker-2: Scope resolution"
-git merge worker-3 --no-ff -m "Merge worker-3: Solver strictness"
-git merge worker-4 --no-ff -m "Merge worker-4: Parser fixes"
+
+# Merge workers in order of completion
+git merge worker-1 --no-ff -m "Merge worker-1: Lib loading validation"
+git merge worker-3 --no-ff -m "Merge worker-3: Solver strictness validation"
+git merge worker-4 --no-ff -m "Merge worker-4: CFA TS2564 implementation"
+git merge worker-2 --no-ff -m "Merge worker-2: [resolved blocker]"
 
 # Run validation
 npm run test:conformance
@@ -131,20 +127,21 @@ git push origin em-team-1
 
 ---
 
-## Anti-Priorities (Do Not Assign)
-
-- Performance optimization (speed is sufficient at 41.7 tests/sec)
-- New Emitter features (downleveling is stable)
-- LSP polish (no new code actions until semantics accurate)
+## Success Metrics (per PROJECT_DIRECTION.md)
+- **TS2304 Extra Errors:** Maintain <50 (Worker-1's fix)
+- **TS2564 Missing Errors:** 413 → <20 (Worker-4's target)
+- **Overall Exact Match:** Contribute to 80%+ target
+- **Team Velocity:** Zero blocked workers
 
 ---
 
-## Success Metrics
+## Director Notes
 
-When all squads complete their targets:
-- Exact Match: 40%+
-- Missing Errors: <50%
-- TS2304 Extra: <50
-- Parser False Positives: <100
+**Your team is the lead for Phase 8 core fixes.** You've delivered excellent results. Keep the momentum by unblocking Worker-2 and coordinating CFA work.
 
-**Only then escalate to Director for integration into `rust`.**
+**Anti-Priorities:**
+- Do NOT assign parser work (EM-3 owns TS1005/TS1109)
+- Do NOT start new features until Worker-2 is resolved
+- Do NOT duplicate EM-2's CFA work (coordinate with Worker-8)
+
+**Report blockers immediately** - don't let tasks stall.

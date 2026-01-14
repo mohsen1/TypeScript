@@ -8543,5 +8543,29 @@
     "'{0}' is not a valid meta-property for keyword 'import'. Did you mean 'meta' or 'defer'?": {
         "category": "Error",
         "code": 18061
+    },
+    "Property '{0}' in mapped type has transformed type '{1}', but the source type is '{2}'.": {
+        "category": "Error",
+        "code": 9519
+    },
+    "Property '{0}' is a remapped key in a mapped type. The original key '{1}' was remapped to '{2}'.": {
+        "category": "Error",
+        "code": 9520
+    },
+    "The expected type comes from a mapped type with constraint '{0}' and template type '{1}'.": {
+        "category": "Error",
+        "code": 9521
+    },
+    "Unwrapped types: '{0}' is not assignable to '{1}'.": {
+        "category": "Error",
+        "code": 9522
+    },
+    "Promise '{0}' has unwrapped type '{1}', and Promise '{2}' has unwrapped type '{3}'.": {
+        "category": "Error",
+        "code": 9523
+    },
+    "Type '{0}' does not match template literal pattern '{1}'.": {
+        "category": "Error",
+        "code": 9524
     }
 }

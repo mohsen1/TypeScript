@@ -8,66 +8,13 @@
 
 ## CURRENT TASK
 
-### Task 9: Improve Error Messages for Mapped Types
-**Status:** READY TO START
-
-**Priority:** LOW
-**Expected Impact:** Better error messages for complex mapped types
-
-**Objective:** When mapped type property access fails, show better information about which property and transformation failed.
-
-**Subtasks:**
-- [ ] Find mapped type error reporting
-- [ ] Add context showing the original property and transformed type
-- [ ] Show key remapping information
-- [ ] Example: "Property 'foo' in mapped type has transformed type 'string' but source has 'number'"
-
-**Key Files:**
-- `src/compiler/checker.ts` (mapped type checking)
-- `src/compiler/diagnosticMessages.json`
+**No current task - all tasks completed.**
 
 ---
 
 ## PENDING TASKS
 
-### Task 10: Add Type Tracing for Async/Await Error Messages
-**Status:** PENDING
-
-**Priority:** MEDIUM
-**Expected Impact:** Better error messages for Promise/async-await type mismatches
-
-**Objective:** When async/await type checking fails, trace through Promise unwrapping to show the root cause.
-
-**Subtasks:**
-- [ ] Find Promise unwrapping logic in type checker
-- [ ] Add diagnostic messages for Promise type unwrapping
-- [ ] Show both wrapped and unwrapped types in errors
-- [ ] Example: "Promise<string> is not assignable to Promise<number>. Unwrapped types: string is not assignable to number"
-
-**Key Files:**
-- `src/compiler/checker.ts` (Promise type handling)
-- `src/compiler/diagnosticMessages.json`
-
----
-
-### Task 11: Enhance Error Messages for Template Literal Types
-**Status:** PENDING
-
-**Priority:** LOW
-**Expected Impact:** Better error messages for template literal type mismatches
-
-**Objective:** When template literal type checking fails, show which parts of the template pattern matched or failed.
-
-**Subtasks:**
-- [ ] Find template literal type checking logic
-- [ ] Add context showing template matching details
-- [ ] Show which literal types failed to match
-- [ ] Example: "Type 'foo-bar' does not match template pattern '${string}-baz'"
-
-**Key Files:**
-- `src/compiler/checker.ts` (template literal type checking)
-- `src/compiler/types.ts` (template literal type representation)
-- `src/compiler/diagnosticMessages.json`
+**No pending tasks.**
 
 ---
 
@@ -246,12 +193,102 @@ This task requires deeper investigation by the TypeScript team. A full solution 
 
 ---
 
+### Task 9: Improve Error Messages for Mapped Types
+**Status:** COMPLETED
+
+**What was done:**
+- [x] Found mapped type error reporting in checker.ts
+- [x] Added context showing the original property and transformed type
+- [x] Added key remapping information
+- [x] Added helper functions for mapped type error context
+
+**Implementation:**
+- Added diagnostic message code 9519: "Property '{0}' in mapped type has transformed type '{1}', but the source type is '{2}'."
+- Added diagnostic message code 9520: "Property '{0}' is a remapped key in a mapped type. The original key '{1}' was remapped to '{2}'."
+- Added diagnostic message code 9521: "The expected type comes from a mapped type with constraint '{0}' and template type '{1}'."
+- Modified property error reporting to include mapped type context
+- Added helper functions: `getConstraintTypeFromMappedType`, `getTemplateTypeFromMappedType`
+
+**Example improvement:**
+```
+Before: Type '{ name: string; }' is not assignable to type 'MappedType'.
+After:  Type '{ name: string; }' is not assignable to type 'MappedType'.
+        Property 'name' in mapped type has transformed type 'number', but the source type is 'string'.
+        The expected type comes from a mapped type with constraint 'keyof T' and template type 'T[key]'.
+```
+
+**Key Files:**
+- `src/compiler/checker.ts` (mapped type property checking, line ~21550)
+- `src/compiler/diagnosticMessages.json` (added codes 9519, 9520, 9521)
+
+---
+
+### Task 10: Add Type Tracing for Async/Await Error Messages
+**Status:** COMPLETED
+
+**What was done:**
+- [x] Found Promise unwrapping logic in type checker
+- [x] Added diagnostic messages for Promise type unwrapping
+- [x] Modified `maybeAddMissingAwaitInfo` to show both wrapped and unwrapped types
+- [x] Added helper function for Promise type unwrapping errors
+
+**Implementation:**
+- Added diagnostic message code 9522: "Unwrapped types: '{0}' is not assignable to '{1}'."
+- Added diagnostic message code 9523: "Promise '{0}' has unwrapped type '{1}', and Promise '{2}' has unwrapped type '{3}'."
+- Enhanced `maybeAddMissingAwaitInfo` to show unwrapped type relationships
+- When both source and target are Promise-like, shows the unwrapped types and their relationship
+
+**Example improvement:**
+```
+Before: Type 'Promise<string>' is not assignable to type 'Promise<number>'.
+After:  Type 'Promise<string>' is not assignable to type 'Promise<number>'.
+        Promise 'Promise<string>' has unwrapped type 'string', and Promise 'Promise<number>' has unwrapped type 'number'.
+        Unwrapped types: 'string' is not assignable to 'number'.
+```
+
+**Key Files:**
+- `src/compiler/checker.ts` (maybeAddMissingAwaitInfo function, line ~36202)
+- `src/compiler/diagnosticMessages.json` (added codes 9522, 9523)
+
+---
+
+### Task 11: Enhance Error Messages for Template Literal Types
+**Status:** COMPLETED
+
+**What was done:**
+- [x] Found template literal type checking logic in checker.ts
+- [x] Added context showing template matching details
+- [x] Added helper function for formatting template literal patterns
+- [x] Integrated error enhancement into checkArguments
+
+**Implementation:**
+- Added diagnostic message code 9524: "Type '{0}' does not match template literal pattern '{1}'."
+- Added `formatTemplateLiteralTypeAsPattern()` helper to format patterns like `${string}-baz`
+- Added `maybeAddTemplateLiteralErrorInfo()` function to add related info
+- Integrated into `checkArguments()` after type checking fails
+
+**Example improvement:**
+```
+Before: Type 'foo-bar' is not assignable to type '${string}-baz'
+After:  Type 'foo-bar' is not assignable to type '${string}-baz'
+        Type 'foo-bar' does not match template literal pattern '${string}-baz'
+```
+
+**Key Files:**
+- `src/compiler/checker.ts` (template literal error checking, line ~36247)
+- `src/compiler/diagnosticMessages.json` (added code 9524)
+
+---
+
 ## KEY FILES
 
 - `src/compiler/checker.ts` - Main type checker (3MB+)
   - Lines 21000-23000: Type checking and subtyping
   - Lines 18000-19000: Freshness and excess property checking
   - Lines 22000-22700: Error reporting
+  - Line ~21550: Mapped type property error enhancement
+  - Line ~36202: Promise unwrapping error enhancement
+  - Line ~36247: Template literal error enhancement
   - Line ~35919: Generic type argument checking
 
 - `src/compiler/types.ts` - Type representation
@@ -293,10 +330,9 @@ EM_3_TASKS.md path references to `src/solver/` are incorrect - actual paths are:
 
 ## MERGE STATUS - 2026-01-14
 
-**Merge Commit:** Pending push to origin
-**Status:** ✅ Merged into em-team-3
+**Status:** ✅ All tasks completed, awaiting EM-3 review and merge
 
-**Work Completed (Tasks 1-8):**
+**Work Completed (Tasks 1-11):**
 - Task 1: Any→Unknown spike testing (478 baselines, all correct)
 - Task 2: TS2322 error message enhancement (code 9512)
 - Task 3: Type tracing to errors (codes 9513, 9514, 9515)
@@ -305,10 +341,13 @@ EM_3_TASKS.md path references to `src/solver/` are incorrect - actual paths are:
 - Task 6: Excess property checking analysis (no bugs found, regression test added)
 - Task 7: Generic type error messages (code 9518)
 - Task 8: Conditional type error messages (architectural limitation identified)
+- Task 9: Mapped type error messages (codes 9519, 9520, 9521)
+- Task 10: Async/Await error messages (codes 9522, 9523)
+- Task 11: Template literal error messages (code 9524)
 
 **Files Changed:**
-- `src/compiler/checker.ts` - 59 lines changed
-- `src/compiler/diagnosticMessages.json` - 12 new diagnostic codes added
+- `src/compiler/checker.ts` - 120+ lines changed
+- `src/compiler/diagnosticMessages.json` - 13 new diagnostic codes added (9512-9524)
 - `tests/cases/compiler/excessPropertyEdgeCasesRegression.ts` - New regression test
 - `WORKER_12_TASK_6_ANALYSIS.md` - Excess property analysis
 - `WORKER_12_TASK_8_ANALYSIS.md` - Conditional type analysis
@@ -321,5 +360,11 @@ EM_3_TASKS.md path references to `src/solver/` are incorrect - actual paths are:
 - 9516: Type parameter constraint error message
 - 9517: TS7006 enhancement with type annotation suggestion
 - 9518: Generic type argument constraint violation
+- 9519: Mapped type property transformation error
+- 9520: Mapped type key remapping information
+- 9521: Mapped type constraint and template type
+- 9522: Unwrapped types error
+- 9523: Promise unwrapped type comparison
+- 9524: Template literal pattern mismatch
 
-**Ready for:** Task 9 (Mapped Types) or reassignment based on Director review
+**All tasks completed. Awaiting new task assignment from Director or EM-3.**
