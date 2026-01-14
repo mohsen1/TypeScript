@@ -2861,6 +2861,9 @@ impl ThinBinderState {
             // - Declaration: export function/class/const/etc
             // - or NONE for: export * from 'mod'
 
+            // Check if the entire export declaration is type-only: export type { ... }
+            let export_type_only = export.is_type_only;
+
             if !export.export_clause.is_none() {
                 if let Some(clause_node) = arena.get(export.export_clause) {
                     // Check if it's named exports { foo, bar }
@@ -2869,6 +2872,10 @@ impl ThinBinderState {
                         for &spec_idx in &named.elements.nodes {
                             if let Some(spec_node) = arena.get(spec_idx) {
                                 if let Some(spec) = arena.get_specifier(spec_node) {
+                                    // Determine if this specifier is type-only
+                                    // (either from export type { ... } or export { type foo })
+                                    let spec_type_only = export_type_only || spec.is_type_only;
+
                                     // For export { foo }, property_name is NONE, name is "foo"
                                     // For export { foo as bar }, property_name is "foo", name is "bar"
                                     let exported_name = if !spec.name.is_none() {
@@ -2883,6 +2890,11 @@ impl ThinBinderState {
                                         let sym_id = self
                                             .symbols
                                             .alloc(symbol_flags::EXPORT_VALUE, name.to_string());
+                                        // Set is_type_only and is_exported on the symbol
+                                        if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                            sym.is_exported = true;
+                                            sym.is_type_only = spec_type_only;
+                                        }
                                         self.node_symbols.insert(spec_idx.0, sym_id);
                                     }
                                 }
@@ -2903,6 +2915,11 @@ impl ThinBinderState {
                     else if let Some(name) = self.get_identifier_name(arena, export.export_clause)
                     {
                         let sym_id = self.symbols.alloc(symbol_flags::ALIAS, name.to_string());
+                        // Set is_type_only and is_exported for namespace exports
+                        if let Some(sym) = self.symbols.get_mut(sym_id) {
+                            sym.is_exported = true;
+                            sym.is_type_only = export_type_only;
+                        }
                         self.current_scope.set(name.to_string(), sym_id);
                         self.node_symbols.insert(export.export_clause.0, sym_id);
                     } else if export.is_default_export {
