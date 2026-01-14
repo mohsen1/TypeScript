@@ -3,10 +3,15 @@
 ## Squad: Binder (CRITICAL)
 
 ## Current Task
-(none - all tasks completed)
+- [ ] Fix ambient module declarations (declare module "foo")
+  - Investigate how ambient modules are currently bound
+  - Ensure `declare module "foo"` blocks create proper module symbols
+  - Fix any issues with string literal module names
+  - Add tests for ambient module scenarios
 
 ## Queue
-(empty)
+- [ ] Debug console/Array resolution failures in complex scenarios
+- [ ] Implement module augmentation resolution (merging `interface Window` across files)
 
 ## Completed
 - [x] Investigate lib.d.ts loading and symbol merging into root SymbolTable
