@@ -1,8 +1,19 @@
 # Team Structure - TypeScript Compiler (Rust)
 
 **Phase:** Phase 8 - Conformance, Convergence, and Hardening
-**Last Updated:** 2026-01-14 (Post EM-1 merge)
+**Last Updated:** 2026-01-14 (Post EM-1 & EM-2 merges)
 **Director:** claude-code-orchestrator
+
+---
+
+## Director's Note
+
+**EM squads have taken autonomous approaches:**
+- EM_1: Hybrid (Parser + Binder)
+- EM_2: Task Master managing all three focus areas
+- EM_3: Pending
+
+Squad-based structure not being followed by EMs. Director adapting to reality.
 
 ---
 
@@ -55,26 +66,28 @@
 
 ---
 
-### EM_2: Parser/Scanner Squad (PRIORITY)
+### EM_2: Task Master - Multi-Squad (Binder + Parser + Solver)
 **Branch:** `em-team-2`
 **Priority:** 🟠 HIGH
-**Target Errors:** TS1005, TS1109
-**Status:** 🟡 AWAITING TRANSFER from EM_1
+**Target Errors:** TS2304, TS1005, TS1109, TS2322
+**Status:** 🟢 ACTIVE - Managing 4 workers across 3 focus areas
 
-**Incoming Workers:** Workers 1-3 (after validation cycle)
+**Director's Note:** EM-2 has taken a "Task Master" approach, managing workers 5-8 across all three focus areas. This deviates from the squad-based structure but is delivering results.
 
-**Focus:**
-- Fix TS1005 ("expected X") emission - over-triggering on valid syntax
-- Fix TS1109 ("expression expected") - false positives on edge cases
-- Audit error recovery logic in `thin_parser.rs`
-- **Goal:** Reduce parser false positives to <100
+**Workers:**
+- worker-5, worker-6: Binder (TS2304)
+- worker-7: Parser (TS1005/TS1109) - **DELIVERED: TS1109 cascading error fix**
+- worker-8: Solver (TS2322/TS7006)
 
-**Key Files:**
-- `src/compiler/parser.ts`
-- `src/scanner.rs` (if exists)
-- `src/error_recovery.rs` (if exists)
+**Progress:**
+- Worker 7 implemented TS1109 cascading error fix (committed `afba575b5`)
+  - Prevents TS1109 errors when TS1005 already reported at same position
+  - Reduces false positive pollution in conformance measurements
 
-**Success Metric:** Parser false positives < 100
+**Success Metrics:**
+- Parser false positives < 100 (worker-7 active)
+- TS2304 extra errors < 50 (workers 5-6 assigned)
+- Solver `Unknown` fallback (worker-8 assigned)
 
 ---
 
@@ -110,15 +123,14 @@
 
 | EM | Squad | Assigned Workers | Total | Notes |
 |----|-------|------------------|-------|-------|
-| EM_1 | **HYBRID** | workers 1-4 | 5 | Workers 1-3 transfer to EM_2 after validation |
-| EM_2 | Parser | (awaiting transfer 1-3) + 5-6 | 3 | Will expand to 6 workers after transfer |
-| EM_3 | Solver | workers 7-9 | 4 | Focus on `Unknown` fallback |
+| EM_1 | **HYBRID** | workers 1-4 | 5 | Parser + Binder, awaiting validation |
+| EM_2 | **Task Master** | workers 5-8 | 5 | Binder + Parser + Solver, delivering results |
+| EM_3 | **PENDING** | workers 9-12 | 5 | Not yet started |
 
-### Pending Restructure
-After EM-1 validation cycle:
-- Workers 1-3 → EM_2 (Parser Squad)
-- EM_1 → Pure Binder Squad with new workers
-- Unassigned workers (10-12) → EM_1 or EM_3 based on priorities
+**Current Status:**
+- Workers 1-8 are active across EM_1 and EM_2
+- Workers 9-12 are pending EM_3 assignment
+- EM_3 branch not yet escalated
 
 **Note:** CFA (Control Flow Analysis) work is on hold until TS2304 is under control.
 
