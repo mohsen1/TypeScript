@@ -402,6 +402,19 @@ impl ThinParserState {
         }
     }
 
+    /// Check if the last error was about a missing close brace
+    /// Used for Pattern 4: Import/Export specifier brace mismatch cascading error suppression
+    fn was_last_error_about_missing_close_brace(&self) -> bool {
+        if let Some(last_error) = self.parse_diagnostics.last() {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            // Check if the last error was TS1005 (TOKEN_EXPECTED) about "}" expected
+            last_error.code == diagnostic_codes::TOKEN_EXPECTED
+                && last_error.message.contains("}' expected")
+        } else {
+            false
+        }
+    }
+
     /// Error: '{token}' expected (TS1005)
     fn error_token_expected(&mut self, token: &str) {
         // Only emit error if we haven't already emitted one at this position
@@ -4431,6 +4444,14 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::CloseBraceToken)
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
+            // Pattern 4: Import/Export specifier brace mismatch cascading error suppression
+            // If we encounter 'from' keyword in the specifier list, it likely means we have:
+            // import { a from "module"  (missing closing brace)
+            // In this case, break the loop to avoid parsing 'from' as an identifier
+            if self.is_token(SyntaxKind::FromKeyword) {
+                break;
+            }
+
             let spec = self.parse_import_specifier();
             elements.push(spec);
 
@@ -4704,6 +4725,14 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::CloseBraceToken)
             && !self.is_token(SyntaxKind::EndOfFileToken)
         {
+            // Pattern 4: Import/Export specifier brace mismatch cascading error suppression
+            // If we encounter 'from' keyword in the specifier list, it likely means we have:
+            // export { a from "module"  (missing closing brace)
+            // In this case, break the loop to avoid parsing 'from' as an identifier
+            if self.is_token(SyntaxKind::FromKeyword) {
+                break;
+            }
+
             let spec = self.parse_export_specifier();
             elements.push(spec);
 
