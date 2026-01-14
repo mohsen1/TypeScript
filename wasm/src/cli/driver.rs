@@ -16,7 +16,9 @@ use crate::cli::config::{
     resolve_compiler_options,
 };
 use crate::cli::fs::{FileDiscoveryOptions, discover_ts_files, is_ts_file};
+use crate::checker::context::LibContext;
 use crate::declaration_emitter::DeclarationEmitter;
+use crate::lib_loader;
 use crate::parallel::{self, BindResult, BoundFile, MergedProgram};
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
@@ -2275,6 +2277,66 @@ fn apply_exports_subpath(target: &str, wildcard: &str) -> String {
     }
 }
 
+/// Load lib.d.ts files and create LibContext objects for the checker.
+///
+/// This function loads the specified lib.d.ts files (e.g., lib.dom.d.ts, lib.es*.d.ts)
+/// and returns LibContext objects that can be used by the checker to resolve global
+/// symbols like `console`, `Array`, `Promise`, etc.
+fn load_lib_files_for_contexts(lib_files: &[PathBuf]) -> Vec<LibContext> {
+    use crate::thin_parser::ThinParserState;
+    use crate::thin_binder::ThinBinderState;
+    use std::sync::Arc;
+
+    let mut lib_contexts = Vec::new();
+
+    // If no lib files are specified, try to load the default lib.d.ts
+    let files_to_load = if lib_files.is_empty() {
+        // Try to load default lib.d.ts from tests/lib directory
+        let default_lib_paths = vec![
+            PathBuf::from("tests/lib/lib.d.ts"),
+            PathBuf::from("tests/lib/lib.dom.d.ts"),
+        ];
+        default_lib_paths
+    } else {
+        lib_files.to_vec()
+    };
+
+    for lib_path in files_to_load {
+        // Skip if the file doesn't exist
+        if !lib_path.exists() {
+            continue;
+        }
+
+        // Read the lib file content
+        let source_text = match std::fs::read_to_string(&lib_path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+
+        // Parse the lib file
+        let file_name = lib_path.to_string_lossy().to_string();
+        let mut lib_parser = ThinParserState::new(file_name.clone(), source_text);
+        let source_file_idx = lib_parser.parse_source_file();
+
+        // Skip if there are parse errors
+        if !lib_parser.get_diagnostics().is_empty() {
+            continue;
+        }
+
+        // Bind the lib file
+        let mut lib_binder = ThinBinderState::new();
+        lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+        // Create the LibContext
+        let arena = Arc::new(lib_parser.into_arena());
+        let binder = Arc::new(lib_binder);
+
+        lib_contexts.push(LibContext { arena, binder });
+    }
+
+    lib_contexts
+}
+
 fn collect_diagnostics(
     program: &MergedProgram,
     options: &ResolvedCompilerOptions,
@@ -2291,6 +2353,9 @@ fn collect_diagnostics(
         let canonical = canonicalize_or_owned(Path::new(&file.file_name));
         program_paths.insert(canonical);
     }
+
+    // Load lib.d.ts files for global symbol resolution (console, Array, Promise, etc.)
+    let lib_contexts: Vec<LibContext> = load_lib_files_for_contexts(&options.lib_files);
 
     for (file_idx, file) in program.files.iter().enumerate() {
         let file_path = PathBuf::from(&file.file_name);
@@ -2327,6 +2392,10 @@ fn collect_diagnostics(
             )
         };
         checker.ctx.report_unresolved_imports = false;
+        // Set lib contexts for global symbol resolution (console, Array, Promise, etc.)
+        if !lib_contexts.is_empty() {
+            checker.ctx.set_lib_contexts(lib_contexts.clone());
+        }
         let module_specifiers = collect_module_specifiers(&file.arena, file.source_file);
         let mut resolved_modules = HashSet::new();
         for (specifier, _) in &module_specifiers {
