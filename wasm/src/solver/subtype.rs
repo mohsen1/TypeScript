@@ -1900,8 +1900,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let is_contravariant = self.check_subtype(target_type, source_type).is_true();
 
         // Methods are bivariant regardless of strict_function_types setting
+        // UNLESS disable_method_bivariance is set
         // This matches TypeScript's behavior for method parameters
-        let use_bivariance = is_method || !self.strict_function_types;
+        let method_should_be_bivariant = is_method && !self.disable_method_bivariance;
+        let use_bivariance = method_should_be_bivariant || !self.strict_function_types;
 
         if !use_bivariance {
             if contains_this {
@@ -3853,3 +3855,7 @@ mod callable_tests;
 #[cfg(test)]
 #[path = "union_tests.rs"]
 mod union_tests;
+
+#[cfg(test)]
+#[path = "typescript_quirks_tests.rs"]
+mod typescript_quirks_tests;
