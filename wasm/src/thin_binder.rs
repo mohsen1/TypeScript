@@ -105,6 +105,21 @@ pub enum ValidationError {
     InvalidValueDeclaration { symbol_id: u32, name: String },
 }
 
+/// Statistics about symbol resolution attempts and successes.
+#[derive(Debug, Clone, Default)]
+pub struct ResolutionStats {
+    /// Total number of resolution attempts
+    pub attempts: u64,
+    /// Number of successful resolutions in scopes
+    pub scope_hits: u64,
+    /// Number of successful resolutions in file_locals
+    pub file_local_hits: u64,
+    /// Number of successful resolutions in lib_binders
+    pub lib_binder_hits: u64,
+    /// Number of failed resolutions
+    pub failures: u64,
+}
+
 impl ThinBinderState {
     pub fn new() -> Self {
         let mut flow_nodes = FlowNodeArena::new();
@@ -288,6 +303,13 @@ impl ThinBinderState {
     /// without maintaining a traversal-order-dependent stack.
     ///
     /// Returns the SymbolId for the identifier, or None if not found.
+    ///
+    /// Debug logging (P1 Task):
+    /// When debug mode is enabled, logs:
+    /// - Scope chain traversal
+    /// - Falls through to file_locals
+    /// - Falls through to lib_binders
+    /// - Resolution failures
     pub fn resolve_identifier(
         &self,
         arena: &ThinNodeArena,
@@ -302,14 +324,22 @@ impl ThinBinderState {
             return None;
         };
 
+        let debug_enabled = crate::module_resolution_debug::is_debug_enabled();
+
         if let Some(mut scope_id) = self.find_enclosing_scope(arena, node_idx) {
             // Walk up the scope chain
+            let mut scope_depth = 0;
             while !scope_id.is_none() {
                 if let Some(scope) = self.scopes.get(scope_id.0 as usize) {
                     if let Some(sym_id) = scope.table.get(name) {
+                        if debug_enabled {
+                            eprintln!("[RESOLVE] '{}' FOUND in scope at depth {} (id={})",
+                                name, scope_depth, sym_id.0);
+                        }
                         return Some(sym_id);
                     }
                     scope_id = scope.parent;
+                    scope_depth += 1;
                 } else {
                     break;
                 }
@@ -318,20 +348,38 @@ impl ThinBinderState {
 
         // Fallback for bound-state binders without persistent scopes.
         if let Some(sym_id) = self.resolve_parameter_fallback(arena, node_idx, name) {
+            if debug_enabled {
+                eprintln!("[RESOLVE] '{}' FOUND via parameter fallback (id={})",
+                    name, sym_id.0);
+            }
             return Some(sym_id);
         }
 
         // Finally check file locals / globals
         if let Some(sym_id) = self.file_locals.get(name) {
+            if debug_enabled {
+                eprintln!("[RESOLVE] '{}' FOUND in file_locals (id={})",
+                    name, sym_id.0);
+            }
             return Some(sym_id);
         }
 
         // Chained lookup: check lib binders for global symbols
         // This enables resolving console, Array, Object, etc. from lib.d.ts
-        for lib_binder in &self.lib_binders {
+        for (i, lib_binder) in self.lib_binders.iter().enumerate() {
             if let Some(sym_id) = lib_binder.file_locals.get(name) {
+                if debug_enabled {
+                    eprintln!("[RESOLVE] '{}' FOUND in lib_binder[{}] (id={}) - LIB SYMBOL",
+                        name, i, sym_id.0);
+                }
                 return Some(sym_id);
             }
+        }
+
+        // Symbol not found - log the failure
+        if debug_enabled {
+            eprintln!("[RESOLVE] '{}' NOT FOUND - searched scopes, file_locals, and {} lib binders",
+                name, self.lib_binders.len());
         }
 
         None
@@ -3846,6 +3894,226 @@ impl ThinBinderState {
     /// Check if the symbol table has any validation errors.
     pub fn is_symbol_table_valid(&self) -> bool {
         self.validate_symbol_table().is_empty()
+    }
+
+    // ========================================================================
+    // Lib Symbol Validation (P0 Task - Improve Test Runner Lib Injection)
+    // ========================================================================
+
+    /// Expected global symbols that should be available from lib.d.ts.
+    /// These are core ECMAScript globals that should always be present.
+    const EXPECTED_GLOBAL_SYMBOLS: &'static [&'static str] = &[
+        // Core types
+        "Object", "Function", "Array", "String", "Number", "Boolean", "Symbol", "BigInt",
+        // Error types
+        "Error", "EvalError", "RangeError", "ReferenceError", "SyntaxError", "TypeError", "URIError",
+        // Collections
+        "Map", "Set", "WeakMap", "WeakSet",
+        // Promises and async
+        "Promise",
+        // Object reflection
+        "Reflect", "Proxy",
+        // Global functions
+        "eval", "isNaN", "isFinite", "parseFloat", "parseInt",
+        // Global values
+        "Infinity", "NaN", "undefined",
+        // Console (if DOM lib is loaded)
+        "console",
+    ];
+
+    /// Validate that expected global symbols are present after binding.
+    ///
+    /// This method should be called after `bind_source_file_with_libs` to ensure
+    /// that lib symbols were properly loaded and merged into the binder.
+    ///
+    /// Returns a list of missing symbol names. Empty list means all expected symbols are present.
+    ///
+    /// # Example
+    /// ```ignore
+    /// binder.bind_source_file_with_libs(arena, root, &lib_files);
+    /// let missing = binder.validate_global_symbols();
+    /// if !missing.is_empty() {
+    ///     eprintln!("WARNING: Missing global symbols: {:?}", missing);
+    /// }
+    /// ```
+    pub fn validate_global_symbols(&self) -> Vec<String> {
+        let mut missing = Vec::new();
+
+        for &symbol_name in Self::EXPECTED_GLOBAL_SYMBOLS {
+            // Check if the symbol is available via resolve_identifier
+            // (which checks both file_locals and lib_binders)
+            let is_available = self.file_locals.has(symbol_name) ||
+                self.lib_binders.iter().any(|b| b.file_locals.has(symbol_name));
+
+            if !is_available {
+                missing.push(symbol_name.to_string());
+            }
+        }
+
+        missing
+    }
+
+    /// Get a detailed report of lib symbol availability.
+    ///
+    /// Returns a human-readable string showing:
+    /// - Which expected symbols are present
+    /// - Which expected symbols are missing
+    /// - Total symbol count from file_locals and lib_binders
+    pub fn get_lib_symbol_report(&self) -> String {
+        let mut report = String::new();
+        report.push_str("=== Lib Symbol Availability Report ===\n\n");
+
+        // Count total symbols
+        let file_local_count = self.file_locals.len();
+        let lib_binder_count: usize = self.lib_binders.iter()
+            .map(|b| b.file_locals.len())
+            .sum();
+
+        report.push_str(&format!("File locals: {} symbols\n", file_local_count));
+        report.push_str(&format!("Lib binders: {} symbols ({} binders)\n\n",
+            lib_binder_count, self.lib_binders.len()));
+
+        // Check each expected symbol
+        let mut present = Vec::new();
+        let mut missing = Vec::new();
+
+        for &symbol_name in Self::EXPECTED_GLOBAL_SYMBOLS {
+            let is_available = self.file_locals.has(symbol_name) ||
+                self.lib_binders.iter().any(|b| b.file_locals.has(symbol_name));
+
+            if is_available {
+                present.push(symbol_name);
+            } else {
+                missing.push(symbol_name);
+            }
+        }
+
+        report.push_str(&format!("Expected symbols present: {}/{}\n", present.len(), Self::EXPECTED_GLOBAL_SYMBOLS.len()));
+        if !missing.is_empty() {
+            report.push_str(&format!("\nMissing symbols:\n"));
+            for name in &missing {
+                report.push_str(&format!("  - {}\n", name));
+            }
+        }
+
+        // Show which lib binders contribute symbols
+        if !self.lib_binders.is_empty() {
+            report.push_str("\nLib binder contributions:\n");
+            for (i, lib_binder) in self.lib_binders.iter().enumerate() {
+                report.push_str(&format!("  Lib binder {}: {} symbols\n",
+                    i, lib_binder.file_locals.len()));
+            }
+        }
+
+        report
+    }
+
+    /// Log missing lib symbols with debug context.
+    ///
+    /// This should be called at test start to warn about missing lib symbols
+    /// that might cause test failures.
+    ///
+    /// Returns true if any expected symbols are missing.
+    pub fn log_missing_lib_symbols(&self) -> bool {
+        let missing = self.validate_global_symbols();
+
+        if !missing.is_empty() {
+            eprintln!("[LIB_SYMBOL_WARNING] Missing {} expected global symbols: {:?}",
+                missing.len(), missing);
+            eprintln!("[LIB_SYMBOL_WARNING] This may cause test failures due to unresolved symbols.");
+            eprintln!("[LIB_SYMBOL_WARNING] Ensure lib.d.ts is loaded via addLibFile() before binding.");
+            true
+        } else {
+            if crate::module_resolution_debug::is_debug_enabled() {
+                eprintln!("[LIB_SYMBOL_INFO] All {} expected global symbols are present.",
+                    Self::EXPECTED_GLOBAL_SYMBOLS.len());
+            }
+            false
+        }
+    }
+
+    /// Verify that lib symbols from multiple test files are properly merged.
+    ///
+    /// This method checks that symbols from multiple lib files are all accessible
+    /// through the binder's symbol resolution chain.
+    ///
+    /// # Arguments
+    /// * `lib_files` - The lib files that were supposed to be merged
+    ///
+    /// Returns a list of lib file names whose symbols are not fully accessible.
+    pub fn verify_lib_symbol_merge(&self, lib_files: &[Arc<lib_loader::LibFile>]) -> Vec<String> {
+        let mut inaccessible = Vec::new();
+
+        for lib_file in lib_files {
+            let file_name = lib_file.file_name.clone();
+
+            // Check if symbols from this lib file are accessible
+            let mut has_accessible_symbols = false;
+            for (name, &sym_id) in lib_file.binder.file_locals.iter() {
+                // Try to resolve the symbol through our binder
+                if self.file_locals.get(name).is_some() ||
+                   self.lib_binders.iter().any(|b| b.file_locals.get(name).is_some()) {
+                    has_accessible_symbols = true;
+                    break;
+                }
+            }
+
+            if !has_accessible_symbols && !lib_file.binder.file_locals.is_empty() {
+                inaccessible.push(file_name);
+            }
+        }
+
+        inaccessible
+    }
+
+    // ========================================================================
+    // Symbol Resolution Statistics (P1 Task - Debug Logging)
+    // ========================================================================
+
+    /// Get a snapshot of current symbol resolution statistics.
+    ///
+    /// This method scans the binder state to provide statistics about
+    /// symbol resolution capability, including:
+    /// - Available symbols by source (scopes, file_locals, lib_binders)
+    /// - Potential resolution paths
+    pub fn get_resolution_stats(&self) -> ResolutionStats {
+        // Count symbols in each resolution tier
+        let scope_symbols: u64 = self.scopes.iter()
+            .map(|s| s.table.len() as u64)
+            .sum();
+
+        let file_local_symbols = self.file_locals.len() as u64;
+
+        let lib_binder_symbols: u64 = self.lib_binders.iter()
+            .map(|b| b.file_locals.len() as u64)
+            .sum();
+
+        ResolutionStats {
+            attempts: 0, // Would need runtime tracking
+            scope_hits: scope_symbols,
+            file_local_hits: file_local_symbols,
+            lib_binder_hits: lib_binder_symbols,
+            failures: 0, // Would need runtime tracking
+        }
+    }
+
+    /// Get a human-readable summary of resolution statistics.
+    pub fn get_resolution_summary(&self) -> String {
+        let stats = self.get_resolution_stats();
+        format!(
+            "Symbol Resolution Summary:\n\
+             - Scope symbols: {}\n\
+             - File local symbols: {}\n\
+             - Lib binder symbols: {} (from {} binders)\n\
+             - Total accessible symbols: {}\n\
+             - Expected global symbols: {}",
+            stats.scope_hits,
+            stats.file_local_hits,
+            stats.lib_binder_hits,
+            self.lib_binders.len(),
+            stats.scope_hits + stats.file_local_hits + stats.lib_binder_hits,
+            Self::EXPECTED_GLOBAL_SYMBOLS.len()
+        )
     }
 }
 

@@ -1,6 +1,6 @@
 # Worker-11 Task List
 
-**Squad:** Infrastructure
+**Squad:** Semantics (Implicit Any Detection)
 **Branch:** `worker-11`
 **EM:** EM-3
 *Assigned: 2026-01-14*
@@ -9,49 +9,51 @@
 
 ## Priority Mission
 
-Improve test runner and debug capabilities. **Target: Better visibility into symbol resolution failures.**
+Fix TS7006 (Implicit Any) detection. **Target: Reduce from 357 to <10 missing errors.**
 
 ---
 
 ## Assigned Tasks
 
-### 1. Improve Test Runner Lib Injection
+### 1. Detect Implicit Any in Parameters
 **Priority:** P0 - High
-**Files:** Test runner scripts, `wasm/src/binder/`
+**Files:** `wasm/src/solver/` and `wasm/src/checker/`
+
+**Problem:** 357 missing TS7006 errors. Parameter type inference is too permissive.
 
 **Tasks:**
-1. Verify `lib.d.ts` loads correctly for all test configurations
-2. Add validation that global symbols are present after binding
-3. Log missing lib symbols at test start
-4. Ensure lib symbols merge across multiple test files
+1. Detect implicit any types in function parameters
+2. Check function signatures for missing types
+3. Apply strict type checking rules
+4. Work配合 with worker-9 (UNKNOWN defaults)
 
-### 2. Add Debug Logging for Symbol Resolution
+### 2. Implicit Any in Other Contexts
 **Priority:** P1
-**Files:** `wasm/src/binder/`, `wasm/src/solver/`
+**Files:** `wasm/src/solver/` and `wasm/src/checker/`
 
 **Tasks:**
-1. Add optional debug flag for symbol lookup traces
-2. Log when symbol falls through to `file_locals`
-3. Log when symbol falls through to `lib_binders`
-4. Track and report symbol resolution attempts vs successes
+1. Detect implicit any in variable declarations
+2. Detect implicit any in return types
+3. Detect implicit any in object properties
+4. Handle `noImplicitAny` compiler option
 
-### 3. Categorize Conformance Tests
+### 3. Test Coverage
 **Priority:** P2
-**Files:** Test infrastructure
 
-**Tasks:**
-1. Parse test file paths to categorize by component
-2. Create categories: parser, binder, solver, checker, integration
-3. Generate report showing error distribution by category
-4. Help identify which component needs most attention
+**Test Cases:**
+- Function parameters without types
+- Object properties without types
+- Variables inferred as any
+- `noImplicitAny` enabled/disabled
+- Properly typed code (no false positives)
 
 ---
 
 ## Success Criteria
-- [ ] Lib symbols load reliably in all test scenarios
-- [ ] Debug logging available for symbol resolution
-- [ ] Conformance tests categorized by component
-- [ ] Error distribution report generated
+- [ ] Implicit any parameters trigger TS7006
+- [ ] No false positives on properly typed code
+- [ ] Metrics showing reduction in missing TS7006
+- [ ] Reduce missing TS7006 from 357 to <10
 
 ---
 
