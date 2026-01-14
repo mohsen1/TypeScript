@@ -3,7 +3,13 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in contextual type patterns
+- [x] Reduce "Any" fallback in contextual type patterns
+
+## Completed
+- [x] Locate contextual type fallback locations (found 3)
+- [x] Change all 3 locations from TypeId::ANY to TypeId::UNKNOWN
+- [x] Verify compilation - Code compiles successfully
+- [x] Test - One pre-existing failure (unrelated to changes)
 
 ## Context
 
@@ -71,4 +77,11 @@ This will expose bugs in:
 - Measurable increase in detected type errors
 
 ## Ready for Merge
-No (task in progress)
+Yes - Implementation complete and tested.
+
+## Changes Summary
+- **Files modified**: 1 (`wasm/src/thin_checker.rs`)
+- **Lines changed**: 3 locations
+- **Change**: Contextual type fallbacks from `TypeId::ANY` → `TypeId::UNKNOWN`
+- **Commit**: `31a2ae625 Complete: Reduce 'Any' fallback in contextual type patterns`
+- **Pushed to**: origin/worker-12
