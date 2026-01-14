@@ -94,17 +94,31 @@ Before merging any worker branch:
 - **Push:** Pushed to origin/em-team-1
 
 ### 2026-01-14 - Worker-4 Merge Complete ✅
-- **Status:** ✅ SUCCESSFULLY MERGED
-- **Merge Commit:** 96ca9f6a5
-- **Changes:** +147 lines thin_checker.rs, +350 lines tests
-- **Bug Fixes:** Switch statements, destructuring, loop definite assignment
-- **Tests:** All 19 TS2564 tests passing
+- **Status:** ✅ SUCCESSFULLY MERGED (TWICE)
+- **Merge Commit 1:** 96ca9f6a5 (Initial TS2564 bug fixes)
+- **Merge Commit 2:** 6fc9e1e59 (Computed property tracking fix)
+- **Total Changes:** +164 lines thin_checker.rs, +442 lines tests
+- **Bug Fixes:** Switch statements, destructuring, loops, computed properties
+- **Tests:** 21 TS2564 tests (all passing)
+
+### 2026-01-14 - Worker-1 Merge Blocked ⚠️
+- **Status:** ⚠️ BRANCH OUT OF DATE - NO MERGE PERFORMED
+- **Issue:** Worker-1 has removed 4,766 lines of work
+- **Action:** Worker-1 needs rebase to rust or branch recreation
+- **Parser Work:** Already completed by worker-10
+
+### 2026-01-14 - Worker-3 Status
+- **Status:** ✅ ALL TASKS COMPLETE (awaiting merge)
+- **Commits:** 1b52ab8a7 (summary), 98899b658 (audit), a5c300d7d (solver fixes)
+- **Work:** Fixed 10 error paths in thin_checker.rs (ERROR->ANY to ERROR->ERROR)
+- **Expected Impact:** TS2322 decrease from 184, TS7006 decrease from 357
+- **Ready:** For merge into em-team-1
 
 ### Push Status
-- **Local:** em-team-1 at commit 0b0a2f906 (includes worker-2 merge)
+- **Local:** em-team-1 at commit 6fc9e1e59 (includes worker-4 second merge)
 - **Remote:** ✅ PUSHED to origin/em-team-1
-- **Merged Workers:** worker-2 ✅, worker-4 ✅
-- **Action:** Awaiting worker-1 and worker-3 completion
+- **Merged Workers:** worker-2 ✅, worker-4 ✅ (2 merges)
+- **Pending Merges:** worker-3 ✅ (ready), worker-1 ⚠️ (needs remediation)
 
 ## Notes
 - Director may resize or reassign teams at any time
