@@ -21546,70 +21546,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                                 );
                             }
                         }
-
-                        // Add mapped type context if the property comes from a mapped type
-                        if (targetProp && getCheckFlags(targetProp) & CheckFlags.Mapped) {
-                            const mappedSymbol = targetProp as MappedSymbol;
-                            const mappedType = mappedSymbol.links.mappedType;
-                            if (mappedType && propertyName) {
-                                // Add information about the mapped type transformation
-                                const constraintType = getConstraintTypeFromMappedType(mappedType);
-                                const templateType = getTemplateTypeFromMappedType(mappedType);
-                                const keyType = mappedSymbol.links.keyType;
-                                const mappedNameType = mappedSymbol.links.nameType;
-
-                                // Show the mapped type constraint and template
-                                if (constraintType && templateType && mappedType.declaration) {
-                                    addRelatedInfo(
-                                        reportedDiag,
-                                        createDiagnosticForNode(
-                                            mappedType.declaration,
-                                            Diagnostics.The_expected_type_comes_from_a_mapped_type_with_constraint_0_and_template_type_1,
-                                            typeToString(constraintType),
-                                            typeToString(templateType),
-                                        ),
-                                    );
-                                }
-
-                                // If key remapping was used, show that information
-                                if (mappedNameType && keyType && keyType !== mappedNameType && mappedType.declaration) {
-                                    const keyTypeName = typeToString(keyType);
-                                    const nameTypeName = typeToString(mappedNameType);
-                                    addRelatedInfo(
-                                        reportedDiag,
-                                        createDiagnosticForNode(
-                                            mappedType.declaration,
-                                            Diagnostics.Property_0_is_a_remapped_key_in_a_mapped_type_The_original_key_1_was_remapped_to_2,
-                                            propertyName && !(mappedNameType.flags & TypeFlags.UniqueESSymbol) ? unescapeLeadingUnderscores(propertyName) : typeToString(mappedNameType),
-                                            keyTypeName,
-                                            nameTypeName,
-                                        ),
-                                    );
-                                }
-
-                                // Show the specific property transformation
-                                const sourceProp = propertyName !== undefined ? getPropertyOfType(source, propertyName) : undefined;
-                                if (sourceProp && mappedType.declaration) {
-                                    const sourcePropType = getTypeOfSymbol(sourceProp);
-                                    const targetPropType = getTypeOfSymbol(targetProp);
-                                    if (sourcePropType && targetPropType) {
-                                        const nameForDisplay = propertyName && (!mappedNameType || !(mappedNameType.flags & TypeFlags.UniqueESSymbol))
-                                            ? unescapeLeadingUnderscores(propertyName)
-                                            : typeToString(mappedNameType || nameType);
-                                        addRelatedInfo(
-                                            reportedDiag,
-                                            createDiagnosticForNode(
-                                                mappedType.declaration,
-                                                Diagnostics.Property_0_in_mapped_type_has_transformed_type_1_but_the_source_type_is_2,
-                                                nameForDisplay,
-                                                typeToString(targetPropType),
-                                                typeToString(sourcePropType),
-                                            ),
-                                        );
-                                    }
-                                }
-                            }
-                        }
                     }
                 }
             }
@@ -36180,7 +36116,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 if (!checkTypeRelatedToAndOptionallyElaborate(checkArgType, paramType, relation, reportErrors ? effectiveCheckArgumentNode : undefined, effectiveCheckArgumentNode, headMessage, containingMessageChain, errorOutputContainer)) {
                     Debug.assert(!reportErrors || !!errorOutputContainer.errors, "parameter should have errors when reporting errors");
                     maybeAddMissingAwaitInfo(arg, checkArgType, paramType);
-                    maybeAddTemplateLiteralErrorInfo(effectiveCheckArgumentNode, checkArgType, paramType);
                     return errorOutputContainer.errors || emptyArray;
                 }
             }
@@ -36195,7 +36130,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             if (!checkTypeRelatedTo(spreadType, restType, relation, errorNode, headMessage, /*containingMessageChain*/ undefined, errorOutputContainer)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "rest parameter should have errors when reporting errors");
                 maybeAddMissingAwaitInfo(errorNode, spreadType, restType);
-                maybeAddTemplateLiteralErrorInfo(errorNode, spreadType, restType);
                 return errorOutputContainer.errors || emptyArray;
             }
         }
@@ -36203,89 +36137,15 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
         function maybeAddMissingAwaitInfo(errorNode: Node | undefined, source: Type, target: Type) {
             if (errorNode && reportErrors && errorOutputContainer.errors && errorOutputContainer.errors.length) {
-                const awaitedTypeOfTarget = getAwaitedTypeOfPromise(target);
-
-                // If both source and target are Promise-like, show the unwrapped types
-                const awaitedTypeOfSource = getAwaitedTypeOfPromise(source);
-                if (awaitedTypeOfSource && awaitedTypeOfTarget) {
-                    addRelatedInfo(
-                        errorOutputContainer.errors[0],
-                        createDiagnosticForNode(
-                            errorNode,
-                            Diagnostics.Promise_0_has_unwrapped_type_1_and_Promise_2_has_unwrapped_type_3,
-                            typeToString(source),
-                            typeToString(awaitedTypeOfSource),
-                            typeToString(target),
-                            typeToString(awaitedTypeOfTarget),
-                        ),
-                    );
-                    // Also show the unwrapped type relationship
-                    if (!isTypeRelatedTo(awaitedTypeOfSource, awaitedTypeOfTarget, relation)) {
-                        addRelatedInfo(
-                            errorOutputContainer.errors[0],
-                            createDiagnosticForNode(
-                                errorNode,
-                                Diagnostics.Unwrapped_types_Colon_0_is_not_assignable_to_1,
-                                typeToString(awaitedTypeOfSource),
-                                typeToString(awaitedTypeOfTarget),
-                            ),
-                        );
-                    }
-                }
-
-                // Bail if target is Promise-like but source is not---something else is wrong
-                // (unless we already added the unwrapped type info above)
-                if (awaitedTypeOfTarget && !awaitedTypeOfSource) {
+                // Bail if target is Promise-like---something else is wrong
+                if (getAwaitedTypeOfPromise(target)) {
                     return;
                 }
-
-                // If source is Promise-like and target is not, suggest using await
-                if (awaitedTypeOfSource && !awaitedTypeOfTarget && isTypeRelatedTo(awaitedTypeOfSource, target, relation)) {
+                const awaitedTypeOfSource = getAwaitedTypeOfPromise(source);
+                if (awaitedTypeOfSource && isTypeRelatedTo(awaitedTypeOfSource, target, relation)) {
                     addRelatedInfo(errorOutputContainer.errors[0], createDiagnosticForNode(errorNode, Diagnostics.Did_you_forget_to_use_await));
                 }
             }
-        }
-
-        function maybeAddTemplateLiteralErrorInfo(errorNode: Node | undefined, source: Type, target: Type) {
-            if (errorNode && reportErrors && errorOutputContainer.errors && errorOutputContainer.errors.length) {
-                // Check if this is a template literal type mismatch
-                // (source is string/template literal, target is template literal type)
-                const isSourceStringOrTemplate = source.flags & (TypeFlags.StringLiteral | TypeFlags.TemplateLiteral);
-                const isTargetTemplate = target.flags & TypeFlags.TemplateLiteral;
-
-                if (isSourceStringOrTemplate && isTargetTemplate) {
-                    const targetTemplate = target as TemplateLiteralType;
-                    const patternString = formatTemplateLiteralTypeAsPattern(targetTemplate);
-
-                    // Only add this info if the source is not assignable to the target template pattern
-                    if (!isTypeMatchedByTemplateLiteralType(source, targetTemplate)) {
-                        addRelatedInfo(
-                            errorOutputContainer.errors[0],
-                            createDiagnosticForNode(
-                                errorNode,
-                                Diagnostics.Type_0_does_not_match_template_literal_pattern_1,
-                                typeToString(source),
-                                patternString,
-                            ),
-                        );
-                    }
-                }
-            }
-        }
-
-        /**
-         * Formats a template literal type as a pattern string (e.g., "${string}-baz")
-         */
-        function formatTemplateLiteralTypeAsPattern(type: TemplateLiteralType): string {
-            let result = "";
-            for (let i = 0; i < type.types.length; i++) {
-                result += type.texts[i];
-                result += "$" + "{";
-                result += typeToString(type.types[i]);
-                result += "}";
-            }
-            result += type.texts[type.texts.length - 1];
-            return result;
         }
     }
 
