@@ -334,9 +334,9 @@ fn compile_inner(
         merged.extend(file_paths.into_iter());
 
         // Only add lib files that actually exist
-        for lib_path in lib_files_to_bind {
+        for lib_path in &lib_files_to_bind {
             if lib_path.exists() {
-                merged.insert(lib_path);
+                merged.insert(lib_path.clone());
             }
         }
         merged.extend(type_files);
@@ -370,7 +370,7 @@ fn compile_inner(
     }
 
     let (program, dirty_paths) = if let Some(cache) = cache.as_deref_mut() {
-        let result = build_program_with_cache(sources, cache);
+        let result = build_program_with_cache(sources, &lib_files_to_bind, cache);
         (result.program, Some(result.dirty_paths))
     } else {
         let compile_inputs: Vec<(String, String)> = sources
@@ -448,6 +448,7 @@ struct BuildProgramResult {
 
 fn build_program_with_cache(
     sources: Vec<SourceEntry>,
+    lib_files: &[PathBuf],
     cache: &mut CompilationCache,
 ) -> BuildProgramResult {
     let mut meta = Vec::with_capacity(sources.len());
@@ -489,7 +490,9 @@ fn build_program_with_cache(
     let parsed_results = if to_parse.is_empty() {
         Vec::new()
     } else {
-        parallel::parse_and_bind_parallel(to_parse)
+        // Pass lib files to binding so global symbols (console, Array, etc.) are available
+        let lib_file_refs: Vec<&Path> = lib_files.iter().map(|p| p.as_path()).collect();
+        parallel::parse_and_bind_parallel_with_lib_files(to_parse, &lib_file_refs)
     };
 
     let mut parsed_map: HashMap<String, BindResult> = parsed_results
