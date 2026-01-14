@@ -42,12 +42,12 @@
 **Estimated with Worker 3's fix:** ~158-168 remaining (vs 262 baseline)
 
 ## Current Task (Assigned by EM-1)
-- [x] **IMMEDIATE:** Run conformance tests to measure TS1109 baseline after definite assignment assertion fix
-- [x] Document exact TS1109 count before and after your fixes
-- [x] Report metrics to EM-1 for validation before proceeding
+- [ ] **Fix new.target context validation** (~52 cases) - HIGH IMPACT
+- Context: `new.target` should only be valid in function bodies and constructors
+- Add TS17013 error when used outside valid contexts
+- Implement context tracking for function/constructor bodies
 
 ## Queue (On Hold - Awaiting Baseline)
-- [ ] Fix new.target context validation (7 cases identified)
 - [ ] Fix template strings in type positions (2 cases)
 - [ ] Fix private names in `in` expressions (2 cases)
 - [ ] Fix destructuring edge cases (3 cases)
