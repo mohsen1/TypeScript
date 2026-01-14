@@ -1,30 +1,31 @@
 # Worker 6 Task List
 
-## Squad: Binder - Scope Resolution & Module Binding
+## Squad: Parser/Scanner - TS1005 Focus
 
 ## Current Task
-- [ ] Investigate file_locals population in `src/thin_binder.rs`
-- [ ] Debug why imported symbols and module-augmented interfaces fail to resolve
+- [ ] Audit TS1005 emission patterns in `wasm/src/thin_parser.rs`
+- [ ] Find all locations where "expected X" errors are emitted
+- [ ] Compare with tsc behavior on same test cases
 
 ## Queue
-- [ ] Fix module augmentation resolution (merging `interface Window` across files)
-- [ ] Ensure `lib.d.ts` symbols are correctly merged into the root `SymbolTable`
-- [ ] Test lib.dom.d.ts loading and symbol merging
-- [ ] Coordinate with Worker 5 on binding fixes
+- [ ] Fix TS1005 false positives (439 occurrences)
+- [ ] Implement better error recovery in object literal parsing
+- [ ] Test parser changes on conformance suite
+- [ ] Coordinate with Worker 5 to avoid duplicate work
 
 ## Completed
-- None
+- [x] Merge attempt - No commits to merge yet
 
 ## Context
-TS2304 has both missing (116) AND extra (343) errors. The extra errors indicate the binder is rejecting valid symbols, often due to:
-1. Lib symbols not being merged into global scope
-2. Module augmentation not working across files
-3. File-level scope not inheriting from library context
+TS1005 has 439 false positive occurrences. Multiple workers needed to tackle this from different angles.
 
 ### Key Files
-- `src/thin_binder.rs` - binding logic, file_locals
-- `src/lib_loader.rs` - lib.d.ts loading
-- `src/symbol.rs` - SymbolTable implementation
+- `wasm/src/thin_parser.rs` - main parser implementation
+- `wasm/src/scanner.rs` - lexical scanner
+
+### Reference
+- `src/compiler/parser.ts` - Worker 1's TS1005 fixes (TypeScript)
+- `TS1005_REDUCTION_RESULTS.md` - Pattern analysis
 
 ### Goal
-Reduce TS2304 extra errors from 343 to <50 by fixing scope resolution and module binding.
+Reduce TS1005 errors from 439 to <50 through parallel work with Worker 5.

@@ -1,27 +1,31 @@
 # Worker 5 Task List
 
-## Squad: Binder - Global Scope & lib.d.ts Integration
+## Squad: Parser/Scanner - TS1005 Focus
 
 ## Current Task
-- [ ] Debug why basic globals like `console`, `Promise`, `Array` fail to resolve in test cases
-- [ ] Verify `lib_loader.rs` correctly merges `lib.d.ts` symbols into root `SymbolTable`
+- [ ] Audit TS1005 "expected X" emission patterns in `wasm/src/thin_parser.rs`
+- [ ] Identify where "expected X" is over-triggering on valid syntax
+- [ ] Reference Worker 1's TypeScript patterns in `src/compiler/parser.ts` and adapt to Rust
 
 ## Queue
-- [ ] Audit `src/thin_binder.rs` to ensure `file_locals` are correctly populated from library context
-- [ ] Fix module augmentation resolution (merging `interface Window` across files)
-- [ ] Investigate TS2304 extra errors - reduce from 343 to <50
-- [ ] Coordinate with Worker 6 on binding fixes
+- [ ] Fix TS1005 false positives (439 occurrences)
+- [ ] Consolidate error emission to avoid duplicates
+- [ ] Test parser changes on conformance suite to measure reduction
+- [ ] Coordinate with Worker 6 to avoid duplicate work
 
 ## Completed
-- [x] Merge attempt - No commits to merge yet (Worker 5 at base commit ebd6cb201)
+- [x] Initial merge attempt - No commits yet
 
 ## Context
-TS2304 (Cannot find name) is the #1 source of "Any" poisoning. When the Binder fails to find `Promise`, `console`, or `Array`, the Solver defaults to `Any`, suppressing all downstream errors.
+TS1005 is the #1 source of parser false positives (439 occurrences). These pollute all measurements and inflate "Extra Errors" by 14%.
 
 ### Key Files
-- `src/lib_loader.rs` - lib.d.ts loading
-- `src/thin_binder.rs` - binding logic
-- `src/symbol.rs` - SymbolTable implementation
+- `wasm/src/thin_parser.rs` - main parser implementation
+- `wasm/src/scanner.rs` - lexical scanner
+
+### Reference
+- `src/compiler/parser.ts` - Worker 1's TS1005 fixes (TypeScript)
+- `TS1005_REDUCTION_RESULTS.md` - Pattern analysis
 
 ### Goal
-Reduce TS2304 extra errors from 343 to <50 by fixing global scope binding.
+Reduce TS1005 errors from 439 to <50 through iterative fixes.
