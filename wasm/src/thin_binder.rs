@@ -88,6 +88,10 @@ pub struct ThinBinderState {
 
     /// Flag indicating we're currently binding inside a `declare global` block
     in_global_augmentation: bool,
+
+    /// Lib binders for automatic lib symbol resolution.
+    /// When get_symbol() doesn't find a symbol locally, it checks these lib binders.
+    lib_binders: Vec<Arc<ThinBinderState>>,
 }
 
 /// Validation result describing issues found in the symbol table
@@ -131,6 +135,7 @@ impl ThinBinderState {
             debugger: ModuleResolutionDebugger::new(),
             global_augmentations: FxHashMap::default(),
             in_global_augmentation: false,
+            lib_binders: Vec::new(),
         }
     }
 
@@ -159,6 +164,7 @@ impl ThinBinderState {
         self.debugger.clear();
         self.global_augmentations.clear();
         self.in_global_augmentation = false;
+        self.lib_binders.clear();
     }
 
     /// Set the current file name for debugging purposes.
@@ -210,6 +216,7 @@ impl ThinBinderState {
             debugger: ModuleResolutionDebugger::new(),
             global_augmentations: FxHashMap::default(),
             in_global_augmentation: false,
+            lib_binders: Vec::new(),
         }
     }
 
@@ -249,6 +256,7 @@ impl ThinBinderState {
             debugger: ModuleResolutionDebugger::new(),
             global_augmentations: FxHashMap::default(),
             in_global_augmentation: false,
+            lib_binders: Vec::new(),
         }
     }
 
@@ -544,6 +552,8 @@ impl ThinBinderState {
                     self.symbol_arenas.insert(*sym_id, Arc::clone(&lib.arena));
                 }
             }
+            // Store lib binders for automatic symbol resolution in get_symbol()
+            self.lib_binders.push(Arc::clone(&lib.binder));
         }
     }
 
@@ -3221,7 +3231,17 @@ impl ThinBinderState {
     // Public accessors
 
     pub fn get_symbol(&self, id: SymbolId) -> Option<&Symbol> {
-        self.symbols.get(id)
+        // First try local symbols
+        if let Some(sym) = self.symbols.get(id) {
+            return Some(sym);
+        }
+        // Then try lib binders (if any have been merged)
+        for lib_binder in &self.lib_binders {
+            if let Some(sym) = lib_binder.symbols.get(id) {
+                return Some(sym);
+            }
+        }
+        None
     }
 
     /// Get a symbol, checking lib binders if not found locally.
