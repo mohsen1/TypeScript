@@ -37,6 +37,10 @@
 ### Merge Status
 - [x] All phases 1-5 integrated to em-team-2
 - [x] Documentation preserved: POSITION_DEDUPLICATION_STRATEGY.md, TS1005_ANALYSIS.md, EXPRESSION_LEVEL_ERROR_RECOVERY_ANALYSIS.md, REMAINING_PARSER_ERROR_TYPES_ANALYSIS.md
+- [x] **EM-2 Latest Merge (2026-01-14):** Phase 6 assignment merged
+  - Commit: 0fc85f52f - Binary expression recovery assignment
+  - Rebased em-team-2 onto rust (10 commits, clean)
+  - Status: IN PROGRESS - Working on Phase 6 implementation
 
 ---
 
