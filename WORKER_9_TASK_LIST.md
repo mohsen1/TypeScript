@@ -25,6 +25,7 @@
 - **Result**: Already in sync (no new commits)
 - **Action Taken**: Verified worker-9 branch is fully merged into em-team-3
 - **Next**: Continue work on TS1005 patterns 6-10
+- **Team Update**: Worker 12 re-added to EM-3 (now 4 workers: 9-12)
 
 ## Context
 TS1005 ("expected X") is the #1 source of parser false positives (439 occurrences). Workers 1-5 have already fixed patterns 1-5. Your focus is on remaining patterns.
