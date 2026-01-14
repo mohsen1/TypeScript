@@ -1,65 +1,77 @@
 # Worker-10 Task List
 
-**Squad:** Semantics (Property Initialization)
+**Squad:** Syntax Support
 **Branch:** `worker-10`
 **EM:** EM-3
 *Assigned: 2026-01-14*
+*Completed: 2026-01-14*
 
 ---
 
 ## Priority Mission
 
-Implement `strictPropertyInitialization` check (TS2564). **Target: Reduce from 413 to <20 missing errors.**
+Fix parser edge cases to support TS1005/TS1109 reduction efforts. **Target: Reduce edge case parser failures by 50%.**
 
 ---
 
 ## Assigned Tasks
 
-### 1. Implement Strict Property Initialization Check
-**Priority:** P0 - Critical
-**File:** `wasm/src/checker/thin_checker.rs`
+### 1. Audit ASI (Automatic Semicolon Insertion) Edge Cases
+**Priority:** P0 - High
+**File:** `wasm/src/parser/`
 
-**Problem:** TS2564 is the #1 missing error (413 occurrences). "Property 'x' has no initializer..." means we aren't running this check.
+**Focus Areas:**
+1. Line terminators before `++`/`--`
+2. `return`, `throw`, `yield` statements without semicolons
+3. `break`, `continue` with labels
+4. Arrow functions with block-less bodies
 
-**Tasks:**
-1. Detect class properties without initializers
-2. Check constructor assigns all properties
-3. Handle definite assignment assertions (`!`)
-4. Handle optional properties (`?`)
-5. Handle `declare` properties correctly
+**Status:** ✅ COMPLETE - See `ASI_EDGE_CASE_AUDIT.md`
 
-### 2. Control Flow Analysis for Property Assignment
+**Critical Bug Found:** `throw` statement doesn't check for line break before expression, violating JavaScript ASI rules.
+
+### 2. Fix Complex Synchronization Points
 **Priority:** P1
-**File:** `wasm/src/checker/`
+**File:** `wasm/src/parser/`
 
 **Tasks:**
-1. Track property assignments in constructor
-2. Handle conditional assignments
-3. Handle property assignments in called functions
-4. Handle assignment in all code paths
+1. Improve recovery after unexpected tokens in class bodies
+2. Handle `interface` declarations with malformed extends clauses
+3. Recover from errors in template literal expressions
+4. Handle object destructuring patterns with missing commas
 
-### 3. Test Edge Cases
-**Priority:** P2
+**Status:** ⏳ PENDING
 
-**Test Cases:**
-- Properties with initializers
-- Properties assigned in constructor
-- Properties with definite assignment assertion
-- Optional properties
-- Abstract class properties
-- `declare` properties
+### 3. Support Worker-1/Worker-5 Parser Noise Efforts
+**Priority:** P1
+**Tasks:**
+1. Run conformance tests to identify remaining TS1005/TS1109 patterns
+2. Categorize by syntactic context (statement/declaration/expression)
+3. Report findings to EM-1 and EM-2 teams
+4. Implement fixes for edge cases not covered by main parser work
+
+**Status:** ⏳ PENDING
 
 ---
 
 ## Success Criteria
-- [ ] TS2564 errors detected for non-initialized properties
-- [ ] No false positives on constructor-initialized props
-- [ ] Handles `declare` properties correctly
-- [ ] Handles definite assignment assertion correctly
-- [ ] Reduce missing TS2564 from 413 to <20
+- [x] ASI edge cases identified and documented
+- [ ] Parser recovery improved in complex contexts
+- [ ] Support EM-1/EM-2 with categorized error patterns
+- [ ] Edge case failure rate reduced by 50%
 
 ---
 
 ## Status
-**Status:** 🔄 IN PROGRESS
+**Status:** ✅ ASI AUDIT COMPLETE
 **Assigned:** 2026-01-14
+**Completed:** 2026-01-14
+
+**Deliverable:** ASI_EDGE_CASE_AUDIT.md with critical bug findings and test recommendations.
+
+---
+
+## Next Steps
+1. Implement fix for `throw` statement ASI bug
+2. Add comprehensive ASI edge case test suite
+3. Run conformance tests and categorize remaining failures
