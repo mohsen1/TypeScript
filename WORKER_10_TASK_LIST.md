@@ -150,6 +150,13 @@ let dog: Dog = animal;  // Should error TS2322
 - Expected impact: +200-400 extra errors (exposing real bugs)
 - All changes tagged with `// EM-3:` comments
 
+### Task 3: Implement Strict Subtype Checking for Type Assignability ✅
+- Changed `requireOptionalProperties` logic (line 24488-24495)
+- Now requires optional properties for `assignableRelation` when both source and target are non-literals
+- Prevents base types from being assignable to derived types with extra required properties
+- Example that now errors: `let dog: Dog = animal;` where Dog extends Animal with extra properties
+- Preserves existing behavior for object literals and fresh literals
+
 ---
 
 ## NOTES
