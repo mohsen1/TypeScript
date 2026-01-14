@@ -68,20 +68,22 @@ Before merging any worker branch:
 ## Current Worker Assignments
 
 ### Worker 1 (Parser - TS1005)
-**Status:** ✅ VALIDATED - Patterns 1-5 reduce TS1005 by 29% (439→312)
+**Status:** ✅ MERGED - Patterns 1-5 reduce TS1005 by 29% (439→312)
 **Results:** Exact Match +1.1%, No regressions, Build passes
-**Decision:** MERGE APPROVED - Ready to merge worker-1 into em-team-1
-**Next:** After merge, coordinate with Worker 3 on comma inference recovery
+**Next:** Coordinate with Worker 3 on comma inference recovery
 
 ### Worker 2 (Parser - TS1109)
-**Status:** Fixed definite assignment assertions, needs baseline
-**Next:** Run conformance to measure impact
-**Blocker:** Need baseline before prioritizing next patterns
+**Status:** ✅ VALIDATED - Definite assignment fix reduces TS1109 by 24% (262→198)
+**Results:** Exact Match +0.4%, No regressions, Build passes
+**Decision:** MERGE APPROVED - Ready to merge worker-2 into em-team-1
+**Next:** After merge, prioritize new.target context validation (~52 cases)
 
 ### Worker 3 (Parser - Cascading Errors)
-**Status:** Implemented `last_error_pos` tracking, needs validation
-**Next:** Run conformance to measure impact
-**Blocker:** Waiting for metrics validation
+**Status:** ✅ VALIDATED - Cascading error fix reduces parser FP by 21% (701→551)
+**Results:** Biggest single-worker impact! Exact Match +1.8%, No regressions, Build passes
+**Synergy:** Amplifies Worker 1 & 2 results - combined: 701→389 (-44%, 312 errors)
+**Decision:** MERGE APPROVED - Ready to merge worker-3 into em-team-1
+**Lesson:** Should have been FIRST - cascading errors masked individual fix impact
 
 ### Worker 4 (Binder - CRITICAL)
 **Status:** Fixed lib.d.ts symbol merging, working on ambient modules
