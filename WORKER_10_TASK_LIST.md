@@ -3,14 +3,13 @@
 ## Squad: Parser/Scanner - TS1109 Focus
 
 ## Current Task
-- [ ] Audit TS1109 ("expression expected") emission patterns in parser
-- [ ] Identify top locations causing false positives
+- [ ] Continue TS1109 reduction - await/yield edge cases
+- [ ] Identify additional patterns causing false positives
 
 ## Queue
 - [ ] Fix TS1109 in statement parsing - valid declarations triggering errors
-- [ ] Fix TS1109 in expression parsing - await/yield edge cases
 - [ ] Fix TS1109 in class member parsing - property declarations
-- [ ] Run conformance tests and measure TS1109 reduction
+- [ ] Run conformance tests and measure total TS1109 reduction
 - [ ] Coordinate with Worker 9 to avoid overlap
 
 ## Completed
@@ -18,12 +17,14 @@
 - [x] Reviewed TS1109_ANALYSIS.md for context
 - [x] Synced with em-team-3 (no new commits to merge)
 - [x] Reconfiguration check: Worker 10 remains on Parser squad (TS1109 focus)
+- [x] Fix TS1109 cascading errors from TS1005 (proximity-based suppression)
 
 ## Recent Merge Status
 - **Date**: 2026-01-14
-- **Result**: Already in sync (no new commits)
-- **Action Taken**: Verified worker-10 branch is fully merged into em-team-3
-- **Next**: Continue work on TS1109 expression expected errors
+- **Result**: Successfully merged worker-10-TS1109-fixes
+- **Commit**: Fix TS1109 cascading errors from TS1005
+- **Changes**: Added proximity-based suppression for TS1109 errors within 50 chars of previous error
+- **Tests**: 7913 passed, 150 failed (build successful)
 - **Team Update**: Worker 12 re-added to EM-3 (now 4 workers: 9-12)
 
 ## Context
