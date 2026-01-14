@@ -1018,9 +1018,14 @@ impl BinderState {
             }
 
             // Export declarations
-            Node::ExportDeclaration(_export) => {
-                // Export declarations don't create new symbols,
-                // they reference existing ones
+            Node::ExportDeclaration(export) => {
+                self.bind_export_declaration(arena, export, idx);
+            }
+
+            // Export assignment: export default x or export = x
+            Node::ExportAssignment(export_assign) => {
+                // Bind the expression (which may contain declarations like arrow functions)
+                self.bind_node(arena, export_assign.expression);
             }
 
             // Module/namespace declarations
@@ -1635,24 +1640,114 @@ impl BinderState {
         _import_idx: NodeIndex,
     ) {
         if let Some(Node::ImportClause(clause)) = arena.get(import.import_clause) {
-            // Default import
+            let clause_type_only = clause.is_type_only;
+
+            // Default import: import Foo from './module'
             if !clause.name.is_none() {
                 if let Some(name) = self.get_identifier_name(arena, clause.name) {
-                    self.declare_symbol(name.to_string(), symbol_flags::ALIAS, clause.name);
+                    let sym_id =
+                        self.declare_symbol(name.to_string(), symbol_flags::ALIAS, clause.name);
+                    // Mark as type-only if import clause is type-only
+                    if let Some(sym) = self.symbols.get_mut(sym_id) {
+                        sym.is_type_only = clause_type_only;
+                    }
                 }
             }
 
-            // Named imports
+            // Named imports: import { Foo, Bar as Baz } from './module'
             if let Some(Node::NamedImports(named)) = arena.get(clause.named_bindings) {
                 for &spec_idx in &named.elements.nodes {
                     if let Some(Node::ImportSpecifier(spec)) = arena.get(spec_idx) {
+                        // Individual specifier can be type-only: import { type Foo, bar } from 'mod'
+                        let spec_type_only = clause_type_only || spec.is_type_only;
                         if let Some(name) = self.get_identifier_name(arena, spec.name) {
-                            self.declare_symbol(name.to_string(), symbol_flags::ALIAS, spec_idx);
+                            let sym_id = self.declare_symbol(
+                                name.to_string(),
+                                symbol_flags::ALIAS,
+                                spec_idx,
+                            );
+                            if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                sym.is_type_only = spec_type_only;
+                            }
                         }
                     }
                 }
             }
+
+            // Namespace import: import * as ns from './module'
+            if let Some(Node::NamespaceImport(ns_import)) = arena.get(clause.named_bindings) {
+                if let Some(name) = self.get_identifier_name(arena, ns_import.name) {
+                    let sym_id = self.declare_symbol(
+                        name.to_string(),
+                        symbol_flags::ALIAS,
+                        clause.named_bindings,
+                    );
+                    if let Some(sym) = self.symbols.get_mut(sym_id) {
+                        sym.is_type_only = clause_type_only;
+                    }
+                }
+            }
         }
+    }
+
+    fn bind_export_declaration(
+        &mut self,
+        arena: &NodeArena,
+        export: &crate::parser::ExportDeclaration,
+        _export_idx: NodeIndex,
+    ) {
+        // Export clause can be:
+        // - NamedExports: export { foo, bar }
+        // - NamespaceExport: export * as ns from 'mod'
+        // - Empty for: export * from 'mod' (re-export all)
+
+        if !export.export_clause.is_none() {
+            // Handle named exports: export { foo, bar } or export { foo as bar }
+            if let Some(Node::NamedExports(named)) = arena.get(export.export_clause) {
+                for &spec_idx in &named.elements.nodes {
+                    if let Some(Node::ExportSpecifier(spec)) = arena.get(spec_idx) {
+                        // For export { foo }, property_name is NONE, name is "foo"
+                        // For export { foo as bar }, property_name is "foo", name is "bar"
+                        let exported_name = if !spec.name.is_none() {
+                            self.get_identifier_name(arena, spec.name)
+                        } else {
+                            self.get_identifier_name(arena, spec.property_name)
+                        };
+
+                        if let Some(name) = exported_name {
+                            // Create export symbol marking it as exported
+                            // Type-only export: export type { Foo } or export { type Foo }
+                            let is_type_only = export.is_type_only || spec.is_type_only;
+                            let sym_id = self.declare_symbol(
+                                name.to_string(),
+                                symbol_flags::EXPORT_VALUE,
+                                spec_idx,
+                            );
+                            if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                sym.is_exported = true;
+                                sym.is_type_only = is_type_only;
+                            }
+                        }
+                    }
+                }
+            }
+            // Handle namespace export: export * as ns from 'mod'
+            else if let Some(Node::NamespaceExport(ns_export)) = arena.get(export.export_clause) {
+                if let Some(name) = self.get_identifier_name(arena, ns_export.name) {
+                    let sym_id = self.declare_symbol(
+                        name.to_string(),
+                        symbol_flags::ALIAS,
+                        export.export_clause,
+                    );
+                    if let Some(sym) = self.symbols.get_mut(sym_id) {
+                        sym.is_exported = true;
+                        sym.is_type_only = export.is_type_only;
+                    }
+                }
+            }
+        }
+        // export * from 'mod' - re-exports don't create new symbols,
+        // they just reference symbols from the target module
     }
 
     fn bind_module_declaration(
