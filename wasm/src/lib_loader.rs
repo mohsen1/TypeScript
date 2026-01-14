@@ -201,4 +201,49 @@ async function foo() {
         assert!(binder.file_locals.has("Object"), "Object should be in file_locals");
         assert!(binder.file_locals.has("Promise"), "Promise should be in file_locals");
     }
+
+    #[test]
+    fn test_get_symbol_resolves_lib_symbols() {
+        use crate::thin_parser::ThinParserState;
+
+        // Load lib.d.ts
+        let lib_file = load_default_lib_dts();
+        if lib_file.is_none() {
+            // Skip test if lib.d.ts is not available
+            return;
+        }
+        let lib_file = lib_file.unwrap();
+
+        // Parse a source file
+        let source = "const x = 1;";
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        // Bind with lib symbols
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+        binder.merge_lib_symbols(&[lib_file]);
+
+        // Get a lib symbol ID and verify get_symbol() can resolve it
+        let console_sym_id = binder.file_locals.get("console")
+            .expect("console should be in file_locals");
+        let promise_sym_id = binder.file_locals.get("Promise")
+            .expect("Promise should be in file_locals");
+        let array_sym_id = binder.file_locals.get("Array")
+            .expect("Array should be in file_locals");
+
+        // This is the key test: get_symbol() should be able to resolve lib symbols
+        // After the fix, get_symbol() checks lib_binders automatically
+        let console_sym = binder.get_symbol(console_sym_id);
+        assert!(console_sym.is_some(), "get_symbol() should resolve lib symbol 'console'");
+        assert_eq!(console_sym.unwrap().escaped_name, "console");
+
+        let promise_sym = binder.get_symbol(promise_sym_id);
+        assert!(promise_sym.is_some(), "get_symbol() should resolve lib symbol 'Promise'");
+        assert_eq!(promise_sym.unwrap().escaped_name, "Promise");
+
+        let array_sym = binder.get_symbol(array_sym_id);
+        assert!(array_sym.is_some(), "get_symbol() should resolve lib symbol 'Array'");
+        assert_eq!(array_sym.unwrap().escaped_name, "Array");
+    }
 }
