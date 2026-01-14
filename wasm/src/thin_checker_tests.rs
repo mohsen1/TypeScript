@@ -8061,6 +8061,92 @@ type PropAlias = { handler: (g) => void; };
 }
 
 #[test]
+fn test_implicit_any_rest_parameter() {
+    use crate::thin_parser::ThinParserState;
+
+    // Test that rest parameters without type annotation trigger TS7006 with 'any[]'
+    let source = r#"
+// @noImplicitAny: true
+function foo(...args) {
+    return args;
+}
+
+function bar(a, ...rest) {
+    return rest;
+}
+
+const arrow = (...items) => items;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        false,
+    );
+    checker.check_source_file(root);
+
+    // Should have 4 errors:
+    // 1. args in foo (rest param, any[])
+    // 2. a in bar (regular param, any)
+    // 3. rest in bar (rest param, any[])
+    // 4. items in arrow (rest param, any[])
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    assert_eq!(
+        codes.iter().filter(|&&c| c == 7006).count(),
+        4,
+        "Expected four 7006 errors, got codes: {:?}",
+        codes
+    );
+
+    // Check that rest parameters get 'any[]' in the message
+    let messages: Vec<&str> = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == 7006)
+        .map(|d| d.message_text.as_str())
+        .collect();
+
+    // Find messages containing "any[]" (rest parameters)
+    let rest_param_errors: Vec<_> = messages
+        .iter()
+        .filter(|m| m.contains("any[]"))
+        .collect();
+    assert_eq!(
+        rest_param_errors.len(),
+        3,
+        "Expected three rest parameter errors with 'any[]', got: {:?}",
+        messages
+    );
+
+    // Find messages containing just "any" but not "any[]" (regular parameters)
+    let regular_param_errors: Vec<_> = messages
+        .iter()
+        .filter(|m| m.contains("'any'") && !m.contains("any[]"))
+        .collect();
+    assert_eq!(
+        regular_param_errors.len(),
+        1,
+        "Expected one regular parameter error with 'any', got: {:?}",
+        messages
+    );
+}
+
+#[test]
 fn test_checker_lowers_element_access_array() {
     use crate::thin_parser::ThinParserState;
 
