@@ -538,8 +538,16 @@ impl ThinBinderState {
 
         self.sync_current_scope_to_persistent();
 
-        // Store file locals
+        // Store file locals, preserving any existing lib symbols
+        // This ensures symbols from merge_lib_symbols() are not lost
+        let existing_file_locals = std::mem::take(&mut self.file_locals);
         self.file_locals = std::mem::take(&mut self.current_scope);
+        // Merge back any existing file locals (e.g., lib symbols) that were pre-populated
+        for (name, sym_id) in existing_file_locals.iter() {
+            if !self.file_locals.has(name) {
+                self.file_locals.set(name.clone(), *sym_id);
+            }
+        }
     }
 
     /// Merge lib file symbols into the current scope.
@@ -704,7 +712,17 @@ impl ThinBinderState {
         }
 
         self.sync_current_scope_to_persistent();
+
+        // Store file locals, preserving any existing lib symbols
+        // This ensures symbols from merge_lib_symbols() are not lost
+        let existing_file_locals = std::mem::take(&mut self.file_locals);
         self.file_locals = std::mem::take(&mut self.current_scope);
+        // Merge back any existing file locals (e.g., lib symbols) that were pre-populated
+        for (name, sym_id) in existing_file_locals.iter() {
+            if !self.file_locals.has(name) {
+                self.file_locals.set(name.clone(), *sym_id);
+            }
+        }
 
         true
     }
