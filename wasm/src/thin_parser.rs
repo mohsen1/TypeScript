@@ -87,6 +87,8 @@ pub struct ThinParserState {
     recursion_depth: u32,
     /// Position of last error (to prevent cascading errors at same position)
     last_error_pos: u32,
+    /// TS1109 error budget for current statement (prevents error storms)
+    ts1109_statement_budget: u32,
 }
 
 impl ThinParserState {
@@ -106,6 +108,7 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
+            ts1109_statement_budget: 3, // Allow 3 TS1109 errors per statement
         }
     }
 
@@ -119,6 +122,7 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
+        self.ts1109_statement_budget = 3; // Reset error budget
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -375,19 +379,29 @@ impl ThinParserState {
         // Only emit error if we haven't already emitted one at this position
         // This prevents cascading TS1109 errors when TS1005 or other errors already reported
         if self.token_pos() != self.last_error_pos {
+            // Check statement-level error budget to prevent error storms
+            if self.ts1109_statement_budget == 0 {
+                // Budget exhausted - suppress this TS1109 to prevent error storm
+                return;
+            }
+
             // Additional check: suppress TS1109 if we're very close to a recent error
             // This catches cascading errors where the parser recovers to the next token
             // after a TS1005 or similar error.
             // Only apply this if we've actually emitted an error (last_error_pos > 0)
-            // and the current position is within 50 characters of the last error.
+            // and the current position is within 100 characters of the last error.
+            // INCREASED from 50 to 100 for better cascading error suppression.
             let current_pos = self.token_pos();
             if self.last_error_pos > 0
                 && current_pos > self.last_error_pos
-                && current_pos < self.last_error_pos.saturating_add(50)
+                && current_pos < self.last_error_pos.saturating_add(100)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1109
                 return;
             }
+
+            // Decrement budget - we're about to emit an error
+            self.ts1109_statement_budget -= 1;
 
             use crate::checker::types::diagnostics::diagnostic_codes;
             self.parse_error_at_current_token(
@@ -499,10 +513,40 @@ impl ThinParserState {
     /// Check if we can parse a semicolon (ASI rules)
     /// Returns true if current token is semicolon or ASI applies
     fn can_parse_semicolon(&self) -> bool {
-        self.is_token(SyntaxKind::SemicolonToken)
-            || self.is_token(SyntaxKind::CloseBraceToken)
-            || self.is_token(SyntaxKind::EndOfFileToken)
-            || self.scanner.has_preceding_line_break()
+        // Explicit semicolon
+        if self.is_token(SyntaxKind::SemicolonToken) {
+            return true;
+        }
+
+        // ASI applies before closing brace
+        if self.is_token(SyntaxKind::CloseBraceToken) {
+            return true;
+        }
+
+        // ASI applies at EOF
+        if self.is_token(SyntaxKind::EndOfFileToken) {
+            return true;
+        }
+
+        // ASI applies after line break
+        if self.scanner.has_preceding_line_break() {
+            // Enhanced ASI: Check if next token starts a statement
+            // This handles cases like:
+            //   return
+            //   x + y;
+            // Where ASI should apply because 'x' starts an expression statement
+            if self.is_statement_start() {
+                return true;
+            }
+            // Also allow ASI before common statement delimiters
+            if self.is_token(SyntaxKind::CloseParenToken)
+                || self.is_token(SyntaxKind::CloseBracketToken)
+            {
+                return true;
+            }
+        }
+
+        false
     }
 
     // =========================================================================
@@ -958,6 +1002,9 @@ impl ThinParserState {
 
     /// Parse a statement
     pub fn parse_statement(&mut self) -> NodeIndex {
+        // Reset TS1109 error budget at statement boundaries to prevent error storms
+        self.ts1109_statement_budget = 3;
+
         match self.token() {
             SyntaxKind::OpenBraceToken => self.parse_block(),
             SyntaxKind::VarKeyword | SyntaxKind::LetKeyword => self.parse_variable_statement(),
