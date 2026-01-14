@@ -292,10 +292,11 @@ impl<'a> TypeLowering<'a> {
     /// This is the main entry point for type synthesis.
     pub fn lower_type(&self, node_idx: NodeIndex) -> TypeId {
         if node_idx == NodeIndex::NONE {
-            // Use UNKNOWN instead of ANY for missing type annotations to prevent
-            // Any poisoning - this exposes hidden bugs downstream instead of silently
-            // accepting all assignments
-            return TypeId::UNKNOWN;
+            // Return ERROR for missing type annotations to prevent "Any poisoning".
+            // This forces explicit type annotations and surfaces bugs early instead
+            // of silently accepting invalid assignments via any/unknown defaults.
+            // Per SOLVER.md Section 6.4: Error propagation prevents cascading noise.
+            return TypeId::ERROR;
         }
 
         let node = match self.arena.get(node_idx) {
@@ -693,9 +694,10 @@ impl<'a> TypeLowering<'a> {
 
     fn lower_return_type(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
         if node_idx == NodeIndex::NONE {
-            // Use UNKNOWN instead of ANY for missing return type annotations
-            // to expose hidden type errors instead of silently accepting all values
-            return (TypeId::UNKNOWN, None);
+            // Return ERROR for missing return type annotations to prevent "Any poisoning".
+            // This forces explicit return type annotations and surfaces bugs early.
+            // Per SOLVER.md Section 6.4: Error propagation prevents cascading noise.
+            return (TypeId::ERROR, None);
         }
 
         let node = match self.arena.get(node_idx) {
