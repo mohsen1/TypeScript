@@ -774,11 +774,14 @@ impl ThinParserState {
         while !self.is_token(SyntaxKind::EndOfFileToken) {
             // If we see a closing brace at the top level, report error 1128
             if self.is_token(SyntaxKind::CloseBraceToken) {
-                use crate::checker::types::diagnostics::diagnostic_codes;
-                self.parse_error_at_current_token(
-                    "Declaration or statement expected.",
-                    diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
-                );
+                // Only emit error if we haven't already emitted one at this position
+                if self.token_pos() != self.last_error_pos {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Declaration or statement expected.",
+                        diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                    );
+                }
                 self.next_token();
                 // Resync to next statement boundary
                 self.resync_after_error();
@@ -2871,10 +2874,13 @@ impl ThinParserState {
         );
 
         if is_statement_keyword {
-            self.parse_error_at_current_token(
-                "Declaration or statement expected.",
-                diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
-            );
+            // Only emit error if we haven't already emitted one at this position
+            if self.token_pos() != self.last_error_pos {
+                self.parse_error_at_current_token(
+                    "Declaration or statement expected.",
+                    diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                );
+            }
             // Parse the statement to consume it and balance braces
             // This maintains parsing sync so we can continue parsing the rest of the class
             let _ = self.parse_statement();
