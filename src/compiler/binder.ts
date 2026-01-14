@@ -3478,7 +3478,8 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                     return symbol;
                 }
                 else {
-                    const table = parent ? parent.exports! :
+                    // EM-3: Defensive lazy initialization for parent exports symbol table
+                    const table = parent ? (parent.exports || (parent.exports = createSymbolTable())) :
                         file.jsGlobalAugmentations || (file.jsGlobalAugmentations = createSymbolTable());
                     return declareSymbol(table, parent, id, flags, excludeFlags);
                 }
