@@ -296,7 +296,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                         resolved
                     } else {
-                        type_id
+                        TypeId::ERROR
                     };
                 self.visiting.borrow_mut().remove(&type_id);
                 self.cache.borrow_mut().insert(type_id, result);
@@ -314,7 +314,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                         resolved
                     } else {
-                        type_id
+                        TypeId::ERROR
                     };
                 self.visiting.borrow_mut().remove(&type_id);
                 self.cache.borrow_mut().insert(type_id, result);
@@ -503,7 +503,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 // Resolve the TypeQuery to get the actual type
                 self.resolver
                     .resolve_ref(sym_ref, self.interner)
-                    .unwrap_or(arg)
+                    .unwrap_or(TypeId::ERROR)
             }
             TypeKey::Application(app_id) => {
                 // Recursively evaluate the nested Application
@@ -1191,8 +1191,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         self.evaluate_index_access(resolved, index_type)
                     }
                 } else {
-                    self.interner
-                        .intern(TypeKey::IndexAccess(object_type, index_type))
+                    TypeId::ERROR
                 }
             }
             TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
@@ -1907,7 +1906,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                         self.evaluate_keyof(resolved)
                     }
                 } else {
-                    self.interner.intern(TypeKey::KeyOf(operand))
+                    TypeId::ERROR
                 }
             }
             TypeKey::TypeParameter(param) | TypeKey::Infer(param) => {
