@@ -1,4 +1,28 @@
 
+# PROJECT Zang
+
+## Mission: TypeScript → Rust/WASM Migration
+
+Project Zang is a complete rewrite of the TypeScript compiler and type checker in Rust, compiled to WebAssembly for performance. The goal is to **beat TypeScript-Go in performance** while maintaining 100% compatibility with the original TypeScript compiler.
+
+## Architecture Overview
+
+**Core Principle:** TypeScript source files (`src/`) remain **read-only** and identical to upstream Microsoft TypeScript. All custom implementation lives in the `wasm/` directory.
+
+### Key Components:
+- **WASM Parser** (`wasm/src/parser/`) - Rust implementation of TypeScript parser
+- **WASM Checker** (`wasm/src/checker/`) - Type checking and semantic analysis  
+- **WASM Solver** (`wasm/src/solver/`) - Type resolution and constraint solving
+- **WASM Binder** (`wasm/src/binder/`) - Symbol binding and scope management
+- **Integration Layer** (`wasm/src/integration/`) - TypeScript ↔ WASM bridge
+
+### Quality Metrics:
+- **Conformance Tests:** 4,941 TypeScript test cases
+- **Current Performance:** 60.8% exact/equivalent match with TypeScript
+- **Target Performance:** 95%+ compatibility before production
+
+## Current Priority Issues
+
 ### 1. 🔴 CRITICAL: Fix The "Parser Noise" (TS1005 & TS1109)
 **Owner:** Syntax Squad
 **Data:** 701 combined extra errors (TS1005: 439, TS1109: 262).
@@ -22,7 +46,7 @@
 **Data:** 2961 missing errors (60%).
 **Analysis:** We are missing 184 `TS2322` (Type Mismatch) and 357 `TS7006` (Implicit Any) errors. This proves our compiler is "optimistic"—when it encounters an unknown type or a resolution failure, it returns `TypeId::ANY`.
 **Action:**
-*   **Change Default to `UNKNOWN`:** Modify `src/solver/` to return `TypeId::UNKNOWN` or `TypeId::ERROR` instead of `TypeId::ANY` when a symbol cannot be resolved or a type operation fails.
+*   **Change Default to `UNKNOWN`:** Modify `wasm/src/solver/` to return `TypeId::UNKNOWN` or `TypeId::ERROR` instead of `TypeId::ANY` when a symbol cannot be resolved or a type operation fails.
 *   **Expect a Regression:** This will cause a massive spike in "Extra Errors." **This is good.** It exposes exactly where our logic is failing rather than hiding it behind `Any`.
 
 ### 4. 🟡 TACTICAL: Fix Class Property Initialization (TS2564)
@@ -30,7 +54,7 @@
 **Data:** TS2564 is the #1 missing error (413 occurrences).
 **Analysis:** "Property 'x' has no initializer..." is missing. This means we are simply *not running* the check that verifies class properties are initialized in the constructor.
 **Action:**
-*   Implement the `strictPropertyInitialization` check in `thin_checker.rs`. This is a high-ROI task that will knock out the top missing error category.
+*   Implement the `strictPropertyInitialization` check in `wasm/src/checker/thin_checker.rs`. This is a high-ROI task that will knock out the top missing error category.
 
 ### 5. 🟢 STABILITY: Recursion Guards
 **Data:** 2 Crashes (Stack Overflow).
