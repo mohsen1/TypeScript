@@ -3113,9 +3113,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
             bindSourceFileAsExternalModule();
             // Create symbol equivalent for the module.exports = {}
             const originalSymbol = file.symbol;
-            // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-            const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
-            declareSymbol(exports, file.symbol, file, SymbolFlags.Property, SymbolFlags.All);
+            declareSymbol(file.symbol.exports!, file.symbol, file, SymbolFlags.Property, SymbolFlags.All);
             file.symbol = originalSymbol;
         }
     }
@@ -3211,9 +3209,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         });
         if (symbol) {
             const flags = SymbolFlags.Property | SymbolFlags.ExportValue;
-            // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-            const exports = symbol.exports || (symbol.exports = createSymbolTable());
-            declareSymbol(exports, symbol, node, flags, SymbolFlags.None);
+            declareSymbol(symbol.exports!, symbol, node, flags, SymbolFlags.None);
         }
     }
 
@@ -3233,9 +3229,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
             const isAlias = isAliasableExpression(node.right) && (isExportsIdentifier(node.left.expression) || isModuleExportsAccessExpression(node.left.expression));
             const flags = isAlias ? SymbolFlags.Alias : SymbolFlags.Property | SymbolFlags.ExportValue;
             setParent(node.left, node);
-            // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-            const exports = symbol.exports || (symbol.exports = createSymbolTable());
-            declareSymbol(exports, symbol, node.left, flags, SymbolFlags.None);
+            declareSymbol(symbol.exports!, symbol, node.left, flags, SymbolFlags.None);
         }
     }
 
@@ -3261,16 +3255,12 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         const flags = exportAssignmentIsAlias(node)
             ? SymbolFlags.Alias // An export= with an EntityNameExpression or a ClassExpression exports all meanings of that identifier or class
             : SymbolFlags.Property | SymbolFlags.ExportValue | SymbolFlags.ValueModule;
-        // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-        const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
-        const symbol = declareSymbol(exports, file.symbol, node, flags | SymbolFlags.Assignment, SymbolFlags.None);
+        const symbol = declareSymbol(file.symbol.exports!, file.symbol, node, flags | SymbolFlags.Assignment, SymbolFlags.None);
         setValueDeclaration(symbol, node);
     }
 
     function bindExportAssignedObjectMemberAlias(node: ShorthandPropertyAssignment) {
-        // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-        const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
-        declareSymbol(exports, file.symbol, node, SymbolFlags.Alias | SymbolFlags.Assignment, SymbolFlags.None);
+        declareSymbol(file.symbol.exports!, file.symbol, node, SymbolFlags.Alias | SymbolFlags.Assignment, SymbolFlags.None);
     }
 
     function bindThisPropertyAssignment(node: BindablePropertyAssignmentExpression | PropertyAccessExpression | LiteralLikeElementAccessExpression) {
@@ -3317,10 +3307,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                 // this.foo assignment in a JavaScript class
                 // Bind this property to the containing class
                 const containingClass = thisContainer.parent;
-                // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-                const symbolTable = isStatic(thisContainer)
-                    ? (containingClass.symbol.exports || (containingClass.symbol.exports = createSymbolTable()))
-                    : (containingClass.symbol.members || (containingClass.symbol.members = createSymbolTable()));
+                const symbolTable = isStatic(thisContainer) ? containingClass.symbol.exports! : containingClass.symbol.members!;
                 if (hasDynamicName(node)) {
                     bindDynamicallyNamedThisPropertyAssignment(node, containingClass.symbol, symbolTable);
                 }
@@ -3334,9 +3321,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                     break;
                 }
                 else if (thisContainer.commonJsModuleIndicator) {
-                    // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-                    const exports = thisContainer.symbol.exports || (thisContainer.symbol.exports = createSymbolTable());
-                    declareSymbol(exports, thisContainer.symbol, node, SymbolFlags.Property | SymbolFlags.ExportValue, SymbolFlags.None);
+                    declareSymbol(thisContainer.symbol.exports!, thisContainer.symbol, node, SymbolFlags.Property | SymbolFlags.ExportValue, SymbolFlags.None);
                 }
                 else {
                     declareSymbolAndAddToSymbolTable(node, SymbolFlags.FunctionScopedVariable, SymbolFlags.FunctionScopedVariableExcludes);
@@ -3469,8 +3454,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                     return symbol;
                 }
                 else {
-                    // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-                    const table = parent ? (parent.exports || (parent.exports = createSymbolTable())) :
+                    const table = parent ? parent.exports! :
                         file.jsGlobalAugmentations || (file.jsGlobalAugmentations = createSymbolTable());
                     return declareSymbol(table, parent, id, flags, excludeFlags);
                 }
@@ -3643,16 +3627,14 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         // module might have an exported variable called 'prototype'.  We can't allow that as
         // that would clash with the built-in 'prototype' for the class.
         const prototypeSymbol = createSymbol(SymbolFlags.Property | SymbolFlags.Prototype, "prototype" as __String);
-        // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-        const exports = symbol.exports || (symbol.exports = createSymbolTable());
-        const symbolExport = exports.get(prototypeSymbol.escapedName);
+        const symbolExport = symbol.exports!.get(prototypeSymbol.escapedName);
         if (symbolExport) {
             if (node.name) {
                 setParent(node.name, node);
             }
             file.bindDiagnostics.push(createDiagnosticForNode(symbolExport.declarations![0], Diagnostics.Duplicate_identifier_0, symbolName(prototypeSymbol)));
         }
-        exports.set(prototypeSymbol.escapedName, prototypeSymbol);
+        symbol.exports!.set(prototypeSymbol.escapedName, prototypeSymbol);
         prototypeSymbol.parent = symbol;
     }
 
@@ -3719,9 +3701,7 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         // containing class.
         if (isParameterPropertyDeclaration(node, node.parent)) {
             const classDeclaration = node.parent.parent;
-            // EM-3: Ensure exports/members table exists before using it to prevent TS2304 errors
-            const members = classDeclaration.symbol.members || (classDeclaration.symbol.members = createSymbolTable());
-            declareSymbol(members, classDeclaration.symbol, node, SymbolFlags.Property | (node.questionToken ? SymbolFlags.Optional : SymbolFlags.None), SymbolFlags.PropertyExcludes);
+            declareSymbol(classDeclaration.symbol.members!, classDeclaration.symbol, node, SymbolFlags.Property | (node.questionToken ? SymbolFlags.Optional : SymbolFlags.None), SymbolFlags.PropertyExcludes);
         }
     }
 

@@ -22597,23 +22597,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
                 else {
                     errorInfo = undefined;
-                    // When a type parameter has no constraint or a circular constraint, provide more context
-                    // Include whether the type parameter has a declared constraint
-                    if (constraint) {
-                        reportError(
-                            Diagnostics._0_is_not_assignable_to_type_1_Type_2_has_a_constraint_that_could_be_instantiated_with_a_different_subtype,
-                            generalizedSourceType,
-                            targetType,
-                            typeToString(target)
-                        );
-                    }
-                    else {
-                        reportError(
-                            Diagnostics._0_could_be_instantiated_with_an_arbitrary_type_which_could_be_unrelated_to_1,
-                            targetType,
-                            generalizedSourceType,
-                        );
-                    }
+                    reportError(
+                        Diagnostics._0_could_be_instantiated_with_an_arbitrary_type_which_could_be_unrelated_to_1,
+                        targetType,
+                        generalizedSourceType,
+                    );
                 }
             }
 
@@ -26078,10 +26066,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         return;
                     }
                 }
-                const paramName = declarationNameToString(getNameOfDeclaration(declaration));
                 diagnostic = (declaration as ParameterDeclaration).dotDotDotToken ?
                     noImplicitAny ? Diagnostics.Rest_parameter_0_implicitly_has_an_any_type : Diagnostics.Rest_parameter_0_implicitly_has_an_any_type_but_a_better_type_may_be_inferred_from_usage :
-                    noImplicitAny ? Diagnostics.Parameter_0_implicitly_has_an_1_type_Add_a_type_annotation_to_make_0_explicit : Diagnostics.Parameter_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
+                    noImplicitAny ? Diagnostics.Parameter_0_implicitly_has_an_1_type : Diagnostics.Parameter_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
                 break;
             case SyntaxKind.BindingElement:
                 diagnostic = Diagnostics.Binding_element_0_implicitly_has_an_1_type;
@@ -35925,36 +35912,22 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             Debug.assert(typeParameters[i] !== undefined, "Should not call checkTypeArguments with too many type arguments");
             const constraint = getConstraintOfTypeParameter(typeParameters[i]);
             if (constraint) {
+                const errorInfo = reportErrors && headMessage ? (() => chainDiagnosticMessages(/*details*/ undefined, Diagnostics.Type_0_does_not_satisfy_the_constraint_1)) : undefined;
+                const typeArgumentHeadMessage = headMessage || Diagnostics.Type_0_does_not_satisfy_the_constraint_1;
                 if (!mapper) {
                     mapper = createTypeMapper(typeParameters, typeArgumentTypes);
                 }
                 const typeArgument = typeArgumentTypes[i];
-                const instantiatedConstraint = getTypeWithThisArgument(instantiateType(constraint, mapper), typeArgument);
-
-                // Check if type argument satisfies the constraint (without reporting errors yet)
-                if (!checkTypeAssignableTo(typeArgument, instantiatedConstraint, /*errorNode*/ undefined)) {
-                    if (reportErrors) {
-                        // Get type parameter name for enhanced error message
-                        const typeParameterName = symbolToString(typeParameters[i].symbol);
-
-                        // Report enhanced error message with type parameter context
-                        error(typeArgumentNodes[i], Diagnostics.Type_parameter_0_has_constraint_1_but_type_argument_2_does_not_satisfy_it, typeParameterName, typeToString(instantiatedConstraint), typeToString(typeArgument));
-                    }
-                    return undefined;
-                }
-
-                // If we have a headMessage, perform full error checking with detailed diagnostics
-                if (headMessage) {
-                    const errorInfo = () => chainDiagnosticMessages(/*details*/ undefined, Diagnostics.Type_0_does_not_satisfy_the_constraint_1);
-                    if (!checkTypeAssignableTo(
+                if (
+                    !checkTypeAssignableTo(
                         typeArgument,
-                        instantiatedConstraint,
-                        typeArgumentNodes[i],
-                        headMessage,
+                        getTypeWithThisArgument(instantiateType(constraint, mapper), typeArgument),
+                        reportErrors ? typeArgumentNodes[i] : undefined,
+                        typeArgumentHeadMessage,
                         errorInfo,
-                    )) {
-                        return undefined;
-                    }
+                    )
+                ) {
+                    return undefined;
                 }
             }
         }

@@ -4632,10 +4632,6 @@
         "category": "Error",
         "code": 5082
     },
-    "'{0}' is not assignable to type '{1}'. Type '{2}' has a constraint that could be instantiated with a different subtype.": {
-        "category": "Error",
-        "code": 9516
-    },
     "Cannot read file '{0}'.": {
         "category": "Error",
         "code": 5083
@@ -6727,14 +6723,6 @@
     "Parameter '{0}' implicitly has an '{1}' type.": {
         "category": "Error",
         "code": 7006
-    },
-    "Parameter '{0}' implicitly has an '{1}' type. Add a type annotation to make '{0}' explicit.": {
-        "category": "Error",
-        "code": 9517
-    },
-    "Type parameter '{0}' has constraint '{1}', but type argument '{2}' does not satisfy it.": {
-        "category": "Error",
-        "code": 9518
     },
     "Member '{0}' implicitly has an '{1}' type.": {
         "category": "Error",
