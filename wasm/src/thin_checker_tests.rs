@@ -24106,3 +24106,108 @@ const obj2 = {
         codes
     );
 }
+
+#[test]
+fn test_global_augmentation_tracks_interface_declarations() {
+    // Test that interface declarations inside `declare global` are tracked as augmentations
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+export {};
+
+declare global {
+    interface Window {
+        myCustomProperty: string;
+    }
+    interface CustomGlobal {
+        value: number;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    // Verify that the binder tracked the global augmentations
+    assert!(
+        binder.global_augmentations.contains_key("Window"),
+        "Expected 'Window' in global_augmentations, got: {:?}",
+        binder.global_augmentations.keys().collect::<Vec<_>>()
+    );
+    assert!(
+        binder.global_augmentations.contains_key("CustomGlobal"),
+        "Expected 'CustomGlobal' in global_augmentations, got: {:?}",
+        binder.global_augmentations.keys().collect::<Vec<_>>()
+    );
+
+    // Check the declarations count
+    assert_eq!(
+        binder.global_augmentations.get("Window").map(|v| v.len()),
+        Some(1),
+        "Expected 1 Window augmentation declaration"
+    );
+    assert_eq!(
+        binder.global_augmentations.get("CustomGlobal").map(|v| v.len()),
+        Some(1),
+        "Expected 1 CustomGlobal augmentation declaration"
+    );
+}
+
+#[test]
+fn test_global_augmentation_interface_no_ts2304() {
+    // Test that augmented interfaces inside `declare global` don't cause TS2304 errors
+    use crate::checker::types::diagnostics::diagnostic_codes;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+export {};
+
+declare global {
+    interface Window {
+        myCustomProperty: string;
+    }
+}
+
+// Access the augmented property via window (Window type)
+const win: Window = {} as Window;
+const prop = win.myCustomProperty;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        false,
+    );
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+
+    // Should not have TS2304 (Cannot find name) for Window or myCustomProperty
+    assert!(
+        !codes.contains(&diagnostic_codes::CANNOT_FIND_NAME),
+        "Unexpected TS2304 for global augmentation interface, got: {:?}",
+        codes
+    );
+}
