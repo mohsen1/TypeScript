@@ -7932,6 +7932,31 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             Some(TypeKey::Function(_)) => Some(constructor_type),
+            Some(TypeKey::Intersection(members_id)) => {
+                // For intersection of constructors (mixin pattern), the result is an
+                // intersection of all instance types. Handle this specially.
+                let members = self.ctx.types.type_list(members_id);
+                let mut instance_types: Vec<TypeId> = Vec::new();
+
+                for &member in members.iter() {
+                    if let Some(TypeKey::Callable(shape_id)) = self.ctx.types.lookup(member) {
+                        let shape = self.ctx.types.callable_shape(shape_id);
+                        // Get the return type from the first construct signature
+                        if let Some(sig) = shape.construct_signatures.first() {
+                            instance_types.push(sig.return_type);
+                        }
+                    }
+                }
+
+                if instance_types.is_empty() {
+                    return TypeId::ANY;
+                } else if instance_types.len() == 1 {
+                    return instance_types[0];
+                } else {
+                    // Return intersection of all instance types
+                    return self.ctx.types.intersection(instance_types);
+                }
+            }
             _ => None,
         };
 
