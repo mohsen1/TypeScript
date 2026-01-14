@@ -2035,3 +2035,65 @@ class Foo {
     let flow_at_class = binder.get_node_flow(class_idx);
     assert!(flow_at_class.is_some(), "Flow should be recorded at class declaration");
 }
+
+/// Test that TS2454 is emitted when a variable is used before being assigned.
+/// This verifies the definite assignment checking is working.
+#[test]
+fn test_ts2454_variable_used_before_assigned() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_checker::ThinCheckerState;
+    use crate::thin_parser::ThinParserState;
+    use crate::interner::Atom;
+
+    let source = r#"
+function test() {
+    let x: string;
+    return x;  // Error: x is used before being assigned
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = crate::solver::TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    // Should have TS2454 error
+    let has_ts2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(has_ts2454, "Should have TS2454 error for variable used before assignment");
+}
+
+/// Test that TS2454 is NOT emitted when a variable has an initializer.
+#[test]
+fn test_ts2454_no_error_with_initializer() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_checker::ThinCheckerState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    let x: string = "hello";
+    return x;  // OK: x is initialized
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let types = crate::solver::TypeInterner::new();
+    let mut checker = ThinCheckerState::new(arena, &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    // Should NOT have TS2454 error
+    let has_ts2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(!has_ts2454, "Should NOT have TS2454 error when variable has initializer");
+}
