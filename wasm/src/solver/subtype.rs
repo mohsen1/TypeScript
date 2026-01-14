@@ -153,6 +153,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     in_progress: HashSet<(TypeId, TypeId)>,
     /// Current recursion depth (for stack overflow prevention)
     depth: u32,
+    /// Whether the recursion depth limit was exceeded (for TS2589 diagnostic)
+    pub depth_exceeded: bool,
     /// Whether to use strict function types (contravariant parameters).
     /// Default: true (sound, correct behavior)
     pub strict_function_types: bool,
@@ -188,6 +190,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             resolver: &NOOP,
             in_progress: HashSet::new(),
             depth: 0,
+            depth_exceeded: false,
             strict_function_types: true, // Default to strict (sound) behavior
             allow_void_return: false,
             allow_bivariant_rest: false,
@@ -209,6 +212,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             resolver,
             in_progress: HashSet::new(),
             depth: 0,
+            depth_exceeded: false,
             strict_function_types: true,
             allow_void_return: false,
             allow_bivariant_rest: false,
@@ -307,9 +311,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // =========================================================================
 
         if self.depth > 100 {
-            // Recursion too deep - return false to be conservative and prevent stack overflow
-            // This ensures complex generics don't silently accept invalid code
+            // Recursion too deep - mark as exceeded and return false to prevent stack overflow
+            // The caller can check depth_exceeded to emit TS2589 diagnostic
             // Note: This differs from coinductive cycle detection which returns Provisional
+            self.depth_exceeded = true;
             return SubtypeResult::False;
         }
 
