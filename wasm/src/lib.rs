@@ -1994,3 +1994,7 @@ mod lib_tests;
 // ASI Conformance tests for verifying TS1005/TS1109 patterns
 #[cfg(test)]
 mod asi_conformance_tests;
+
+// P1 Error Recovery tests for synchronization point improvements
+#[cfg(test)]
+mod p1_error_recovery_tests;

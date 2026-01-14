@@ -2575,7 +2575,19 @@ impl ThinParserState {
                 | SyntaxKind::NoSubstitutionTemplateLiteral
                 | SyntaxKind::TemplateHead
         ) {
-            self.parse_primary_expression()
+            // P1 FIX: Literals are not valid in heritage clauses
+            // Emit error instead of silently accepting them
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Class name or type expression expected",
+                diagnostic_codes::EXPRESSION_EXPECTED,
+            );
+            // Parse the literal anyway for error recovery
+            let _lit = self.parse_primary_expression();
+            // Return unknown token to indicate this is invalid
+            let end_pos = self.token_end();
+            self.arena
+                .add_token(SyntaxKind::Unknown as u16, start_pos, end_pos)
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
