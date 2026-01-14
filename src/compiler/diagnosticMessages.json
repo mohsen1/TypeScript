@@ -6069,22 +6069,6 @@
         "category": "Message",
         "code": 6501
     },
-    "The error is in property '{0}'": {
-        "category": "Message",
-        "code": 9512
-    },
-    "Type '{0}' was inferred from expression at this location.": {
-        "category": "Message",
-        "code": 9513
-    },
-    "Type '{0}' was inferred from argument '{1}' at position {2}.": {
-        "category": "Message",
-        "code": 9514
-    },
-    "Type '{0}' was inferred from return statement.": {
-        "category": "Message",
-        "code": 9515
-    },
     "The expected type comes from the return type of this signature.": {
         "category": "Message",
         "code": 6502

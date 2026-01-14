@@ -21471,13 +21471,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return result;
     }
 
-    // Helper function to create a property-aware error message that shows the full type path
-    function createPropertyErrorMessage(propertyName: string | undefined, sourceType: Type, targetType: Type): DiagnosticMessage {
-        // For now, we use the base diagnostic message
-        // The property context is already added as related information elsewhere
-        return Diagnostics.Type_0_is_not_assignable_to_type_1;
-    }
-
     type ElaborationIterator = IterableIterator<{ errorNode: Node; innerExpression: Expression | undefined; nameType: Type; errorMessage?: DiagnosticMessage | undefined; }>;
     /**
      * For every element returned from the iterator, checks that element to issue an error on a property of that element's type
@@ -21519,12 +21512,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         const sourceIsOptional = !!(propName && (getPropertyOfType(source, propName) || unknownSymbol).flags & SymbolFlags.Optional);
                         targetPropType = removeMissingType(targetPropType, targetIsOptional);
                         sourcePropType = removeMissingType(sourcePropType, targetIsOptional && sourceIsOptional);
-                        // Create a property-aware error message to show full type path
-                        const propertyErrorMessage = errorMessage || createPropertyErrorMessage(propName as string | undefined, sourcePropType, targetPropType);
-                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
+                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
                         if (result && specificSource !== sourcePropType) {
                             // If for whatever reason the expression type doesn't yield an error, make sure we still issue an error on the sourcePropType
-                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
+                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
                         }
                     }
                     if (resultObj.errors) {
@@ -21611,12 +21602,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         const sourceIsOptional = !!(propName && (getPropertyOfType(source, propName) || unknownSymbol).flags & SymbolFlags.Optional);
                         targetPropType = removeMissingType(targetPropType, targetIsOptional);
                         sourcePropType = removeMissingType(sourcePropType, targetIsOptional && sourceIsOptional);
-                        // Create a property-aware error message to show full type path
-                        const propertyErrorMessage = errorMessage || createPropertyErrorMessage(propName as string | undefined, sourcePropType, targetPropType);
-                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
+                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
                         if (result && specificSource !== sourcePropType) {
                             // If for whatever reason the expression type doesn't yield an error, make sure we still issue an error on the sourcePropType
-                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
+                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
                         }
                     }
                 }
@@ -22576,30 +22565,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             }
         }
 
-        // Helper function to add type origin information as related information
-        function addTypeOriginInfo(type: Type, originNode: Node | undefined): void {
-            if (!originNode) return;
-
-            // Add related information showing where the type was inferred from
-            const typeName = typeToString(type);
-
-            // Determine the kind of origin based on the node type
-            let message: DiagnosticMessage;
-
-            switch (originNode.kind) {
-                case SyntaxKind.ReturnStatement:
-                    // Return statement
-                    message = Diagnostics.Type_0_was_inferred_from_return_statement;
-                    break;
-                default:
-                    // Generic expression
-                    message = Diagnostics.Type_0_was_inferred_from_expression_at_this_location;
-                    break;
-            }
-
-            associateRelatedInfo(createDiagnosticForNode(originNode, message, typeName));
-        }
-
         function reportRelationError(message: DiagnosticMessage | undefined, source: Type, target: Type) {
             if (incompatibleStack) reportIncompatibleStack();
             const [sourceType, targetType] = getTypeNamesForErrorDisplay(source, target);
@@ -22670,16 +22635,6 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             }
 
             reportError(message, generalizedSourceType, targetType);
-            // Add type origin information if we have an error node and this is a type inference error
-            if (errorNode && message === Diagnostics.Type_0_is_not_assignable_to_type_1) {
-                // Only add origin info for source types that appear to be inferred (not literal types or simple primitives)
-                if (source.flags & (TypeFlags.Intrinsic | TypeFlags.Literal)) {
-                    // Don't add origin info for literal/intrinsic types as they're self-explanatory
-                } else if (source.symbol && source.symbol.declarations) {
-                    // The type comes from a symbol declaration - add origin info
-                    addTypeOriginInfo(source, errorNode);
-                }
-            }
         }
 
         function tryElaborateErrorsForPrimitivesAndObjects(source: Type, target: Type) {
@@ -24522,14 +24477,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return Ternary.False;
                 }
             }
-            // EM-3: Require optional properties for assignableRelation in non-literal cases
-            // This prevents: let animal: Animal; let dog: Dog = animal; where Dog has extra required properties
-            const requireOptionalProperties = !isObjectLiteralType(source) && !isEmptyArrayLiteralType(source) && !isTupleType(source) && (
-                relation === subtypeRelation ||
-                relation === strictSubtypeRelation ||
-                // For assignable relation, require optional properties when target is not a fresh object literal
-                (relation === assignableRelation && (!isObjectLiteralType(target) || !(getObjectFlags(target) & ObjectFlags.FreshLiteral)))
-            );
+            const requireOptionalProperties = (relation === subtypeRelation || relation === strictSubtypeRelation) && !isObjectLiteralType(source) && !isEmptyArrayLiteralType(source) && !isTupleType(source);
             const unmatchedProperty = getUnmatchedProperty(source, target, requireOptionalProperties, /*matchDiscriminantProperties*/ false);
             if (unmatchedProperty) {
                 if (reportErrors && shouldReportUnmatchedPropertyError(source, target)) {
