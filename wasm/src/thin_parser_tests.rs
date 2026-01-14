@@ -416,6 +416,62 @@ fn test_thin_parser_type_assertion_in_new_expression_reports_ts1109() {
 }
 
 #[test]
+fn test_thin_parser_heritage_clause_reports_specific_error() {
+    // Test that invalid tokens in extends/implements clauses report specific error
+    let source = "class A extends ! {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    let ts1109_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::EXPRESSION_EXPECTED)
+        .collect();
+
+    assert!(
+        !ts1109_errors.is_empty(),
+        "Expected TS1109 error for invalid heritage clause: {:?}",
+        diagnostics
+    );
+
+    // Check that the error message is specific to heritage clauses
+    let error_msg = &ts1109_errors[0].message;
+    assert!(
+        error_msg.contains("Class name or type expression expected"),
+        "Expected 'Class name or type expression expected', got: {}",
+        error_msg
+    );
+}
+
+#[test]
+fn test_thin_parser_implements_clause_reports_specific_error() {
+    // Test that invalid tokens in implements clauses report specific error
+    let source = "class C implements + {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    let diagnostics = parser.get_diagnostics();
+    let ts1109_errors: Vec<_> = diagnostics
+        .iter()
+        .filter(|d| d.code == diagnostic_codes::EXPRESSION_EXPECTED)
+        .collect();
+
+    assert!(
+        !ts1109_errors.is_empty(),
+        "Expected TS1109 error for invalid implements clause: {:?}",
+        diagnostics
+    );
+
+    // Check that the error message is specific to heritage clauses
+    let error_msg = &ts1109_errors[0].message;
+    assert!(
+        error_msg.contains("Class name or type expression expected"),
+        "Expected 'Class name or type expression expected', got: {}",
+        error_msg
+    );
+}
+
+#[test]
 fn test_thin_parser_generic_default_missing_type_reports_ts1110() {
     let source = "type Box<T = > = T;";
     let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());

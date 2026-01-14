@@ -2506,7 +2506,18 @@ impl ThinParserState {
         } else if self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
-            self.parse_primary_expression()
+            // Invalid token in heritage clause - emit more specific error
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Class name or type expression expected",
+                diagnostic_codes::EXPRESSION_EXPECTED,
+            );
+            // Create unknown token and continue
+            let start_pos = self.token_pos();
+            let end_pos = self.token_end();
+            self.next_token();
+            self.arena
+                .add_token(SyntaxKind::Unknown as u16, start_pos, end_pos)
         };
 
         // Handle property access chain and call expressions: Foo.Bar.Baz or Mixin(Parent)
