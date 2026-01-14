@@ -4354,7 +4354,7 @@ impl<'a> ThinCheckerState<'a> {
             if methods.contains_key(&name) {
                 continue;
             }
-            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::UNKNOWN);
             let write_type = accessor.setter.or(accessor.getter).unwrap_or(read_type);
             let readonly = accessor.getter.is_some() && accessor.setter.is_none();
             properties.insert(
@@ -4976,7 +4976,7 @@ impl<'a> ThinCheckerState<'a> {
             if methods.contains_key(&name) {
                 continue;
             }
-            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::ANY);
+            let read_type = accessor.getter.or(accessor.setter).unwrap_or(TypeId::UNKNOWN);
             let write_type = accessor.setter.or(accessor.getter).unwrap_or(read_type);
             let readonly = accessor.getter.is_some() && accessor.setter.is_none();
             properties.insert(
