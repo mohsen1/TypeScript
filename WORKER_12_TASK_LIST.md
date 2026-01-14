@@ -3,50 +3,65 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Switch solver default fallback from `Any` to `Unknown` to expose hidden bugs
+- [ ] Reduce "Any" fallback in type parameter defaults only
 
 ## Context
 
-**The "Any" Poisoning Problem**
-Currently, when the compiler encounters something it doesn't understand (a missing symbol, a complex generic, or a syntax error), it defaults to `Any`. In TypeScript, `Any` shuts off type checking - if a variable becomes `Any` because the binder couldn't find its definition, **all** downstream errors related to that variable disappear.
+**Previous Attempt Status: REJECTED**
+The previous attempt to change ALL fallbacks from `Any` to `Unknown` was too aggressive and caused issues.
 
-This creates an illusion of progress. You implement new features (like Control Flow Analysis), but because the underlying variables resolved to `Any` (due to binding failures), the new checks simply say "Looks good!" and emit nothing.
+**New Approach: Incremental Strategy**
+Instead of changing everything at once, we'll make focused, testable changes one area at a time.
 
-**Why This Task Matters**
-Switching to `Unknown` or `Error` as the default fallback will:
-1. **Expose bugs** - Instead of silently accepting invalid code, the compiler will emit real errors
-2. **Reveal progress** - Fixes that were being masked by `Any` will become visible in conformance metrics
-3. **Force correctness** - We can't hide behind permissive defaults
+**Why Type Parameter Defaults?**
+Type parameter defaults are a critical source of "Any" poisoning:
+- When generic functions are called without explicit type arguments
+- The compiler fills in missing type parameters from `default` or `constraint`
+- If neither exists, it currently falls back to `Any`
+- This `Any` then propagates through the entire call chain
 
-**Expected Outcome**
-- Conformance metrics may temporarily worsen (more "extra errors")
-- This is GOOD - it means we're seeing real errors instead of masked failures
-- The errors will point to actual bugs that need fixing in Binder and Solver
+**Targeted Change**
+Only change the fallback in these specific locations in `thin_checker.rs`:
+1. Line ~1706: `param.default.or(param.constraint).unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+2. Line ~3575: Same pattern (interface merging)
+3. Line ~4520: Same pattern
+4. Line ~4603: Same pattern
+5. Line ~5118: Same pattern
+
+This is a surgical change (5 locations) that should:
+- Expose bugs in generic type handling
+- Not affect other parts of the codebase
+- Be easy to test and measure
 
 ## Queue
-- [ ] After switching fallback, analyze new errors to identify top bug patterns
-- [ ] Coordinate with Binder Squad (TS2304 issues revealed)
-- [ ] Coordinate with Parser Squad (syntax errors causing resolution failures)
+- [ ] After type parameter fix, measure conformance impact
+- [ ] If successful, tackle other fallback patterns incrementally
+- [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Implementation Steps
 
-1. **Locate the fallback logic**
-   - Search for `TypeId::ANY` in `wasm/src/solver/`
-   - Find where `solve_subtype` and other solver functions return `Any` on failure
+1. **Make targeted changes**
+   - Only modify type parameter default fallbacks in `thin_checker.rs`
+   - Search for `param.default.or(param.constraint).unwrap_or(TypeId::ANY)`
+   - Replace with `.unwrap_or(TypeId::UNKNOWN)`
 
-2. **Make the switch**
-   - Replace `TypeId::ANY` with `TypeId::UNKNOWN` or `TypeId::ERROR`
-   - Update any error handling that assumes `Any` as the safe default
+2. **Test incrementally**
+   - Run `./wasm/test.sh` after each change
+   - Run small conformance sample: `./wasm/differential-test/run-conformance.sh --max=50`
+   - Verify no crashes
 
-3. **Test and measure**
-   - Run `./wasm/test.sh` to verify compilation
-   - Run `./wasm/differential-test/run-conformance.sh --all`
-   - Compare before/after reports to identify exposed bugs
+3. **Measure impact**
+   - Compare error counts before/after
+   - Focus on TS2322 (type mismatch) and TS7006 (implicit any)
+   - Document which tests are affected
 
-4. **Document findings**
-   - What error codes increased the most?
-   - Which files/tests reveal the most binding failures?
-   - Create prioritized bug list for other squads
+## Files to Modify
+- `wasm/src/thin_checker.rs` - Only type parameter default fallbacks (5 locations)
+
+## Success Criteria
+- Code compiles without errors
+- No test crashes
+- Measurable increase in detected type errors (TS2322, TS7006)
 
 ## Ready for Merge
 No (task in progress)
