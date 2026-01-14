@@ -6894,7 +6894,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(op) = op_str {
             return match evaluator.evaluate(left_type, right_type, op) {
                 BinaryOpResult::Success(result) => result,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
         }
 
@@ -7018,7 +7018,7 @@ impl<'a> ThinCheckerState<'a> {
                     continue;
                 }
                 _ => {
-                    type_stack.push(TypeId::ANY);
+                    type_stack.push(TypeId::UNKNOWN);
                     continue;
                 }
             };
@@ -7026,12 +7026,12 @@ impl<'a> ThinCheckerState<'a> {
             let result = evaluator.evaluate(left_type, right_type, op_str);
             let result_type = match result {
                 BinaryOpResult::Success(result_type) => result_type,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
             type_stack.push(result_type);
         }
 
-        type_stack.pop().unwrap_or(TypeId::ANY)
+        type_stack.pop().unwrap_or(TypeId::UNKNOWN)
     }
 
     /// Get type of variable declaration.
