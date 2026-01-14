@@ -2264,6 +2264,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
+
+            // Check optional compatibility:
+            // - Required param can substitute for optional param (if types match)
+            // - Optional param CANNOT substitute for required param (unless type accepts undefined)
+            if s_param.optional && !t_param.optional {
+                // Source is optional, target is required
+                // Optional param can only substitute for required if the type accepts undefined
+                if !self.check_subtype(TypeId::UNDEFINED, t_param.type_id).is_true() {
+                    return SubtypeResult::False;
+                }
+            }
+
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
             // Methods use bivariance even in strict mode
             if !self.are_parameters_compatible_impl(s_param.type_id, t_param.type_id, is_method) {
