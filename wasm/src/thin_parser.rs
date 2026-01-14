@@ -470,6 +470,104 @@ impl ThinParserState {
             || self.scanner.has_preceding_line_break()
     }
 
+    // =========================================================================
+    // Error Resynchronization
+    // =========================================================================
+
+    /// Check if current token can start a statement (synchronization point)
+    fn is_statement_start(&self) -> bool {
+        match self.token() {
+            // Keywords that start statements
+            SyntaxKind::VarKeyword
+            | SyntaxKind::LetKeyword
+            | SyntaxKind::ConstKeyword
+            | SyntaxKind::FunctionKeyword
+            | SyntaxKind::ClassKeyword
+            | SyntaxKind::IfKeyword
+            | SyntaxKind::ForKeyword
+            | SyntaxKind::WhileKeyword
+            | SyntaxKind::DoKeyword
+            | SyntaxKind::SwitchKeyword
+            | SyntaxKind::TryKeyword
+            | SyntaxKind::WithKeyword
+            | SyntaxKind::DebuggerKeyword
+            | SyntaxKind::ReturnKeyword
+            | SyntaxKind::BreakKeyword
+            | SyntaxKind::ContinueKeyword
+            | SyntaxKind::ThrowKeyword
+            | SyntaxKind::AsyncKeyword
+            | SyntaxKind::InterfaceKeyword
+            | SyntaxKind::TypeKeyword
+            | SyntaxKind::EnumKeyword
+            | SyntaxKind::NamespaceKeyword
+            | SyntaxKind::ModuleKeyword
+            | SyntaxKind::ImportKeyword
+            | SyntaxKind::ExportKeyword
+            | SyntaxKind::DeclareKeyword => true,
+            // Identifiers, string literals, and decorators can start statements
+            SyntaxKind::Identifier
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::AtToken => true,
+            // Structural tokens that can start statements
+            SyntaxKind::OpenBraceToken
+            | SyntaxKind::SemicolonToken => true,
+            _ => false,
+        }
+    }
+
+    /// Resynchronize after a parse error by skipping to the next statement boundary
+    /// This prevents cascading errors by finding a known good synchronization point
+    fn resync_after_error(&mut self) {
+        // If we're already at a statement start or EOF, no need to resync
+        if self.is_statement_start() || self.is_token(SyntaxKind::EndOfFileToken) {
+            return;
+        }
+
+        // Skip tokens until we find a synchronization point
+        let mut depth = 0u32;
+        let max_iterations = 1000; // Prevent infinite loops
+
+        for _ in 0..max_iterations {
+            // Check for EOF
+            if self.is_token(SyntaxKind::EndOfFileToken) {
+                break;
+            }
+
+            // Track brace depth to handle nested blocks
+            match self.token() {
+                SyntaxKind::OpenBraceToken => {
+                    depth += 1;
+                    self.next_token();
+                    continue;
+                }
+                SyntaxKind::CloseBraceToken => {
+                    if depth > 0 {
+                        depth -= 1;
+                        self.next_token();
+                        continue;
+                    }
+                    // Found closing brace at same level - this is a sync point
+                    self.next_token();
+                    break;
+                }
+                SyntaxKind::SemicolonToken => {
+                    // Semicolon is always a sync point
+                    self.next_token();
+                    break;
+                }
+                _ => {}
+            }
+
+            // If we're at depth 0 and found a statement start, we've resync'd
+            if depth == 0 && self.is_statement_start() {
+                break;
+            }
+
+            // Otherwise, keep skipping tokens
+            self.next_token();
+        }
+    }
+
     /// Try to rescan `>` as a compound token (`>>`, `>>>`, `>=`, `>>=`, `>>>=`)
     /// Returns the rescanned token (which may be unchanged if no compound token found)
     fn try_rescan_greater_token(&mut self) -> SyntaxKind {
@@ -661,6 +759,7 @@ impl ThinParserState {
 
     /// Parse list of statements for a source file (top-level).
     /// Reports error 1128 for unexpected closing braces.
+    /// Uses resynchronization to recover from errors and continue parsing.
     fn parse_source_file_statements(&mut self) -> NodeList {
         let mut statements = Vec::new();
 
@@ -673,15 +772,29 @@ impl ThinParserState {
                     diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
                 );
                 self.next_token();
+                // Resync to next statement boundary
+                self.resync_after_error();
                 continue;
             }
 
             let stmt = self.parse_statement();
             if !stmt.is_none() {
                 statements.push(stmt);
+            } else {
+                // Statement parsing failed, resync to recover
+                // Emit error for unexpected token if we haven't already
+                if self.token_pos() != self.last_error_pos && !self.is_token(SyntaxKind::EndOfFileToken) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Declaration or statement expected.",
+                        diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                    );
+                }
+                // Resync to next statement boundary to continue parsing
+                self.resync_after_error();
             }
 
-            // Safety: break on unexpected tokens to avoid infinite loop
+            // Safety: break on Unknown tokens to avoid infinite loop
             if self.is_token(SyntaxKind::Unknown) {
                 break;
             }
@@ -692,6 +805,7 @@ impl ThinParserState {
 
     /// Parse list of statements (for blocks, function bodies, etc.).
     /// Stops at closing brace without error (closing brace is expected).
+    /// Uses resynchronization to recover from errors and continue parsing.
     fn parse_statements(&mut self) -> NodeList {
         let mut statements = Vec::new();
 
@@ -701,9 +815,21 @@ impl ThinParserState {
             let stmt = self.parse_statement();
             if !stmt.is_none() {
                 statements.push(stmt);
+            } else {
+                // Statement parsing failed, resync to recover
+                // Emit error for unexpected token if we haven't already
+                if self.token_pos() != self.last_error_pos && !self.is_token(SyntaxKind::EndOfFileToken) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Declaration or statement expected.",
+                        diagnostic_codes::DECLARATION_OR_STATEMENT_EXPECTED,
+                    );
+                }
+                // Resync to next statement boundary to continue parsing
+                self.resync_after_error();
             }
 
-            // Safety: break on unexpected tokens to avoid infinite loop
+            // Safety: break on Unknown tokens to avoid infinite loop
             if self.is_token(SyntaxKind::Unknown) {
                 break;
             }
