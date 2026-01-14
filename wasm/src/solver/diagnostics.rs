@@ -279,6 +279,13 @@ pub mod codes {
 
     /// Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: u32 = 7011;
+
+    // =========================================================================
+    // Type Instantiation Errors (2xxx series)
+    // =========================================================================
+
+    /// Type instantiation is excessively deep and possibly infinite.
+    pub const INSTANTIATION_TOO_DEEP: u32 = 2589;
 }
 
 // =============================================================================
@@ -328,6 +335,9 @@ pub fn get_message_template(code: u32) -> &'static str {
         }
         codes::IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION => {
             "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type."
+        }
+        codes::INSTANTIATION_TOO_DEEP => {
+            "Type instantiation is excessively deep and possibly infinite."
         }
         _ => "Unknown diagnostic",
     }
