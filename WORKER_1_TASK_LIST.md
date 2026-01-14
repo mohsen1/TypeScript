@@ -31,16 +31,21 @@ if (!tryParseSemicolon()) {
 ```
 
 ## Current Task (Assigned by EM-1)
-- [x] **PATTERN 6:** Fix statement termination edge cases (~38 cases) ✅ COMPLETE
+- [ ] **PATTERN 7:** Eliminate remaining 2 TS1005 errors - ZERO TARGET
+  - Analyze the 2 remaining TS1005 errors in test baselines
+  - Identify root cause of each error
+  - Apply targeted fixes to eliminate false positives
+  - Verify complete elimination of TS1005 errors
+  - Target: Reduce from 2 to 0 TS1005 errors (PERFECT SCORE)
 
-## Next Tasks (Awaiting Assignment)
-Based on outstanding TS1005 patterns:
+## Queue
 - Fix object literal comma handling edge cases (~85 cases)
 - Fix type parameter parsing edge cases (~52 cases)
 - Fix template literal expression parsing (~27 cases)
 - Fix miscellaneous edge cases (~110 cases)
 
-**Status:** TS1005 goal of <100 errors ACHIEVED! (Currently: 2 errors)
+**Status:** TS1005 goal of <100 errors ACHIEVED! Currently: 2 errors
+**Next Milestone:** Achieve ZERO TS1005 errors
 
 ## Completed
 - [x] Audit TS1005 ("expected X") emission patterns - identified specific parser locations emitting false positives
