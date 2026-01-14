@@ -73,9 +73,10 @@ Before merging any worker branch:
 **Next:** Coordinate with Worker 3 on comma inference recovery
 
 ### Worker 2 (Parser - TS1109)
-**Status:** ✅ MERGED - Definite assignment fix reduces TS1109 by 24% (262→198)
+**Status:** ✅ VALIDATED - Definite assignment fix reduces TS1109 by 24% (262→198)
 **Results:** Exact Match +0.4%, No regressions, Build passes
-**Next:** Prioritize new.target context validation (~52 cases)
+**Decision:** MERGE APPROVED - Ready to merge worker-2 into em-team-1
+**Next:** After merge, prioritize new.target context validation (~52 cases)
 
 ### Worker 3 (Parser - Cascading Errors)
 **Status:** ✅ MERGED - Cascading error fix reduces parser FP by 21% (701→551)
@@ -84,9 +85,10 @@ Before merging any worker branch:
 **Lesson:** Should have been FIRST - cascading errors masked individual fix impact
 
 ### Worker 4 (Binder - CRITICAL)
-**Status:** ✅ MERGED - Ambient module fix reduces TS2304 by 37% (459→276)
+**Status:** ✅ VALIDATED - Ambient module fix reduces TS2304 by 37% (459→276)
 **Results:** HIGHEST Exact Match impact! +3.8%, Stops "Any" poisoning
 **Synergy:** Unlocks full value of Parser fixes - all 4 workers: 30.1%→34.5% (+4.4%)
+**Decision:** MERGE APPROVED - Ready to merge worker-4 into em-team-1
 **Next:** Module namespace resolution (~48 cases)
 
 ---
