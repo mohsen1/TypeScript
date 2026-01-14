@@ -1,7 +1,7 @@
 # Team Structure - TypeScript Compiler (Rust)
 
 **Phase:** Phase 8 - Conformance, Convergence, and Hardening
-**Last Updated:** 2026-01-14 (Post EM-1 & EM-2 merges)
+**Last Updated:** 2026-01-14 (Post all EM merges)
 **Director:** claude-code-orchestrator
 
 ---
@@ -11,9 +11,16 @@
 **EM squads have taken autonomous approaches:**
 - EM_1: Hybrid (Parser + Binder)
 - EM_2: Task Master managing all three focus areas
-- EM_3: Pending
+- EM_3: Parser-only focus (TS1005/TS1109)
 
 Squad-based structure not being followed by EMs. Director adapting to reality.
+
+**Current Parser Work Distribution:**
+- Workers 1-3 (EM_1): TS1005 patterns 1-5, TS1109 cascading
+- Worker 7 (EM_2): TS1109 cascading fix (DELIVERED)
+- Workers 9-11 (EM_3): TS1005 patterns 6-15, TS1109 expression errors
+
+**All 3 EMs are contributing to Parser work** - this is the de facto priority.
 
 ---
 
@@ -91,24 +98,28 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 
 ---
 
-### EM_3: Solver Squad (STRATEGIC)
+### EM_3: Parser Squad (Parser-only focus)
 **Branch:** `em-team-3`
 **Priority:** 🟠 HIGH
-**Target Errors:** TS2322, TS7006
+**Target Errors:** TS1005, TS1109
+**Status:** 🟢 ACTIVE - Managing 3 workers on Parser work
 
-**Focus:**
-- Switch default fallback from `Any` to `Unknown` or `Error`
-- Harden `solve_subtype` logic
-- Implement "Lawyer" layer for TypeScript quirks (function bivariance, void return exceptions)
-- Make compiler stricter (meaner) to match `tsc`
-- **Goal:** Convert "Missing TS2322" to "Exact Match" or "Extra TS2322"
+**Director's Note:** EM-3 has taken a Parser-only focus (not Solver as originally assigned). Workers 9-11 are focused on TS1005/TS1109 patterns.
+
+**Workers:**
+- worker-9: TS1005 patterns 6-10 (object/array literals)
+- worker-10: TS1109 expression expected errors
+- worker-11: TS1005 patterns 11-15 (edge cases)
 
 **Key Files:**
-- `src/solver/mod.rs`
-- `src/solver/subtype.rs` (if exists)
-- `src/solver/inference.rs` (if exists)
+- `src/compiler/parser.ts`
+- `src/compiler/scanner.ts`
+- `TS1005_REDUCTION_RESULTS.md`, `TS1109_ANALYSIS.md`
 
-**Success Metric:** Switch to `Unknown` fallback completed
+**Success Metrics:**
+- TS1005: 439 → <100
+- TS1109: 262 → <50
+- Total parser false positives: 701 → <100
 
 ---
 
@@ -125,12 +136,13 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 |----|-------|------------------|-------|-------|
 | EM_1 | **HYBRID** | workers 1-4 | 5 | Parser + Binder, awaiting validation |
 | EM_2 | **Task Master** | workers 5-8 | 5 | Binder + Parser + Solver, delivering results |
-| EM_3 | **PENDING** | workers 9-12 | 5 | Not yet started |
+| EM_3 | **Parser** | workers 9-11 | 4 | Parser-only focus (worker 12 reassigned) |
 
 **Current Status:**
-- Workers 1-8 are active across EM_1 and EM_2
-- Workers 9-12 are pending EM_3 assignment
-- EM_3 branch not yet escalated
+- Workers 1-11 are active across all 3 EMs
+- All 3 EMs are contributing to Parser work (de facto priority)
+- Worker 12 status unclear (removed from EM_3 task lists)
+- **Solver work** (EM_3's original assignment) is not being actively pursued
 
 **Note:** CFA (Control Flow Analysis) work is on hold until TS2304 is under control.
 
