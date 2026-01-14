@@ -422,7 +422,7 @@ async function main() {
     case 'run': {
       // Run conformance tests and save metrics
       const maxTests = parseInt(args.find(a => a.startsWith('--max='))?.split('=')[1] || '200', 10);
-      const category = args.find(a => !a.startsWith('--'));
+      const category = args.find(a => !a.startsWith('--') && a !== 'run');
       const metrics = await runConformanceTests({ maxTests, category });
       addMetricsRun(metrics);
       log('\nMetrics saved successfully.', colors.green);

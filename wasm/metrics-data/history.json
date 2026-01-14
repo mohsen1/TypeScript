@@ -1,0 +1,42 @@
+{
+  "runs": [
+    {
+      "timestamp": "2026-01-14T23:05:27.187Z",
+      "date": "1/14/2026",
+      "totalTests": 45,
+      "exactMatch": 0,
+      "exactMatchPercent": 0,
+      "sameCount": 0,
+      "sameCountPercent": 0,
+      "missingErrors": 0,
+      "missingErrorsPercent": 0,
+      "extraErrors": 0,
+      "extraErrorsPercent": 0,
+      "crashed": 45,
+      "missingCodeCounts": {},
+      "extraCodeCounts": {},
+      "byCategory": {
+        "Symbols": {
+          "total": 8,
+          "exact": 0,
+          "same": 0
+        },
+        "additionalChecks": {
+          "total": 1,
+          "exact": 0,
+          "same": 0
+        },
+        "ambient": {
+          "total": 18,
+          "exact": 0,
+          "same": 0
+        },
+        "async": {
+          "total": 18,
+          "exact": 0,
+          "same": 0
+        }
+      }
+    }
+  ]
+}
