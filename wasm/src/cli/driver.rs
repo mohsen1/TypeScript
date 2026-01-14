@@ -316,10 +316,29 @@ fn compile_inner(
     )?;
     let mut file_paths = discover_ts_files(&discovery)?;
     let type_files = collect_type_root_files(&base_dir, &resolved);
-    if !resolved.lib_files.is_empty() || !type_files.is_empty() {
+
+    // Determine lib files to include (for binding globals like console, Object, etc.)
+    let lib_files_to_bind = if resolved.lib_files.is_empty() {
+        // Load default lib.d.ts files when none are specified
+        // These provide global symbols like console, Array, Promise, etc.
+        vec![
+            base_dir.join("tests/lib/lib.d.ts"),
+            base_dir.join("tests/lib/lib.dom.d.ts"),
+        ]
+    } else {
+        resolved.lib_files.iter().cloned().collect()
+    };
+
+    if !lib_files_to_bind.is_empty() || !type_files.is_empty() {
         let mut merged = std::collections::BTreeSet::new();
         merged.extend(file_paths.into_iter());
-        merged.extend(resolved.lib_files.iter().cloned());
+
+        // Only add lib files that actually exist
+        for lib_path in lib_files_to_bind {
+            if lib_path.exists() {
+                merged.insert(lib_path);
+            }
+        }
         merged.extend(type_files);
         file_paths = merged.into_iter().collect();
     }
