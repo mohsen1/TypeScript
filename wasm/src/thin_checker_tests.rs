@@ -18656,7 +18656,7 @@ class Foo {
         &binder,
         &types,
         "test.ts".to_string(),
-        false,
+        true, // strict mode enables strictPropertyInitialization
     );
     checker.check_source_file(root);
 
