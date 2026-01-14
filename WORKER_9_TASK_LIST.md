@@ -55,17 +55,16 @@ The TypeScript compiler is being rewritten in Rust (codename: "Zang"). Current s
   - Flow graph and definite assignment analysis already exist
   - Note: `check_flow_usage` function is dead code; actual check is inline
 
-#### Task 4: Property Initialization (Class Fields)
+#### ~~Task 4: Property Initialization (Class Fields)~~ ✅ COMPLETE (Already Implemented)
 - **Error**: TS2564 - "Property not initialized in constructor"
 - **Location**: `wasm/src/checker/thin_checker.rs`
 - **Acceptance**:
   - Class fields without init flagged
   - Definite assignment analysis (`!`) works
   - Optional properties excluded
-
----
-
-### HIGH PRIORITY: Solver Strictness (TS2322)
+- **Status**: ✅ Already implemented (by Worker 2)
+  - All 12 TS2564 tests pass
+  - Tests include: required properties, optional properties, definite assignment assertions, initializers, static properties, constructor assignments, class expressions, derived classes, abstract classes, undefined unions
 
 #### Task 5: Switch Fallback from `Any` to `Unknown`
 - **Problem**: Failed inferences fall back to `Any`, hiding bugs
@@ -119,14 +118,15 @@ ALL tasks must pass:
 
 ## Current Status
 
-**Status**: ACTIVE - Working on Task 4
+**Status**: ACTIVE - Working on Task 5
 
 **Last Completed**:
+- Task 4: Property Initialization (verified already implemented by Worker 2)
 - Task 3: Variable Initialization Checking (verified already implemented)
 - Task 2: Fix Scope Chain Resolution (investigated, no bug found)
 - Task 1: Fix Global Scope and Lib Injection (fixed)
 
-**Next Task**: Task 4 (Property Initialization - TS2564)
+**Next Task**: Task 5 (Switch Fallback from `Any` to `Unknown` - TS2322)
 
 ---
 
