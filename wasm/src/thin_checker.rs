@@ -14802,6 +14802,29 @@ impl<'a> ThinCheckerState<'a> {
             let final_type = compute_final_type(self);
             self.pop_symbol_dependency();
 
+            // TS7005: Variable implicitly has an 'any' type
+            // Report this error when noImplicitAny is enabled and the variable has no type annotation
+            // and the inferred type is 'any'
+            if self.ctx.no_implicit_any
+                && var_decl.type_annotation.is_none()
+                && final_type == TypeId::ANY
+            {
+                if let Some(ref name) = var_name {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages, format_message,
+                    };
+                    let message = format_message(
+                        diagnostic_messages::VARIABLE_IMPLICIT_ANY,
+                        &[name, "any"],
+                    );
+                    self.error_at_node(
+                        var_decl.name,
+                        &message,
+                        diagnostic_codes::IMPLICIT_ANY,
+                    );
+                }
+            }
+
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
             // let/const duplicates are caught earlier by the binder (TS2451).
