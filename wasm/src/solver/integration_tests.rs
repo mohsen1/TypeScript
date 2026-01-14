@@ -1402,3 +1402,386 @@ mod unknown_fallback_tests {
         assert!(!checker.is_assignable(type_a, TypeId::UNKNOWN));
     }
 }
+
+/// Test suite for SOLVER.md Section 8.2: TypeScript Quirks (The Lawyer Layer)
+///
+/// This module tests the intentional unsoundness in TypeScript that we must support
+/// for compatibility. These are not bugs - they are documented design decisions.
+#[cfg(test)]
+mod typescript_quirks_tests {
+    use super::*;
+
+    /// Test suite for SOLVER.md Section 8.2.C: The Void Exception
+    ///
+    /// TypeScript allows `() => void` to match `() => T` for any T because
+    /// the caller promises to ignore the return value. This is an intentional
+    /// unsoundness for practical callback compatibility.
+    ///
+    /// See: https://github.com/microsoft/TypeScript/issues/25274
+    #[test]
+    fn test_void_return_exception_string() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // () => void
+        let func_returns_void = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => string
+        let func_returns_string = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // The void return exception: () => string is assignable to () => void
+        // This allows callbacks that return values to be used where the return is ignored
+        assert!(
+            checker.is_assignable(func_returns_string, func_returns_void),
+            "void return exception: () => string should be assignable to () => void"
+        );
+    }
+
+    #[test]
+    fn test_void_return_exception_number() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // () => void
+        let func_returns_void = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => number
+        let func_returns_number = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::NUMBER,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => number should be assignable to () => void
+        assert!(
+            checker.is_assignable(func_returns_number, func_returns_void),
+            "void return exception: () => number should be assignable to () => void"
+        );
+    }
+
+    #[test]
+    fn test_void_return_exception_is_one_way() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // () => void
+        let func_returns_void = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => string
+        let func_returns_string = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // The void exception is one-way: () => void is NOT assignable to () => string
+        // You can't use a function that returns void where a string return is expected
+        assert!(
+            !checker.is_assignable(func_returns_void, func_returns_string),
+            "void return exception is one-way: () => void should NOT be assignable to () => string"
+        );
+    }
+
+    #[test]
+    fn test_void_return_exception_with_parameters() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // (x: number) => void
+        let callback_void = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // (x: number) => string
+        let callback_string = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: TypeId::NUMBER,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::STRING,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // Void return exception works with matching parameters
+        assert!(
+            checker.is_assignable(callback_string, callback_void),
+            "void return exception should work with matching parameters"
+        );
+    }
+
+    #[test]
+    fn test_void_return_exception_with_object_return() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // () => void
+        let func_returns_void = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => { name: string }
+        let obj_type = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        let func_returns_object = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![],
+            this_type: None,
+            return_type: obj_type,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // () => { name: string } should be assignable to () => void
+        assert!(
+            checker.is_assignable(func_returns_object, func_returns_void),
+            "void return exception should work with object return types"
+        );
+    }
+
+    /// Test suite for SOLVER.md Section 8.2.A: Function Variance
+    ///
+    /// TypeScript supports two modes for function parameter checking:
+    /// - Contravariant (strict): Target param must be subtype of source param
+    /// - Bivariant (legacy): Either direction is allowed
+    #[test]
+    fn test_function_strict_contravariance_animal_cat_example() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Enable strict function types (contravariant parameters)
+        checker.set_strict_function_types(true);
+
+        // Create Animal and Cat types (Cat <: Animal)
+        let animal_type = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        let cat_type = interner.object(vec![
+            PropertyInfo {
+                name: interner.intern_string("name"),
+                type_id: TypeId::STRING,
+                write_type: TypeId::STRING,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            },
+            PropertyInfo {
+                name: interner.intern_string("meow"),
+                type_id: TypeId::BOOLEAN,
+                write_type: TypeId::BOOLEAN,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            },
+        ]);
+
+        // Verify Cat <: Animal (has all Animal's properties plus more)
+        assert!(checker.is_assignable(cat_type, animal_type));
+
+        // (x: Animal) => void
+        let handler_animal = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: animal_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // (x: Cat) => void
+        let handler_cat = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: cat_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // In strict mode (contravariant):
+        // handler_animal IS assignable to handler_cat
+        // Because if you expect a Cat handler, an Animal handler is safer
+        // (it can handle any Cat since Cat is an Animal)
+        assert!(
+            checker.is_assignable(handler_animal, handler_cat),
+            "Contravariant: (Animal) => void should be assignable to (Cat) => void"
+        );
+
+        // handler_cat is NOT assignable to handler_animal
+        // Because if you expect an Animal handler, a Cat handler is unsafe
+        // (it might try to call cat-specific methods on a Dog)
+        assert!(
+            !checker.is_assignable(handler_cat, handler_animal),
+            "Contravariant: (Cat) => void should NOT be assignable to (Animal) => void"
+        );
+    }
+
+    #[test]
+    fn test_function_bivariant_legacy_mode() {
+        let interner = TypeInterner::new();
+        let mut checker = CompatChecker::new(&interner);
+
+        // Disable strict function types (bivariant parameters - legacy mode)
+        checker.set_strict_function_types(false);
+
+        // Create Animal and Cat types (Cat <: Animal)
+        let animal_type = interner.object(vec![PropertyInfo {
+            name: interner.intern_string("name"),
+            type_id: TypeId::STRING,
+            write_type: TypeId::STRING,
+            optional: false,
+            readonly: false,
+            is_method: false,
+        }]);
+
+        let cat_type = interner.object(vec![
+            PropertyInfo {
+                name: interner.intern_string("name"),
+                type_id: TypeId::STRING,
+                write_type: TypeId::STRING,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            },
+            PropertyInfo {
+                name: interner.intern_string("meow"),
+                type_id: TypeId::BOOLEAN,
+                write_type: TypeId::BOOLEAN,
+                optional: false,
+                readonly: false,
+                is_method: false,
+            },
+        ]);
+
+        // (x: Animal) => void
+        let handler_animal = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: animal_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // (x: Cat) => void
+        let handler_cat = interner.function(FunctionShape {
+            type_params: vec![],
+            params: vec![ParamInfo {
+                name: Some(interner.intern_string("x")),
+                type_id: cat_type,
+                optional: false,
+                rest: false,
+            }],
+            this_type: None,
+            return_type: TypeId::VOID,
+            type_predicate: None,
+            is_constructor: false,
+            is_method: false,
+        });
+
+        // In bivariant mode (legacy):
+        // Both directions should be allowed
+        assert!(
+            checker.is_assignable(handler_animal, handler_cat),
+            "Bivariant: (Animal) => void should be assignable to (Cat) => void"
+        );
+        assert!(
+            checker.is_assignable(handler_cat, handler_animal),
+            "Bivariant: (Cat) => void should be assignable to (Animal) => void"
+        );
+    }
+}
