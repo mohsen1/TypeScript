@@ -5390,6 +5390,13 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         }
 
+        // Skip if the variable is captured in a closure (used in a different function).
+        // TypeScript doesn't check definite assignment for variables captured in non-IIFE closures
+        // because the closure might be called later when the variable is assigned.
+        if self.is_variable_captured_in_closure(sym_id, idx) {
+            return false;
+        }
+
         // Skip definite assignment check for variables whose types allow uninitialized use:
         // - Literal types: `let key: "a"` - the type restricts to a single literal
         // - Union of literals: `let key: "a" | "b"` - all possible values are literals
@@ -5428,6 +5435,49 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         false
+    }
+
+    /// Check if a variable is captured in a closure (used in a different function than its declaration).
+    /// TypeScript does not check definite assignment for variables captured in non-IIFE closures.
+    fn is_variable_captured_in_closure(&self, sym_id: SymbolId, usage_idx: NodeIndex) -> bool {
+        let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+            return false;
+        };
+
+        // Get the enclosing function for the usage
+        let usage_function = self.find_enclosing_function(usage_idx);
+
+        // Get the enclosing function for the variable's declaration
+        for &decl_idx in &symbol.declarations {
+            let decl_function = self.find_enclosing_function(decl_idx);
+
+            // If the usage is in a different function than the declaration,
+            // the variable is captured in a closure
+            if usage_function != decl_function {
+                return true;
+            }
+        }
+
+        false
+    }
+
+    /// Find the enclosing function-like node for a given node.
+    /// Returns Some(NodeIndex) if inside a function, None if at module/global scope.
+    fn find_enclosing_function(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                if node.is_function_like() {
+                    return Some(current);
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
     }
 
     /// Check if a variable symbol can be used without initialization.
