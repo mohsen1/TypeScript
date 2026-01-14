@@ -9670,7 +9670,9 @@ impl<'a> ThinCheckerState<'a> {
                     } else {
                         None
                     };
-                    let has_contextual_type = contextual_type.is_some();
+                    // TS7006: Only count as contextual type if it's not UNKNOWN
+                    // UNKNOWN is a "no type" value and shouldn't prevent implicit any errors
+                    let has_contextual_type = contextual_type.is_some_and(|t| t != TypeId::UNKNOWN);
 
                     // Use type annotation if present, otherwise infer from context
                     let type_id = if !param.type_annotation.is_none() {
