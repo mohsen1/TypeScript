@@ -337,6 +337,11 @@ impl<'a> FlowGraphBuilder<'a> {
                 self.record_node_flow(stmt_idx);
             }
 
+            // Class declaration - track heritage clause expressions, static blocks, and computed properties
+            syntax_kind_ext::CLASS_DECLARATION | syntax_kind_ext::CLASS_EXPRESSION => {
+                self.build_class_declaration(stmt_idx);
+            }
+
             // Return/throw/break/continue
             syntax_kind_ext::RETURN_STATEMENT | syntax_kind_ext::THROW_STATEMENT => {
                 self.record_node_flow(stmt_idx);
@@ -1235,6 +1240,152 @@ impl<'a> FlowGraphBuilder<'a> {
     pub fn into_graph(self) -> FlowGraph {
         self.graph
     }
+
+    // =============================================================================
+    // Class Declaration Flow (CFA for classes)
+    // =============================================================================
+
+    /// Build flow graph for a class declaration.
+    ///
+    /// Class declarations have control flow for:
+    /// - Heritage clause expressions (extends expression executes first)
+    /// - Static blocks (execute during class definition)
+    /// - Static field initializers (execute during class definition)
+    /// - Computed property names (execute during evaluation)
+    fn build_class_declaration(&mut self, idx: NodeIndex) {
+        let Some(node) = self.arena.get(idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(node) else {
+            return;
+        };
+
+        // 1. Heritage clauses (extends expression executes first)
+        if let Some(heritage_clauses) = &class.heritage_clauses {
+            for &clause_idx in &heritage_clauses.nodes {
+                if clause_idx.is_none() {
+                    continue;
+                }
+                if let Some(clause_node) = self.arena.get(clause_idx) {
+                    if let Some(heritage) = self.arena.get_heritage_clause(clause_node) {
+                        // For 'extends', the expression is evaluated
+                        if heritage.token == SyntaxKind::ExtendsKeyword as u16 {
+                            for &type_idx in &heritage.types.nodes {
+                                if type_idx.is_none() {
+                                    continue;
+                                }
+                                if let Some(expr_with_type) = self.arena.get(type_idx) {
+                                    if let Some(data) = self.arena.get_expr_type_args(expr_with_type) {
+                                        // The extends expression is evaluated at class definition time
+                                        self.handle_expression_for_suspension_points(data.expression);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        // Clone members to avoid borrow issues
+        let members = class.members.nodes.clone();
+
+        // 2. Class members (static fields and blocks execute during class definition)
+        // Note: Instance fields execute during construction, but for top-level flow
+        // we only care about static side effects. Instance fields are handled
+        // when checking the constructor.
+        for &member_idx in &members {
+            if member_idx.is_none() {
+                continue;
+            }
+            let Some(member_node) = self.arena.get(member_idx) else {
+                continue;
+            };
+
+            match member_node.kind {
+                k if k == syntax_kind_ext::PROPERTY_DECLARATION => {
+                    if let Some(prop) = self.arena.get_property_decl(member_node) {
+                        let prop_name = prop.name;
+                        let prop_initializer = prop.initializer;
+                        let prop_modifiers = prop.modifiers.clone();
+
+                        // Computed property name executes
+                        if let Some(name_node) = self.arena.get(prop_name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                if let Some(computed) = self.arena.get_computed_property(name_node) {
+                                    self.handle_expression_for_suspension_points(computed.expression);
+                                }
+                            }
+                        }
+
+                        // Static initializer executes
+                        if self.has_static_modifier(&prop_modifiers) && !prop_initializer.is_none() {
+                            self.handle_expression_for_suspension_points(prop_initializer);
+                            // Track assignment for static fields
+                            let flow = self.create_flow_node(
+                                flow_flags::ASSIGNMENT,
+                                self.current_flow,
+                                member_idx,
+                            );
+                            self.current_flow = flow;
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::CLASS_STATIC_BLOCK_DECLARATION => {
+                    // Static block executes immediately during class definition
+                    if let Some(block) = self.arena.get_block(member_node) {
+                        self.build_block(block);
+                    }
+                }
+                k if k == syntax_kind_ext::METHOD_DECLARATION => {
+                    // Computed property name executes
+                    if let Some(method) = self.arena.get_method_decl(member_node) {
+                        let method_name = method.name;
+                        if let Some(name_node) = self.arena.get(method_name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                if let Some(computed) = self.arena.get_computed_property(name_node) {
+                                    self.handle_expression_for_suspension_points(computed.expression);
+                                }
+                            }
+                        }
+                    }
+                }
+                k if k == syntax_kind_ext::GET_ACCESSOR || k == syntax_kind_ext::SET_ACCESSOR => {
+                    // Computed property name executes
+                    if let Some(accessor) = self.arena.get_accessor(member_node) {
+                        let accessor_name = accessor.name;
+                        if let Some(name_node) = self.arena.get(accessor_name) {
+                            if name_node.kind == syntax_kind_ext::COMPUTED_PROPERTY_NAME {
+                                if let Some(computed) = self.arena.get_computed_property(name_node) {
+                                    self.handle_expression_for_suspension_points(computed.expression);
+                                }
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        self.record_node_flow(idx);
+    }
+
+    /// Check if modifiers list contains 'static'.
+    fn has_static_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if mod_idx.is_none() {
+                    continue;
+                }
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::StaticKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
 }
 
 #[cfg(test)]
@@ -1827,6 +1978,183 @@ yield 3;
                     .count();
 
                 assert!(yield_count >= 3, "Expected at least 3 yield points, got {}", yield_count);
+            }
+        }
+    }
+
+    // =============================================================================
+    // Class Declaration Flow Tests
+    // =============================================================================
+
+    #[test]
+    fn test_flow_graph_class_with_static_block() {
+        let source = r#"
+let x: number;
+class Foo {
+    static {
+        x = 42;
+    }
+}
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_class_with_static_property() {
+        let source = r#"
+let x: number;
+class Foo {
+    static prop = (x = 42);
+}
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph has assignment node for static property
+                assert!(graph.nodes.len() > 0);
+
+                let assignment_count = (0..graph.nodes.len())
+                    .filter_map(|i| graph.nodes.get(FlowNodeId(i as u32)))
+                    .filter(|n| (n.flags & flow_flags::ASSIGNMENT) != 0)
+                    .count();
+
+                // Should have assignment for static property initializer
+                assert!(assignment_count >= 1, "Expected at least 1 assignment node for static property, got {}", assignment_count);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_class_with_extends() {
+        let source = r#"
+class Base {}
+class Derived extends Base {}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists - extends expression should be tracked
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_class_with_computed_property() {
+        let source = r#"
+const key = "myMethod";
+class Foo {
+    [key]() {
+        return 42;
+    }
+}
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists - computed property expression should be tracked
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_class_multiple_static_blocks() {
+        let source = r#"
+let x: number;
+let y: string;
+class Foo {
+    static {
+        x = 1;
+    }
+    static prop = "hello";
+    static {
+        y = "world";
+    }
+}
+console.log(x, y);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists
+                assert!(graph.nodes.len() > 0);
+            }
+        }
+    }
+
+    #[test]
+    fn test_flow_graph_class_expression() {
+        let source = r#"
+let x: number;
+const Foo = class {
+    static {
+        x = 42;
+    }
+};
+console.log(x);
+"#;
+
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let arena = parser.get_arena();
+
+        if let Some(source_file) = arena.get(root) {
+            if let Some(sf) = arena.get_source_file(source_file) {
+                let mut builder = FlowGraphBuilder::new(arena);
+                let graph = builder.build_source_file(&sf.statements);
+
+                // Verify flow graph exists - class expression with static block
+                assert!(graph.nodes.len() > 0);
             }
         }
     }
