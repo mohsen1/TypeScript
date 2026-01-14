@@ -391,20 +391,28 @@ impl ThinParserState {
 
     /// Error: Identifier expected (TS1003)
     fn error_identifier_expected(&mut self) {
-        use crate::checker::types::diagnostics::diagnostic_codes;
-        self.parse_error_at_current_token(
-            "Identifier expected",
-            diagnostic_codes::IDENTIFIER_EXPECTED,
-        );
+        // Only emit error if we haven't already emitted one at this position
+        // This prevents cascading errors when a missing token causes identifier to be expected
+        if self.token_pos() != self.last_error_pos {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Identifier expected",
+                diagnostic_codes::IDENTIFIER_EXPECTED,
+            );
+        }
     }
 
     /// Error: '{token}' expected (TS1005)
     fn error_token_expected(&mut self, token: &str) {
-        use crate::checker::types::diagnostics::diagnostic_codes;
-        self.parse_error_at_current_token(
-            &format!("'{}' expected", token),
-            diagnostic_codes::TOKEN_EXPECTED,
-        );
+        // Only emit error if we haven't already emitted one at this position
+        // This prevents cascading errors when parse_semicolon() and similar functions call this
+        if self.token_pos() != self.last_error_pos {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                &format!("'{}' expected", token),
+                diagnostic_codes::TOKEN_EXPECTED,
+            );
+        }
     }
 
     /// Error: Unterminated template literal (TS1160)
