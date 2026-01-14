@@ -8,37 +8,8 @@
 
 ## CURRENT TASK
 
-### Task 8: Enhance Error Messages for Conditional Types
-**Status:** READY TO START
-
-**Priority:** MEDIUM
-**Expected Impact:** Better error messages for complex conditional types
-
-**Objective:** When conditional type checking fails, show better information about WHICH branch condition failed and WHY.
-
-**Subtasks:**
-- [ ] Find conditional type error reporting in checker.ts
-- [ ] Add context showing which condition branch was evaluated
-- [ ] Show the distributive condition that failed
-- [ ] Example: "Type 'string' does not satisfy condition 'extends number' in conditional type"
-
-**Key Files:**
-- `src/compiler/checker.ts` (conditional type checking)
-- `src/compiler/diagnosticMessages.json`
-
-**Example:**
-```typescript
-// Before: Type 'string' is not assignable to type 'string | number'.
-// After:  In conditional type 'T extends number ? string : never',
-//         type 'string' does not satisfy condition 'T extends number'
-```
-
----
-
-## PENDING TASKS
-
 ### Task 9: Improve Error Messages for Mapped Types
-**Status:** PENDING
+**Status:** READY TO START
 
 **Priority:** LOW
 **Expected Impact:** Better error messages for complex mapped types
@@ -56,6 +27,8 @@
 - `src/compiler/diagnosticMessages.json`
 
 ---
+
+## PENDING TASKS
 
 ### Task 10: Add Type Tracing for Async/Await Error Messages
 **Status:** PENDING
@@ -236,6 +209,40 @@ After:  error TS9518: Type parameter 'T' has constraint 'number', but type argum
 **Key Files:**
 - `src/compiler/checker.ts` (checkTypeArguments function at line ~35919)
 - `src/compiler/diagnosticMessages.json` (added code 9518)
+
+---
+
+### Task 8: Enhance Error Messages for Conditional Types
+**Status:** ANALYSIS COMPLETED - ARCHITECTURAL LIMITATION
+
+**What was done:**
+- [x] Found conditional type error reporting in checker.ts
+- [x] Investigated type resolution process for conditional types
+- [x] Identified architectural limitation: alias information is lost during type resolution
+- [x] Created analysis document: WORKER_12_TASK_8_ANALYSIS.md
+
+**Key Finding:**
+Enhancing conditional type error messages as described requires **significant architectural changes** to the TypeScript compiler's type system. By the time errors are reported, type alias information has been lost during type resolution.
+
+**Technical Issue:**
+When a type alias with a conditional type is used (e.g., `ToString<number>`), the compiler:
+1. Creates a `TypeReference` with `aliasSymbol` pointing to `ToString`
+2. Resolves it to a `ConditionalType` (still has `aliasSymbol`)
+3. Evaluates the condition and resolves to the result type (e.g., `never`)
+4. The `never` type is a primitive type with no `aliasSymbol`
+
+By the time `reportRelationError` is called, the target is just `never` with no way to trace back to the original conditional type.
+
+**Recommendation:**
+This task requires deeper investigation by the TypeScript team. A full solution would require tracking type origins through the resolution process, which is a significant architectural change.
+
+**Report:** WORKER_12_TASK_8_ANALYSIS.md
+
+**Key Files Investigated:**
+- `src/compiler/checker.ts`
+  - `getTypeFromConditionalTypeNode` (line 19892)
+  - `getConditionalType` (line 19712)
+  - `reportRelationError` (line 22568)
 
 ---
 
