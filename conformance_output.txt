@@ -1,0 +1,931 @@
+
+> typescript@6.0.0 test
+> hereby runtests-parallel --light=false
+
+Using [33m/private/tmp/orchestrator-workspace/worktrees/worker-1/Herebyfile.mjs[39m to run [34mruntests-parallel[39m
+Starting [34mbuild-wasm[39m
+Starting [34mgenerate-diagnostics[39m
+> [32m/Users/mohsenazimi/.volta/tools/image/node/24.11.1/bin/node[39m scripts/processDiagnosticMessages.mjs src/compiler/diagnosticMessages.json
+Starting [34mlint[39m
+Linting: node_modules/eslint/bin/eslint --cache --cache-location ./.eslintcache --format autolinkable-stylish --report-unused-disable-directives --max-warnings 0 .
+> [32m/Users/mohsenazimi/.volta/tools/image/node/24.11.1/bin/node[39m node_modules/eslint/bin/eslint --cache --cache-location ./.eslintcache --format autolinkable-stylish --report-unused-disable-directives --max-warnings 0 .
+> [32mwasm-pack[39m build wasm --target nodejs --out-dir ../built/local/wasm
+Reading diagnostics from src/compiler/diagnosticMessages.json
+Finished [32mgenerate-diagnostics[39m in 243ms
+Starting [34mbundle-tests[39m
+Starting [34mbuild-tests[39m
+Starting [34mbuild-services[39m
+[INFO]: 🎯  Checking for the Wasm target...
+Finished [32mbundle-tests[39m in 2.1s
+[INFO]: 🌀  Compiling to Wasm...
+   Compiling wasm v0.1.0 (/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm)
+warning: unused import: `crate::checker::types::diagnostics::diagnostic_codes`
+    --> src/thin_parser.rs:3980:13
+     |
+3980 |         use crate::checker::types::diagnostics::diagnostic_codes;
+     |             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+     |
+     = note: `#[warn(unused_imports)]` (part of `#[warn(unused)]`) on by default
+
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/bench/globals.d.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/bench/globals.d.ts:1:17 [90m@typescript-eslint/no-unused-vars[39m [33m'T' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:23:10 [90m@typescript-eslint/no-unused-vars[39m [33m'Command' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:24:8  [90m@typescript-eslint/no-unused-vars[39m [33m'chalk' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:282:38  [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:330:15  [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:449:82  [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:581:76  [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/ask-gemini.mjs:816:64  [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/categorize-emit-failures.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/categorize-emit-failures.mjs:87:14 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/check-failures.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/check-failures.mjs:24:5    [90mprefer-const[39m                      [33m'unexpectedFailures' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/check-failures.mjs:45:14 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/check_comments.cjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/check_comments.cjs:49:7 [90mprefer-const[39m [33m'actual' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runCheckerTests.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runCheckerTests.mjs:18:10 [90m@typescript-eslint/no-unused-vars[39m [33m'execSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runCheckerTests.mjs:40:15   [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runCheckerTests.mjs:110:29  [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runLanguageServiceTests.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runLanguageServiceTests.mjs:40:21  [90mno-restricted-syntax[39m [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/runLanguageServiceTests.mjs:141:28 [90mno-restricted-syntax[39m [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyChecker.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyChecker.mjs:130:79 [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyParser.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyParser.mjs:160:90  [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyParser.mjs:174:96  [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyParser.mjs:203:96  [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyParser.mjs:212:102 [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyScanner.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyScanner.mjs:123:11 [90m@typescript-eslint/no-unused-vars[39m [33m'tsValue' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyScanner.mjs:124:11 [90m@typescript-eslint/no-unused-vars[39m [33m'wasmValue' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/scripts/verifyScanner.mjs:127:9    [90mprefer-const[39m                      [33m'details' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/src/compiler/checker.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/src/compiler/checker.ts:21475:41 [90m@typescript-eslint/no-unused-vars[39m [33m'propertyName' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/src/compiler/checker.ts:21475:75 [90m@typescript-eslint/no-unused-vars[39m [33m'sourceType' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/src/compiler/checker.ts:21475:93 [90m@typescript-eslint/no-unused-vars[39m [33m'targetType' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_7011_debug.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_7011_debug.ts:1:7  [90m@typescript-eslint/no-unused-vars[39m [33m'C' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_7011_debug.ts:3:7    [90mno-var[39m                            [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_7011_debug.ts:3:11 [90m@typescript-eslint/no-unused-vars[39m [33m'fn' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_7011_debug.ts:3:28   [90mno-return-await[39m                   [33mRedundant use of `await` on a return value.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_promise_type.js[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/dev-tests/test_promise_type.js:1:21 [90m@typescript-eslint/no-unused-vars[39m [33m'TypeId' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:52:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:57:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:67:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:110:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:155:29   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:158:33 [90m@typescript-eslint/no-unused-vars[39m   [33m'code' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:216:46 [90m@typescript-eslint/no-unused-vars[39m   [33m'files' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/analyze-extra-ts2304.mjs:268:94   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:29:25  [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:35:60  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:46:49  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:105:82 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:131:16 [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:158:14 [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-child.mjs:163:36 [90mno-empty[39m                            [33mEmpty block statement.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:76:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:83:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:96:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:171:5    [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:243:85   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-runner.mjs:513:14 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-simple.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-simple.mjs:30:18 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-simple.mjs:34:14 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:28:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:34:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:45:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:104:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:129:16 [90m@typescript-eslint/no-unused-vars[39m   [33m'runTscMultiFile' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:167:85   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/conformance-worker.mjs:237:16 [90m@typescript-eslint/no-unused-vars[39m   [33m'runWasmMultiFile' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-2355.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-2355.mjs:50:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-2355.mjs:76:82    [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-2355.mjs:110:13 [90m@typescript-eslint/no-unused-vars[39m   [33m'options' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-7011.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-7011.mjs:49:47    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-7011.mjs:73:82    [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-7011.mjs:105:13 [90m@typescript-eslint/no-unused-vars[39m   [33m'options' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs:47:7   [90m@typescript-eslint/no-unused-vars[39m   [33m'isMultiFile' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs:47:7     [90mprefer-const[39m                        [33m'isMultiFile' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs:51:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs:77:82    [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-2705.mjs:111:13 [90m@typescript-eslint/no-unused-vars[39m   [33m'options' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-ts2454.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-ts2454.mjs:33:18 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-ts2454.mjs:33:21   [90mno-empty[39m                          [33mEmpty block statement.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-ts2454.mjs:35:14 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-extra-ts2454.mjs:35:17   [90mno-empty[39m                          [33mEmpty block statement.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-missing-ts2322.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-missing-ts2322.mjs:66:74 [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-missing-ts2322.mjs:84:7  [90mprefer-const[39m          [33m'wasmDiags' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2300.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2300.mjs:69:80 [90mlocal/argument-trivia[39m [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:51:25  [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:57:60  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:68:49  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:135:82 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:165:85 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:200:23 [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2304.mjs:244:7  [90mprefer-const[39m                        [33m'wasmDiags' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:50:25  [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:56:60  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:67:49  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:134:82 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:164:85 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2322.mjs:203:7  [90mprefer-const[39m                        [33m'wasmDiags' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:50:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:56:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:67:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:134:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:159:23   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:161:16 [90m@typescript-eslint/no-unused-vars[39m   [33m'loadLibFiles' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:161:35 [90m@typescript-eslint/no-unused-vars[39m   [33m'target' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:180:7    [90mprefer-const[39m                        [33m'wasmDiags' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:224:14 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:239:50   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:240:46   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:259:46 [90m@typescript-eslint/no-unused-vars[39m   [33m'files' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2339.mjs:271:14 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs:51:25  [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs:57:60  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs:68:49  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs:135:82 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2355.mjs:165:85 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:50:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:56:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:67:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:134:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:165:85   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:204:7    [90mprefer-const[39m                        [33m'wasmDiags' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:236:50   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:237:46   [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2403.mjs:270:14 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:51:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:57:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:68:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:135:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:165:85   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2454.mjs:265:11 [90m@typescript-eslint/no-unused-vars[39m   [33m'extraCodes' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:51:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:57:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:68:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:138:82   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:168:85   [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2564.mjs:268:11 [90m@typescript-eslint/no-unused-vars[39m   [33m'extraCodes' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2769.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2769.mjs:50:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2769.mjs:55:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2769.mjs:82:82    [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2769.mjs:139:14 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:51:25  [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:57:60  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/i, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:68:49  [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:166:85 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:202:85 [90mlocal/argument-trivia[39m               [33mTag argument with parameter name[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:268:24 [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts2792.mjs:270:29 [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7006.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7006.mjs:8:34 [90m@typescript-eslint/no-unused-vars[39m [33m'basename' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7006.mjs:69:80  [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7008.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7008.mjs:8:34 [90m@typescript-eslint/no-unused-vars[39m [33m'basename' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7008.mjs:69:80  [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7010.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7010.mjs:8:34 [90m@typescript-eslint/no-unused-vars[39m [33m'basename' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7010.mjs:69:80  [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7011.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7011.mjs:36:7    [90mprefer-const[39m                      [33m'falsePositives' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7011.mjs:57:88   [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/find-ts7011.mjs:64:14 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/process-pool-conformance.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/process-pool-conformance.mjs:10:60 [90m@typescript-eslint/no-unused-vars[39m [33m'existsSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/process-pool-conformance.mjs:83:30 [90m@typescript-eslint/no-unused-vars[39m [33m'data' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/process-pool-conformance.mjs:101:43  [90mno-empty[39m                          [33mEmpty block statement.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/process-pool-conformance.mjs:111:43  [90mno-empty[39m                          [33mEmpty block statement.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:19:10  [90m@typescript-eslint/no-unused-vars[39m [33m'execSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:19:20  [90m@typescript-eslint/no-unused-vars[39m [33m'spawn' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:66:51    [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:67:14    [90mlocal/no-keywords[39m                 [33mnumber clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:71:58    [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:77:59    [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:171:88   [90mregexp/strict[39m                     [33mUnescaped source character '}'.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:171:89   [90mregexp/no-useless-character-class[39m [33mUnexpected character class with one character class escape. Can remove brackets.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:175:52   [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:176:40 [90m@typescript-eslint/no-unused-vars[39m [33m'content' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:234:5    [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:604:9  [90m@typescript-eslint/no-unused-vars[39m [33m'passCount' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/runner.js:629:59   [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:4:7   [90m@typescript-eslint/no-unused-vars[39m [33m'num' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:5:7   [90m@typescript-eslint/no-unused-vars[39m [33m'str' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:6:7   [90m@typescript-eslint/no-unused-vars[39m [33m'bool' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:10:7  [90m@typescript-eslint/no-unused-vars[39m [33m'anyToNum' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:13:7  [90m@typescript-eslint/no-unused-vars[39m [33m'point' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:14:7  [90m@typescript-eslint/no-unused-vars[39m [33m'coords' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:17:7  [90m@typescript-eslint/no-unused-vars[39m [33m'nums' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:18:7  [90m@typescript-eslint/no-unused-vars[39m [33m'strs' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:21:10 [90m@typescript-eslint/no-unused-vars[39m [33m'add' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:26:7  [90m@typescript-eslint/no-unused-vars[39m [33m'multiply' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/basic-types.ts:29:10 [90m@typescript-eslint/no-unused-vars[39m [33m'logIt' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:12:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'a2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:16:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'b2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:19:23  [90m@typescript-eslint/no-unused-vars[39m          [33m'x' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:26:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'anyResult' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:35:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'obj1' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:35:15    [90m@typescript-eslint/no-wrapper-object-types[39m [33mPrefer using the primitive `object` as a type name, rather than the upper-cased `Object`.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:36:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'obj2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:36:15    [90m@typescript-eslint/no-wrapper-object-types[39m [33mPrefer using the primitive `object` as a type name, rather than the upper-cased `Object`.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:37:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'obj3' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:37:15    [90m@typescript-eslint/no-wrapper-object-types[39m [33mPrefer using the primitive `object` as a type name, rather than the upper-cased `Object`.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:40:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'empty1' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:41:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'empty2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:42:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'empty3' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:45:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'lower1' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:59:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'stringReturner' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:62:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'numberReturner' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:93:9   [90m@typescript-eslint/no-unused-vars[39m          [33m'animals' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:108:13 [90m@typescript-eslint/no-unused-vars[39m          [33m'Handler' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:116:8  [90m@typescript-eslint/no-unused-vars[39m          [33m'AnimalHandler' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:117:8  [90m@typescript-eslint/no-unused-vars[39m          [33m'DogHandler' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:129:31   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:129:38   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:133:23   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:134:11 [90m@typescript-eslint/no-unused-vars[39m          [33m'str' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:138:12 [90m@typescript-eslint/no-unused-vars[39m          [33m'greet' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:149:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'constStr' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:152:7    [90mprefer-const[39m                               [33m'letStr' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:152:7  [90m@typescript-eslint/no-unused-vars[39m          [33m'letStr' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:155:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'obj' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:158:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'frozen' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:172:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'c1' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:173:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'c2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:176:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'c3' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:192:9  [90m@typescript-eslint/no-unused-vars[39m          [33m'p2' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-cases/phase1-critical.ts:195:21 [90m@typescript-eslint/no-unused-vars[39m          [33m'p' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-ts2454-extra.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-ts2454-extra.mjs:21:15   [90mno-empty[39m                          [33mEmpty block statement.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-ts2454-extra.mjs:23:11   [90mno-empty[39m                          [33mEmpty block statement.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-ts2454-extra.mjs:28:74   [90mlocal/argument-trivia[39m             [33mTag argument with parameter name[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/differential-test/test-ts2454-extra.mjs:59:12 [90m@typescript-eslint/no-unused-vars[39m [33m'e' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:11:7   [90m@typescript-eslint/no-unused-vars[39m   [33m'require' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:55:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:61:60    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:72:49    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:74:14    [90mprefer-const[39m                        [33m'key' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:90:30    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/find-ts1005-errors.mjs:155:35 [90m@typescript-eslint/no-unused-vars[39m   [33m'files' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:69:46    [90mno-restricted-syntax[39m                     [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:84:49  [90m@typescript-eslint/no-unused-vars[39m        [33m'testName' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:140:23   [90mno-restricted-syntax[39m                     [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:142:9    [90mprefer-const[39m                             [33m'headerLines' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:145:61   [90mregexp/no-super-linear-backtracking[39m      [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/i, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:148:33   [90mno-restricted-syntax[39m                     [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:156:36   [90mno-restricted-syntax[39m                     [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:163:25   [90mno-restricted-syntax[39m                     [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:186:10 [90m@typescript-eslint/no-unused-vars[39m        [33m'e' is defined but never used.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:242:40 [90m@typescript-eslint/no-unused-vars[39m        [33m'testName' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:282:18 [90m@typescript-eslint/no-unused-vars[39m        [33m'e' is defined but never used.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:286:39 [90m@typescript-eslint/no-unused-vars[39m        [33m'e' is defined but never used.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:294:15   [90m@typescript-eslint/no-unused-expressions[39m [33mExpected an assignment or function call and instead saw an expression.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/compare-baselines.mjs:294:54 [90m@typescript-eslint/no-unused-vars[39m        [33m'e2' is defined but never used.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:11:24  [90m@typescript-eslint/no-unused-vars[39m   [33m'existsSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:59:23    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:61:9     [90mprefer-const[39m                        [33m'headerLines' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:65:61    [90mregexp/no-super-linear-backtracking[39m [33mThe quantifier '\s*' can exchange characters with '.+'. Using any string accepted by /[\t\x0b\f \xa0\u1680\u2000-\u200a\u202f\u205f\u3000\ufeff]+/i, this can be exploited to cause at least polynomial backtracking.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:69:33    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:78:36    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:88:25    [90mno-restricted-syntax[39m                [33mAvoid using null; use undefined instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:110:10 [90m@typescript-eslint/no-unused-vars[39m   [33m'e' is defined but never used.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:214:35 [90m@typescript-eslint/no-unused-vars[39m   [33m'headerLines' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:221:13 [90m@typescript-eslint/no-unused-vars[39m   [33m'multiFileSkipped' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:227:17 [90m@typescript-eslint/no-unused-vars[39m   [33m'allPassed' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-batch-tests.mjs:227:17   [90mprefer-const[39m                        [33m'allPassed' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-single-test.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-single-test.mjs:29:7 [90m@typescript-eslint/no-unused-vars[39m [33m'useThin' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/scripts/run-single-test.mjs:203:46 [90mno-restricted-syntax[39m              [33mAvoid using null; use undefined instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:1:10 [90m@typescript-eslint/no-unused-vars[39m [33m'readFileSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:1:24 [90m@typescript-eslint/no-unused-vars[39m [33m'readdirSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:1:37 [90m@typescript-eslint/no-unused-vars[39m [33m'statSync' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:2:10 [90m@typescript-eslint/no-unused-vars[39m [33m'join' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:2:16 [90m@typescript-eslint/no-unused-vars[39m [33m'basename' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-error-recovery-v2.mjs:51:5   [90mprefer-const[39m                      [33m'results' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts:3:10 [90m@typescript-eslint/no-unused-vars[39m        [33m'f1' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts:5:9    [90m@typescript-eslint/no-unused-expressions[39m [33mExpected an assignment or function call and instead saw an expression.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts:6:9    [90m@typescript-eslint/no-unused-expressions[39m [33mExpected an assignment or function call and instead saw an expression.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts:10:9   [90m@typescript-eslint/no-unused-expressions[39m [33mExpected an assignment or function call and instead saw an expression.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-control-flow-generics.ts:14:9   [90m@typescript-eslint/no-unused-expressions[39m [33mExpected an assignment or function call and instead saw an expression.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:8:23    [90mlocal/js-extensions[39m                        [33mThis relative module reference is missing a '.js' extension[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:10:10 [90m@typescript-eslint/no-unused-vars[39m          [33m'testImportVisibleInFunction' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:12:16   [90m@typescript-eslint/array-type[39m              [33mArray type using 'Array<string>' is forbidden. Use 'string[]' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:17:25   [90mlocal/js-extensions[39m                        [33mThis relative module reference is missing a '.js' extension[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:19:10 [90m@typescript-eslint/no-unused-vars[39m          [33m'testShadowing' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:21:9    [90mprefer-const[39m                               [33m'console' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:26:25   [90mlocal/js-extensions[39m                        [33mThis relative module reference is missing a '.js' extension[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:28:10 [90m@typescript-eslint/no-unused-vars[39m          [33m'testNestedScopes' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:30:14 [90m@typescript-eslint/no-unused-vars[39m          [33m'inner' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:32:15 [90m@typescript-eslint/no-unused-vars[39m          [33m'p' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:37:24   [90mlocal/js-extensions[39m                        [33mThis relative module reference is missing a '.js' extension[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:39:10 [90m@typescript-eslint/no-unused-vars[39m          [33m'testBlockShadowing' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:42:13   [90mprefer-const[39m                               [33m'Object' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:47:15 [90m@typescript-eslint/no-unused-vars[39m          [33m'obj' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:52:11 [90m@typescript-eslint/no-unused-vars[39m          [33m'MyModule' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:53:28   [90mlocal/js-extensions[39m                        [33mThis relative module reference is missing a '.js' extension[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:55:14 [90m@typescript-eslint/no-unused-vars[39m          [33m'inNamespace' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:57:15 [90m@typescript-eslint/no-unused-vars[39m          [33m's' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:62:10 [90m@typescript-eslint/no-unused-vars[39m          [33m'testGlobalSymbols' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:64:11 [90m@typescript-eslint/no-unused-vars[39m          [33m'num' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:64:16   [90m@typescript-eslint/no-wrapper-object-types[39m [33mPrefer using the primitive `number` as a type name, rather than the upper-cased `Number`.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:65:11 [90m@typescript-eslint/no-unused-vars[39m          [33m'bool' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:65:17   [90m@typescript-eslint/no-wrapper-object-types[39m [33mPrefer using the primitive `boolean` as a type name, rather than the upper-cased `Boolean`.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-scope-chain.ts:66:11 [90m@typescript-eslint/no-unused-vars[39m          [33m'undef' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304-complex.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304-complex.ts:2:10  [90m@typescript-eslint/no-unused-vars[39m [33m'f' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304-complex.ts:2:30  [90m@typescript-eslint/no-unused-vars[39m [33m'x' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304-complex.ts:9:11  [90m@typescript-eslint/no-unused-vars[39m [33m'Dog' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304-complex.ts:11:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304.ts:2:10 [90m@typescript-eslint/no-unused-vars[39m [33m'identity' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304.ts:11:5   [90mprefer-const[39m                      [33m'p' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-files/test-ts2304.ts:11:5 [90m@typescript-eslint/no-unused-vars[39m [33m'p' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:1:10  [90m@typescript-eslint/no-unused-vars[39m [33m'test1' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:2:5     [90mno-var[39m                            [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:5:10  [90m@typescript-eslint/no-unused-vars[39m [33m'test2' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:6:9     [90mno-constant-condition[39m             [33mUnexpected constant condition.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:7:13    [90mprefer-const[39m                      [33m'y' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:10:12   [90mno-undef[39m                          [33m'y' is not defined.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:12:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test3' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:18:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test4' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:21:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test5' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:22:5    [90mno-var[39m                            [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:28:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test6' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:33:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test7' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:34:9    [90mprefer-const[39m                      [33m'a' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:35:9    [90mprefer-const[39m                      [33m'b' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:36:9    [90mprefer-const[39m                      [33m'c' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:39:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test8' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:40:9  [90m@typescript-eslint/no-unused-vars[39m [33m'x' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:40:9    [90mprefer-const[39m                      [33m'x' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.js:42:13   [90mprefer-const[39m                      [33m'x' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:5:10  [90m@typescript-eslint/no-unused-vars[39m [33m'test1' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:6:3     [90mno-var[39m                            [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:11:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test2' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:12:7    [90mno-constant-condition[39m             [33mUnexpected constant condition.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:13:9    [90mprefer-const[39m                      [33m'y' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:20:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test3' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:28:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test4' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:33:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test5' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:34:3    [90mno-var[39m                            [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:42:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test6' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:49:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test7' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:50:7    [90mprefer-const[39m                      [33m'a' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:51:7    [90mprefer-const[39m                      [33m'b' is never reassigned. Use 'const' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:52:7    [90mprefer-const[39m                      [33m'c' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:57:10 [90m@typescript-eslint/no-unused-vars[39m [33m'test8' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:58:7    [90mprefer-const[39m                      [33m'x' is never reassigned. Use 'const' instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:58:7  [90m@typescript-eslint/no-unused-vars[39m [33m'x' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-local-reference.ts:60:9    [90mprefer-const[39m                      [33m'x' is never reassigned. Use 'const' instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-primitive-extends.js[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-primitive-extends.js:7:17  [33mParsing error: Expression expected.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-primitive-extends.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-primitive-extends.ts:14:17  [33mParsing error: Expression expected.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.js[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.js:14:5  [33mParsing error: Expression expected.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:5:10  [90m@typescript-eslint/no-unused-vars[39m [33m'basic' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:8:10  [90m@typescript-eslint/no-unused-vars[39m [33m'constrained' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:11:10 [90m@typescript-eslint/no-unused-vars[39m [33m'withDefault' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:14:10 [90m@typescript-eslint/no-unused-vars[39m [33m'both' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:18:6  [90m@typescript-eslint/no-unused-vars[39m [33m'Getter' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:19:6  [90m@typescript-eslint/no-unused-vars[39m [33m'Setter' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:22:10 [90m@typescript-eslint/no-unused-vars[39m [33m'nested' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:26:11 [90m@typescript-eslint/no-unused-vars[39m [33m'Dog' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:27:10 [90m@typescript-eslint/no-unused-vars[39m [33m'complex' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:30:6  [90m@typescript-eslint/no-unused-vars[39m [33m'Conditional' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:33:7  [90m@typescript-eslint/no-unused-vars[39m [33m'GenericClass' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:41:11 [90m@typescript-eslint/no-unused-vars[39m [33m'GenericInterface' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:46:7  [90m@typescript-eslint/no-unused-vars[39m [33m'Covariant' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:50:7  [90m@typescript-eslint/no-unused-vars[39m [33m'Contravariant' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:51:7  [90m@typescript-eslint/no-unused-vars[39m [33m'value' is defined but never used. Allowed unused args must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:55:10 [90m@typescript-eslint/no-unused-vars[39m [33m'missing' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-type-parameters.ts:58:10 [90m@typescript-eslint/no-unused-vars[39m [33m'extraComma' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:5:6   [90m@typescript-eslint/no-unused-vars[39m [33m'Test1' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:9:10  [90m@typescript-eslint/no-unused-vars[39m [33m'foo' is defined but only used as a type. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:12:6  [90m@typescript-eslint/no-unused-vars[39m [33m'FooReturn' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:16:6  [90m@typescript-eslint/no-unused-vars[39m [33m'FooParams' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:19:10 [90m@typescript-eslint/no-unused-vars[39m [33m'bar' is defined but only used as a type. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:22:6  [90m@typescript-eslint/no-unused-vars[39m [33m'BarParams' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:31:6  [90m@typescript-eslint/no-unused-vars[39m [33m'PartialUser' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:35:6  [90m@typescript-eslint/no-unused-vars[39m [33m'RequiredUser' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:39:6  [90m@typescript-eslint/no-unused-vars[39m [33m'ReadonlyUser' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:43:6  [90m@typescript-eslint/no-unused-vars[39m [33m'RecordType' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:47:6  [90m@typescript-eslint/no-unused-vars[39m [33m'UserWithName' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:51:6  [90m@typescript-eslint/no-unused-vars[39m [33m'UserWithoutAge' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:55:16 [90m@typescript-eslint/no-unused-vars[39m [33m'asyncFunc' is defined but only used as a type. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test-utility-types.ts:58:6  [90m@typescript-eslint/no-unused-vars[39m [33m'AwaitedResult' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test_await_yield.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test_await_yield.ts:20:15  [33mParsing error: Expression expected.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test_heritage_clause_error.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/test_heritage_clause_error.ts:4:16  [33mParsing error: Expression expected.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:15:6    [90m@typescript-eslint/unified-signatures[39m [33mThese overloads can be combined into one signature with an optional parameter.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:17:24   [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:25:1    [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:43:1    [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:69:1    [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:69:13   [90mlocal/no-keywords[39m                     [33mString clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:87:14   [90mlocal/no-keywords[39m                     [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:88:16   [90mlocal/no-keywords[39m                     [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:91:1    [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:91:13   [90mlocal/no-keywords[39m                     [33mNumber clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:104:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:104:13  [90mlocal/no-keywords[39m                     [33mBoolean clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:122:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:164:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:174:86  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:175:88  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:177:105 [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:178:52  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:183:86  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:184:88  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:196:16  [90m@typescript-eslint/unified-signatures[39m [33mThis overload and the one on line 195 can be combined into one signature taking `T | T | PromiseLike<T>`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:201:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:203:29  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:227:57  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:231:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:246:43  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:250:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:260:87  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:264:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:273:61  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:277:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:292:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:302:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:312:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:316:10  [90mlocal/no-keywords[39m                     [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:316:45  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:317:10  [90mlocal/no-keywords[39m                     [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:334:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:370:9   [90m@typescript-eslint/unified-signatures[39m [33mThis overload and the one on line 369 can be combined into one signature with an optional parameter.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:378:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:384:27  [90m@typescript-eslint/unified-signatures[39m [33mThese overloads can be combined into one signature taking `(this: any, key: string, value: any) => any | (number | string)[] | null`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:384:60  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:387:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:421:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:446:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:516:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:551:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:565:9   [90m@typescript-eslint/unified-signatures[39m [33mThis overload and the one on line 564 can be combined into one signature taking `number | ArrayLike<number>`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:570:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:584:9   [90m@typescript-eslint/unified-signatures[39m [33mThis overload and the one on line 583 can be combined into one signature taking `number | ArrayLike<number>`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:589:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:603:9   [90m@typescript-eslint/unified-signatures[39m [33mThis overload and the one on line 602 can be combined into one signature taking `number | ArrayLike<number>`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:608:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:619:33  [90mno-restricted-syntax[39m                  [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:638:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:638:13  [90mno-shadow-restricted-names[39m            [33mShadowing of global property 'NaN'.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:639:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:639:13  [90mno-shadow-restricted-names[39m            [33mShadowing of global property 'Infinity'.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:640:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:640:13  [90mlocal/no-keywords[39m                     [33mundefined clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.d.ts:641:1   [90mno-var[39m                                [33mUnexpected var, use let or const instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:6:5       [90m@typescript-eslint/prefer-function-type[39m    [33mInterface only has a call signature, you should use a function type instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:31:43     [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:36:36     [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:52:1      [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:71:43     [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:80:1      [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:92:35     [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:117:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:132:29    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:137:21    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:140:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:147:83    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:149:86    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:152:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:163:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:171:56    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:175:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:186:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:188:37    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:189:39    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:192:25    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:193:40    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:194:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:195:39    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:196:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:197:27    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:201:28    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:204:57    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:205:44    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:206:35    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:207:34    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:208:41    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:208:57    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:209:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:209:54    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:215:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:234:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:235:42    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:238:100   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:239:49    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:257:37    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:259:31    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:266:93    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:267:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:268:51    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:269:40    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:269:75    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:276:40    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:280:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:289:40    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:293:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:334:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:338:23    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:352:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:363:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:369:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:375:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:401:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:409:27    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:429:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:444:23    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:445:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:453:53    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:464:59    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:465:28    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:466:30    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:474:25    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:484:39    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:484:59    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:490:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:499:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:517:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:536:45    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:543:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:554:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:578:39    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:578:59    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:581:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:589:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:604:91    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:606:46    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:607:50    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:614:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:622:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:630:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:636:37    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:637:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:641:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:649:105   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:650:70    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:655:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:660:35    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:666:39    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:667:34    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:674:36    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:677:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:681:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:683:43    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:687:42    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:694:42    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:704:44    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:710:54    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:718:71    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:727:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:744:38    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:771:28    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:779:57    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:780:33    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:784:76    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:787:59    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:809:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:814:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:815:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:818:30    [90m@typescript-eslint/no-unsafe-function-type[39m [33mThe `Function` type accepts any function-like value.[39m
+[33mPrefer explicitly defining any function parameters and return type.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:844:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:856:63    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:857:66    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:860:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:885:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:890:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:905:36    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:906:34    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:912:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:917:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:918:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:922:49    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:948:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:962:23    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:973:28    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:991:1     [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:993:27    [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1010:33   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1019:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1044:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1055:33   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1068:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1083:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1103:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1114:33   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1118:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1127:45   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1137:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1139:59   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1147:33   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1155:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1171:36   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1172:40   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1176:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1182:30   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1183:34   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1188:56   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1191:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1200:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1208:91   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1212:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1219:49   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1220:40   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1220:73   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1221:33   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1223:43   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1224:38   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1225:40   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1229:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1236:14   [90mlocal/no-keywords[39m                          [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1237:35   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1241:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1250:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1260:35   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1272:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1285:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1303:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1320:37   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1322:38   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1323:31   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1328:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1344:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1354:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1362:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1392:51   [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1397:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1403:1    [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.dom.d.ts:1419:26 [90m@typescript-eslint/no-unused-vars[39m          [33m'R' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:56:64  [90m@typescript-eslint/no-unsafe-function-type[39m [33mThe `Function` type accepts any function-like value.[39m
+[33mPrefer explicitly defining any function parameters and return type.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:67:24  [90m@typescript-eslint/no-unsafe-function-type[39m [33mThe `Function` type accepts any function-like value.[39m
+[33mPrefer explicitly defining any function parameters and return type.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:69:109 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:73:24  [90m@typescript-eslint/array-type[39m              [33mArray type using 'ReadonlyArray<T>' is forbidden. Use 'readonly T[]' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:75:70  [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:81:8   [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 79 can be combined into one signature taking `'beforeExit' | 'exit'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:90:10  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 88 can be combined into one signature taking `'beforeExit' | 'exit'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:98:31  [90m@typescript-eslint/no-unsafe-function-type[39m [33mThe `Function` type accepts any function-like value.[39m
+[33mPrefer explicitly defining any function parameters and return type.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:136:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:143:29 [90m@typescript-eslint/array-type[39m              [33mArray type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:144:10 [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 143 can be combined into one signature taking `Uint8Array | ReadonlyArray<number> | WithImplicitCoercion<Uint8Array | ReadonlyArray<number> | string>`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:144:50 [90m@typescript-eslint/array-type[39m              [33mArray type using 'ReadonlyArray<number>' is forbidden. Use 'readonly number[]' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:149:16 [90mlocal/no-keywords[39m                          [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:150:18 [90m@typescript-eslint/array-type[39m              [33mArray type using 'ReadonlyArray<Uint8Array>' is forbidden. Use 'readonly Uint8Array[]' instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:160:11 [90mlocal/no-keywords[39m                          [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:161:11 [90mlocal/no-keywords[39m                          [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:162:11 [90mlocal/no-keywords[39m                          [33mstring clashes with keyword/type[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:212:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:245:23 [90m@typescript-eslint/no-unsafe-function-type[39m [33mThe `Function` type accepts any function-like value.[39m
+[33mPrefer explicitly defining any function parameters and return type.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:264:26 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:280:40 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:284:5  [90m@typescript-eslint/naming-convention[39m       [33mType Method name `.js` must match one of the following formats: camelCase, PascalCase[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:285:5  [90m@typescript-eslint/naming-convention[39m       [33mType Method name `.json` must match one of the following formats: camelCase, PascalCase[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:286:5  [90m@typescript-eslint/naming-convention[39m       [33mType Method name `.node` must match one of the following formats: camelCase, PascalCase[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:295:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:296:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:297:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:298:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:299:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:312:44 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:325:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 323 can be combined into one signature taking `'close' | 'end'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:327:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 323 can be combined into one signature taking `'close' | 'pause'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:327:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 325 can be combined into one signature taking `'end' | 'pause'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:328:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 323 can be combined into one signature taking `'close' | 'readable'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:328:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 325 can be combined into one signature taking `'end' | 'readable'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:328:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 327 can be combined into one signature taking `'pause' | 'readable'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:329:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 323 can be combined into one signature taking `'close' | 'resume'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:329:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 325 can be combined into one signature taking `'end' | 'resume'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:329:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 327 can be combined into one signature taking `'pause' | 'resume'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:329:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 328 can be combined into one signature taking `'readable' | 'resume'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:335:60 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:336:71 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:343:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 342 can be combined into one signature taking `'close' | 'drain'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:345:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 342 can be combined into one signature taking `'close' | 'finish'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:345:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 343 can be combined into one signature taking `'drain' | 'finish'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:347:8  [90m@typescript-eslint/unified-signatures[39m      [33mThis overload and the one on line 346 can be combined into one signature taking `'pipe' | 'unpipe'`.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:382:33 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:393:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:400:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:412:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:424:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:435:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:459:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:469:36 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:470:43 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:485:83 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:487:86 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:493:5  [90m@typescript-eslint/prefer-function-type[39m    [33mInterface only has a call signature, you should use a function type instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:557:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:562:49 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:597:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:609:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:627:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:640:45 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:650:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:661:33 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:670:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:679:37 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:702:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:716:23 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:727:28 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:733:37 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:750:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:752:27 [90mno-restricted-syntax[39m                       [33mAvoid using null; use undefined instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/lib/lib.node.d.ts:772:1  [90mno-var[39m                                     [33mUnexpected var, use let or const instead.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/test_lib_augmentations.mjs[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/tests/test_lib_augmentations.mjs:13:7 [90m@typescript-eslint/no-unused-vars[39m [33m'require' is assigned a value but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[37m/private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:71:5     [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:73:5     [90m@typescript-eslint/prefer-function-type[39m [33mInterface only has a call signature, you should use a function type instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:76:5     [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:529:5    [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:531:5    [90m@typescript-eslint/prefer-function-type[39m [33mInterface only has a call signature, you should use a function type instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:534:5    [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:582:5    [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+[34mWarning[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:583:11 [90m@typescript-eslint/no-unused-vars[39m       [33m'WasmBinderStateClass' is defined but never used. Allowed unused vars must match /^(_+$|_[^_])/u.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:584:5    [90m@typescript-eslint/prefer-function-type[39m [33mInterface only has a call signature, you should use a function type instead.[39m
+[31mError[39m: /private/tmp/orchestrator-workspace/worktrees/worker-1/wasm/typescript-bridge.ts:587:5    [90mlocal/jsdoc-format[39m                      [33m@internal should not appear on an unexported declaration.[39m
+
+[34m178 warnings[39m
+[31m521 errors[39m
+warning: variant `AsyncFunction` is never constructed
+   --> src/checker/flow_graph_builder.rs:124:5
+    |
+120 | enum FlowContextType {
+    |      --------------- variant in this enum
+...
+124 |     AsyncFunction,
+    |     ^^^^^^^^^^^^^
+    |
+    = note: `FlowContextType` has a derived impl for the trait `Clone`, but this is intentionally ignored during dead code analysis
+
+warning: associated functions `is_block_boundary`, `is_loop_statement`, `is_conditional_statement`, `is_variable_declaration`, and `is_assignment` are never used
+    --> src/checker/flow_graph_builder.rs:1034:8
+     |
+ 127 | impl<'a> FlowGraphBuilder<'a> {
+     | ----------------------------- associated functions in this implementation
+...
+1034 |     fn is_block_boundary(kind: u16) -> bool {
+     |        ^^^^^^^^^^^^^^^^^
+...
+1053 |     fn is_loop_statement(kind: u16) -> bool {
+     |        ^^^^^^^^^^^^^^^^^
+...
+1068 |     fn is_conditional_statement(kind: u16) -> bool {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+1079 |     fn is_variable_declaration(kind: u16) -> bool {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^
+...
+1091 |     fn is_assignment(kind: u16) -> bool {
+     |        ^^^^^^^^^^^^^
+
+warning: field `unreachable_cache` is never read
+  --> src/checker/reachability_analyzer.rs:26:5
+   |
+20 | pub struct ReachabilityAnalyzer<'a> {
+   |            -------------------- field in this struct
+...
+26 |     unreachable_cache: FxHashSet<u32>,
+   |     ^^^^^^^^^^^^^^^^^
+
+warning: methods `lower_type_parameter_info`, `can_merge_symbols`, `type_contains_any`, and `type_contains_any_inner` are never used
+     --> src/thin_checker.rs:2968:8
+      |
+  104 | impl<'a> ThinCheckerState<'a> {
+      | ----------------------------- methods in this implementation
+...
+ 2968 |     fn lower_type_parameter_info(
+      |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+13179 |     fn can_merge_symbols(&self, existing_flags: u32, new_flags: u32) -> bool {
+      |        ^^^^^^^^^^^^^^^^^
+...
+21161 |     fn type_contains_any(&self, type_id: TypeId) -> bool {
+      |        ^^^^^^^^^^^^^^^^^
+...
+21166 |     fn type_contains_any_inner(&self, type_id: TypeId, visited: &mut Vec<TypeId>) -> bool {
+      |        ^^^^^^^^^^^^^^^^^^^^^^^
+
+warning: constant `VLQ_BASE_SHIFT` is never used
+   --> src/source_map.rs:382:7
+    |
+382 | const VLQ_BASE_SHIFT: i32 = 5;
+    |       ^^^^^^^^^^^^^^
+
+warning: constant `VLQ_BASE` is never used
+   --> src/source_map.rs:383:7
+    |
+383 | const VLQ_BASE: i32 = 1 << VLQ_BASE_SHIFT;
+    |       ^^^^^^^^
+
+warning: constant `VLQ_BASE_MASK` is never used
+   --> src/source_map.rs:384:7
+    |
+384 | const VLQ_BASE_MASK: i32 = VLQ_BASE - 1;
+    |       ^^^^^^^^^^^^^
+
+warning: constant `VLQ_CONTINUATION_BIT` is never used
+   --> src/source_map.rs:385:7
+    |
+385 | const VLQ_CONTINUATION_BIT: i32 = VLQ_BASE;
+    |       ^^^^^^^^^^^^^^^^^^^^
+
+warning: function `vlq_encode` is never used
+   --> src/source_map.rs:389:4
+    |
+389 | fn vlq_encode(value: i32) -> String {
+    |    ^^^^^^^^^^
+
+warning: methods `emit_accessor`, `emit_variable_declaration`, `is_valid_identifier_name`, `get_computed_property_name`, and `has_extends_clause` are never used
+    --> src/transforms/class_es5.rs:1516:8
+     |
+  99 | impl<'a> ClassES5Emitter<'a> {
+     | ---------------------------- methods in this implementation
+...
+1516 |     fn emit_accessor(&mut self, class_name: &str, accessor_idx: NodeIndex, is_getter: bool) {
+     |        ^^^^^^^^^^^^^
+...
+2804 |     fn emit_variable_declaration(&mut self, decl_idx: NodeIndex) {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+4310 |     fn is_valid_identifier_name(&self, idx: NodeIndex) -> bool {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^
+...
+4328 |     fn get_computed_property_name(&self, idx: NodeIndex) -> String {
+     |        ^^^^^^^^^^^^^^^^^^^^^^^^^^
+...
+4388 |     fn has_extends_clause(&self, heritage_clauses: &Option<NodeList>) -> bool {
+     |        ^^^^^^^^^^^^^^^^^^
+
+warning: method `is_private_field` is never used
+    --> src/solver/operations.rs:1815:8
+     |
+1768 | impl<'a> PropertyAccessEvaluator<'a> {
+     | ------------------------------------ method in this implementation
+...
+1815 |     fn is_private_field(&self, prop_name: &str) -> bool {
+     |        ^^^^^^^^^^^^^^^^
+
+Error in [31mlint[39m in 23.3s
+Error: Process exited with code: 1
+> [32m/Users/mohsenazimi/.volta/tools/image/node/24.11.1/bin/node[39m ./scripts/dtsBundler.mjs --entrypoint ./built/local/typescript/typescript.d.ts --output ./built/local/typescript.d.ts
+Bundling ./built/local/typescript/typescript.d.ts to ./built/local/typescript.d.ts and ./built/local/typescript.internal.d.ts
+warning: `wasm` (lib) generated 12 warnings (run `cargo fix --lib -p wasm` to apply 1 suggestion)
+Error: Compiling your crate to WebAssembly failed
+Caused by: Compiling your crate to WebAssembly failed
+Caused by: failed to execute `cargo build`: exited with exit status: 101
+  full command: cd "wasm" && "cargo" "build" "--lib" "--release" "--target" "wasm32-unknown-unknown"
+Completed [34mruntests-parallel[39m[31m with errors[39m in 55.8s
+Failed tasks: [31mbuild-wasm[39m, [31mlint[39m
