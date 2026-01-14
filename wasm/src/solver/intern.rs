@@ -176,32 +176,11 @@ pub struct TypeInterner {
     conditional_types: RwLock<ValueInterner<ConditionalType>>,
     mapped_types: RwLock<ValueInterner<MappedType>>,
     applications: RwLock<ValueInterner<TypeApplication>>,
-    /// Fast-rejection flags for types (indexed by TypeId.0)
-    /// Allows O(1) checks for common type properties
-    type_flags: RwLock<Vec<TypeFlags>>,
 }
 
 impl TypeInterner {
     /// Create a new type interner with pre-registered intrinsics
     pub fn new() -> Self {
-        // Initialize type flags for intrinsic types
-        let mut flags = vec![TypeFlags::NONE; TypeId::FIRST_USER as usize];
-
-        // Set flags for each intrinsic type
-        flags[TypeId::NONE.0 as usize] = TypeFlags::IS_ERROR;
-        flags[TypeId::ERROR.0 as usize] = TypeFlags::IS_ERROR;
-        flags[TypeId::NEVER.0 as usize] = TypeFlags::IS_FALSY;
-        flags[TypeId::UNKNOWN.0 as usize] = TypeFlags::IS_GENERIC;
-        flags[TypeId::ANY.0 as usize] = TypeFlags::IS_GENERIC;
-        flags[TypeId::VOID.0 as usize] = TypeFlags::IS_FALSY;
-        flags[TypeId::UNDEFINED.0 as usize] = TypeFlags::IS_FALSY;
-        flags[TypeId::NULL.0 as usize] = TypeFlags::IS_FALSY;
-        // Boolean, Number, String, BigInt, Symbol - no specific flags
-        flags[TypeId::OBJECT.0 as usize] = TypeFlags::IS_TRUTHY | TypeFlags::HAS_OBJECT_STRUCTURE;
-        flags[TypeId::BOOLEAN_TRUE.0 as usize] = TypeFlags::IS_TRUTHY;
-        flags[TypeId::BOOLEAN_FALSE.0 as usize] = TypeFlags::IS_FALSY;
-        flags[TypeId::FUNCTION.0 as usize] = TypeFlags::IS_TRUTHY | TypeFlags::IS_CALLABLE | TypeFlags::HAS_OBJECT_STRUCTURE;
-
         TypeInterner {
             shards: std::array::from_fn(|_| TypeShard::new()),
             string_interner: {
@@ -219,7 +198,6 @@ impl TypeInterner {
             conditional_types: RwLock::new(ValueInterner::new()),
             mapped_types: RwLock::new(ValueInterner::new()),
             applications: RwLock::new(ValueInterner::new()),
-            type_flags: RwLock::new(flags),
         }
     }
 
@@ -434,17 +412,9 @@ impl TypeInterner {
         }
 
         storage.push(key.clone());
-
-        // Compute type flags before moving key
-        let flags = TypeFlags::from_type_key(&key);
         map.insert(key, local_index);
 
-        let type_id = self.make_id(local_index, shard_idx as u32);
-
-        // Store type flags for this new type
-        self.store_type_flags(type_id, flags);
-
-        type_id
+        self.make_id(local_index, shard_idx as u32)
     }
 
     /// Look up the TypeKey for a given TypeId
@@ -519,66 +489,6 @@ impl TypeInterner {
     /// Check if the interner is empty (only has intrinsics)
     pub fn is_empty(&self) -> bool {
         self.len() <= TypeId::FIRST_USER as usize
-    }
-
-    // =========================================================================
-    // Type Flags (Fast Rejection)
-    // =========================================================================
-
-    /// Get the type flags for a given TypeId.
-    /// Returns TypeFlags::NONE if the TypeId is not found.
-    pub fn get_type_flags(&self, type_id: TypeId) -> TypeFlags {
-        let flags = self.type_flags.read().unwrap();
-        if type_id.0 as usize >= flags.len() {
-            TypeFlags::NONE
-        } else {
-            flags[type_id.0 as usize]
-        }
-    }
-
-    /// Store type flags for a given TypeId.
-    fn store_type_flags(&self, type_id: TypeId, flags: TypeFlags) {
-        let mut type_flags = self.type_flags.write().unwrap();
-        if type_id.0 as usize >= type_flags.len() {
-            type_flags.resize(type_id.0 as usize + 1, TypeFlags::NONE);
-        }
-        type_flags[type_id.0 as usize] = flags;
-    }
-
-    /// Check if a type is definitely truthy in boolean context.
-    /// Returns None if it depends on runtime (e.g., union of truthy and falsy).
-    pub fn is_definitely_truthy(&self, type_id: TypeId) -> Option<bool> {
-        self.get_type_flags(type_id).is_definitely_truthy()
-    }
-
-    /// Check if a type has object structure (can be accessed with . operator).
-    pub fn has_object_structure(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::HAS_OBJECT_STRUCTURE)
-    }
-
-    /// Check if a type is callable.
-    pub fn is_callable(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::IS_CALLABLE)
-    }
-
-    /// Check if a type is a union type.
-    pub fn is_union(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::IS_UNION)
-    }
-
-    /// Check if a type is an intersection type.
-    pub fn is_intersection(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::IS_INTERSECTION)
-    }
-
-    /// Check if a type is or contains generics (type parameters, conditionals, etc.).
-    pub fn is_generic(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::IS_GENERIC)
-    }
-
-    /// Check if a type is an error type.
-    pub fn is_error_type(&self, type_id: TypeId) -> bool {
-        self.get_type_flags(type_id).contains(TypeFlags::IS_ERROR)
     }
 
     #[inline]

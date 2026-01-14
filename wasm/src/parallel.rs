@@ -507,11 +507,8 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
 
     // Track which symbols have been merged to avoid duplicate processing
     let mut merged_symbols: FxHashMap<String, SymbolId> = FxHashMap::default();
-    // Track which file each symbol was first declared in (for decl_file_idx)
-    let mut symbol_file_idx: FxHashMap<SymbolId, u32> = FxHashMap::default();
 
-    for (file_idx, result) in results.iter().enumerate() {
-        let file_idx = file_idx as u32;
+    for result in results {
         declared_modules.extend(result.declared_modules.iter().cloned());
         // Copy symbols from this file to global arena, getting new IDs
         let mut id_remap: FxHashMap<SymbolId, SymbolId> = FxHashMap::default();
@@ -531,8 +528,6 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                             let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
                             symbol_arenas.insert(new_id, Arc::clone(&result.arena));
                             merged_symbols.insert(sym.escaped_name.clone(), new_id);
-                            // Track which file this symbol is from
-                            symbol_file_idx.insert(new_id, file_idx);
                             new_id
                         }
                     } else {
@@ -540,7 +535,6 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                         let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
                         symbol_arenas.insert(new_id, Arc::clone(&result.arena));
                         merged_symbols.insert(sym.escaped_name.clone(), new_id);
-                        symbol_file_idx.insert(new_id, file_idx);
                         new_id
                     }
                 } else {
@@ -548,8 +542,6 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                     let new_id = global_symbols.alloc(sym.flags, sym.escaped_name.clone());
                     symbol_arenas.insert(new_id, Arc::clone(&result.arena));
                     merged_symbols.insert(sym.escaped_name.clone(), new_id);
-                    // Track which file this symbol is from
-                    symbol_file_idx.insert(new_id, file_idx);
                     new_id
                 };
                 id_remap.insert(old_id, new_id);
@@ -626,9 +618,6 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                     updated.value_declaration = old_sym.value_declaration;
                     updated.declarations = old_sym.declarations.clone();
                     updated.is_exported = old_sym.is_exported;
-                    // CRITICAL: Set decl_file_idx for cross-file symbol resolution
-                    // This allows the checker to find the declaration in the correct arena
-                    updated.decl_file_idx = symbol_file_idx.get(&new_id).copied().unwrap_or(u32::MAX);
                     updated.exports = old_sym
                         .exports
                         .as_ref()

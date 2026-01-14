@@ -887,7 +887,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         const hasExportModifier = !!(getCombinedModifierFlags(node) & ModifierFlags.Export) || jsdocTreatAsExported(node);
         if (symbolFlags & SymbolFlags.Alias) {
             if (node.kind === SyntaxKind.ExportSpecifier || (node.kind === SyntaxKind.ImportEqualsDeclaration && hasExportModifier)) {
-                return declareSymbol(container.symbol.exports!, container.symbol, node, symbolFlags, symbolExcludes);
+                // EM-3: Defensive lazy initialization for exports symbol table
+                const exports = container.symbol.exports || (container.symbol.exports = createSymbolTable());
+                return declareSymbol(exports, container.symbol, node, symbolFlags, symbolExcludes);
             }
             else {
                 Debug.assertNode(container, canHaveLocals);
@@ -913,11 +915,15 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
             if (isJSDocTypeAlias(node)) Debug.assert(isInJSFile(node)); // We shouldn't add symbols for JSDoc nodes if not in a JS file.
             if (!isAmbientModule(node) && (hasExportModifier || container.flags & NodeFlags.ExportContext)) {
                 if (!canHaveLocals(container) || !container.locals || (hasSyntacticModifier(node, ModifierFlags.Default) && !getDeclarationName(node))) {
-                    return declareSymbol(container.symbol.exports!, container.symbol, node, symbolFlags, symbolExcludes); // No local symbol for an unnamed default!
+                    // EM-3: Defensive lazy initialization for exports symbol table
+                    const exports = container.symbol.exports || (container.symbol.exports = createSymbolTable());
+                    return declareSymbol(exports, container.symbol, node, symbolFlags, symbolExcludes); // No local symbol for an unnamed default!
                 }
                 const exportKind = symbolFlags & SymbolFlags.Value ? SymbolFlags.ExportValue : 0;
                 const local = declareSymbol(container.locals, /*parent*/ undefined, node, exportKind, symbolExcludes);
-                local.exportSymbol = declareSymbol(container.symbol.exports!, container.symbol, node, symbolFlags, symbolExcludes);
+                // EM-3: Defensive lazy initialization for exports symbol table
+                const exports = container.symbol.exports || (container.symbol.exports = createSymbolTable());
+                local.exportSymbol = declareSymbol(exports, container.symbol, node, symbolFlags, symbolExcludes);
                 node.localSymbol = local;
                 return local;
             }
@@ -2277,7 +2283,8 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                 return declareClassMember(node, symbolFlags, symbolExcludes);
 
             case SyntaxKind.EnumDeclaration:
-                return declareSymbol(container.symbol.exports!, container.symbol, node, symbolFlags, symbolExcludes);
+                // EM-3: Defensive lazy initialization for exports symbol table
+                return declareSymbol(container.symbol.exports || (container.symbol.exports = createSymbolTable()), container.symbol, node, symbolFlags, symbolExcludes);
 
             case SyntaxKind.TypeLiteral:
             case SyntaxKind.JSDocTypeLiteral:
@@ -2289,7 +2296,8 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                 // container, and are never in scope otherwise (even inside the body of the
                 // object / type / interface declaring them). An exception is type parameters,
                 // which are in scope without qualification (similar to 'locals').
-                return declareSymbol(container.symbol.members!, container.symbol, node, symbolFlags, symbolExcludes);
+                // EM-3: Defensive lazy initialization for members symbol table
+                return declareSymbol(container.symbol.members || (container.symbol.members = createSymbolTable()), container.symbol, node, symbolFlags, symbolExcludes);
 
             case SyntaxKind.FunctionType:
             case SyntaxKind.ConstructorType:
@@ -2321,9 +2329,10 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
     }
 
     function declareClassMember(node: Declaration, symbolFlags: SymbolFlags, symbolExcludes: SymbolFlags) {
+        // EM-3: Defensive lazy initialization for exports/members symbol tables
         return isStatic(node)
-            ? declareSymbol(container.symbol.exports!, container.symbol, node, symbolFlags, symbolExcludes)
-            : declareSymbol(container.symbol.members!, container.symbol, node, symbolFlags, symbolExcludes);
+            ? declareSymbol(container.symbol.exports || (container.symbol.exports = createSymbolTable()), container.symbol, node, symbolFlags, symbolExcludes)
+            : declareSymbol(container.symbol.members || (container.symbol.members = createSymbolTable()), container.symbol, node, symbolFlags, symbolExcludes);
     }
 
     function declareSourceFileMember(node: Declaration, symbolFlags: SymbolFlags, symbolExcludes: SymbolFlags) {
@@ -3113,7 +3122,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
             bindSourceFileAsExternalModule();
             // Create symbol equivalent for the module.exports = {}
             const originalSymbol = file.symbol;
-            declareSymbol(file.symbol.exports!, file.symbol, file, SymbolFlags.Property, SymbolFlags.All);
+            // EM-3: Defensive lazy initialization for exports symbol table
+            const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
+            declareSymbol(exports, file.symbol, file, SymbolFlags.Property, SymbolFlags.All);
             file.symbol = originalSymbol;
         }
     }
@@ -3209,7 +3220,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         });
         if (symbol) {
             const flags = SymbolFlags.Property | SymbolFlags.ExportValue;
-            declareSymbol(symbol.exports!, symbol, node, flags, SymbolFlags.None);
+            // EM-3: Defensive lazy initialization for exports symbol table
+            const exports = symbol.exports || (symbol.exports = createSymbolTable());
+            declareSymbol(exports, symbol, node, flags, SymbolFlags.None);
         }
     }
 
@@ -3229,7 +3242,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
             const isAlias = isAliasableExpression(node.right) && (isExportsIdentifier(node.left.expression) || isModuleExportsAccessExpression(node.left.expression));
             const flags = isAlias ? SymbolFlags.Alias : SymbolFlags.Property | SymbolFlags.ExportValue;
             setParent(node.left, node);
-            declareSymbol(symbol.exports!, symbol, node.left, flags, SymbolFlags.None);
+            // EM-3: Defensive lazy initialization for exports symbol table
+            const exports = symbol.exports || (symbol.exports = createSymbolTable());
+            declareSymbol(exports, symbol, node.left, flags, SymbolFlags.None);
         }
     }
 
@@ -3255,12 +3270,16 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         const flags = exportAssignmentIsAlias(node)
             ? SymbolFlags.Alias // An export= with an EntityNameExpression or a ClassExpression exports all meanings of that identifier or class
             : SymbolFlags.Property | SymbolFlags.ExportValue | SymbolFlags.ValueModule;
-        const symbol = declareSymbol(file.symbol.exports!, file.symbol, node, flags | SymbolFlags.Assignment, SymbolFlags.None);
+        // EM-3: Defensive lazy initialization for exports symbol table
+        const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
+        const symbol = declareSymbol(exports, file.symbol, node, flags | SymbolFlags.Assignment, SymbolFlags.None);
         setValueDeclaration(symbol, node);
     }
 
     function bindExportAssignedObjectMemberAlias(node: ShorthandPropertyAssignment) {
-        declareSymbol(file.symbol.exports!, file.symbol, node, SymbolFlags.Alias | SymbolFlags.Assignment, SymbolFlags.None);
+        // EM-3: Defensive lazy initialization for exports symbol table
+        const exports = file.symbol.exports || (file.symbol.exports = createSymbolTable());
+        declareSymbol(exports, file.symbol, node, SymbolFlags.Alias | SymbolFlags.Assignment, SymbolFlags.None);
     }
 
     function bindThisPropertyAssignment(node: BindablePropertyAssignmentExpression | PropertyAccessExpression | LiteralLikeElementAccessExpression) {
@@ -3307,7 +3326,10 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                 // this.foo assignment in a JavaScript class
                 // Bind this property to the containing class
                 const containingClass = thisContainer.parent;
-                const symbolTable = isStatic(thisContainer) ? containingClass.symbol.exports! : containingClass.symbol.members!;
+                // EM-3: Defensive lazy initialization for exports/members symbol tables
+                const symbolTable = isStatic(thisContainer)
+                    ? (containingClass.symbol.exports || (containingClass.symbol.exports = createSymbolTable()))
+                    : (containingClass.symbol.members || (containingClass.symbol.members = createSymbolTable()));
                 if (hasDynamicName(node)) {
                     bindDynamicallyNamedThisPropertyAssignment(node, containingClass.symbol, symbolTable);
                 }
@@ -3321,7 +3343,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                     break;
                 }
                 else if (thisContainer.commonJsModuleIndicator) {
-                    declareSymbol(thisContainer.symbol.exports!, thisContainer.symbol, node, SymbolFlags.Property | SymbolFlags.ExportValue, SymbolFlags.None);
+                    // EM-3: Defensive lazy initialization for exports symbol table
+                    const exports = thisContainer.symbol.exports || (thisContainer.symbol.exports = createSymbolTable());
+                    declareSymbol(exports, thisContainer.symbol, node, SymbolFlags.Property | SymbolFlags.ExportValue, SymbolFlags.None);
                 }
                 else {
                     declareSymbolAndAddToSymbolTable(node, SymbolFlags.FunctionScopedVariable, SymbolFlags.FunctionScopedVariableExcludes);
@@ -3454,7 +3478,8 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
                     return symbol;
                 }
                 else {
-                    const table = parent ? parent.exports! :
+                    // EM-3: Defensive lazy initialization for parent exports symbol table
+                    const table = parent ? (parent.exports || (parent.exports = createSymbolTable())) :
                         file.jsGlobalAugmentations || (file.jsGlobalAugmentations = createSymbolTable());
                     return declareSymbol(table, parent, id, flags, excludeFlags);
                 }
@@ -3627,14 +3652,16 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         // module might have an exported variable called 'prototype'.  We can't allow that as
         // that would clash with the built-in 'prototype' for the class.
         const prototypeSymbol = createSymbol(SymbolFlags.Property | SymbolFlags.Prototype, "prototype" as __String);
-        const symbolExport = symbol.exports!.get(prototypeSymbol.escapedName);
+        // EM-3: Defensive lazy initialization for exports symbol table
+        const exports = symbol.exports || (symbol.exports = createSymbolTable());
+        const symbolExport = exports.get(prototypeSymbol.escapedName);
         if (symbolExport) {
             if (node.name) {
                 setParent(node.name, node);
             }
             file.bindDiagnostics.push(createDiagnosticForNode(symbolExport.declarations![0], Diagnostics.Duplicate_identifier_0, symbolName(prototypeSymbol)));
         }
-        symbol.exports!.set(prototypeSymbol.escapedName, prototypeSymbol);
+        exports.set(prototypeSymbol.escapedName, prototypeSymbol);
         prototypeSymbol.parent = symbol;
     }
 
@@ -3701,7 +3728,9 @@ function createBinder(): (file: SourceFile, options: CompilerOptions) => void {
         // containing class.
         if (isParameterPropertyDeclaration(node, node.parent)) {
             const classDeclaration = node.parent.parent;
-            declareSymbol(classDeclaration.symbol.members!, classDeclaration.symbol, node, SymbolFlags.Property | (node.questionToken ? SymbolFlags.Optional : SymbolFlags.None), SymbolFlags.PropertyExcludes);
+            // EM-3: Defensive lazy initialization for members symbol table
+            const members = classDeclaration.symbol.members || (classDeclaration.symbol.members = createSymbolTable());
+            declareSymbol(members, classDeclaration.symbol, node, SymbolFlags.Property | (node.questionToken ? SymbolFlags.Optional : SymbolFlags.None), SymbolFlags.PropertyExcludes);
         }
     }
 
