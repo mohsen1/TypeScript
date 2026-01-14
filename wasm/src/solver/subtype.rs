@@ -2096,10 +2096,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let source_type = source_type.unwrap_or(TypeId::UNKNOWN);
         let target_type = target_type.unwrap_or(TypeId::UNKNOWN);
 
-        // this parameters must be EXACTLY the same type (invariant)
-        // Unlike regular parameters, `this` is not contravariant or bivariant
+        // this parameters are checked covariantly (like return types)
+        // For `(this: S) => void` to be assignable to `(this: T) => void`,
+        // we need `S <: T` because the source function will be called with `this`
+        // bound to something of type S, and the target expects T
+        // In strict mode, this is still the correct check (invariance would
+        // require S == T, which is too strict)
         self.check_subtype(source_type, target_type).is_true()
-            && self.check_subtype(target_type, source_type).is_true()
     }
 
     fn required_param_count(&self, params: &[ParamInfo]) -> usize {
