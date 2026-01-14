@@ -557,16 +557,19 @@ impl ThinBinderState {
 
         self.sync_current_scope_to_persistent();
 
-        // Store file locals, merging with lib symbols if they were pre-merged
-        let user_symbols = std::mem::take(&mut self.current_scope);
-
-        // Set file_locals to user symbols
-        self.file_locals = user_symbols;
-
-        // Restore lib symbols from the saved lib_symbols map (if they were pre-merged)
-        // We use the saved map instead of the root scope because sync_current_scope_to_persistent
-        // may have overwritten lib symbols in the root scope with user symbols.
+        // Store file locals, preserving any existing lib symbols.
         // User symbols take precedence - only add lib symbols if no user symbol exists.
+        let existing_file_locals = std::mem::take(&mut self.file_locals);
+        self.file_locals = std::mem::take(&mut self.current_scope);
+
+        // Merge back any existing file locals (e.g., lib symbols) that were pre-populated.
+        for (name, sym_id) in existing_file_locals.iter() {
+            if !self.file_locals.has(name) {
+                self.file_locals.set(name.clone(), *sym_id);
+            }
+        }
+
+        // Restore lib symbols from the saved lib_symbols map (if they were pre-merged).
         if has_lib_symbols {
             for (name, sym_id) in &lib_symbols {
                 if !self.file_locals.has(name) {
@@ -738,7 +741,17 @@ impl ThinBinderState {
         }
 
         self.sync_current_scope_to_persistent();
+
+        // Store file locals, preserving any existing lib symbols
+        // This ensures symbols from merge_lib_symbols() are not lost
+        let existing_file_locals = std::mem::take(&mut self.file_locals);
         self.file_locals = std::mem::take(&mut self.current_scope);
+        // Merge back any existing file locals (e.g., lib symbols) that were pre-populated
+        for (name, sym_id) in existing_file_locals.iter() {
+            if !self.file_locals.has(name) {
+                self.file_locals.set(name.clone(), *sym_id);
+            }
+        }
 
         true
     }
