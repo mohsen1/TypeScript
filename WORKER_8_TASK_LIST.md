@@ -14,7 +14,7 @@
 - [ ] Ensure parser doesn't bail early on syntax deviations
 
 ## Completed
-- [x] Initial merge attempt - No commits yet
+- [x] Merge attempt - No commits to merge yet
 
 ## Context
 Error recovery is critical to prevent one syntax error from poisoning the entire file. When the parser bails early, the incomplete AST leads to missing symbols and cascading errors.
