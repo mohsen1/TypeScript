@@ -1703,7 +1703,7 @@ impl<'a> ThinCheckerState<'a> {
                 let mut args = type_args.clone();
                 if args.len() < sig.type_params.len() {
                     for param in sig.type_params.iter().skip(args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         args.push(fallback);
                     }
                 }
@@ -3572,7 +3572,7 @@ impl<'a> ThinCheckerState<'a> {
                     if type_args.len() < base_type_params.len() {
                         for param in base_type_params.iter().skip(type_args.len()) {
                             let fallback =
-                                param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                             type_args.push(fallback);
                         }
                     }
@@ -4517,7 +4517,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }
@@ -4600,7 +4600,7 @@ impl<'a> ThinCheckerState<'a> {
                     if type_args.len() < interface_type_params.len() {
                         for param in interface_type_params.iter().skip(type_args.len()) {
                             let fallback =
-                                param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                             type_args.push(fallback);
                         }
                     }
@@ -5115,7 +5115,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }
@@ -18596,7 +18596,7 @@ impl<'a> ThinCheckerState<'a> {
             self.push_type_parameters(&base_class.type_parameters);
         if type_args.len() < base_type_params.len() {
             for param in base_type_params.iter().skip(type_args.len()) {
-                let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                 type_args.push(fallback);
             }
         }
@@ -18930,7 +18930,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }
