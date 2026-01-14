@@ -3,7 +3,13 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in property access patterns
+- [x] Reduce "Any" fallback in property access patterns
+
+## Completed
+- [x] Locate property access fallback locations (found 5)
+- [x] Change all 5 locations from TypeId::ANY to TypeId::UNKNOWN
+- [x] Verify compilation - Code compiles successfully
+- [x] Test - One pre-existing failure (unrelated to changes)
 
 ## Context
 
@@ -68,4 +74,11 @@ This will expose bugs where:
 - Measurable increase in detected type errors
 
 ## Ready for Merge
-No (task in progress)
+Yes - Implementation complete and tested.
+
+## Changes Summary
+- **Files modified**: 1 (`wasm/src/thin_checker.rs`)
+- **Lines changed**: 5 locations
+- **Change**: `property_type.unwrap_or(TypeId::ANY)` → `.unwrap_or(TypeId::UNKNOWN)`
+- **Commit**: `75c0eefe6 Complete: Reduce 'Any' fallback in property access patterns`
+- **Pushed to**: origin/worker-12
