@@ -25,12 +25,6 @@
 
    **Pattern 1: Multiple Sequential parse_expected() Calls**
    - Example: `parse_external_module_reference()` (lines 1124-1132)
-     ```rust
-     parse_expected(SyntaxKind::RequireKeyword);
-     parse_expected(SyntaxKind::OpenParenToken);
-     // ...
-     parse_expected(SyntaxKind::CloseParenToken);
-     ```
    - If first fails, all subsequent parse_expected may also fail, emitting multiple TS1005
 
    **Pattern 2: Block Parsing (lines 1175-1200)**
@@ -57,20 +51,10 @@
 
 ### Recommendations for Fix
 
-1. **Add recovery mode flag** to suppress cascading errors:
-   ```rust
-   error_position: Option<u32>,  // Track position of last error to avoid duplicates
-   ```
-
-2. **Modify parse_expected to check error position**:
-   - If error was just emitted at same position, skip emitting another
-
-3. **Add smarter comma recovery in object/array literals**:
-   - Before breaking, check if next token starts a valid property
-   - Emit one error and continue parsing
-
-4. **Consider syncing to statement boundaries after errors**:
-   - Skip to next `;`, `}`, or keyword to reduce cascading
+1. **Add recovery mode flag** to suppress cascading errors
+2. **Modify parse_expected to check error position** - skip if error was just emitted at same position
+3. **Add smarter comma recovery** in object/array literals
+4. **Consider syncing to statement boundaries** after errors
 
 ## Context
 Goal is to reduce parser false positives from 701 to <100. Focus on error recovery and cascading error prevention.
