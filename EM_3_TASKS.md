@@ -1,101 +1,102 @@
-# EM_3 Tasks - Solver Squad (STRATEGIC)
+# EM-3 Task List
 
-**Branch:** `em-team-3`
-**Priority:** 🟠 HIGH
-**Assigned Workers:** workers 7-9
-**Last Updated:** 2026-01-14
+## Team: Engineering Manager 3
+- **Workers**: worker-9, worker-10, worker-11
+- **Branch**: em-team-3
+- **Worktree**: /tmp/orchestrator-workspace/worktrees/em-3
+- **Squad Focus**: Parser/Scanner ONLY (TS1005/TS1109)
 
----
+## Mission Phase: Phase 8 - Conformance, Convergence, and Hardening
 
-## Squad Mission
+### Current Status
+| Metric | Value | Target |
+|--------|-------|--------|
+| Exact Match | 30.1% | 40% |
+| Missing Errors | 60.0% | <50% |
+| Parser false positives | 701 | <100 |
+| TS2304 extra errors | 343 | <50 |
 
-Stop being "nice". The compiler is too permissive—it defaults to `Any` when type checking gets hard. We need to switch to `Unknown`/`Error` fallbacks and harden the subtyping logic to expose real bugs.
-
----
-
-## Problem Statement
-
-**Error Codes:** TS2322 (Type not assignable), TS7006 (Implicit Any)
-
-**Current State:**
-- Solver returns `Any` when it can't resolve a type
-- `Any` silences ALL downstream type checking
-- We're missing TS2322 and TS7006 errors that `tsc` catches
-
-**Root Cause:**
-The "optimistic" compiler approach—when in doubt, return `Any`. This was fine for early development, but now it masks semantic bugs.
-
-**Impact:**
-- Missing errors that should be caught
-- False sense of correctness
-- Impossible to measure real semantic progress
+### Critical Problem: "Any" Poisoning
+The compiler defaults to `Any` when it encounters unresolved symbols, silencing downstream errors. This masks real progress.
 
 ---
 
-## Immediate Goals
+## Squad Assignments
 
-1. **Switch Fallback from `Any` to `Unknown`/`Error`**
-   - Change `TypeId::ANY` defaults to `TypeId::UNKNOWN` or `TypeId::ERROR`
-   - Update `lower_type` to return `Error` on resolution failure
-   - **WARNING:** This will temporarily spike error counts—this is GOOD (exposes real bugs)
+### Parser/Scanner Squad (3 workers) - TS1005/TS1109 Focus
+**Workers**: worker-9, worker-10, worker-11
+**Priority**: HIGH - 701 false positives inflate "Extra Errors" by 14%
 
-2. **Harden `solve_subtype` Logic**
-   - Implement TypeScript's function bivariance rules
-   - Handle void return exceptions
-   - Fix generic constraint checking
+**Directive**:
+- Audit TS1005 ("expected X") emission - likely over-triggering on valid syntax
+- Audit TS1109 ("expression expected") - false positives on edge cases
+- Reduce parser false positives to <100
 
-3. **Implement the "Lawyer" Layer**
-   - Reference: `specs/SOLVER.md`
-   - TypeScript has intentional quirks—implement them precisely
-   - Stop being "helpful" and be "accurate" instead
+**Key Files**:
+- `src/compiler/parser.ts` (540K lines)
+- `src/compiler/scanner.ts` (219K lines)
+- `TS1005_REDUCTION_RESULTS.md` - reference for patterns already fixed
+- `TS1109_ANALYSIS.md` - reference for TS1109 analysis
 
-4. **Target Metric:** Convert "Missing TS2322" to "Exact Match" or "Extra TS2322"
+**Success Metrics**:
+- TS1005: 439 → <100
+- TS1109: 262 → <50
+- Total parser false positives: 701 → <100
 
----
+### Worker Breakdown
 
-## Key Files to Investigate
-
-| File | Purpose | Action |
-|------|---------|--------|
-| `src/solver/mod.rs` | Main solver entry point | Change default fallback type |
-| `src/solver/subtype.rs` | Subtype checking | Harden logic, add TS quirks |
-| `src/solver/inference.rs` | Generic inference | Fix constraint handling |
-| `specs/SOLVER.md` | TypeScript spec | Implement "Lawyer" layer |
-
----
-
-## Worker Assignment Strategy
-
-| Worker | Focus Area |
-|--------|-----------|
-| worker-7 | Change `Any` → `Unknown` fallback across solver |
-| worker-8 | Harden `solve_subtype` with function bivariance |
-| worker-9 | Implement "Lawyer" layer quirks from specs/SOLVER.md |
+| Worker | Primary Focus | Secondary Focus |
+|--------|---------------|-----------------|
+| **worker-9** | TS1005 patterns 6-10 (object/array literals) | TS1109 statement parsing |
+| **worker-10** | TS1109 expression expected errors | TS1005 type parameters |
+| **worker-11** | TS1005 patterns 11-15 (edge cases) | TS1109 class member parsing |
 
 ---
 
-## Escalation Triggers
+## Team Workflow
 
-Escalate to Director if:
-- Fallback switch completed and metrics stabilized
-- Need architectural changes to solver design
-- Team size exceeds 4 (need team split)
+### 1. Task Assignment
+- EM-3 maintains this file
+- Updates each `WORKER_<id>_TASK_LIST.md` when assigning tasks
+- Workers work on individual branches
+
+### 2. Integration Process
+- Workers push to their feature branches
+- EM-3 merges locally to em-team-3
+- Run validation (`npm test` or conformance tests)
+- Escalate to Director only when stable
+
+### 3. Validation Commands
+```bash
+# Run conformance tests
+npm run test:conformance
+
+# Run unit tests
+npm test
+
+# Build compiler
+npm run build
+
+# Check specific error patterns
+npm run test -- --grep "TS1005"
+npm run test -- --grep "TS2304"
+```
 
 ---
 
-## Success Criteria
+## Current Sprint Goals
 
-- [ ] Solver defaults to `Unknown` or `Error` instead of `Any`
-- [ ] Function bivariance rules implemented
-- [ ] "Lawyer" layer for TS quirks implemented
-- [ ] Missing TS2322 errors decrease (or convert to Extra TS2322)
+1. **Worker 9**: Fix TS1005 patterns 6-10 (object literals, arrays, edge cases)
+2. **Worker 10**: Fix TS1109 false positives (expression expected errors)
+3. **Worker 11**: Fix TS1005 patterns 11-15 (edge cases: type parameters, return types, statements)
 
 ---
 
-## Notes
+## Next Actions
 
-- **Do NOT** modify worker task lists directly
-- Workers should create their own task breakdown
-- **Expect temporary metric regression**—this is intentional and good
-- Coordinate with EM_1 (Binder) as solver fixes depend on symbol resolution
-- This is "strategic" work—it unblocks all other squads by exposing real bugs
+- [x] Create WORKER_9_TASK_LIST.md
+- [x] Create WORKER_10_TASK_LIST.md
+- [x] Update WORKER_11_TASK_LIST.md (Parser focus)
+- [x] Remove WORKER_12_TASK_LIST.md (reassigned)
+- [ ] Run baseline conformance tests
+- [ ] Assign updated tasks to workers 9-11
