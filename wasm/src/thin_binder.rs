@@ -80,6 +80,14 @@ pub struct ThinBinderState {
     // ===== Module Resolution Debugging =====
     /// Debugger for tracking symbol table operations and scope lookups
     pub debugger: ModuleResolutionDebugger,
+
+    // ===== Global Augmentations =====
+    /// Tracks interface/type declarations inside `declare global` blocks that should
+    /// merge with lib.d.ts symbols. Maps interface name to declaration NodeIndex values.
+    pub global_augmentations: FxHashMap<String, Vec<NodeIndex>>,
+
+    /// Flag indicating we're currently binding inside a `declare global` block
+    in_global_augmentation: bool,
 }
 
 /// Validation result describing issues found in the symbol table
@@ -121,6 +129,8 @@ impl ThinBinderState {
             node_scope_ids: FxHashMap::default(),
             current_scope_id: ScopeId::NONE,
             debugger: ModuleResolutionDebugger::new(),
+            global_augmentations: FxHashMap::default(),
+            in_global_augmentation: false,
         }
     }
 
@@ -147,6 +157,8 @@ impl ThinBinderState {
         self.node_scope_ids.clear();
         self.current_scope_id = ScopeId::NONE;
         self.debugger.clear();
+        self.global_augmentations.clear();
+        self.in_global_augmentation = false;
     }
 
     /// Set the current file name for debugging purposes.
@@ -196,6 +208,8 @@ impl ThinBinderState {
             node_scope_ids: FxHashMap::default(),
             current_scope_id: ScopeId::NONE,
             debugger: ModuleResolutionDebugger::new(),
+            global_augmentations: FxHashMap::default(),
+            in_global_augmentation: false,
         }
     }
 
@@ -233,6 +247,8 @@ impl ThinBinderState {
             node_scope_ids,
             current_scope_id: ScopeId::NONE,
             debugger: ModuleResolutionDebugger::new(),
+            global_augmentations: FxHashMap::default(),
+            in_global_augmentation: false,
         }
     }
 
@@ -2498,6 +2514,15 @@ impl ThinBinderState {
                 // Check if exported BEFORE allocating symbol
                 let is_exported = self.has_export_modifier(arena, &iface.modifiers);
 
+                // If we're inside a global augmentation block, track this as an augmentation
+                // that should merge with lib.d.ts symbols at type resolution time
+                if self.in_global_augmentation {
+                    self.global_augmentations
+                        .entry(name.to_string())
+                        .or_default()
+                        .push(idx);
+                }
+
                 self.declare_symbol(name, symbol_flags::INTERFACE, idx, is_exported);
             }
         }
@@ -2921,7 +2946,11 @@ impl ThinBinderState {
                 if !module.body.is_none() {
                     self.node_scope_ids
                         .insert(module.body.0, self.current_scope_id);
+                    // Set flag so interface declarations inside are tracked as augmentations
+                    let was_in_global_augmentation = self.in_global_augmentation;
+                    self.in_global_augmentation = true;
                     self.bind_node(arena, module.body);
+                    self.in_global_augmentation = was_in_global_augmentation;
                 }
                 return;
             }

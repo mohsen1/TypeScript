@@ -1287,8 +1287,11 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Resolve a type by name from lib file contexts.
     /// This is used for global types like Object, Array, Promise, etc. from lib.d.ts.
+    /// Also merges in any global augmentations from the current file.
     fn resolve_lib_type_by_name(&mut self, name: &str) -> Option<TypeId> {
         use crate::solver::TypeLowering;
+
+        let mut lib_type_id: Option<TypeId> = None;
 
         for lib_ctx in &self.ctx.lib_contexts {
             // Look up the symbol in this lib file's file_locals
@@ -1299,17 +1302,37 @@ impl<'a> ThinCheckerState<'a> {
                     let lowering = TypeLowering::new(lib_ctx.arena.as_ref(), self.ctx.types);
                     // For interfaces, use all declarations (handles declaration merging)
                     if !symbol.declarations.is_empty() {
-                        return Some(lowering.lower_interface_declarations(&symbol.declarations));
+                        lib_type_id = Some(lowering.lower_interface_declarations(&symbol.declarations));
+                        break;
                     }
                     // For type aliases and other single-declaration types
                     let decl_idx = symbol.value_declaration;
                     if decl_idx.0 != u32::MAX {
-                        return Some(lowering.lower_type(decl_idx));
+                        lib_type_id = Some(lowering.lower_type(decl_idx));
+                        break;
                     }
                 }
             }
         }
-        None
+
+        // Check for global augmentations in the current file that should merge with this type
+        if let Some(augmentation_decls) = self.ctx.binder.global_augmentations.get(name) {
+            if !augmentation_decls.is_empty() {
+                // Lower the augmentation declarations from the current file's arena
+                let lowering = TypeLowering::new(self.ctx.arena, self.ctx.types);
+                let augmentation_type = lowering.lower_interface_declarations(augmentation_decls);
+
+                // Merge lib type with augmentation using intersection
+                if let Some(lib_type) = lib_type_id {
+                    return Some(self.ctx.types.intersection2(lib_type, augmentation_type));
+                } else {
+                    // No lib type found, just return the augmentation
+                    return Some(augmentation_type);
+                }
+            }
+        }
+
+        lib_type_id
     }
 
     fn lookup_type_parameter(&self, name: &str) -> Option<TypeId> {
