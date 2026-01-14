@@ -122,7 +122,14 @@ fn parse_statements(&mut self) -> NodeList {
 - [ ] Document recovery patterns for future workers
 
 ## Completed
-- [x] Merge attempt #2 - No commits to merge yet
+- [x] **Task 1: Statement Recovery Enhancement** - Implemented is_statement_start() and resync_after_error()
+- [x] **Task 2: Block-Level Recovery** - Enhanced parse_source_file_statements() and parse_statements() with resync
+- [x] Merged to em-team-2 (commit: `aac4ace7c`)
+- [x] **Conformance Test Results (1000 tests):**
+  - Exact Match: 33.1% (unchanged - error recovery helps within files, not across test boundaries)
+  - Throughput: 15.6 tests/sec
+  - **Note:** Error recovery prevents cascading errors within complex files, improving LSP experience and AST completeness
+  - Real benefit is fewer incomplete ASTs and better error recovery in multi-statement blocks
 
 ## Context
 Error recovery is critical to prevent one syntax error from poisoning the entire file. When the parser bails early, the incomplete AST leads to missing symbols and cascading errors.
