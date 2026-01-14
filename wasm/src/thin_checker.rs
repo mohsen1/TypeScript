@@ -9780,7 +9780,9 @@ impl<'a> ThinCheckerState<'a> {
                 let return_context = ctx_helper
                     .as_ref()
                     .and_then(|helper| helper.get_return_type());
-                has_contextual_return = return_context.is_some();
+                // TS7010/TS7011: Only count as contextual return if it's not UNKNOWN
+                // UNKNOWN is a "no type" value and shouldn't prevent implicit any errors
+                has_contextual_return = return_context.is_some_and(|t| t != TypeId::UNKNOWN);
                 return_type = self.infer_return_type_from_body(body, return_context);
             }
 
