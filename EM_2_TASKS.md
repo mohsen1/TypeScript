@@ -1,117 +1,67 @@
-# EM_2 Tasks - Parser/Scanner Squad (PRIORITY)
+# EM-2 Task Master
 
-**Branch:** `em-team-2`
-**Priority:** 🟠 HIGH
-**Assigned Workers:** workers 5-6 (incoming: workers 1-3 from EM_1 after validation)
-**Last Updated:** 2026-01-14 (Director update - awaiting transfer)
+## Team: em-team-2
+**Workers:** worker-5, worker-6, worker-7, worker-8
+**Branch:** em-team-2
 
----
+## Mission
+Own task assignment, maintain worker task lists, merge locally when stable, escalate to Director only when validated.
 
-## Squad Mission
+## Current Phase: Phase 8 - Conformance, Convergence, and Hardening
+**Focus:** Stop the "Any" poisoning, fix parser false positives, harden semantic checking.
 
-Fix the **701 false positive parser errors** that are polluting conformance measurements. When the parser over-reports errors, it masks real progress and inflates "Extra Errors" by 14%.
+### Status Overview
+| Metric | Current | Target |
+|--------|---------|--------|
+| Exact Match | 30.1% | 40% |
+| Missing Errors | 60.0% | <50% |
+| Parser false positives | 701 | <100 |
+| TS2304 extra errors | 343 | <50 |
 
----
+## Squad Assignments
 
-## Problem Statement
+### 🔴 CRITICAL: Binder Squad (2 workers)
+**Problem:** TS2304 (Cannot find name) - global scope and lib.d.ts binding failures causing "Any" poisoning
+**Assigned:** worker-5, worker-6
+**Goal:** Reduce TS2304 extra errors from 343 to <50
 
-**Error Codes:** TS1005, TS1109
+**Tasks:**
+1. Debug why `console.log`, `Promise`, `Array` fail to resolve
+2. Verify `lib_loader.rs` correctly merges `lib.d.ts` symbols into root `SymbolTable`
+3. Fix module augmentation resolution (merging `interface Window` across files)
+4. Debug `src/thin_binder.rs` `file_locals` population from library context
 
-**Current State:**
-- **TS1005 ("expected X"):** 439 false positives
-- **TS1109 ("expression expected"):** 262 false positives
-- **Total:** 701 false positives
+### 🟠 PRIORITY: Parser Squad (1 worker)
+**Problem:** 701 false positive errors (TS1005: 439, TS1109: 262) polluting measurements
+**Assigned:** worker-7
+**Goal:** Reduce parser false positives from 701 to <100
 
-**Root Cause:**
-The parser is likely:
-1. Too strict on valid TypeScript syntax edge cases
-2. Not implementing proper error recovery (resynchronization)
-3. Emitting errors on syntax that `tsc` accepts
+**Tasks:**
+1. Continue TS1005 "expected X" fixes (Worker 1 has patterns 1-5 done, continue remaining)
+2. Audit and fix TS1109 "expression expected" false positives (262 occurrences)
+3. Improve error recovery/resynchronization in `src/thin_parser.rs`
 
-**Impact:**
-- Inflates "Extra Errors" metric by 14%
-- Masks actual semantic progress
-- Incomplete AST leads to missing symbols (cascading into Binder failures)
+### 🟡 SUPPORT: Solver Squad (1 worker)
+**Problem:** Solver too permissive, defaults to `Any` instead of `Unknown`/`Error`
+**Assigned:** worker-8
+**Goal:** Expose real errors by stopping silent `Any` fallback
 
----
+**Tasks:**
+1. Change `lower_type` to return `Error` instead of `Any` when resolution fails
+2. Harden `solve_subtype` logic
+3. Implement "Lawyer" layer for TypeScript quirks (function bivariance, void return exceptions)
 
-## Immediate Goals
+## Merge Protocol
+1. Workers push to their feature branches
+2. EM-2 merges worker branches locally to em-team-2
+3. Run validation: `cargo test && npm run conformance`
+4. Only escalate to Director when metrics improve and tests pass
 
-1. **Audit TS1005 Emission**
-   - Find where "expected X" is emitted
-   - Compare with `tsc` behavior on same test cases
-   - Identify over-triggering conditions
+## Blocking Issues
+None - all workers can start in parallel
 
-2. **Audit TS1109 Emission**
-   - Find "expression expected" emission points
-   - Check for false positives on valid edge cases
-   - Verify lookahead/parser state isn't bailing early
-
-3. **Improve Error Recovery**
-   - Implement resynchronization after syntax errors
-   - Keep parsing to complete the AST even with errors
-   - Don't let one error poison the rest of the file
-
-4. **Target Metric:** Reduce parser false positives to **<100**
-
----
-
-## Key Files to Investigate
-
-| File | Purpose | Action |
-|------|---------|--------|
-| `src/compiler/parser.ts` | Main parser logic | Audit TS1005/TS1109 emission |
-| `src/scanner.ts` (if exists) | Lexical analysis | Check tokenization edge cases |
-| `src/error_recovery.ts` (if exists) | Error recovery | Implement/improve resynchronization |
-
-**Note:** Workers 1-3 have already implemented fixes in `src/compiler/parser.ts`:
-- Worker 1: TS1005 patterns 1-5 (semicolon handling, return type arrow functions)
-- Worker 2: TS1109 definite assignment assertions
-- Worker 3: Cascading error tracking with `last_error_pos`
-
----
-
-## Worker Assignment Strategy
-
-| Worker | Focus Area | Status |
-|--------|-----------|--------|
-| worker-1 | TS1005 patterns 1-5 (DONE, needs validation) | Incoming from EM_1 |
-| worker-2 | TS1109 definite assignment (DONE, needs validation) | Incoming from EM_1 |
-| worker-3 | Cascading error tracking (DONE, needs validation) | Incoming from EM_1 |
-| worker-5 | TS1005 investigation and fixes | Current |
-| worker-6 | TS1109 investigation and fixes | Current |
-| (Shared) | Error recovery implementation | All workers |
-
-**Next Steps for EM_2:**
-1. Await EM-1 validation cycle completion
-2. Accept transfer of workers 1-3
-3. Validate their fixes (run conformance tests)
-4. Continue with remaining TS1005/TS1109 patterns
-
----
-
-## Escalation Triggers
-
-Escalate to Director if:
-- Parser false positives < 100 (mission complete)
-- Need architectural changes to parser design
-- Team size exceeds 4 (need team split)
-
----
-
-## Success Criteria
-
-- [ ] TS1005 false positives < 50
-- [ ] TS1109 false positives < 50
-- [ ] Total parser false positives < 100
-- [ ] Error recovery keeps parsing after syntax errors
-- [ ] No regression in valid syntax parsing
-
----
-
-## Notes
-
-- **Do NOT** modify worker task lists directly
-- Workers should create their own task breakdown
-- Coordinate with EM_1 (Binder) as parser fixes may affect symbol binding
-- Existing analysis docs: `TS1005_REDUCTION_RESULTS.md`, `TS1109_ANALYSIS.md`
+## Next Actions
+1. Assign tasks to worker-5 through worker-8
+2. Monitor progress via WORKER_*_TASK_LIST.md updates
+3. Merge completed work to em-team-2
+4. Run conformance to measure impact
