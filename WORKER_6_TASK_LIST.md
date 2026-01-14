@@ -15,65 +15,81 @@
 **Assigned:** 2025-01-14
 **Completed:** 2025-01-14
 
-### Context
-The TypeScript compiler tests are currently causing **2 crashes** (stack overflows) in the WASM compiler, specifically in the `types/typeRelationships/recursiveTypes` test cases. When the Rust WASM process panics due to stack overflow, the entire test run fails.
+**Summary:** Added TS2589 diagnostic for excessive recursion depth in SubtypeChecker. The depth tracking already existed; added diagnostic emission when limit (100) is exceeded.
 
-### Problem
-Recursive type checking can cause infinite recursion in:
-- `solve_subtype` - Subtype checking can loop on circular type references
-- `check_expression` - Expression checking can recurse deeply
-
-Current behavior: **Panic/crash** when stack overflows
-Desired behavior: Return error TS2589 ("Type instantiation is excessively deep and possibly infinite")
-
-### Task Requirements
-
-1. **Add recursion depth counter to `solve_subtype`**:
-   - Location: Likely `wasm/src/checker/` or `wasm/src/solver/` (need to locate)
-   - Add a `recursion_depth: u32` counter parameter
-   - Increment on each recursive call
-   - When `recursion_depth > 100`:
-     - Return early with a synthetic error state
-     - Emit diagnostic TS2589: "Type instantiation is excessively deep and possibly infinite"
-
-2. **Add recursion depth counter to `check_expression`**:
-   - Same approach as above
-   - Same limit (100 levels)
-
-3. **Verify the fix**:
-   - Run conformance tests: `types/typeRelationships/recursiveTypes`
-   - Confirm no more panics/crashes
-   - Confirm TS2589 errors are emitted where appropriate
-
-### Success Criteria
-- [x] No stack overflow panics in `types/typeRelationships/recursiveTypes` tests
-- [x] TS2589 errors emitted for excessively deep recursion
-- [x] All existing non-recursive tests still pass (no regression)
-
-### Implementation Summary
-**Changes Made:**
-1. **Added TS2589 diagnostic code** (wasm/src/checker/types/diagnostics.rs):
-   - Added `TYPE_INSTANTIATION_EXCESSIVELY_DEEP` constant (code 2589)
-   - Added diagnostic message: "Type instantiation is excessively deep and possibly infinite."
-
-2. **Updated SubtypeChecker** (wasm/src/solver/subtype.rs):
-   - Added `depth_exceeded: bool` field to track when limit is hit
-   - Set flag when `depth > 100` before returning `SubtypeResult::False`
-   - Initialize flag in both `new()` and `with_resolver()` constructors
-
-3. **Updated ThinChecker** (wasm/src/thin_checker.rs):
-   - Changed `is_subtype_of` and `is_subtype_of_with_env` to `&mut self`
-   - Check `depth_exceeded` flag after subtype checks
-   - Emit TS2589 diagnostic when flag is set
-   - Added `error_at_current_node()` helper method
-
-**Notes:**
-- The SubtypeChecker already had depth tracking (depth field with limit of 100)
-- This change adds diagnostic emission when the limit is exceeded
-- Replaces panics/crashes with proper TS2589 error messages
+**Changes:**
+- `wasm/src/checker/types/diagnostics.rs` - Added TS2589 code/message
+- `wasm/src/solver/subtype.rs` - Added depth_exceeded flag
+- `wasm/src/thin_checker.rs` - Added diagnostic emission logic
 
 ---
 
 ## Current Task
 
-*Waiting for EM-2 assignment...*
+### Task 2: Fix Class Property Initialization (TS2564)
+
+**Priority:** 🟡 TACTICAL (Project Zang Priority #4)
+**Status:** ⏳ IN PROGRESS
+**Assigned:** 2025-01-14
+
+#### Context
+TS2564 ("Property 'x' has no initializer and is not definitely assigned in the constructor.") is the **#1 missing error** with **413 occurrences**.
+
+TypeScript's `strictPropertyInitialization` check ensures that class properties are either:
+1. Declared with an initializer, OR
+2. Definitely assigned in the constructor
+
+This check is **not implemented** in the WASM compiler, which is why we're missing 413 errors.
+
+#### Problem
+The WASM compiler is not running the `strictPropertyInitialization` check, so properties without initializers are not flagged even when they should be.
+
+#### Task Requirements
+
+1. **Understand the TypeScript behavior:**
+   - Only applies when `strictPropertyInitialization` compiler option is enabled
+   - Checks non-optional instance properties of classes
+   - Excludes: `static` properties, `readonly` properties with initializers, properties marked with `!` (definite assignment assertion)
+
+2. **Implement the check in `wasm/src/checker/thin_checker.rs`:**
+   - Find where class declarations are checked
+   - For each non-optional instance property without an initializer:
+     - Track whether it's assigned in the constructor
+     - If not assigned AND has no initializer, emit TS2564
+
+3. **Implementation hints:**
+   - Look for existing class declaration checking code
+   - Use the flow analyzer (if available) to track definite assignment
+   - The context has `ctx.strict_property_initialization` flag
+   - Check for the definite assignment assertion operator (`!`)
+
+4. **Verify the fix:**
+   - Run conformance tests and count TS2564 errors
+   - Should see ~413 new TS2564 errors appear
+   - Verify errors match tsc's output
+
+#### Success Criteria
+- [ ] TS2564 diagnostic code defined in diagnostics.rs (if not already)
+- [ ] Check implemented in thin_checker.rs
+- [ ] Respects `strict_property_initialization` flag
+- [ ] Correctly excludes static, readonly with initializers, and `!`-marked properties
+- [ ] ~413 new TS2564 errors appear in conformance tests
+- [ ] No regressions (no extra TS2564 where tsc doesn't emit)
+
+#### Reference Test Files
+Look for existing test cases that should emit TS2564:
+```
+tests/cases/conformance/strictPropertyInitialization/
+tests/baselines/reference/strictPropertyInitialization*.errors.txt
+```
+
+#### Notes
+- This is a **high-ROI task** - one fix catches 413 missing errors
+- The check runs **after** type checking (in the checker phase, not solver)
+- May need to leverage flow analysis or constructor body scanning
+- The `!` definite assignment assertion should suppress the error
+
+---
+
+## Pending Tasks
+*None - awaiting EM-2 assignment*
