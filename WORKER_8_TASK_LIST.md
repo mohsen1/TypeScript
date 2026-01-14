@@ -35,6 +35,8 @@
   - **Note:** Error recovery prevents cascading errors within complex files, improving LSP experience and AST completeness
   - Real benefit is fewer incomplete ASTs and better error recovery in multi-statement blocks
 
+- [x] Merge attempt #2 - No commits to merge yet
+
 ## Context
 Error recovery is critical to prevent one syntax error from poisoning the entire file. When the parser bails early, the incomplete AST leads to missing symbols and cascading errors.
 
