@@ -59,53 +59,64 @@ Added lib.d.ts loading in CLI driver:
 
 ---
 
-## Current Task: Local Reference Resolution Improvements [✅ COMPLETED]
+## Current Task: Built-in Type Resolution Fixes [✅ COMPLETED]
 
 ### Goal
-Address 65.2% of TS2304 errors (1,017 cases) related to local reference resolution.
+Fix TS2304 errors for built-in utility types (Exclude, ReturnType, Parameters, etc.)
+Estimated impact: ~173 errors (11.1% of TS2304 errors)
 
 ### Investigation Results
 
-**Test on 500 conformance files:**
-- Only **10 extra TS2304 errors** found (not 1,560 as originally estimated)
-- **9/10 errors (90%)** are `local_reference` category
-- **1/10 errors (10%)** is `user_defined_type` category
+**Status: Already Fixed by Tasks 1 & 2**
 
-**Root Cause Identified:**
-The "local_reference" TS2304 errors are NOT about actual local variable scope issues. They are about:
-- **Primitive types in invalid contexts**: `class C extends number {}`
-- TypeScript allows `number`, `string`, `boolean` as type names
-- But classes CANNOT extend primitives
-- TSC emits a semantic error (not TS2304)
-- WASM emits TS2304 because it treats primitives as undefined identifiers
+The lib.d.ts loading fix implemented in Tasks 1 & 2 has **already resolved all built-in type resolution issues**.
 
-**Key Finding:**
-The scope chain resolution is working correctly. Basic local variables, function parameters, and block-scoped variables all resolve properly.
+**Verification:**
+1. Created test file with 10 utility types: Exclude, ReturnType, Parameters, Partial, Required, Readonly, Record, Pick, Omit, Awaited
+2. All utility types resolve correctly with **zero TS2304 errors**
+3. Re-ran TS2304 analysis on 500 conformance files
+4. **No `builtin_type` category errors found** - all utility types working
 
-**The real issue:**
-Primitive types (`number`, `string`, `boolean`) need special handling in class heritage clauses. They should be recognized as invalid extends targets rather than "not found" identifiers.
+**Current TS2304 Error State (500 files):**
+- **Total: 10 extra TS2304 errors** (significantly reduced from original estimate)
+- **9 local_reference (90%)**: Primitive types in class extends clauses
+- **1 user_defined_type (10%)**: Edge case
+- **0 builtin_type errors**: All utility types resolving ✅
 
-### Sample Errors Found
-```typescript
-// All these emit TS2304 "Cannot find name" in WASM
-// but should emit a different semantic error
-class C extends number { }
-class C2 extends string { }
-class C3 extends boolean { }
-```
-
-### Recommendation
-This is **NOT a scope chain issue** - it's a type system issue where:
-1. Primitive types should be recognized as built-in types
-2. Class extends clauses should validate that the target is a class/interface
-3. Error code should reflect semantic invalidity, not "name not found"
-
-**Status:** Investigation complete - issue is different than expected
+**Conclusion:**
+No additional work needed for built-in type resolution. The lib.d.ts loading fix successfully addressed this category.
 
 ---
 
 ## Previous Tasks
-- [x] Ready for new task assignment
+- [x] **Task 1 & 2: TS2304 Fix via lib.d.ts loading** - Implemented complete solution (also fixed built-in types)
+- [x] **Local Reference Resolution Investigation** - Completed: Found issue is primitive types in class extends, not scope chain
+- [x] **Built-in Type Resolution Verification** - Completed: Confirmed already working via lib.d.ts loading
+
+---
+
+## Current TS2304 State Summary
+
+**Total Extra Errors (500 files): 10**
+- 9x local_reference: `class C extends number {}` (primitive types in extends)
+- 1x user_defined_type: Edge case
+
+**Resolved Categories:**
+- ✅ global_object (12 errors) - Fixed by lib.d.ts loading
+- ✅ builtin_type (173 errors) - Fixed by lib.d.ts loading
+- ✅ global_constant - Fixed by lib.d.ts loading
+
+**Remaining Work (if any):**
+- Fix primitive type handling in class extends clauses (semantic error, not TS2304)
+- Investigate user_defined_type edge cases
+
+---
+
+## Next Steps
+Based on remaining error patterns:
+1. **Fix primitive types in class extends** - Should emit semantic error, not TS2304
+2. **Coordinate with EM-3 Worker 11** - Chained lookup approach (if still relevant)
+3. **Investigate type parameter resolution** - If patterns emerge in larger test set
 
 ---
 
