@@ -2,53 +2,16 @@
 
 ## Squad: Parser/Scanner - Error Recovery Focus
 
-## Completed ✅
-
-### Task 1 & 2: Statement-Level Error Recovery Implementation
-**Status:** ✅ Complete and Verified
-
-**Implementation Details:**
-- Added `is_statement_start()` - Identifies statement boundary tokens (keywords, identifiers, braces)
-- Added `resync_after_error()` - Skips tokens to next statement boundary after errors
-- Enhanced `parse_source_file_statements()` - Uses resync on parse failures
-- Enhanced `parse_statements()` - Uses resync with infinite loop protection
-
-**File Modified:** `wasm/src/thin_parser.rs` (+130 lines from commit `aac4ace7c`)
-
-### Test Results (Error Recovery Verification)
-**Test File:** `wasm/test-error-recovery-v2.mjs` (commit `934ac45c2`)
-
-**Results:** ✅ **5/5 tests passed (100%)**
-
-| Test | Nodes | Errors | Result |
-|------|-------|--------|--------|
-| Valid code (baseline) | 12 | 0 | ✓ No errors |
-| Missing semicolon | 12 | 0 | ✓ ASI recovery |
-| Extra closing brace | 18 | 1 | ✓ Recovered |
-| Invalid syntax mid-file | 25 | 3 | ✓ Recovered |
-| Mismatched braces | 18 | 1 | ✓ Recovered |
-
-**Summary:**
-- Total Tests: 5
-- Passed: 5 (100%)
-- Total Nodes: 85
-- Error Recovery: **WORKING ✓**
-
-### Impact
-- Parser continues building complete ASTs despite syntax errors
-- Prevents cascading errors across statement boundaries
-- Improves LSP experience (partial AST for code intelligence)
-- Reports errors without stopping compilation
-
----
+## Current Task
+- [ ] Improve parser error recovery and resynchronization in `wasm/src/thin_parser.rs`
+- [ ] Implement better resynchronization after syntax errors
+- [ ] Keep parsing to complete the AST even with errors
 
 ## Queue
-- [x] Reduce cascading errors through better recovery (ACHIEVED)
-- [x] Test parser changes on conformance suite (DONE - 33.1% exact match)
-- [x] Coordinate with Workers 5-7 on error emission patterns (COMPLETE)
-- [x] Ensure parser doesn't bail early on syntax deviations (ACHIEVED)
-
----
+- [ ] Reduce cascading errors through better recovery
+- [ ] Test parser changes on conformance suite
+- [ ] Coordinate with Workers 5-7 on error emission patterns
+- [ ] Ensure parser doesn't bail early on syntax deviations
 
 ## Completed
 - [x] **Task 1 & 2:** Statement-level error recovery (commit: `aac4ace7c`)
@@ -63,20 +26,20 @@
 
 ---
 
+- [x] **Task 1: Statement Recovery Enhancement** - Implemented is_statement_start() and resync_after_error()
+- [x] **Task 2: Block-Level Recovery** - Enhanced parse_source_file_statements() and parse_statements() with resync
+- [x] Merged to em-team-2 (commit: `aac4ace7c`)
+- [x] **Conformance Test Results (1000 tests):**
+  - Exact Match: 33.1% (unchanged - error recovery helps within files, not across test boundaries)
+  - Throughput: 15.6 tests/sec
+  - **Note:** Error recovery prevents cascading errors within complex files, improving LSP experience and AST completeness
+  - Real benefit is fewer incomplete ASTs and better error recovery in multi-statement blocks
+
 ## Context
 Error recovery is critical to prevent one syntax error from poisoning the entire file. When the parser bails early, the incomplete AST leads to missing symbols and cascading errors.
 
 ### Key Files
-- `wasm/src/thin_parser.rs` - main parser implementation (statement recovery)
-- `wasm/test-error-recovery-v2.mjs` - verification tests
+- `wasm/src/thin_parser.rs` - main parser implementation
 
-### Success Metric
-✅ **ACHIEVED:** Parser recovers from syntax errors and continues parsing. All 5 test cases pass.
-
----
-
-## Next Steps
-- [x] Ready for new task assignment
-- [ ] Consider: Expression-level error recovery (within statements)
-- [ ] Consider: Declaration-level resynchronization
-- [ ] Consider: Block-level recovery improvements (nested blocks)
+### Goal
+Improve parser resilience so it can recover from syntax errors and continue parsing, reducing incomplete ASTs and cascading errors.
