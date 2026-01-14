@@ -987,7 +987,12 @@ namespace Merge {
         exports.get("hidden").is_none(),
         "hidden should not be in Merge exports"
     );
-    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+    // Enum members should be in exports when merging with namespace (TypeScript behavior)
+    assert!(
+        exports.get("A").is_some(),
+        "A should be in Merge exports"
+    );
+    assert_eq!(exports.len(), 2, "Merge should have exactly 2 exports (enum member A + namespace export extra)");
 }
 
 #[test]
@@ -1032,7 +1037,12 @@ enum Merge {
         exports.get("hidden").is_none(),
         "hidden should not be in Merge exports"
     );
-    assert_eq!(exports.len(), 1, "Merge should have exactly 1 export");
+    // Enum members should be in exports when merging with namespace (TypeScript behavior)
+    assert!(
+        exports.get("A").is_some(),
+        "A should be in Merge exports"
+    );
+    assert_eq!(exports.len(), 2, "Merge should have exactly 2 exports (namespace export extra + enum member A)");
 }
 
 #[test]

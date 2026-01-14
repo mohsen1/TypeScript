@@ -1,66 +1,80 @@
 # Worker 10 Task List
 
-## Squad: Parser/Scanner - TS1109 Focus
+## Squad: Binder (CRITICAL) - TS2304 Focus
 
 ## Current Task
-- [ ] Audit TS1109 ("expression expected") emission patterns in parser
-- [ ] Identify top locations causing false positives
+- [ ] Investigate and fix namespace declaration merging across files
+  - Namespaces should merge symbols across multiple `namespace X { }` declarations
+  - Test scenarios: `namespace Foo {}` in multiple files, nested namespaces
+  - Verify exported types/values are accessible from merged namespace
 
 ## Queue
-- [ ] Fix TS1109 in statement parsing - valid declarations triggering errors
-- [ ] Fix TS1109 in expression parsing - await/yield edge cases
-- [ ] Fix TS1109 in class member parsing - property declarations
-- [ ] Run conformance tests and measure TS1109 reduction
-- [ ] Coordinate with Worker 9 to avoid overlap
+- [ ] Debug remaining console/Array resolution failures in edge cases
+  - Trace why some global symbols still resolve incorrectly despite lib.d.ts fixes
+  - Check module vs script mode differences in global resolution
+- [ ] Fix enum declaration binding and merging
+  - Ensure enum members are accessible as namespace properties
+  - Test: `enum E { A }` should allow `E.A` access
+- [ ] Implement interface merging across declarations
+  - Multiple `interface X {}` declarations should merge members
+  - Test: interface extending, declaration merging in modules
+- [ ] Fix function/variable scope hoisting edge cases
+  - Functions should be hoisted within their scope
+  - Verify `var` hoisting behavior matches tsc
+- [ ] Add comprehensive tests for symbol resolution edge cases
+- [ ] Coordinate with Worker 4 on module resolution and ambient contexts
 
 ## Completed
-- [x] Branch created from em-team-3
-- [x] Reviewed TS1109_ANALYSIS.md for context
-- [x] Synced with em-team-3 (no new commits to merge)
-- [x] Reconfiguration check: Worker 10 remains on Parser squad (TS1109 focus)
-
-## Recent Merge Status
-- **Date**: 2026-01-14
-- **Result**: Already in sync (no new commits)
-- **Action Taken**: Verified worker-10 branch is fully merged into em-team-3
-- **Next**: Continue work on TS1109 expression expected errors
-- **Team Update**: Worker 12 re-added to EM-3 (now 4 workers: 9-12)
+- [ ] Initial setup and environment sync
 
 ## Context
-TS1109 ("expression expected") has 262 false positive occurrences. These occur when the parser expects an expression but encounters a valid construct it doesn't recognize.
 
-### Key Areas to Investigate
+### Why Binder Squad is CRITICAL
 
-**Area 1 - Statement vs Expression confusion:**
-- Declaration statements (class, function, enum) may be treated as expressions
-- Check `parseStatement()` for premature TS1109 emission
-- Location: `src/compiler/parser.ts`
+**TS2304 (Cannot find name)** is the #1 source of **Error Poisoning**. When the binder fails to resolve:
+- `console`, `Promise`, `Array` → becomes `Any`
+- User-defined types in other files → becomes `Any`
+- All downstream errors are **silenced**
 
-**Area 2 - Await/Yield handling:**
-- Await expressions in non-async contexts may trigger false TS1109
-- Yield expressions in generator functions
-- Check `parseAwaitExpression()` and `parseYieldExpression()`
-- Location: `src/compiler/parser.ts`
+This means you can fix CFA or Solver logic, but if the symbols never resolved, those fixes never fire.
 
-**Area 3 - Class property parsing:**
-- Property declarations with modifiers may trigger TS1109
-- Check `parseClassElement()` for edge cases
-- Location: `src/compiler/parser.ts`
+### What Worker 4 Has Completed
 
-**Area 4 - Type assertion edge cases:**
-- Angle bracket type assertions: `<Type>expr`
-- May be confused with JSX or relational operators
-- Location: `src/compiler/parser.ts`
+Worker 4 fixed the core lib.d.ts injection issue:
+- ✅ lib.d.ts symbols now merge into root SymbolTable
+- ✅ Lib binders stored in ThinBinderState for cross-arena resolution
+- ✅ `get_symbol()` now checks lib binders automatically
 
-### Reference
-- `TS1109_ANALYSIS.md` - Contains existing analysis of this error pattern
+### What Still Needs Work
 
-### Success Metric
-Reduce TS1109 from 262 to <50 total.
+Despite the core fixes, TS2304 still has:
+- **343 extra errors** (false positives - reporting errors when symbols exist)
+- **116 missing errors** (failing to report when symbols truly don't exist)
 
-### Workflow
-1. Create branch: `git checkout -b worker-10-TS1109-fixes`
-2. Fix identified patterns
-3. Run tests: `npm run test:conformance`
-4. Push: `git push origin worker-10-TS1109-fixes`
-5. Notify EM-3 for merge
+The remaining issues are in:
+1. **Module resolution** - Worker 4 is working on ambient modules
+2. **Declaration merging** - Namespaces, interfaces, enums across files
+3. **Scope edge cases** - Hoisting, block scoping, export/import scoping
+4. **Namespace binding** - Complex namespace merging and member access
+
+### Success Metrics
+
+| Metric | Current | Target |
+|--------|---------|--------|
+| TS2304 extra errors | 343 | <50 |
+| TS2304 missing errors | 116 | <20 |
+| Global symbol resolution | ~85% | >98% |
+
+### Key Files to Modify
+
+- `wasm/src/thin_binder.rs` - Main binder logic
+- `wasm/src/lib_loader.rs` - Lib.d.ts loading
+- `wasm/src/symbol.rs` - Symbol table implementation
+- `wasm/src/checker.rs` - Type checking integration
+
+### Testing Approach
+
+1. Write specific test cases in `tests/` for each bug pattern
+2. Run `cargo test` for unit tests
+3. Run conformance tests: `npm run conformance` (if available)
+4. Compare error counts against tsc baseline
