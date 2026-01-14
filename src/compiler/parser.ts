@@ -3519,7 +3519,15 @@ namespace Parser {
 
                 // We didn't get a comma, and the list wasn't terminated, explicitly parse
                 // out a comma so we give a good error message.
-                parseExpected(SyntaxKind.CommaToken, getExpectedCommaDiagnostic(kind));
+                // Pattern 6: Avoid false positive TS1005 for object literals when line break serves as separator
+                // JavaScript allows line breaks between object literal properties, similar to ASI behavior
+                if (kind === ParsingContext.ObjectLiteralMembers && scanner.hasPrecedingLineBreak()) {
+                    // Line break in object literal - don't emit TS1005
+                    // This handles valid cases like: { a: 1 \n b: 2 }
+                }
+                else {
+                    parseExpected(SyntaxKind.CommaToken, getExpectedCommaDiagnostic(kind));
+                }
 
                 // If the token was a semicolon, and the caller allows that, then skip it and
                 // continue.  This ensures we get back on track and don't result in tons of
