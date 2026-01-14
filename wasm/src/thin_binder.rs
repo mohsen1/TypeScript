@@ -221,6 +221,29 @@ impl ThinBinderState {
         scopes: Vec<Scope>,
         node_scope_ids: FxHashMap<u32, ScopeId>,
     ) -> Self {
+        Self::from_bound_state_with_scopes_and_augmentations(
+            symbols,
+            file_locals,
+            node_symbols,
+            scopes,
+            node_scope_ids,
+            FxHashMap::default(),
+        )
+    }
+
+    /// Create a ThinBinderState from existing bound state, preserving scopes and global augmentations.
+    ///
+    /// This is used for type checking after parallel binding and symbol merging.
+    /// Global augmentations are interface/type declarations inside `declare global` blocks
+    /// that should merge with lib.d.ts symbols during type resolution.
+    pub fn from_bound_state_with_scopes_and_augmentations(
+        symbols: SymbolArena,
+        file_locals: SymbolTable,
+        node_symbols: FxHashMap<u32, SymbolId>,
+        scopes: Vec<Scope>,
+        node_scope_ids: FxHashMap<u32, ScopeId>,
+        global_augmentations: FxHashMap<String, Vec<crate::parser::NodeIndex>>,
+    ) -> Self {
         let mut flow_nodes = FlowNodeArena::new();
         let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
 
@@ -247,7 +270,7 @@ impl ThinBinderState {
             node_scope_ids,
             current_scope_id: ScopeId::NONE,
             debugger: ModuleResolutionDebugger::new(),
-            global_augmentations: FxHashMap::default(),
+            global_augmentations,
             in_global_augmentation: false,
         }
     }
