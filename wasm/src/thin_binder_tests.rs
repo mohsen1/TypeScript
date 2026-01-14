@@ -2126,3 +2126,65 @@ fn test_symbol_table_validation_broken_links() {
     let link_errors: Vec<_> = errors.iter().filter(|e| matches!(e, crate::thin_binder::ValidationError::BrokenSymbolLink { .. })).collect();
     assert_eq!(link_errors.len(), 1);
 }
+
+#[test]
+fn test_closure_variable_capture() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    // Test that variables declared in outer scopes are resolvable inside closures.
+    // This is the core issue for Task 2.
+    let source = r#"
+const outerX = 100;
+
+const arrowFn = () => {
+    return outerX;
+};
+
+const functionExpr = function() {
+    return outerX;
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // outerX should be in file_locals (module scope)
+    assert!(binder.file_locals.has("outerX"), "outerX should be in file_locals");
+
+    // Verify scope chain is set up correctly
+    // There should be multiple scopes: module scope, arrow function scope, function expression scope
+    assert!(binder.scopes.len() >= 3, "Should have at least module scope + 2 closure scopes");
+
+    // Find the arrow function scope
+    let mut arrow_fn_scope = None;
+    let mut function_expr_scope = None;
+
+    for (idx, scope) in binder.scopes.iter().enumerate() {
+        match scope.kind {
+            crate::binder::ContainerKind::Function => {
+                if arrow_fn_scope.is_none() {
+                    arrow_fn_scope = Some(idx);
+                } else {
+                    function_expr_scope = Some(idx);
+                }
+            }
+            _ => {}
+        }
+    }
+
+    // Both closures should have scopes
+    assert!(arrow_fn_scope.is_some(), "Arrow function should have a scope");
+    assert!(function_expr_scope.is_some(), "Function expression should have a scope");
+
+    // Verify that the parent chain points to module scope
+    if let Some(arrow_idx) = arrow_fn_scope {
+        let arrow_scope = &binder.scopes[arrow_idx];
+        // The parent of arrow function should be module scope (index 0)
+        assert_eq!(arrow_scope.parent, crate::binder::ScopeId(0), "Arrow function parent should be module scope");
+    }
+}
