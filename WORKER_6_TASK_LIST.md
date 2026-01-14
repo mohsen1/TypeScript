@@ -48,6 +48,11 @@
   - All worker-6 commits already present in em-team-2
   - Worker 6 at rust merge point (f2a02b79a)
   - Status: READY - Awaiting TS1005 Pattern 4-5 implementation
+- [x] **TS1005 Pattern 4 Implementation** (merged via rust)
+  - Commits: bba41d11a (Analysis), 5c09083ed (Implementation)
+  - Import/Export specifier brace mismatch fix applied
+  - All Worker 6 work now integrated into em-team-2
+  - Status: COMPLETE - Ready for next assignment
 
 ## Context
 TS1005 has 42 extra errors in conformance sample. Worker 1 fixed 5 patterns in TypeScript; adapt patterns 4-5 to Rust to reduce cascading and duplicate errors.
