@@ -1,75 +1,82 @@
 # Team Structure - TypeScript Compiler (Rust)
 
 **Phase:** Phase 8 - Conformance, Convergence, and Hardening
-**Last Updated:** 2026-01-14 (Post all EM merges)
+**Last Updated:** 2026-01-14 (Post EM-1 validation & EM-3 Solver work)
 **Director:** claude-code-orchestrator
+
+---
+
+## Major Milestones
+
+### ✅ EM-1 Validation Complete
+**Delivered excellent conformance improvements:**
+- Exact Match: 30.1% → 34.5% (+4.4%)
+- Parser false positives: 701 → 389 (-44%)
+- TS2304 errors: 459 → 276 (-37%)
+
+**Worker 4's Binder fix had HIGHEST impact (+3.8% EM)** - validates that fixing "Any" poisoning is critical.
+
+### ✅ EM-3 Adds Solver Worker
+**Worker 12 assigned to Solver work:**
+- Task: Switch solver fallback from `Any` to `Unknown`
+- This exposes hidden bugs by stopping silent error masking
+- Addresses critical gap in Solver capacity
 
 ---
 
 ## Director's Note
 
-**EM squads have taken autonomous approaches:**
-- EM_1: Hybrid (Parser + Binder)
-- EM_2: Task Master managing all three focus areas
-- EM_3: Parser-only focus (TS1005/TS1109)
+**EM squads are rebalancing based on validated results:**
+- EM_1: Hybrid (Parser + Binder) - VALIDATED, keep together
+- EM_2: Parser (reassigned from Task Master)
+- EM_3: Parser + Solver (added worker-12 for Solver work)
 
-Squad-based structure not being followed by EMs. Director adapting to reality.
-
-**Current Parser Work Distribution:**
-- Workers 1-3 (EM_1): TS1005 patterns 1-5, TS1109 cascading
-- Worker 7 (EM_2): TS1109 cascading fix (DELIVERED)
-- Workers 9-11 (EM_3): TS1005 patterns 6-15, TS1109 expression errors
-
-**All 3 EMs are contributing to Parser work** - this is the de facto priority.
+**Key Insight:** Binder fixes (like Worker 4's) have highest impact. Need more Binder capacity.
 
 ---
 
 ## Current Conformance Status
 
-| Metric | Value | Target |
-|--------|-------|--------|
-| Exact Match | 30.1% (1488/4939) | **40%** |
-| Missing Errors | 60.0% (2961) | **<50%** |
-| Extra Errors | 30.9% (1528) | Reduce |
+| Metric | Before EM-1 | After EM-1 | Target | Progress |
+|--------|-------------|------------|--------|----------|
+| Exact Match | 30.1% (1488/4939) | **34.5%** | **40%** | ✅ +4.4% |
+| Parser False Positives | 701 (TS1005: 439, TS1109: 262) | **389** (-44%) | **<100** | ✅ -312 errors |
+| TS2304 Errors | 459 | **276** (-37%) | **<50** | ✅ -183 errors |
+| Missing Errors | 60.0% (2961) | TBD | **<50%** | 🟡 TBD |
 
-### Critical Issues
-- **Error Poisoning:** Solver defaults to `Any` when Binder fails, silencing downstream errors
-- **TS2304:** 116 missing + 343 extra (Cannot find name)
-- **Parser False Positives:** 701 errors (TS1005: 439, TS1109: 262)
+### Critical Issues - IMPROVING
+- ✅ **Error Poisoning:** Worker 4's Binder fix reduced TS2304 by 37%
+- ✅ **Parser False Positives:** Combined fixes reduced by 44% (701→389)
+- ✅ **Solver Work:** Worker 12 assigned to switch `Any` → `Unknown` fallback
+- 🟡 **Remaining:** TS2304 still at 276 (target <50), Parser FP at 389 (target <100)
 
 ---
 
 ## Squad Assignments
 
-### EM_1: HYBRID Squad (Parser + Binder) - TRANSITIONAL
+### EM_1: HYBRID Squad (Parser + Binder) - VALIDATED ✅
 **Branch:** `em-team-1`
 **Priority:** 🔴 HIGHEST
 **Target Errors:** TS2304 (Binder), TS1005/TS1109 (Parser)
-**Status:** 🟡 HYBRID - Awaiting validation cycle, then restructure
+**Status:** 🟢 VALIDATED - Delivered +4.4% Exact Match improvement
 
-**Director's Note:** This is a transitional hybrid squad. Workers 1-3 made progress on Parser work before formal squad structure. After validation, they will transfer to EM_2.
+**Director's Decision:** Keep EM-1 together as a high-performing team. Do NOT split up workers.
 
-**Focus (Worker 4 - Binder):**
-- Fix Global Scope binding
-- Ensure `lib.d.ts` symbols merge into root `SymbolTable`
-- Fix module augmentation resolution
-- Debug `console`, `Promise`, `Array` resolution failures
-- **Goal:** Reduce TS2304 extra errors to <50
+**Results Delivered:**
+- Worker 1 (TS1005): 439→312 (-29%), Exact Match +1.1%
+- Worker 2 (TS1109): 262→198 (-24%), Exact Match +0.4%
+- Worker 3 (Cascading): 701→551 (-21%), Exact Match +1.8%
+- Worker 4 (Binder): 459→276 (-37%), Exact Match +3.8% ⭐ HIGHEST
+- **Combined:** 30.1% → 34.5% Exact Match (+4.4%)
 
-**Focus (Workers 1-3 - Parser, TRANSFERRING):**
-- Fix TS1005 ("expected X") emission
-- Fix TS1109 ("expression expected")
-- Validate existing fixes and measure impact
-- **Goal:** Reduce parser false positives to <100
+**Next Steps:**
+- Workers 1-3: Continue Parser work (remaining TS1005/TS1109 patterns)
+- Worker 4: Continue Binder work (module namespace resolution, ~48 cases)
+- All workers: High throughput, keep together as a team
 
 **Key Files:**
 - `src/lib_loader.rs`, `src/thin_binder.rs` (Binder)
 - `src/compiler/parser.ts` (Parser)
-
-**Success Metrics:**
-- TS2304 extra errors < 50
-- Parser false positives < 100
-- **Complete validation cycle → Transfer workers 1-3 to EM_2**
 
 ---
 
@@ -97,28 +104,27 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 
 ---
 
-### EM_3: Parser Squad (Parser-only focus)
+### EM_3: Parser + Solver Squad
 **Branch:** `em-team-3`
 **Priority:** 🟠 HIGH
-**Target Errors:** TS1005, TS1109
-**Status:** 🟢 ACTIVE - Managing 3 workers on Parser work
+**Target Errors:** TS1005, TS1109, TS2322, TS7006
+**Status:** 🟢 ACTIVE - 3 workers on Parser, 1 worker on Solver
 
-**Director's Note:** EM-3 has taken a Parser-only focus (not Solver as originally assigned). Workers 9-11 are focused on TS1005/TS1109 patterns.
+**Director's Note:** EM-3 has added worker-12 for Solver work! This addresses the critical gap.
 
 **Workers:**
 - worker-9: TS1005 patterns 6-10 (object/array literals)
 - worker-10: TS1109 expression expected errors
 - worker-11: TS1005 patterns 11-15 (edge cases)
+- **worker-12: Solver** - Switch `Any` → `Unknown` fallback ⭐ NEW
 
 **Key Files:**
-- `src/compiler/parser.ts`
-- `src/compiler/scanner.ts`
-- `TS1005_REDUCTION_RESULTS.md`, `TS1109_ANALYSIS.md`
+- `src/compiler/parser.ts`, `src/compiler/scanner.ts` (Parser)
+- `wasm/src/solver/` (Solver)
 
 **Success Metrics:**
-- TS1005: 439 → <100
-- TS1109: 262 → <50
-- Total parser false positives: 701 → <100
+- Parser: TS1005 < 100, TS1109 < 50
+- Solver: Switch to `Unknown` fallback complete
 
 ---
 
@@ -131,25 +137,25 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 
 ## Resource Allocation
 
-| EM | Squad | Assigned Workers | Total | Notes |
-|----|-------|------------------|-------|-------|
-| EM_1 | **HYBRID** | workers 1-4 | 5 | Parser + Binder, awaiting validation |
-| EM_2 | **Parser** | workers 5-8 | 5 | All workers on Parser (reassigned) |
-| EM_3 | **Parser** | workers 9-11 | 4 | Parser-only focus (worker 12 reassigned) |
+| EM | Squad | Assigned Workers | Total | Status | Notes |
+|----|-------|------------------|-------|--------|-------|
+| EM_1 | **HYBRID** | workers 1-4 | 5 | ✅ VALIDATED | +4.4% Exact Match, keep together |
+| EM_2 | **Parser** | workers 5-8 | 5 | 🟡 ACTIVE | All workers on Parser |
+| EM_3 | **Parser + Solver** | workers 9-12 | 5 | 🟢 ACTIVE | 3 Parser, 1 Solver (worker-12) |
 
-**Current Status:**
-- Workers 1-11 are active across all 3 EMs
-- **All 3 EMs are 100% focused on Parser work** (de facto priority)
-- **Binder work** (critical path for TS2304) only has worker-4 (EM_1)
-- **Solver work** (switching to `Unknown` fallback) is not being actively pursued
-- Worker 12 status unclear (removed from EM_3 task lists)
+**Current Status (Post-Rebalancing):**
+- All 12 workers are now active
+- **Binder:** Worker 4 only (1 worker) - still under-resourced
+- **Solver:** Worker 12 only (1 worker) - critical work started ✅
+- **Parser:** Workers 1-3, 5-11 (10 workers) - well-resourced
 
 **Director Assessment:**
-Parser work is consuming all capacity. The squad structure has completely broken down. Need to decide:
-1. Accept Parser-focused approach and reassign EMs accordingly
-2. Or enforce original squad assignments (may disrupt ongoing work)
+- ✅ EM-1 validated, high-performing team
+- ✅ EM-3 added Solver worker (addresses critical gap)
+- 🟡 EM-2 still 100% on Parser (consider reassigning 1 to Binder)
+- 🔴 Binder work still under-resourced (only Worker 4)
 
-**Note:** CFA (Control Flow Analysis) work is on hold until TS2304 is under control.
+**Note:** CFA (Control Flow Analysis) work remains on hold until TS2304 is under control.
 
 ---
 
