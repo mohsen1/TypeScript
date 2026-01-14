@@ -2085,7 +2085,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // When this parameter type is not specified, we should not allow any value
         let source_type = source_type.unwrap_or(TypeId::UNKNOWN);
         let target_type = target_type.unwrap_or(TypeId::UNKNOWN);
-        self.are_parameters_compatible(source_type, target_type)
+
+        // this parameters must be EXACTLY the same type (invariant)
+        // Unlike regular parameters, `this` is not contravariant or bivariant
+        self.check_subtype(source_type, target_type).is_true()
+            && self.check_subtype(target_type, source_type).is_true()
     }
 
     fn required_param_count(&self, params: &[ParamInfo]) -> usize {
