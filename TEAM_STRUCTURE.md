@@ -241,16 +241,19 @@
   - Total: 2 workers + EM = **3** ✅
   - **OPTION:** Add 1 more worker if needed (e.g., Worker 6 from reserve)
 
-### Resulting Structure (After EM-2 Split)
+### Recommended Structure (After Workers 7 & 8 Reassignment)
 
 | EM | Workers | Total | Focus | Status |
 |----|---------|-------|-------|--------|
-| EM_1 | 4, 5, 11 | 4 ✅ | Binder | Delivering +7.1% EM |
-| EM_2A | 1, 2, 3 | 4 ✅ | Parser (from EM-1) | +5.2% EM |
-| EM_2B | 7, 8 | 3 ✅ | Parser (original) | +3.0% EM |
+| EM_1 | 4, 5, 11 | 4 ✅ | Binder (COMPLETE) | Phase 8 Victory! |
+| EM_2 | 1, 2, 3 (+ 7,8 support) | 4 ✅ | Parser (TS1005 push) | 18 more needed |
 | EM_3 | 9, 10, 12 | 4 ✅ | Parser + Solver | "Any" fallback work |
 
 **All teams within size limits!** 🎉
+
+**Reassignment Plan:**
+- Workers 7 & 8: Support Workers 1 & 2 on final TS1005 push (118 → <100)
+- Once TS1005 <100 achieved, Workers 7 & 8 can transfer to new focus areas
 
 **Note:** CFA (Control Flow Analysis) work remains on hold until TS2304 is under control.
 
