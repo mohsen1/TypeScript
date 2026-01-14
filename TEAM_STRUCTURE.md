@@ -32,19 +32,20 @@
 
 ### Latest Deliverables
 
-**Binder Squad (Workers 4, 5, 11) - EM-1:**
+**Binder Squad (Workers 4, 11) - EM-1:**
 - **Worker 4: MISSION COMPLETE!** 🎉 Generic constraints, module namespaces, lib.d.ts (+11.7% EM - HIGHEST!)
   - Round 1: Ambient modules + lib.d.ts (-183 errors, +7.1% EM)
   - Round 2: Module namespaces (-103 errors)
   - Round 3: Generic constraints (-120 errors) → TARGETS ACHIEVED!
-- Worker 5: lib.d.ts loading in CLI driver ✅
 - Worker 11: Chained lookup for lib.d.ts globals ✅
 
-**Parser Squad (Workers 1-3, 7-8) - EM-2:**
+**Parser Squad (Workers 1-3, 5-8) - EM-2:**
 - Worker 1: Comma inference (+5.2% EM)
 - Worker 3: Bracket recovery, support role **+ EM-2 Round 3** 🎉 Parser FP -71%!
-- Worker 7: TS1109 cascading fix (-93% on TS1109)
-- Worker 8: Statement-level error recovery ✅
+- **Worker 5: REASSIGNED** 🔄 From TS2304 → TS1005 (Type Parameters & Templates)
+- **Worker 6: ASSIGNED** ✅ To TS1005 (Comma Inference)
+- Worker 7: TS1109 cascading fix (-93% on TS1109) - COMPLETE
+- Worker 8: Statement-level error recovery - COMPLETE
 
 **Solver Squad (Worker 12):**
 - Incremental "Any" fallback reduction strategy
@@ -55,14 +56,14 @@
 ## Director's Note
 
 **All 12 workers active and delivering results!**
-- EM_1: Workers 4, 5, 11 (Binder squad - 3 workers)
-- EM_2: Workers 1-3, 7-8 (Parser squad - 5 workers)
+- EM_1: Workers 4, 11 (Binder squad - 2 workers) - Phase 8 COMPLETE
+- EM_2: Workers 1-3, 5-8 (Parser squad - 7 workers) - 🔴 **CRITICAL SIZE ISSUE**
 - EM_3: Workers 9-10, 12 (Parser + Solver - 3 workers)
 
-**🔴 TEAM SIZE ISSUES:**
-- EM_2 has 5 workers + EM = 6 total (exceeds limit of 4)
-- Need to split EM-2 into two squads
-- See "Director's Orders" below for rebalancing plan
+**🔴 CRITICAL TEAM SIZE ISSUE:**
+- EM_2 has 7 workers + EM = **8 total** (limit is 4, exceeds by 4!)
+- EM-2 has absorbed Workers 5 & 6 for final TS1005 push
+- **IMMEDIATE SPLIT REQUIRED** - See "Director's Orders" below
 
 ---
 
@@ -206,56 +207,74 @@
 
 | EM | Squad | Assigned Workers | Total + EM | Status | Action Needed |
 |----|-------|------------------|------------|--------|---------------|
-| EM_1 | **Binder** | workers 4, 5, 11 | **4** ✅ | Expanded Binder squad | Within limit |
-| EM_2 | **Parser** | workers 1-3, 7-8 | **6** 🔴 | Parser squad | **SPLIT into 2 squads** |
+| EM_1 | **Binder** | workers 4, 11 | **3** ✅ | Phase 8 COMPLETE | Within limit |
+| EM_2 | **Parser** | workers 1-3, 5-8 | **9** 🔴🔴 | **CRITICAL** | **IMMEDIATE SPLIT REQUIRED** |
 | EM_3 | **Parser + Solver** | workers 9-10, 12 | **4** ✅ | Hybrid squad | Within limit |
 
-**Actual Worker Distribution (based on completed work):**
-- EM_1: Workers 4, 5, 11 (Binder squad - 3 workers) - All delivered TS2304 fixes ✅
-- EM_2: Workers 1-3, 7-8 (Parser squad - 5 workers) - Comma inference, cascading, error recovery ✅
+**Actual Worker Distribution (after EM-2 escalation):**
+- EM_1: Workers 4, 11 (Binder squad - 2 workers) - Phase 8 COMPLETE ✅
+- EM_2: Workers 1-3, 5-8 (Parser squad - 7 workers) - Exceeds limit by 4! 🔴
 - EM_3: Workers 9-10, 12 (Parser + Solver - 3 workers) - TS1005 patterns + "Any" fallback
 
-**🔴 TEAM SIZE ISSUE:**
-- EM_2: 5 workers + EM = **6 total** (limit is 4, need to remove 2)
+**🔴 CRITICAL TEAM SIZE ISSUE:**
+- EM_2: 7 workers + EM = **8 total** (limit is 4, exceeds by 4!)
+- Workers 5, 6 just reassigned from Binder to Parser
+- Workers 7, 8 complete and ready for reassignment
 
-**✅ FIXED:**
-- EM_1: 3 workers + EM = **4 total** ✅
+**✅ WITHIN LIMIT:**
+- EM_1: 2 workers + EM = **3 total** ✅
 - EM_3: 3 workers + EM = **4 total** ✅
 
 ---
 
-## Director's Orders: Execute EM-2 Split
+## Director's Orders: Execute EM-2 Split - CRITICAL
 
-### Required Action: SPLIT EM-2
+### 🚨 IMMEDIATE ACTION REQUIRED: SPLIT EM-2
 
-**Current EM_2 (6 total - exceeds limit):**
-- Workers: 1, 2, 3, 7, 8 + EM
+**Current EM_2 (8 total - DOUBLES the limit!):**
+- Workers: 1, 2, 3, 5, 6, 7, 8 + EM
+- Exceeds limit by 4 workers (limit is 4, current is 8)
 
-**Split into two squads:**
-- **EM_2A:** Workers 1, 2, 3 (from EM-1, high-performing team with +5.2% EM)
-  - Focus: Comma inference, bracket recovery, support role
-  - Total: 3 workers + EM = **4** ✅
+### Split Plan: Create Two Parser Squads
 
-- **EM_2B:** Workers 7, 8 (original EM-2 workers)
-  - Focus: TS1109 cascading, statement-level error recovery
-  - Total: 2 workers + EM = **3** ✅
-  - **OPTION:** Add 1 more worker if needed (e.g., Worker 6 from reserve)
+**EM_2A: Core Parser Team (Workers 1-3)**
+- Workers: 1, 2, 3 + EM = **4 total** ✅
+- Focus: Comma inference, new.target validation, bracket recovery
+- Status: High-performing team (+5.2% EM already delivered)
 
-### Recommended Structure (After Workers 7 & 8 Reassignment)
+**EM_2B: Expanded Parser Team (Workers 5-8)**
+- Workers: 5, 6, 7, 8 = **4 workers** (needs EM assignment)
+- Focus: Type parameters, templates, comma inference, error recovery
+- Worker 7: COMPLETE (TS1109 cascading -93%)
+- Worker 8: COMPLETE (Statement-level error recovery)
+- Workers 5, 6: New to TS1005 work
+
+### ⚠️ Requires New EM Assignment
+
+**Option A: Promote Worker 4 to EM-2B**
+- Worker 4 has proven leadership (highest EM impact: +11.7%)
+- Binder mission complete, ready for new challenge
+- EM-2B: Workers 5, 6, 7, 8 + Worker 4 as EM = 5 total (still exceeds)
+
+**Option B: Split Workers 5-8 Across Existing EMs**
+- Workers 7, 8: Transfer to EM-1 (Binder → Parser expansion)
+- Workers 5, 6: Stay with EM-2A (would exceed limit)
+
+**Option C: Create EM-4 (RECOMMENDED)**
+- EM-4: Workers 5, 6 + new EM
+- Workers 7, 8: Reserve for new assignments or transfer to EM-1
+
+### Resulting Structure (After Split + EM-4 Creation)
 
 | EM | Workers | Total | Focus | Status |
 |----|---------|-------|-------|--------|
-| EM_1 | 4, 5, 11 | 4 ✅ | Binder (COMPLETE) | Phase 8 Victory! |
-| EM_2 | 1, 2, 3 (+ 7,8 support) | 4 ✅ | Parser (TS1005 push) | 18 more needed |
+| EM_1 | 4, 11 | 3 ✅ | Binder (COMPLETE) | Phase 8 Victory! |
+| EM_2A | 1, 2, 3 + EM | 4 ✅ | Parser (TS1005 push) | 18 more needed |
+| EM_2B → EM_4 | 5, 6 + EM | 3 ✅ | Parser (Type/Template) | New assignments |
 | EM_3 | 9, 10, 12 | 4 ✅ | Parser + Solver | "Any" fallback work |
+| Reserve | 7, 8 | 2 | Error Recovery | COMPLETE - reassign |
 
-**All teams within size limits!** 🎉
-
-**Reassignment Plan:**
-- Workers 7 & 8: Support Workers 1 & 2 on final TS1005 push (118 → <100)
-- Once TS1005 <100 achieved, Workers 7 & 8 can transfer to new focus areas
-
-**Note:** CFA (Control Flow Analysis) work remains on hold until TS2304 is under control.
+**Note:** Workers 7 & 8 are complete and available for reassignment to any squad needing support.
 
 ---
 
