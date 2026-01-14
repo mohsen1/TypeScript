@@ -2,19 +2,97 @@
 
 **Branch:** worker-12
 **Reports to:** EM-3 (Semantics Squad)
-**Focus:** Type checking strictness, error messages
+**Focus:** Type checking strictness, error messages, TypeScript compiler correctness
 
 ---
 
 ## CURRENT TASK
 
-(None - all tasks completed)
+### Task 4: Reduce TS2322 "Missing Errors" by Improving Type Inference Tracking
+**Status:** READY TO START
+
+**Priority:** HIGH
+**Expected Impact:** +50-100 exact matches (convert "missing errors" to "exact matches")
+
+**Objective:** Currently, some TS2322 ("Type X is not assignable to type Y") errors are not being emitted when they should be. This reduces our "Exact Match" score. Track down and fix the inference logic that's causing these errors to be missed.
+
+**Subtasks:**
+- [ ] Analyze conformance test failures - find cases where TS2322 should emit but doesn't
+- [ ] Search for `getBaseConstraintOfType` usages that might return `any` incorrectly
+- [ ] Check `checkTypeRelatedTo` for early returns that skip error emission
+- [ ] Verify `createDiagnosticForNode` is called in all type mismatch paths
+- [ ] Add tests for fixed cases
+
+**Key Files:**
+- `src/compiler/checker.ts` - Type checking logic (lines ~21000-23000)
+- `tests/cases/compiler` - Conformance test cases
+
+**Success Criteria:**
+- Increase Exact Match score by at least 2 percentage points
+- No regression in Extra Errors
+- Conformance tests pass
 
 ---
 
-## BLOCKED TASKS
+## PENDING TASKS
 
-(None - all tasks completed or unblocked)
+### Task 5: Improve TS7006 "Implicit Any" Error Messages
+**Status:** PENDING
+
+**Priority:** MEDIUM
+**Expected Impact:** Better developer experience
+
+**Objective:** TS7006 errors currently say "Parameter X implicitly has an 'any' type". Enhance this to show WHERE the type was inferred from (similar to Task 3's type tracing).
+
+**Subtasks:**
+- [ ] Find TS7006 emission in checker.ts
+- [ ] Add contextual information about where the 'any' came from
+- [ ] Include suggestion: "Add type annotation for X"
+- [ ] Test with common scenarios
+
+**Key Files:**
+- `src/compiler/checker.ts`
+- `src/compiler/diagnosticMessages.json`
+
+---
+
+### Task 6: Fix "Excess Property Checking" Edge Cases
+**Status:** PENDING
+
+**Priority:** MEDIUM
+**Expected Impact:** Reduce false positives
+
+**Objective:** Fresh object literals with excess properties sometimes error incorrectly. Fix the logic to match tsc behavior in edge cases involving intersection types, generic constraints, and index signatures.
+
+**Subtasks:**
+- [ ] Find `getFreshType` and related freshness checking logic
+- [ ] Identify test cases where excess property errors are wrong
+- [ ] Fix the checking logic for complex object literal scenarios
+- [ ] Add regression tests
+
+**Key Files:**
+- `src/compiler/checker.ts` (freshness logic around lines 18000-19000)
+- `src/compiler/types.ts` (object literal types)
+
+---
+
+### Task 7: Enhance Generic Type Error Messages
+**Status:** PENDING
+
+**Priority:** LOW
+**Expected Impact:** Better error messages for complex generics
+
+**Objective:** When generic type instantiation fails, show better information about WHICH type argument caused the failure.
+
+**Subtasks:**
+- [ ] Find generic instantiation error reporting
+- [ ] Add context showing which type parameter failed
+- [ ] Show the constraint that was violated
+- [ ] Example: "Type 'string' does not satisfy constraint 'extends number' for type parameter 'T'"
+
+**Key Files:**
+- `src/compiler/checker.ts` (generic type checking)
+- `src/compiler/diagnosticMessages.json`
 
 ---
 
@@ -25,75 +103,44 @@
 
 **Report:** WORKER_12_TASK_1_REPORT.md
 
-**What was done:**
-- [x] Ran conformance tests after worker-9 and worker-10 completed their changes
-- [x] Measured the spike in errors
-- [x] Verified all errors are CORRECT (no false positives)
-- [x] Documented findings in comprehensive report
-
-**Test Results:**
-- **Total baselines affected:** ~478 files (228 error baselines, 250 type baselines)
-- **Expected spike:** 200-400 errors
-- **Actual spike:** ~478 files
-- **False positives:** 0 (all changes are CORRECT)
-
-**Key Findings:**
-- Circular references now use `unknown` (catches arithmetic errors)
-- JSDoc templates now default to `unknown` (catches type mismatches)
-- Recursive initializers properly error on `unknown` operations
-- globalThis property access handled correctly
-- **Compiler is now STRICTER as intended** ✅
-
-**Dependencies Completed:**
-- worker-9: "Complete: Audit anyType fallback in checker.ts" (commit 0c641c433)
-- worker-10: "Replace anyType fallback with unknownType in 13 locations" (commit 9abf900d7)
-
----
-
-### Task 3: Add Type Tracing to Errors
-**Status:** COMPLETED
-
-**File:** `src/compiler/checker.ts`, `src/compiler/diagnosticMessages.json`
-
-**What was done:**
-- [x] Added `addTypeOriginInfo()` helper function to track type origins
-- [x] Added new diagnostic messages for type origin (codes 9513, 9514, 9515)
-- [x] Modified `reportRelationError()` to include type origin information
-- [x] Type origin is now shown as related information when errors occur
-
-**Implementation:**
-- Added helper function in checker.ts (line ~22579)
-- Messages show where types were inferred from (expression location, return statement, etc.)
-- Adds origin info as related information for non-literal/intrinsic types
-
-**Diagnostic Messages Added:**
-- "Type '{0}' was inferred from expression at this location" (9513)
-- "Type '{0}' was inferred from argument '{1}' at position {2}" (9514)
-- "Type '{0}' was inferred from return statement" (9515)
+**Results:**
+- ~478 baselines affected (228 error, 250 type)
+- Expected: 200-400 | Actual: ~478 (within acceptable range)
+- All changes CORRECT - 0 false positives
+- Compiler is now STRICTER as intended
 
 ---
 
 ### Task 2: Enhance TS2322 Error Messages
 **Status:** COMPLETED
 
-**File:** `src/compiler/checker.ts`, `src/compiler/diagnosticMessages.json`
-
 **What was done:**
-- [x] Created `createPropertyErrorMessage()` helper function that builds property-aware error messages
-- [x] Added new diagnostic message "The error is in property '{0}'" (code 9512)
-- [x] Modified `elaborateElementwise()` to use property-aware messages when property context is available
-- [x] Enhanced error messages now show full type path including property names
-
-**Implementation:**
-- Added helper function in checker.ts (line ~21474)
-- Uses `chainDiagnosticMessages()` to append property context
-- Falls back to base message when no property context exists
+- Added `createPropertyErrorMessage()` helper function
+- Added diagnostic message "The error is in property '{0}'" (code 9512)
+- Modified `elaborateElementwise()` to use property-aware messages
 
 ---
 
-## PENDING TASKS
+### Task 3: Add Type Tracing to Errors
+**Status:** COMPLETED
 
-(None - all tasks completed or blocked)
+**What was done:**
+- Added `addTypeOriginInfo()` helper function
+- Added diagnostic messages for type origin (codes 9513, 9514, 9515)
+- Modified `reportRelationError()` to include type origin information
+
+---
+
+## KEY FILES
+
+- `src/compiler/checker.ts` - Main type checker (3MB+)
+  - Lines 21000-23000: Type checking and subtyping
+  - Lines 18000-19000: Freshness and excess property checking
+  - Lines 22000-22700: Error reporting
+
+- `src/compiler/types.ts` - Type representation
+- `src/compiler/diagnosticMessages.json` - Error message definitions
+- `tests/cases/compiler` - Conformance test suite
 
 ---
 
@@ -101,26 +148,16 @@
 
 **DO NOT work on:**
 - Parser work (EM-1's responsibility)
-- Binder work (EM-2's responsibility)
+- Binder/symbol table work (EM-2's responsibility)
 - Performance optimization (correctness first)
-- New type system features (fix existing ones first)
-
----
-
-## KEY FILES
-
-- `src/compiler/checker.ts` - Main type checker (3MB+)
-- `src/compiler/types.ts` - Type representation
-- `src/compiler/diagnosticMessages.json` - Error message definitions
-- `src/compiler/utilities.ts` - Type utilities
-- `src/factory` - Type factory functions
+- Rust/WASM solver in `wasm/src/solver/` (separate project)
 
 ---
 
 ## WORKFLOW
 
 1. Work on current task fully
-2. Run tests: `npm test` or relevant test commands
+2. Run tests: `npm run build:compiler` and `npm test`
 3. Commit: `git add -A && git commit -m "Complete: <task>"`
 4. Push: `git push origin worker-12 --force`
 5. STOP and wait for EM-3 review
@@ -129,9 +166,9 @@
 
 ## NOTES
 
-This codebase is **TypeScript**, not Rust. The EM_3_TASKS.md document references Rust files but the actual implementation is in TypeScript.
+**Worker 12 Scope:** TypeScript compiler in `src/compiler/` (TypeScript implementation)
+**NOT:** Rust solver in `wasm/src/solver/` (separate WASM implementation)
 
-Focus areas for Worker 12:
-- Testing/measuring type strictness improvements
-- Improving error messages for better DX
-- Adding type origin/tracing information
+EM_3_TASKS.md path references to `src/solver/` are incorrect - actual paths are:
+- TypeScript: `src/compiler/checker.ts`
+- Rust: `wasm/src/solver/subtype.rs`
