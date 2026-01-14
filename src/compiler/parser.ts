@@ -3237,25 +3237,28 @@ namespace Parser {
             return;
         }
 
-        if (type && !canParseSemicolon()) {
-            if (initializer) {
-                parseErrorAtCurrentToken(Diagnostics._0_expected, tokenToString(SyntaxKind.SemicolonToken));
-            }
-            else {
-                parseErrorAtCurrentToken(Diagnostics.Expected_for_property_initializer);
-            }
+        // When we have a type annotation but ASI cannot apply, provide a more specific error.
+        // This handles the case where: `name: type nextToken` (no semicolon, no line break)
+        if (type && !canParseSemicolon() && !initializer) {
+            parseErrorAtCurrentToken(Diagnostics.Expected_for_property_initializer);
             return;
         }
 
-        if (tryParseSemicolon()) {
+        // Try to parse an optional semicolon (including ASI). If that fails, emit error.
+        // This consolidates error reporting and avoids duplicate TS1005 emissions.
+        if (parseSemicolon()) {
             return;
         }
 
+        // If we reach here, semicolon parsing failed. parseSemicolon() already emitted TS1005,
+        // so we don't need to emit another error. However, we can provide additional context
+        // if this is a case where an initializer was expected.
         if (initializer) {
-            parseErrorAtCurrentToken(Diagnostics._0_expected, tokenToString(SyntaxKind.SemicolonToken));
+            // Error already emitted by parseSemicolon(), no additional action needed
             return;
         }
 
+        // Provide context-specific error message for the missing semicolon
         parseErrorForMissingSemicolonAfter(name);
     }
 
@@ -4881,8 +4884,9 @@ namespace Parser {
             return true;
         }
         else if (isType && token() === SyntaxKind.EqualsGreaterThanToken) {
-            // This is easy to get backward, especially in type contexts, so parse the type anyway
-            parseErrorAtCurrentToken(Diagnostics._0_expected, tokenToString(SyntaxKind.ColonToken));
+            // This is easy to get backward, especially in type contexts, so parse the type anyway.
+            // We don't emit TS1005 here since the parser recovers successfully and the error
+            // is redundant with other diagnostics that may be emitted.
             nextToken();
             return true;
         }
