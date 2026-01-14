@@ -1596,10 +1596,13 @@ const msg2 = ErrorCode.getMessage(ErrorCode.ServerError);
 
 #[test]
 fn test_scope_chain_traversal() {
+    use crate::binder::symbol_flags;
     use crate::thin_binder::ThinBinderState;
     use crate::thin_parser::ThinParserState;
 
-    // Test that identifier resolution walks the scope chain: local -> module -> global
+    // Test that identifier resolution walks the scope chain correctly.
+    // - Global symbols (globalX, foo) should be in file_locals
+    // - Local function symbols (localX) should be in the function's scope
     let source = r#"
 const globalX = 100;
 
@@ -1616,15 +1619,49 @@ function foo() {
     let mut binder = ThinBinderState::new();
     binder.bind_source_file(arena, root);
 
-    assert!(binder.file_locals.has("globalX"));
-    assert!(binder.file_locals.has("foo"));
-    assert!(binder.file_locals.has("localX"));
+    // Global symbols should be in file_locals
+    assert!(binder.file_locals.has("globalX"), "globalX should be in file_locals");
+    assert!(binder.file_locals.has("foo"), "foo function should be in file_locals");
 
-    let local_x_sym_id = binder.file_locals.get("localX").expect("localX should exist");
-    let local_x_symbol = binder.get_symbol(local_x_sym_id).expect("localX symbol should exist");
+    // localX should NOT be in file_locals (it's a function-local variable)
+    assert!(
+        !binder.file_locals.has("localX"),
+        "localX should NOT be in file_locals - it's a function-local variable"
+    );
 
-    use crate::binder::symbol_flags;
-    assert!(local_x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0);
+    // localX should be in the function's scope (via persistent scopes)
+    // Find the function's scope and verify localX is there
+    let mut found_local_x_in_function_scope = false;
+    for (scope_idx, scope) in binder.scopes.iter().enumerate() {
+        if scope.table.has("localX") {
+            found_local_x_in_function_scope = true;
+            // Verify the symbol has correct flags
+            let local_x_sym_id = scope.table.get("localX").expect("localX exists");
+            let local_x_symbol = binder.get_symbol(local_x_sym_id).expect("localX symbol");
+            assert!(
+                local_x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0,
+                "localX should be a block-scoped variable (const)"
+            );
+            // Verify this is not the root scope
+            assert!(
+                scope_idx > 0,
+                "localX should be in a nested scope, not the root scope"
+            );
+            break;
+        }
+    }
+    assert!(
+        found_local_x_in_function_scope,
+        "localX should be found in a function scope"
+    );
+
+    // Verify the global symbol has correct flags
+    let global_x_sym_id = binder.file_locals.get("globalX").expect("globalX exists");
+    let global_x_symbol = binder.get_symbol(global_x_sym_id).expect("globalX symbol");
+    assert!(
+        global_x_symbol.flags & symbol_flags::BLOCK_SCOPED_VARIABLE != 0,
+        "globalX should be a block-scoped variable (const)"
+    );
 }
 
 #[test]
