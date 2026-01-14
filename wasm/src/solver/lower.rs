@@ -292,7 +292,10 @@ impl<'a> TypeLowering<'a> {
     /// This is the main entry point for type synthesis.
     pub fn lower_type(&self, node_idx: NodeIndex) -> TypeId {
         if node_idx == NodeIndex::NONE {
-            return TypeId::ANY; // Implicit any for missing type annotations
+            // Use UNKNOWN instead of ANY for missing type annotations to prevent
+            // Any poisoning - this exposes hidden bugs downstream instead of silently
+            // accepting all assignments
+            return TypeId::UNKNOWN;
         }
 
         let node = match self.arena.get(node_idx) {
