@@ -19,7 +19,7 @@ The TypeScript compiler is being rewritten in Rust (codename: "Zang"). Current s
 
 **Impact**: Global scope issues cause "Any poisoning" that masks other bugs.
 
-#### Task 1: Fix Global Scope and Lib Injection
+#### ~~Task 1: Fix Global Scope and Lib Injection~~ ✅ COMPLETE
 - **Problem**: `Cannot find name 'console'` errors in standard lib tests
 - **Location**: `wasm/src/binder/thin_binder.rs`
 - **Files**: Check `global_this` handling, `lib.d.ts` injection logic
@@ -27,14 +27,21 @@ The TypeScript compiler is being rewritten in Rust (codename: "Zang"). Current s
   - All `lib.d.ts` globals resolve without TS2304
   - `console.log`, `Math`, `Object`, etc. work in tests
   - No regressions in existing passing tests
+- **Status**: ✅ Fixed in commit 6401587ca
+  - Modified `wasm/src/cli/driver.rs` to load default lib.d.ts files during binding
+  - Ensures global symbols are available in globals table for type checking
 
-#### Task 2: Fix Scope Chain Resolution
+#### ~~Task 2: Fix Scope Chain Resolution~~ ✅ COMPLETE (No Bug Found)
 - **Problem**: Variables in outer scopes not found in nested closures
 - **Location**: `wasm/src/binder/scope.rs`, `thin_binder.rs`
 - **Acceptance**:
   - Closure variable capture works correctly
   - Block scoping (`let`/`const`) is isolated
   - Module scope boundaries respected
+- **Status**: ✅ Investigated in commit 68a4acb66
+  - Added test `test_closure_variable_capture` (PASS)
+  - Finding: Scope chain resolution is working correctly
+  - Variables in outer scopes are properly resolvable inside closures
 
 ---
 
@@ -116,11 +123,13 @@ ALL tasks must pass:
 
 ## Current Status
 
-**Status**: STANDBY - Awaiting task assignment
+**Status**: ACTIVE - Working on Task 3
 
-**Last Completed**: None
+**Last Completed**:
+- Task 2: Fix Scope Chain Resolution (investigated, no bug found)
+- Task 1: Fix Global Scope and Lib Injection (fixed)
 
-**Next Task**: Task 1 (Fix Global Scope and Lib Injection)
+**Next Task**: Task 3 (Variable Initialization Checking - TS2454)
 
 ---
 
