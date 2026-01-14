@@ -3938,11 +3938,12 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypePredicate;
 
         if type_annotation.is_none() {
-            return (TypeId::ANY, None);
+            // Return UNKNOWN instead of ANY to enforce strict type checking
+            return (TypeId::UNKNOWN, None);
         }
 
         let Some(node) = self.ctx.arena.get(type_annotation) else {
-            return (TypeId::ANY, None);
+            return (TypeId::UNKNOWN, None);
         };
 
         if node.kind != syntax_kind_ext::TYPE_PREDICATE {
@@ -9763,7 +9764,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_type_for_parameter_properties(type_annotation);
             self.return_type_and_predicate(type_annotation)
         } else {
-            (TypeId::ANY, None)
+            // Use UNKNOWN as default to enforce strict checking
+            // This ensures return statements are checked even without annotation
+            (TypeId::UNKNOWN, None)
         };
 
         // Evaluate Application types in return type to get their structural form
@@ -14445,7 +14448,8 @@ impl<'a> ThinCheckerState<'a> {
                         let mut return_type = if has_type_annotation {
                             self.get_type_of_node(func.type_annotation)
                         } else {
-                            TypeId::ANY
+                            // Use UNKNOWN to enforce strict checking
+                            TypeId::UNKNOWN
                         };
 
                         self.cache_parameter_types(&func.parameters.nodes, None);
