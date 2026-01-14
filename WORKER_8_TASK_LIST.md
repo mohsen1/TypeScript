@@ -65,6 +65,11 @@
   - Rebased em-team-2 onto rust branch (14 commits applied)
   - Worker 8 error recovery implementation preserved
   - Status: COMPLETE - Ready for new assignment
+- [x] **EM-2 Second Merge (2026-01-14):** Worker 8 branch merged again
+  - Rebased em-team-2 onto rust (12 commits, 2 conflicts resolved)
+  - Merged 7 commits from worker-8 (team coordination docs)
+  - All Worker 8 error recovery work preserved
+  - Status: MERGED - Awaiting new task assignment
 
 ---
 
