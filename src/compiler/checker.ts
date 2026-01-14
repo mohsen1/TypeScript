@@ -36180,6 +36180,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 if (!checkTypeRelatedToAndOptionallyElaborate(checkArgType, paramType, relation, reportErrors ? effectiveCheckArgumentNode : undefined, effectiveCheckArgumentNode, headMessage, containingMessageChain, errorOutputContainer)) {
                     Debug.assert(!reportErrors || !!errorOutputContainer.errors, "parameter should have errors when reporting errors");
                     maybeAddMissingAwaitInfo(arg, checkArgType, paramType);
+                    maybeAddTemplateLiteralErrorInfo(effectiveCheckArgumentNode, checkArgType, paramType);
                     return errorOutputContainer.errors || emptyArray;
                 }
             }
@@ -36194,6 +36195,7 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             if (!checkTypeRelatedTo(spreadType, restType, relation, errorNode, headMessage, /*containingMessageChain*/ undefined, errorOutputContainer)) {
                 Debug.assert(!reportErrors || !!errorOutputContainer.errors, "rest parameter should have errors when reporting errors");
                 maybeAddMissingAwaitInfo(errorNode, spreadType, restType);
+                maybeAddTemplateLiteralErrorInfo(errorNode, spreadType, restType);
                 return errorOutputContainer.errors || emptyArray;
             }
         }
@@ -36242,6 +36244,48 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     addRelatedInfo(errorOutputContainer.errors[0], createDiagnosticForNode(errorNode, Diagnostics.Did_you_forget_to_use_await));
                 }
             }
+        }
+
+        function maybeAddTemplateLiteralErrorInfo(errorNode: Node | undefined, source: Type, target: Type) {
+            if (errorNode && reportErrors && errorOutputContainer.errors && errorOutputContainer.errors.length) {
+                // Check if this is a template literal type mismatch
+                // (source is string/template literal, target is template literal type)
+                const isSourceStringOrTemplate = source.flags & (TypeFlags.StringLiteral | TypeFlags.TemplateLiteral);
+                const isTargetTemplate = target.flags & TypeFlags.TemplateLiteral;
+
+                if (isSourceStringOrTemplate && isTargetTemplate) {
+                    const targetTemplate = target as TemplateLiteralType;
+                    const patternString = formatTemplateLiteralTypeAsPattern(targetTemplate);
+
+                    // Only add this info if the source is not assignable to the target template pattern
+                    if (!isTypeMatchedByTemplateLiteralType(source, targetTemplate)) {
+                        addRelatedInfo(
+                            errorOutputContainer.errors[0],
+                            createDiagnosticForNode(
+                                errorNode,
+                                Diagnostics.Type_0_does_not_match_template_literal_pattern_1,
+                                typeToString(source),
+                                patternString,
+                            ),
+                        );
+                    }
+                }
+            }
+        }
+
+        /**
+         * Formats a template literal type as a pattern string (e.g., "${string}-baz")
+         */
+        function formatTemplateLiteralTypeAsPattern(type: TemplateLiteralType): string {
+            let result = "";
+            for (let i = 0; i < type.types.length; i++) {
+                result += type.texts[i];
+                result += "$" + "{";
+                result += typeToString(type.types[i]);
+                result += "}";
+            }
+            result += type.texts[type.texts.length - 1];
+            return result;
         }
     }
 

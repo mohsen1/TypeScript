@@ -8563,5 +8563,9 @@
     "Promise '{0}' has unwrapped type '{1}', and Promise '{2}' has unwrapped type '{3}'.": {
         "category": "Error",
         "code": 9523
+    },
+    "Type '{0}' does not match template literal pattern '{1}'.": {
+        "category": "Error",
+        "code": 9524
     }
 }
