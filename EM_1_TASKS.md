@@ -73,10 +73,9 @@ Before merging any worker branch:
 **Next:** Coordinate with Worker 3 on comma inference recovery
 
 ### Worker 2 (Parser - TS1109)
-**Status:** ✅ VALIDATED - Definite assignment fix reduces TS1109 by 24% (262→198)
+**Status:** ✅ MERGED - Definite assignment fix reduces TS1109 by 24% (262→198)
 **Results:** Exact Match +0.4%, No regressions, Build passes
-**Decision:** MERGE APPROVED - Ready to merge worker-2 into em-team-1
-**Next:** After merge, prioritize new.target context validation (~52 cases)
+**Next:** Prioritize new.target context validation (~52 cases)
 
 ### Worker 3 (Parser - Cascading Errors)
 **Status:** ✅ MERGED - Cascading error fix reduces parser FP by 21% (701→551)
