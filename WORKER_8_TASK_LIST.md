@@ -56,6 +56,10 @@
 - [x] **Merge to em-team-2:** commit `3aee5a746`
 - [x] **Test Results:** 5/5 tests passed (100%)
 - [x] **Conformance:** 33.1% exact match (unchanged - error recovery helps within files)
+- [x] **Latest Merge Check:** worker-8 branch is out of sync (behind em-team-2)
+  - em-team-2 has Worker 7's TS1128 deduplication
+  - worker-8 branch doesn't have these fixes
+  - No merge needed - em-team-2 already has all Worker 8 work
 
 ---
 
