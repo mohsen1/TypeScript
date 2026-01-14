@@ -263,6 +263,22 @@ pub mod codes {
 
     /// Object literal may only specify known properties, and '{0}' does not exist in type '{1}'.
     pub const EXCESS_PROPERTY: u32 = 2353;
+
+    // =========================================================================
+    // Implicit Any Errors (7xxx series)
+    // =========================================================================
+
+    /// Parameter '{0}' implicitly has an '{1}' type.
+    pub const IMPLICIT_ANY_PARAMETER: u32 = 7006;
+
+    /// Member '{0}' implicitly has an '{1}' type.
+    pub const IMPLICIT_ANY_MEMBER: u32 = 7008;
+
+    /// '{0}', which lacks return-type annotation, implicitly has an '{1}' return type.
+    pub const IMPLICIT_ANY_RETURN: u32 = 7010;
+
+    /// Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.
+    pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: u32 = 7011;
 }
 
 // =============================================================================
@@ -303,6 +319,15 @@ pub fn get_message_template(code: u32) -> &'static str {
         codes::OBJECT_IS_UNKNOWN => "Object is of type 'unknown'.",
         codes::EXCESS_PROPERTY => {
             "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'."
+        }
+        // Implicit any errors (7xxx series)
+        codes::IMPLICIT_ANY_PARAMETER => "Parameter '{0}' implicitly has an '{1}' type.",
+        codes::IMPLICIT_ANY_MEMBER => "Member '{0}' implicitly has an '{1}' type.",
+        codes::IMPLICIT_ANY_RETURN => {
+            "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type."
+        }
+        codes::IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION => {
+            "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type."
         }
         _ => "Unknown diagnostic",
     }
@@ -878,6 +903,84 @@ impl<'a> DiagnosticBuilder<'a> {
                 prop_name, target_str
             ),
             codes::EXCESS_PROPERTY,
+        )
+    }
+
+    // =========================================================================
+    // Implicit Any Diagnostics (TS7006, TS7008, TS7010, TS7011)
+    // =========================================================================
+
+    /// Create a "Parameter implicitly has an 'any' type" diagnostic (TS7006).
+    ///
+    /// This is emitted when noImplicitAny is enabled and a function parameter
+    /// has no type annotation and no contextual type.
+    pub fn implicit_any_parameter(&mut self, param_name: &str) -> TypeDiagnostic {
+        TypeDiagnostic::error(
+            format!("Parameter '{}' implicitly has an 'any' type.", param_name),
+            codes::IMPLICIT_ANY_PARAMETER,
+        )
+    }
+
+    /// Create a "Parameter implicitly has a specific type" diagnostic (TS7006 variant).
+    ///
+    /// This is used when the implicit type is known to be something other than 'any',
+    /// such as when a rest parameter implicitly has 'any[]'.
+    pub fn implicit_any_parameter_with_type(
+        &mut self,
+        param_name: &str,
+        implicit_type: TypeId,
+    ) -> TypeDiagnostic {
+        let type_str = self.formatter.format(implicit_type);
+        TypeDiagnostic::error(
+            format!(
+                "Parameter '{}' implicitly has an '{}' type.",
+                param_name, type_str
+            ),
+            codes::IMPLICIT_ANY_PARAMETER,
+        )
+    }
+
+    /// Create a "Member implicitly has an 'any' type" diagnostic (TS7008).
+    ///
+    /// This is emitted when noImplicitAny is enabled and a class/interface member
+    /// has no type annotation.
+    pub fn implicit_any_member(&mut self, member_name: &str) -> TypeDiagnostic {
+        TypeDiagnostic::error(
+            format!("Member '{}' implicitly has an 'any' type.", member_name),
+            codes::IMPLICIT_ANY_MEMBER,
+        )
+    }
+
+    /// Create an "implicitly has an 'any' return type" diagnostic (TS7010).
+    ///
+    /// This is emitted when noImplicitAny is enabled and a function declaration
+    /// has no return type annotation and returns 'any'.
+    pub fn implicit_any_return(&mut self, func_name: &str, return_type: TypeId) -> TypeDiagnostic {
+        let type_str = self.formatter.format(return_type);
+        TypeDiagnostic::error(
+            format!(
+                "'{}', which lacks return-type annotation, implicitly has an '{}' return type.",
+                func_name, type_str
+            ),
+            codes::IMPLICIT_ANY_RETURN,
+        )
+    }
+
+    /// Create a "Function expression implicitly has an 'any' return type" diagnostic (TS7011).
+    ///
+    /// This is emitted when noImplicitAny is enabled and a function expression
+    /// has no return type annotation and returns 'any'.
+    pub fn implicit_any_return_function_expression(
+        &mut self,
+        return_type: TypeId,
+    ) -> TypeDiagnostic {
+        let type_str = self.formatter.format(return_type);
+        TypeDiagnostic::error(
+            format!(
+                "Function expression, which lacks return-type annotation, implicitly has an '{}' return type.",
+                type_str
+            ),
+            codes::IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION,
         )
     }
 }
