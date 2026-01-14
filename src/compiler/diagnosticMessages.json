@@ -6728,6 +6728,10 @@
         "category": "Error",
         "code": 7006
     },
+    "Parameter '{0}' implicitly has an '{1}' type. Add a type annotation to make '{0}' explicit.": {
+        "category": "Error",
+        "code": 9517
+    },
     "Member '{0}' implicitly has an '{1}' type.": {
         "category": "Error",
         "code": 7008

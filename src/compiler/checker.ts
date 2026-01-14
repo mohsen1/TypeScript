@@ -26078,9 +26078,10 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         return;
                     }
                 }
+                const paramName = declarationNameToString(getNameOfDeclaration(declaration));
                 diagnostic = (declaration as ParameterDeclaration).dotDotDotToken ?
                     noImplicitAny ? Diagnostics.Rest_parameter_0_implicitly_has_an_any_type : Diagnostics.Rest_parameter_0_implicitly_has_an_any_type_but_a_better_type_may_be_inferred_from_usage :
-                    noImplicitAny ? Diagnostics.Parameter_0_implicitly_has_an_1_type : Diagnostics.Parameter_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
+                    noImplicitAny ? Diagnostics.Parameter_0_implicitly_has_an_1_type_Add_a_type_annotation_to_make_0_explicit : Diagnostics.Parameter_0_implicitly_has_an_1_type_but_a_better_type_may_be_inferred_from_usage;
                 break;
             case SyntaxKind.BindingElement:
                 diagnostic = Diagnostics.Binding_element_0_implicitly_has_an_1_type;

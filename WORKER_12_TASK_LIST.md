@@ -8,45 +8,45 @@
 
 ## CURRENT TASK
 
-### Task 5: Improve TS7006 "Implicit Any" Error Messages
+### Task 6: Fix "Excess Property Checking" Edge Cases
 **Status:** READY TO START
 
 **Priority:** MEDIUM
-**Expected Impact:** Better developer experience
+**Expected Impact:** Reduce false positives
 
-**Objective:** TS7006 errors currently say "Parameter X implicitly has an 'any' type". Enhance this to show WHERE the type was inferred from (similar to Task 3's type tracing).
+**Objective:** Fresh object literals with excess properties sometimes error incorrectly. Fix the logic to match tsc behavior in edge cases involving intersection types, generic constraints, and index signatures.
 
 **Subtasks:**
-- [ ] Find TS7006 emission in checker.ts
-- [ ] Add contextual information about where the 'any' came from
-- [ ] Include suggestion: "Add type annotation for X"
-- [ ] Test with common scenarios
+- [ ] Find `getFreshType` and related freshness checking logic
+- [ ] Identify test cases where excess property errors are wrong
+- [ ] Fix the checking logic for complex object literal scenarios
+- [ ] Add regression tests
 
 **Key Files:**
-- `src/compiler/checker.ts`
-- `src/compiler/diagnosticMessages.json`
+- `src/compiler/checker.ts` (freshness logic around lines 18000-19000)
+- `src/compiler/types.ts` (object literal types)
 
 ---
 
 ## PENDING TASKS
 
-### Task 6: Fix "Excess Property Checking" Edge Cases
+### Task 7: Enhance Generic Type Error Messages
 **Status:** PENDING
 
-**Priority:** MEDIUM
-**Expected Impact:** Better developer experience
+**Priority:** LOW
+**Expected Impact:** Better error messages for complex generics
 
-**Objective:** TS7006 errors currently say "Parameter X implicitly has an 'any' type". Enhance this to show WHERE the type was inferred from (similar to Task 3's type tracing).
+**Objective:** When generic type instantiation fails, show better information about WHICH type argument caused the failure.
 
 **Subtasks:**
-- [ ] Find TS7006 emission in checker.ts
-- [ ] Add contextual information about where the 'any' came from
-- [ ] Include suggestion: "Add type annotation for X"
-- [ ] Test with common scenarios
+- [ ] Find generic instantiation error reporting
+- [ ] Add context showing which type parameter failed
+- [ ] Show the constraint that was violated
+- [ ] Example: "Type 'string' does not satisfy constraint 'extends number' for type parameter 'T'"
 
 **Key Files:**
-- `src/compiler/checker.ts`
-- `src/compiler/diagnosticMessages.json`
+- `src/compiler/checker.ts` (generic type checking)
+- `src/compiler/diagnosticMessages.json'
 
 ---
 
@@ -149,6 +149,31 @@
 
 **Diagnostic Message Added:**
 - "'{0}' is not assignable to type '{1}'. Type '{2}' has a constraint that could be instantiated with a different subtype" (9516)
+
+---
+
+### Task 5: Improve TS7006 "Implicit Any" Error Messages
+**Status:** COMPLETED
+
+**What was done:**
+- [x] Found TS7006 emission in checker.ts (line ~26135)
+- [x] Added enhanced diagnostic message with type annotation suggestion
+- [x] Modified error emission to use new message
+- [x] Built and verified changes
+
+**Implementation:**
+- Modified `reportImplicitAny()` in checker.ts (line ~26133)
+- Added new diagnostic message code 9517
+- New message format: "Parameter '{0}' implicitly has an '{1}' type. Add a type annotation to make '{0}' explicit."
+
+**Diagnostic Message Added:**
+- "Parameter '{0}' implicitly has an '{1}' type. Add a type annotation to make '{0}' explicit" (9517)
+
+**Example improvement:**
+```
+Before: Parameter 'x' implicitly has an 'any' type
+After:  Parameter 'x' implicitly has an 'any' type. Add a type annotation to make 'x' explicit
+```
 
 ---
 
