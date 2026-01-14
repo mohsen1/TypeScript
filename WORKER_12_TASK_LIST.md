@@ -3,74 +3,69 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in type parameter defaults only
+- [ ] Reduce "Any" fallback in property access patterns
 
 ## Context
 
-**Previous Attempt Status: REJECTED**
-The previous attempt to change ALL fallbacks from `Any` to `Unknown` was too aggressive and caused issues.
+**Previous Work**
+Worker 12 has been incrementally reducing "Any" fallback usage to expose hidden bugs. The type parameter defaults change (7 locations) was implemented but not yet merged to rust.
 
-**New Approach: Incremental Strategy**
-Instead of changing everything at once, we'll make focused, testable changes one area at a time.
+**New Focus: Property Access Fallbacks**
+Property access is a critical source of "Any" poisoning:
+- When accessing `obj.property` where the property type is unknown
+- The checker returns `Any` instead of `Unknown`
+- This `Any` then propagates through all subsequent operations on that property
 
-**Why Type Parameter Defaults?**
-Type parameter defaults are a critical source of "Any" poisoning:
-- When generic functions are called without explicit type arguments
-- The compiler fills in missing type parameters from `default` or `constraint`
-- If neither exists, it currently falls back to `Any`
-- This `Any` then propagates through the entire call chain
+**Targeted Changes**
+Change property access fallbacks in `thin_checker.rs`:
 
-**Targeted Change**
-Only change the fallback in these specific locations in `thin_checker.rs`:
-1. Line ~1706: `param.default.or(param.constraint).unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
-2. Line ~3575: Same pattern (interface merging)
-3. Line ~4520: Same pattern
-4. Line ~4603: Same pattern
-5. Line ~5118: Same pattern
+1. Lines 8470, 8554, 8758, 8981, 9361: `property_type.unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
 
-This is a surgical change (5 locations) that should:
-- Expose bugs in generic type handling
-- Not affect other parts of the codebase
-- Be easy to test and measure
+These are in:
+- Property type resolution for spread operators
+- Property access expressions
+- Union type construction
+- Object literal property types
+
+**Why This Matters**
+When you access `obj.foo` and `foo` doesn't exist or has no type:
+- Current: Returns `Any` (silently accepts invalid code)
+- New: Returns `Unknown` (will emit errors for unsafe operations)
+
+This will expose bugs where:
+- Properties are accessed without type checking
+- Optional chaining isn't used where it should be
+- Type assertions are missing
 
 ## Queue
-- [ ] After type parameter fix, measure conformance impact
-- [ ] If successful, tackle other fallback patterns incrementally
+- [ ] After property access fix, measure conformance impact
+- [ ] Tackle contextual type fallbacks
+- [ ] Tackle this-type fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Implementation Steps
 
 1. **Make targeted changes**
-   - Only modify type parameter default fallbacks in `thin_checker.rs`
-   - Search for `param.default.or(param.constraint).unwrap_or(TypeId::ANY)`
-   - Replace with `.unwrap_or(TypeId::UNKNOWN)`
+   - Change property access fallbacks from `TypeId::ANY` to `TypeId::UNKNOWN`
+   - Search pattern: `property_type.unwrap_or(TypeId::ANY)`
+   - Found 5 locations in thin_checker.rs
 
 2. **Test incrementally**
-   - Run `./wasm/test.sh` after each change
-   - Run small conformance sample: `./wasm/differential-test/run-conformance.sh --max=50`
-   - Verify no crashes
+   - Run `./wasm/test.sh` after changes
+   - Verify compilation succeeds
+   - Check for new test failures
 
-3. **Measure impact**
-   - Compare error counts before/after
-   - Focus on TS2322 (type mismatch) and TS7006 (implicit any)
-   - Document which tests are affected
+3. **Document findings**
+   - Note which error codes increase
+   - Identify patterns in exposed bugs
 
 ## Files to Modify
-- `wasm/src/thin_checker.rs` - Only type parameter default fallbacks (5 locations)
+- `wasm/src/thin_checker.rs` - Property access fallbacks (5 locations)
 
 ## Success Criteria
 - Code compiles without errors
-- No test crashes
-- Measurable increase in detected type errors (TS2322, TS7006)
-
-## Recent Merge Status
-- **Date**: 2026-01-14 (second verification)
-- **Result**: Worker-12 already fully merged into em-team-3
-- **Action Taken**:
-  - Rebased em-team-3 onto rust (successful)
-  - Verified all worker-12 commits present
-  - Build verification: PASSED
-- **Next**: Continue incremental Any→Unknown changes in type parameter defaults
+- No critical test crashes (pre-existing test_closure_capture_with_array_filter failure is OK)
+- Measurable increase in detected type errors
 
 ## Ready for Merge
-Yes (task list update merged)
+No (task in progress)
