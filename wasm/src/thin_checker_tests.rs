@@ -24488,7 +24488,7 @@ abstract class AbstractBase {
     binder.bind_source_file(parser.get_arena(), root);
 
     let types = TypeInterner::new();
-    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
     checker.check_source_file(root);
 
     // Abstract classes should not have TS2564 errors

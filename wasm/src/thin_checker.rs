@@ -15851,6 +15851,7 @@ impl<'a> ThinCheckerState<'a> {
         let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
         let class_name = self.get_class_name_from_decl(class_idx);
+        let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
 
         let prev_enclosing_class = self.ctx.enclosing_class.take();
         self.ctx.enclosing_class = Some(EnclosingClassInfo {
@@ -15867,7 +15868,7 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check strict property initialization (TS2564) for class expressions
         // Class expressions should have the same property initialization checks as class declarations
-        self.check_property_initialization(class_idx, class, false);
+        self.check_property_initialization(class_idx, class, false, is_abstract_class);
 
         self.ctx.enclosing_class = prev_enclosing_class;
 
