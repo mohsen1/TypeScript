@@ -693,7 +693,9 @@ impl<'a> TypeLowering<'a> {
 
     fn lower_return_type(&self, node_idx: NodeIndex) -> (TypeId, Option<TypePredicate>) {
         if node_idx == NodeIndex::NONE {
-            return (TypeId::ANY, None);
+            // Use UNKNOWN instead of ANY for missing return type annotations
+            // to expose hidden type errors instead of silently accepting all values
+            return (TypeId::UNKNOWN, None);
         }
 
         let node = match self.arena.get(node_idx) {
