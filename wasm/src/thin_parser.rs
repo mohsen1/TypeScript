@@ -85,6 +85,8 @@ pub struct ThinParserState {
     node_count: u32,
     /// Recursion depth for stack overflow protection
     recursion_depth: u32,
+    /// Position of last error (to prevent cascading errors at same position)
+    last_error_pos: u32,
 }
 
 impl ThinParserState {
@@ -103,6 +105,7 @@ impl ThinParserState {
             parse_diagnostics: Vec::new(),
             node_count: 0,
             recursion_depth: 0,
+            last_error_pos: 0,
         }
     }
 
@@ -115,6 +118,7 @@ impl ThinParserState {
         self.parse_diagnostics.clear();
         self.node_count = 0;
         self.recursion_depth = 0;
+        self.last_error_pos = 0;
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -295,12 +299,19 @@ impl ThinParserState {
     }
 
     /// Parse expected token, report error if not found
+    /// Suppresses error if we already emitted an error at the current position
+    /// (to prevent cascading errors from sequential parse_expected calls)
     pub fn parse_expected(&mut self, kind: SyntaxKind) -> bool {
         if self.is_token(kind) {
             self.next_token();
             true
         } else {
-            self.error_token_expected(Self::token_to_string(kind));
+            // Only emit error if we haven't already emitted one at this position
+            // This prevents cascading errors like "';' expected" followed by "')' expected"
+            // when the real issue is a single missing token
+            if self.token_pos() != self.last_error_pos {
+                self.error_token_expected(Self::token_to_string(kind));
+            }
             false
         }
     }
@@ -338,6 +349,8 @@ impl ThinParserState {
     }
 
     fn parse_error_at(&mut self, start: u32, length: u32, message: &str, code: u32) {
+        // Track the position of this error to prevent cascading errors at same position
+        self.last_error_pos = start;
         self.parse_diagnostics.push(ParseDiagnostic {
             start,
             length,
@@ -498,7 +511,10 @@ impl ThinParserState {
                 self.current_token = SyntaxKind::GreaterThanGreaterThanEqualsToken;
             }
             _ => {
-                self.error_token_expected(">");
+                // Only emit error if we haven't already emitted one at this position
+                if self.token_pos() != self.last_error_pos {
+                    self.error_token_expected(">");
+                }
             }
         }
     }
