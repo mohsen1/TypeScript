@@ -3,13 +3,7 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [x] Reduce "Any" fallback in this-type patterns
-
-## Completed
-- [x] Locate this-type fallback location (found 1)
-- [x] Change this-type fallback from TypeId::ANY to TypeId::UNKNOWN
-- [x] Verify compilation - Code compiles successfully
-- [x] Test - One pre-existing failure (unrelated to changes)
+- [ ] Reduce "Any" fallback in array element type patterns
 
 ## Context
 
@@ -18,73 +12,67 @@ Worker 12 has been incrementally reducing "Any" fallback usage:
 1. ✅ Type parameter defaults (7 locations)
 2. ✅ Property access fallbacks (5 locations)
 3. ✅ Contextual type fallbacks (3 locations)
+4. ✅ This-type fallback (1 location)
 
-All changes merged to rust.
+All changes merged to rust. Total: 16 locations changed.
 
-**New Focus: This-Type Fallbacks**
-This-type is used in class methods to refer to the instance type:
-- When a method uses `this` and the type needs to be inferred
-- The checker resolves `this` to the class instance type
-- When this-type cannot be determined, it currently falls back to `Any`
+**New Focus: Array Element Type Fallbacks**
+Array types like `Array<T>` or `T[]` need to know their element type:
+- When creating or inferring array types
+- The checker extracts the element type for type checking
+- When the element type is unknown, it currently falls back to `Any`
 
 **Targeted Changes**
-Change this-type fallback in `thin_checker.rs`:
+Change array element type fallbacks in `thin_checker.rs`:
 
-1. Line ~629: `self.current_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+1. Line ~965: Array type element type inference
+2. Line ~2583: Array type element type in type literals
+3. Line ~2657: Additional array element type handling
 
-This is in:
-- Primary expression type checking (this keyword resolution)
+Pattern: `.unwrap_or(TypeId::ANY)` after array type construction
 
 **Why This Matters**
-When `this` is used in a context where its type cannot be determined:
-- **Current**: Returns `Any` (loses all type safety for `this`)
-- **New**: Returns `Unknown` (maintains strictness, emits errors for unsafe operations)
+When array element type cannot be determined:
+- **Current**: Returns `Any` (array becomes `any[]`, loses all type safety)
+- **New**: Returns `Unknown` (array becomes `unknown[]`, maintains strictness)
 
 This will expose bugs in:
-- Methods without proper class binding
-- Arrow functions using `this` incorrectly
-- Nested function scopes losing `this` context
+- Arrays without explicit type parameters
+- Array literals with inconsistent element types
+- Generic array operations where element type is lost
 
-Note: This is a single-location change but with high impact. The `this` keyword
-is fundamental to class methods, and ensuring its type is correctly resolved
-is critical for type safety.
+Note: Arrays are a fundamental data structure. Ensuring element type is
+correctly resolved is critical for collection type safety.
 
 ## Queue
-- [ ] After this-type fix, measure conformance impact
-- [ ] Tackle array element type fallbacks
+- [ ] After array element fix, measure conformance impact
 - [ ] Tackle remaining accessor fallbacks
+- [ ] Tackle argument type fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Implementation Steps
 
-1. **Make targeted change**
-   - Change this-type fallback from `TypeId::ANY` to `TypeId::UNKNOWN`
-   - Location: Line ~629 in thin_checker.rs
-   - Pattern: `self.current_this_type().unwrap_or(TypeId::ANY)`
+1. **Make targeted changes**
+   - Change array element type fallbacks from `TypeId::ANY` to `TypeId::UNKNOWN`
+   - Focus on: array literal type construction
+   - Found ~3 locations in thin_checker.rs
 
 2. **Test incrementally**
-   - Run `./wasm/test.sh` after change
+   - Run `./wasm/test.sh` after changes
    - Verify compilation succeeds
    - Check for new test failures
 
 3. **Document findings**
    - Note which error codes increase
-   - Identify patterns in exposed bugs (especially class-related)
+   - Identify patterns in exposed bugs (especially array-related)
 
 ## Files to Modify
-- `wasm/src/thin_checker.rs` - This-type fallback (1 location)
+- `wasm/src/thin_checker.rs` - Array element type fallbacks (~3 locations)
 
 ## Success Criteria
 - Code compiles without errors
 - No critical test crashes (pre-existing test_closure_capture_with_array_filter failure is OK)
-- Measurable increase in detected type errors related to `this`
+- Measurable increase in detected type errors related to arrays
 
 ## Ready for Merge
-Yes - Implementation complete and tested.
-
-## Changes Summary
-- **Files modified**: 1 (`wasm/src/thin_checker.rs`)
-- **Lines changed**: 1 location
-- **Change**: This-type fallback from `TypeId::ANY` → `TypeId::UNKNOWN`
-- **Commit**: `b7cf10b43 Complete: Reduce 'Any' fallback in this-type patterns`
-- **Pushed to**: origin/worker-12
+No (task in progress)
