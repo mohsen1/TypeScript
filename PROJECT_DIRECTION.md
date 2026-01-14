@@ -3,11 +3,15 @@
 
 ## Mission: TypeScript → Rust/WASM Migration
 
-Project Zang is a complete rewrite of the TypeScript compiler and type checker in Rust, compiled to WebAssembly for performance. The goal is to **beat TypeScript-Go in performance** while maintaining 100% compatibility with the original TypeScript compiler.
+Project Zang is a complete rewrite of the TypeScript compiler and type checker in Rust, compiled to WebAssembly for performance. The goal is to **beat TypeScript in performance** while maintaining 100% compatibility with the original TypeScript compiler.
 
 ## Architecture Overview
 
 **Core Principle:** TypeScript source files (`src/`) remain **read-only** and identical to upstream Microsoft TypeScript. All custom implementation lives in the `wasm/` directory.
+
+See `wasm/specs/WASM_ARCHITECTURE.md` for a deep dive.
+See `wasm/specs/SOLVER.md` for type solver architecture.
+See `wasm/specs` files for other component designs and references.
 
 ### Key Components:
 - **WASM Parser** (`wasm/src/parser/`) - Rust implementation of TypeScript parser
