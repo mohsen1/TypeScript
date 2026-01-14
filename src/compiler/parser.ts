@@ -4245,6 +4245,14 @@ namespace Parser {
                 return parseErrorAtCurrentToken(Diagnostics.Unexpected_token_expected);
             case ParsingContext.ImportOrExportSpecifiers:
                 if (token() === SyntaxKind.FromKeyword) {
+                    // When we encounter 'from' in this context, it likely means the specifier list
+                    // brace was not closed. To avoid cascading errors, check if there's already a
+                    // recent TS1005 or TS1008 error about the unclosed brace.
+                    const lastError = lastOrUndefined(parseDiagnostics);
+                    if (lastError && (lastError.code === Diagnostics._0_expected.code || lastError.code === Diagnostics.The_parser_expected_to_find_a_1_to_match_the_0_token_here.code)) {
+                        // Suppress this TS1005 as it's likely a cascading error from the unclosed brace
+                        return undefined;
+                    }
                     return parseErrorAtCurrentToken(Diagnostics._0_expected, "}");
                 }
                 return parseErrorAtCurrentToken(Diagnostics.Identifier_expected);
@@ -6367,7 +6375,9 @@ namespace Parser {
                 colonToken = parseExpectedToken(SyntaxKind.ColonToken),
                 nodeIsPresent(colonToken)
                     ? parseAssignmentExpressionOrHigher(allowReturnTypeInArrowFunction)
-                    : createMissingNode(SyntaxKind.Identifier, /*reportAtCurrentPosition*/ false, Diagnostics._0_expected, tokenToString(SyntaxKind.ColonToken)),
+                    // parseExpectedToken already emitted TS1005, so create the missing node without
+                    // emitting another error to avoid dual emission for the same missing colon
+                    : createMissingNode(SyntaxKind.Identifier, /*reportAtCurrentPosition*/ false),
             ),
             pos,
         );
