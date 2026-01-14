@@ -2835,6 +2835,21 @@ pub enum SubtypeFailureReason {
         source_type: TypeId,
         target_type: TypeId,
     },
+    /// Intrinsic type mismatch (e.g., string vs number).
+    IntrinsicTypeMismatch {
+        source_type: TypeId,
+        target_type: TypeId,
+    },
+    /// Literal type mismatch (e.g., "hello" vs "world" or "hello" vs 42).
+    LiteralTypeMismatch {
+        source_type: TypeId,
+        target_type: TypeId,
+    },
+    /// Error type encountered - indicates unresolved type that should not be silently compatible.
+    ErrorType {
+        source_type: TypeId,
+        target_type: TypeId,
+    },
 }
 
 impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
@@ -2867,8 +2882,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         if source == TypeId::NEVER {
             return None;
         }
+        // ERROR types should produce a failure reason, not be silently ignored.
+        // This ensures that unresolved types (TS2304) still trigger downstream TS2322 errors.
         if source == TypeId::ERROR || target == TypeId::ERROR {
-            return None;
+            return Some(SubtypeFailureReason::ErrorType {
+                source_type: source,
+                target_type: target,
+            });
         }
 
         // Look up the type keys
@@ -3017,6 +3037,52 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 Some(SubtypeFailureReason::NoUnionMemberMatches {
                     source_type: source,
                     target_union_members: members.as_ref().to_vec(),
+                })
+            }
+
+            // Intrinsic to intrinsic mismatch (e.g., string vs number)
+            (TypeKey::Intrinsic(s_kind), TypeKey::Intrinsic(t_kind)) => {
+                if s_kind != t_kind {
+                    Some(SubtypeFailureReason::IntrinsicTypeMismatch {
+                        source_type: source,
+                        target_type: target,
+                    })
+                } else {
+                    None
+                }
+            }
+
+            // Literal to literal mismatch (e.g., "hello" vs "world")
+            (TypeKey::Literal(_), TypeKey::Literal(_)) => {
+                Some(SubtypeFailureReason::LiteralTypeMismatch {
+                    source_type: source,
+                    target_type: target,
+                })
+            }
+
+            // Literal to incompatible intrinsic (e.g., "hello" vs number)
+            (TypeKey::Literal(lit), TypeKey::Intrinsic(t_kind)) => {
+                let compatible = match lit {
+                    LiteralValue::String(_) => *t_kind == IntrinsicKind::String,
+                    LiteralValue::Number(_) => *t_kind == IntrinsicKind::Number,
+                    LiteralValue::BigInt(_) => *t_kind == IntrinsicKind::Bigint,
+                    LiteralValue::Boolean(_) => *t_kind == IntrinsicKind::Boolean,
+                };
+                if !compatible {
+                    Some(SubtypeFailureReason::LiteralTypeMismatch {
+                        source_type: source,
+                        target_type: target,
+                    })
+                } else {
+                    None
+                }
+            }
+
+            // Intrinsic to literal (e.g., string vs "hello") - always incompatible
+            (TypeKey::Intrinsic(_), TypeKey::Literal(_)) => {
+                Some(SubtypeFailureReason::TypeMismatch {
+                    source_type: source,
+                    target_type: target,
                 })
             }
 
