@@ -116,11 +116,6 @@ fn obj_with_prop(interner: &TypeInterner, prop_name: &str, prop: TypeId) -> Type
     }])
 }
 
-/// Create an empty object type (for Animal/Cat etc.)
-fn empty_object(interner: &TypeInterner) -> TypeId {
-    interner.object(vec![])
-}
-
 /// Create an Animal type (base type with just name)
 fn animal_type(interner: &TypeInterner) -> TypeId {
     let name = interner.intern_string("name");
@@ -382,6 +377,10 @@ fn test_method_bivariance_disabled() {
     // source or target is a method, both get method handling.
     // This test documents the current behavior; full contravariance for methods
     // may require additional solver refinements.
+    //
+    // TODO: Track known limitation - disable_method_bivariance doesn't fully prevent
+    // bivariance because method comparison treats source and target as a group.
+    // Consider tracking as an issue for future solver enhancement.
     assert!(
         checker.is_subtype_of(obj_with_cat_method, obj_with_animal_method),
         "Current behavior: reverse also passes (method comparison treats both as methods)"
@@ -523,10 +522,22 @@ fn test_optional_property_includes_undefined() {
         is_method: false,
     }]);
 
-    // With exact_optional_property_types=false, these should be compatible
-    // (Optional properties implicitly include undefined)
-    // Note: This test verifies the behavior exists; the implementation
-    // may vary based on how optional properties are encoded
+    // With exact_optional_property_types=false, optional properties implicitly
+    // include undefined, so type A (optional string) should ideally be assignable to type B
+    // (explicit string | undefined) and vice versa.
+    //
+    // TODO: Current implementation may not fully support this quirk.
+    // This test documents the expected behavior; assertions disabled pending implementation.
+    //
+    // Expected behavior (when implemented):
+    // assert!(
+    //     checker.is_subtype_of(type_a, type_b),
+    //     "Optional string should be subtype of string|undefined when exact_optional_property_types=false"
+    // );
+    // assert!(
+    //     checker.is_subtype_of(type_b, type_a),
+    //     "string|undefined should be subtype of optional string when exact_optional_property_types=false"
+    // );
 }
 
 // =============================================================================
@@ -640,6 +651,10 @@ fn test_callback_contravariance_strict() {
     // The test below documents the current behavior where both directions
     // are treated equivalently for nested function comparisons.
     // This is an area for future solver enhancement.
+    //
+    // TODO: Track known limitation - nested callback contravariance not fully
+    // implemented in strict mode. Consider filing an issue or adding to known
+    // limitations document for future improvement.
 
     // Current behavior: both directions work (equivalence)
     assert!(

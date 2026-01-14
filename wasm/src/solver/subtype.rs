@@ -1910,9 +1910,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             // Example: (x: string) => x is string cannot be assigned to (x: string) => boolean
             (Some(_), None) => false,
 
-            // Source has no predicate, target has one - compatible
-            // Target is more specific and can accept the source
-            // Example: (x: string) => boolean can be assigned to (x: string) => x is string
+            // Source has no predicate, target has one - still compatible.
+            // This mirrors TypeScript's behavior: a less specific function (no predicate)
+            // can be used where a more specific function (with a predicate) is expected,
+            // because the predicate is an additional guarantee to the caller, not a stronger
+            // requirement on the implementation.
+            // Example: (x: string) => boolean is assignable to (x: string) => x is string.
             (None, Some(_)) => true,
 
             // Both have predicates - check compatibility
@@ -1936,19 +1939,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                     (true, false) => false,
                     // Both are type guards - check type compatibility
                     // (x is T) assignable to (x is U) if T extends U
-                    (false, false) => {
-                        match (source_pred.type_id, target_pred.type_id) {
-                            (Some(source_type), Some(target_type)) => {
-                                self.check_subtype(source_type, target_type).is_true()
-                            }
-                            (None, Some(_)) => false,
-                            (Some(_), None) => true,
-                            (None, None) => true,
-                        }
-                    }
                     // Both are assertions - check type compatibility
                     // (asserts x is T) assignable to (asserts x is U) if T extends U
-                    (true, true) => {
+                    //
+                    // For both cases, the logic is identical: check if the asserted types
+                    // are compatible (source <: target).
+                    (false, false) | (true, true) => {
                         match (source_pred.type_id, target_pred.type_id) {
                             (Some(source_type), Some(target_type)) => {
                                 self.check_subtype(source_type, target_type).is_true()
@@ -2181,7 +2177,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // this parameters follow the same variance rules as regular parameters:
         // - Strict mode: Contravariant (target <: source)
         // - Non-strict mode: Bivariant (both directions)
-        // This is different from my initial implementation which used covariance.
+        // This behavior differs from an earlier implementation that used covariance.
         // The key insight is that `this` is a pseudo-parameter, so it follows
         // parameter variance rules, not return type variance rules.
         if self.strict_function_types {

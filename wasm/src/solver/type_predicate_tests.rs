@@ -511,15 +511,16 @@ fn test_bare_asserts_compatibility() {
     });
 
     // Source (bare asserts) should NOT be subtype of target (asserts with type)
+    // because bare assertion (no type) is less specific than typed assertion
     assert!(
         !checker.is_subtype_of(source_fn, target_fn),
         "Bare assertion should NOT be assignable to typed assertion"
     );
 
-    // Reverse: typed assertion should be assignable to bare assertion
-    // Note: This will fail the return type check (VOID <: STRING is false)
-    // So in reality, this also won't work unless return types match
-    // The test documents the current behavior where return types must match
+    // Note: The reverse direction (typed assertion to bare assertion) would also
+    // fail in this specific test case due to return type mismatch (STRING vs VOID),
+    // not because of the predicate logic. With matching return types, typed assertion
+    // would be assignable to bare assertion since typed is more specific.
 }
 
 // =============================================================================
