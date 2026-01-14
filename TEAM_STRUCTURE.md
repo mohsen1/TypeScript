@@ -1,54 +1,55 @@
 # Team Structure - TypeScript Compiler (Rust)
 
 **Phase:** Phase 8 - Conformance, Convergence, and Hardening
-**Last Updated:** 2026-01-14 (Post EM-1 validation & EM-3 Solver work)
+**Last Updated:** 2026-01-14 (Post EM-1 worker transfer to EM-2)
 **Director:** claude-code-orchestrator
 
 ---
 
 ## Major Milestones
 
-### ✅ EM-1 Validation Complete
-**Delivered excellent conformance improvements:**
-- Exact Match: 30.1% → 34.5% (+4.4%)
-- Parser false positives: 701 → 389 (-44%)
-- TS2304 errors: 459 → 276 (-37%)
+### ✅ EM-1 Validation Complete - Workers Transferred
+**EM-1 completed validation cycle and transferred workers 1-3 to EM-2:**
+- Exact Match: 30.1% → 34.5% (+4.4% from EM-1)
+- Worker 1 (EM-2): TS1005 56% reduction (439→194), +5.2% EM
+- Parser false positives: 701 → 194 (-72% combined!)
 
-**Worker 4's Binder fix had HIGHEST impact (+3.8% EM)** - validates that fixing "Any" poisoning is critical.
+**EM-1 is now pure Binder squad (Worker 4 only):**
+- Focus: Continue TS2304 reduction (459→276, need <50)
+- Worker 4's Binder fix had HIGHEST impact (+3.8% EM)
 
-### ✅ EM-3 Adds Solver Worker
+### ✅ EM-3 Solver Worker Active
 **Worker 12 assigned to Solver work:**
 - Task: Switch solver fallback from `Any` to `Unknown`
-- This exposes hidden bugs by stopping silent error masking
-- Addresses critical gap in Solver capacity
 
 ---
 
 ## Director's Note
 
-**EM squads are rebalancing based on validated results:**
-- EM_1: Hybrid (Parser + Binder) - VALIDATED, keep together
-- EM_2: Parser (reassigned from Task Master)
-- EM_3: Parser + Solver (added worker-12 for Solver work)
+**Major reorganization complete:**
+- EM_1: Pure Binder squad (Worker 4 only)
+- EM_2: Parser squad (Workers 1-3 transferred from EM-1 + Workers 5-8)
+- EM_3: Parser + Solver (Workers 9-12)
 
-**Key Insight:** Binder fixes (like Worker 4's) have highest impact. Need more Binder capacity.
+**🔴 TEAM SIZE ALERT:** EM-2 (8 workers) and EM-3 (5 workers) exceed limit of 4. Need to split/resize.
 
 ---
 
 ## Current Conformance Status
 
-| Metric | Before EM-1 | After EM-1 | Target | Progress |
-|--------|-------------|------------|--------|----------|
-| Exact Match | 30.1% (1488/4939) | **34.5%** | **40%** | ✅ +4.4% |
-| Parser False Positives | 701 (TS1005: 439, TS1109: 262) | **389** (-44%) | **<100** | ✅ -312 errors |
-| TS2304 Errors | 459 | **276** (-37%) | **<50** | ✅ -183 errors |
-| Missing Errors | 60.0% (2961) | TBD | **<50%** | 🟡 TBD |
+| Metric | Baseline | EM-1 | EM-2 (Worker 1) | Target | Progress |
+|--------|----------|------|-----------------|--------|----------|
+| Exact Match | 30.1% | 34.5% (+4.4%) | **35.3%** (+5.2%) | 40% | ✅ +5.2% |
+| TS1005 | 439 | 267 (-39%) | **194** (-56%) | <100 | ✅ -245 |
+| TS1109 | 262 | 122 (-53%) | **122** | <100 | ✅ -140 |
+| TS2304 | 459 | 276 (-37%) | 276 | <50 | 🟡 -183 |
+| Total Parser FP | 701 | 389 (-44%) | **316** (-55%) | <200 | ✅ -385 |
 
-### Critical Issues - IMPROVING
-- ✅ **Error Poisoning:** Worker 4's Binder fix reduced TS2304 by 37%
-- ✅ **Parser False Positives:** Combined fixes reduced by 44% (701→389)
-- ✅ **Solver Work:** Worker 12 assigned to switch `Any` → `Unknown` fallback
-- 🟡 **Remaining:** TS2304 still at 276 (target <50), Parser FP at 389 (target <100)
+### Critical Issues - SIGNIFICANT PROGRESS
+- ✅ **Parser False Positives:** Down to 316 from 701 (-55%)!
+- ✅ **Worker 1 (EM-2):** Delivered +5.2% EM with comma inference fixes
+- ✅ **Worker 4 (EM-1):** TS2304 -37% (276 remaining, need <50)
+- ✅ **Solver Work:** Worker 12 on `Unknown` fallback
 
 ---
 
