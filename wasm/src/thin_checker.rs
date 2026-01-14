@@ -19675,7 +19675,8 @@ impl<'a> ThinCheckerState<'a> {
         if !self.ctx.no_implicit_any || has_contextual_type {
             return;
         }
-        if !param.type_annotation.is_none() || param.dot_dot_dot_token {
+        // Skip parameters that have explicit type annotations
+        if !param.type_annotation.is_none() {
             return;
         }
         if self.is_this_parameter_name(param.name) {
@@ -19694,9 +19695,15 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let param_name = self.parameter_name_for_error(param.name);
+        // Rest parameters implicitly have 'any[]' type, regular parameters have 'any'
+        let implicit_type = if param.dot_dot_dot_token {
+            "any[]"
+        } else {
+            "any"
+        };
         let message = format_message(
             diagnostic_messages::PARAMETER_IMPLICIT_ANY,
-            &[&param_name, "any"],
+            &[&param_name, implicit_type],
         );
         self.error_at_node(
             param.name,
