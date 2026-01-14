@@ -626,7 +626,7 @@ impl<'a> ThinCheckerState<'a> {
             // Identifiers
             k if k == SyntaxKind::Identifier as u16 => self.get_type_of_identifier(idx),
             k if k == SyntaxKind::ThisKeyword as u16 => {
-                self.current_this_type().unwrap_or(TypeId::ANY)
+                self.current_this_type().unwrap_or(TypeId::UNKNOWN)
             }
 
             // Literals - preserve literal types when contextual typing expects them.
