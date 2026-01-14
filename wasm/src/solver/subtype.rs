@@ -153,7 +153,7 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     in_progress: HashSet<(TypeId, TypeId)>,
     /// Current recursion depth (for stack overflow prevention)
     depth: u32,
-    /// Whether recursion depth was exceeded (for TS2589 emission)
+    /// Whether the recursion depth limit was exceeded (for TS2589 diagnostic)
     pub depth_exceeded: bool,
     /// Whether to use strict function types (contravariant parameters).
     /// Default: true (sound, correct behavior)
@@ -241,12 +241,6 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         self.check_subtype(source, target).is_true()
     }
 
-    /// Check if recursion depth was exceeded during subtype checking.
-    /// Returns true if the depth limit (>100) was hit.
-    pub fn depth_exceeded(&self) -> bool {
-        self.depth_exceeded
-    }
-
     /// Check if `source` is assignable to `target`.
     /// This is a strict structural check; use CompatChecker for TypeScript assignability rules.
     pub fn is_assignable_to(&mut self, source: TypeId, target: TypeId) -> bool {
@@ -317,8 +311,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // =========================================================================
 
         if self.depth > 100 {
-            // Recursion too deep - set flag and return False
-            // The checker will detect this flag and emit TS2589
+            // Recursion too deep - mark as exceeded and return false to prevent stack overflow
+            // The caller can check depth_exceeded to emit TS2589 diagnostic
+            // Note: This differs from coinductive cycle detection which returns Provisional
             self.depth_exceeded = true;
             return SubtypeResult::False;
         }

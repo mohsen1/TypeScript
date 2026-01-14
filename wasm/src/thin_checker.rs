@@ -609,9 +609,6 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.node_resolution_stack.pop();
         self.ctx.node_resolution_set.remove(&idx);
 
-        // Check for type instantiation depth exceeded (TS2589)
-        self.check_depth_exceeded(idx);
-
         // Cache result
         self.ctx.node_types.insert(idx.0, result);
 
@@ -11380,37 +11377,49 @@ impl<'a> ThinCheckerState<'a> {
     ///
     /// Stricter than assignability. Uses coinductive semantics for recursive types.
     /// Uses the context's TypeEnvironment for resolving type references and expanding Applications.
-    pub fn is_subtype_of(&self, source: TypeId, target: TypeId) -> bool {
+    pub fn is_subtype_of(&mut self, source: TypeId, target: TypeId) -> bool {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
         use crate::solver::SubtypeChecker;
-        let env = self.ctx.type_env.borrow();
-        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
-        let result = checker.is_subtype_of(source, target);
+        let depth_exceeded = {
+            let env = self.ctx.type_env.borrow();
+            let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
+            let result = checker.is_subtype_of(source, target);
+            let depth_exceeded = checker.depth_exceeded;
+            (result, depth_exceeded)
+        };
 
-        // If depth was exceeded during subtype checking, set the context flag
-        // The checker will emit TS2589 at the appropriate location
-        if checker.depth_exceeded() {
-            *self.ctx.depth_exceeded.borrow_mut() = true;
+        // Emit TS2589 if recursion depth was exceeded
+        if depth_exceeded.1 {
+            self.error_at_current_node(
+                diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+                diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+            );
         }
 
-        result
+        depth_exceeded.0
     }
 
     /// Check if `source` type is a subtype of `target` type, resolving Ref types.
     ///
     /// Uses the provided TypeEnvironment to resolve type references.
     pub fn is_subtype_of_with_env(
-        &self,
+        &mut self,
         source: TypeId,
         target: TypeId,
         env: &crate::solver::TypeEnvironment,
     ) -> bool {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
         use crate::solver::SubtypeChecker;
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
         let result = checker.is_subtype_of(source, target);
+        let depth_exceeded = checker.depth_exceeded;
 
-        // If depth was exceeded during subtype checking, set the context flag
-        if checker.depth_exceeded() {
-            *self.ctx.depth_exceeded.borrow_mut() = true;
+        // Emit TS2589 if recursion depth was exceeded
+        if depth_exceeded {
+            self.error_at_current_node(
+                diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+                diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+            );
         }
 
         result
@@ -20031,22 +20040,19 @@ impl<'a> ThinCheckerState<'a> {
         });
     }
 
-    /// Check if type instantiation depth was exceeded and emit TS2589 if so.
-    /// This should be called after type checking expressions that might recurse deeply.
-    fn check_depth_exceeded(&mut self, node_idx: NodeIndex) {
-        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
-
-        if *self.ctx.depth_exceeded.borrow() {
-            // Reset the flag after emitting to avoid duplicate errors
-            *self.ctx.depth_exceeded.borrow_mut() = false;
-
-            self.error_at_node(
-                node_idx,
-                diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
-                diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
-            );
+    /// Report an error at the current node being processed (from resolution stack).
+    /// Falls back to the start of the file if no node is in the stack.
+    fn error_at_current_node(&mut self, message: &str, code: u32) {
+        // Try to use the last node in the resolution stack
+        if let Some(&node_idx) = self.ctx.node_resolution_stack.last() {
+            self.error_at_node(node_idx, message, code);
+        } else {
+            // No current node - emit at start of file
+            self.error_at_position(0, 0, message, code);
         }
     }
+
+    /// Report an error with context about a related symbol.
 
     fn class_member_is_static(&self, member_idx: NodeIndex) -> bool {
         let Some(node) = self.ctx.arena.get(member_idx) else {
