@@ -274,6 +274,23 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::True;
         }
 
+        // =========================================================================
+        // Meta-type evaluation (must happen before NEVER target check)
+        // =========================================================================
+        // Evaluate meta-types (KeyOf, Conditional, etc.) before the NEVER check
+        // because keyof {} = never, and we need to evaluate that first
+        let source_eval = self.evaluate_type(source);
+        let target_eval = self.evaluate_type(target);
+
+        // If evaluation changed anything, recurse with the simplified types
+        if source_eval != source || target_eval != target {
+            return self.check_subtype(source_eval, target_eval);
+        }
+
+        // =========================================================================
+        // Post-evaluation fast paths
+        // =========================================================================
+
         // Nothing (except never) is assignable to never
         if target == TypeId::NEVER {
             return SubtypeResult::False;
@@ -321,16 +338,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         result
     }
 
-    /// Inner subtype check (after cycle detection)
+    /// Inner subtype check (after cycle detection and type evaluation)
     fn check_subtype_inner(&mut self, source: TypeId, target: TypeId) -> SubtypeResult {
-        // Evaluate meta-types (conditionals, index access, etc.) before comparing
-        let source_eval = self.evaluate_type(source);
-        let target_eval = self.evaluate_type(target);
-
-        // If evaluation changed anything, recurse with the simplified types
-        if source_eval != source || target_eval != target {
-            return self.check_subtype(source_eval, target_eval);
-        }
+        // Types are already evaluated in check_subtype, so no need to re-evaluate here
 
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return SubtypeResult::True;
