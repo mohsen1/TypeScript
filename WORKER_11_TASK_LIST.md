@@ -9,14 +9,14 @@
 ## Task Queue
 
 ### Current Task
-**Task 3:** Implement AST Type Lowering (The Bridge)
-- [ ] Implement `lower_type(db, node: NodeIndex) -> Type` query
-- [ ] Handle primitives: `SyntaxKind::StringKeyword` -> `Intrinsic::String`
-- [ ] Handle literals: Extract text from scanner -> `Literal::String`
-- [ ] Handle interfaces: Iterate members, recursively call `lower_type`, return `TypeKey::Object`
-- [ ] Handle union types: Flatten and normalize
-- [ ] Handle function types: Extract parameters and return type
-- [ ] Add tests for lowering in `wasm/src/solver/lower_tests.rs`
+**Task 4:** Implement Core Subtyping Logic
+- [ ] Implement `solve_subtype(db, sub: Type, sup: Type) -> bool` query
+- [ ] Handle primitive subtyping: `String <: String`, `Never <: T`, `T <: Unknown`
+- [ ] Handle structured objects: Iterate sup properties, binary search in sub, recurse
+- [ ] Handle unions: `Union <: T` (ALL parts), `T <: Union` (ANY part)
+- [ ] Handle intersections with distributivity rules
+- [ ] Implement function variance (contravariant parameters, covariant returns)
+- [ ] Add cycle detection tests: `interface A { x: A }; interface B { x: B }; A <: B?`
 - [ ] **Run:** `./wasm/test.sh` to verify
 - [ ] **Run:** `./wasm/differential-test/run-conformance.sh --all` and analyze report
 
@@ -28,7 +28,7 @@
 
 **Task 1:** Implement TypeKey normalization infrastructure ✓
 - [x] Add `salsa`, `ena`, `indexmap`, `bitflags` dependencies to `wasm/Cargo.toml`
-- [x] Create `wasm/src/solver/` module structure (mod.rs, db.rs, jar.rs, type_id.rs, type_key.rs, lower.rs, logic.rs, infer.rs) - Already existed
+- [x] Create `wasm/src/solver/` module structure - Already existed
 - [x] Define `TypeKey` enum with variants - Already existed in `types.rs`
 - [x] Implement `TypeKey::object()` constructor that sorts properties by Atom - Already existed in `intern.rs`
 - [x] Implement `TypeKey::union()` constructor that flattens nested unions and sorts by ID - Already existed in `intern.rs`
@@ -42,20 +42,18 @@
 - [x] Comprehensive tests for interning deduplication in `intern_tests.rs` and `db_tests.rs`
 - Note: Implementation uses manual query system instead of Salsa (Salsa requires nightly Rust)
 
+**Task 3:** Implement AST Type Lowering (The Bridge) ✓
+- [x] Implement `lower_type(db, node: NodeIndex) -> Type` query - Main entry point in `lower.rs`
+- [x] Handle primitives: `SyntaxKind::StringKeyword` -> `Intrinsic::String` - All keywords handled
+- [x] Handle literals: Extract text from scanner -> `Literal::String` - String, Number, BigInt, Boolean handled
+- [x] Handle interfaces: Iterate members, recursively call `lower_type`, return `TypeKey::Object` - `lower_interface_declarations`
+- [x] Handle union types: Flatten and normalize - `lower_union_type` with interner normalization
+- [x] Handle function types: Extract parameters and return type - `lower_function_type` with full support
+- [x] 162 lowering tests passing in `lower_tests.rs`
+
 ---
 
 ### Pending Tasks
-
-**Task 4:** Implement Core Subtyping Logic
-- [ ] Implement `solve_subtype(db, sub: Type, sup: Type) -> bool` query
-- [ ] Handle primitive subtyping: `String <: String`, `Never <: T`, `T <: Unknown`
-- [ ] Handle structured objects: Iterate sup properties, binary search in sub, recurse
-- [ ] Handle unions: `Union <: T` (ALL parts), `T <: Union` (ANY part)
-- [ ] Handle intersections with distributivity rules
-- [ ] Implement function variance (contravariant parameters, covariant returns)
-- [ ] Add cycle detection tests: `interface A { x: A }; interface B { x: B }; A <: B?`
-- [ ] **Run:** `./wasm/test.sh` to verify
-- [ ] **Run:** `./wasm/differential-test/run-conformance.sh --all` and analyze report
 
 **Task 5:** Implement Inference and Unification
 - [ ] Define `InferenceContext` wrapper around `ena::InPlaceUnificationTable`
@@ -101,8 +99,8 @@
 
 ## Progress Notes
 - Branch is clean and synced with `origin/rust`
-- Tasks 1 and 2 complete: TypeKey normalization and TypeInterner already implemented
-- solver/ module has comprehensive implementation with 3239 passing tests
-- Working on Task 3: AST Type Lowering (The Bridge)
+- Tasks 1-3 complete: TypeKey normalization, TypeInterner, and AST Type Lowering already implemented
+- solver/ module has comprehensive implementation with 3239+ passing tests
+- Working on Task 4: Core Subtyping Logic
 - All work stays within `wasm/` directory per architecture rules
 - Each task includes conformance testing to track progress
