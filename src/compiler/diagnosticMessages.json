@@ -6732,6 +6732,10 @@
         "category": "Error",
         "code": 9517
     },
+    "Type parameter '{0}' has constraint '{1}', but type argument '{2}' does not satisfy it.": {
+        "category": "Error",
+        "code": 9518
+    },
     "Member '{0}' implicitly has an '{1}' type.": {
         "category": "Error",
         "code": 7008

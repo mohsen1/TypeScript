@@ -35925,22 +35925,36 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             Debug.assert(typeParameters[i] !== undefined, "Should not call checkTypeArguments with too many type arguments");
             const constraint = getConstraintOfTypeParameter(typeParameters[i]);
             if (constraint) {
-                const errorInfo = reportErrors && headMessage ? (() => chainDiagnosticMessages(/*details*/ undefined, Diagnostics.Type_0_does_not_satisfy_the_constraint_1)) : undefined;
-                const typeArgumentHeadMessage = headMessage || Diagnostics.Type_0_does_not_satisfy_the_constraint_1;
                 if (!mapper) {
                     mapper = createTypeMapper(typeParameters, typeArgumentTypes);
                 }
                 const typeArgument = typeArgumentTypes[i];
-                if (
-                    !checkTypeAssignableTo(
-                        typeArgument,
-                        getTypeWithThisArgument(instantiateType(constraint, mapper), typeArgument),
-                        reportErrors ? typeArgumentNodes[i] : undefined,
-                        typeArgumentHeadMessage,
-                        errorInfo,
-                    )
-                ) {
+                const instantiatedConstraint = getTypeWithThisArgument(instantiateType(constraint, mapper), typeArgument);
+
+                // Check if type argument satisfies the constraint (without reporting errors yet)
+                if (!checkTypeAssignableTo(typeArgument, instantiatedConstraint, /*errorNode*/ undefined)) {
+                    if (reportErrors) {
+                        // Get type parameter name for enhanced error message
+                        const typeParameterName = symbolToString(typeParameters[i].symbol);
+
+                        // Report enhanced error message with type parameter context
+                        error(typeArgumentNodes[i], Diagnostics.Type_parameter_0_has_constraint_1_but_type_argument_2_does_not_satisfy_it, typeParameterName, typeToString(instantiatedConstraint), typeToString(typeArgument));
+                    }
                     return undefined;
+                }
+
+                // If we have a headMessage, perform full error checking with detailed diagnostics
+                if (headMessage) {
+                    const errorInfo = () => chainDiagnosticMessages(/*details*/ undefined, Diagnostics.Type_0_does_not_satisfy_the_constraint_1);
+                    if (!checkTypeAssignableTo(
+                        typeArgument,
+                        instantiatedConstraint,
+                        typeArgumentNodes[i],
+                        headMessage,
+                        errorInfo,
+                    )) {
+                        return undefined;
+                    }
                 }
             }
         }
