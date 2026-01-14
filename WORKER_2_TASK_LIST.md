@@ -2,8 +2,6 @@
 
 ## Squad: Parser (Syntax)
 
-## Merge Status: ✅ MERGED into em-team-1 (2026-01-14)
-
 ## Conformance Test Results (2026-01-14)
 
 ### TS1109 Reduction
