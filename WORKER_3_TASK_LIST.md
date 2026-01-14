@@ -110,3 +110,50 @@ Reduce missing TS2322/TS7006 errors significantly ✅
 - Work merged to rust by EM-2 (commit ab2b0203e)
 - Now in em-team-1 via rebase
 - Co-Authored-By: Claude Sonnet 4.5
+
+---
+
+## New Assignment
+
+### Task 3: Fix Member Type Inference (TS7008)
+**Priority:** HIGH
+**Assigned:** 2026-01-14
+**Status:** 🔄 IN PROGRESS
+
+**Problem:**
+Based on conformance test results, **TS7008** has 133 missing errors:
+- "Member '{0}' of class '{1}' implicitly has an '{2}' type"
+- Members (properties/methods) without type annotations are falling back to 'any'
+- This hides type errors in class members
+
+**Objective:**
+Fix member type inference to return ERROR instead of ANY when type inference fails, similar to the parameter fixes in Task 1.
+
+**Files to Audit:**
+- `wasm/src/thin_checker.rs` - Class member type checking
+- `wasm/src/solver/*.rs` - Member type resolution
+
+**Steps:**
+1. Search for class member type inference code
+2. Find where members without type annotations fall back to ANY
+3. Replace with ERROR to expose the missing type annotation
+4. Ensure error messages for TS7008 are generated correctly
+
+**Expected Impact:**
+- TS7008 missing errors should decrease from 133
+- Better error messages for class members missing types
+- Temporary increase in extra errors (expected and good)
+
+**Acceptance Criteria:**
+- Class members without types return ERROR instead of ANY
+- TS7008 errors are properly generated
+- Code compiles without errors
+- Conformance test shows improvement in TS7008
+
+**Deliverables:**
+1. Code changes fixing member type inference
+2. Updated audit document with new changes
+3. Conformance test comparison showing TS7008 improvement
+
+**Success Metric:**
+Reduce TS7008 missing errors significantly (target: <50 missing)
