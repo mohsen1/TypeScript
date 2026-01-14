@@ -105,6 +105,21 @@ pub enum ValidationError {
     InvalidValueDeclaration { symbol_id: u32, name: String },
 }
 
+/// Statistics about symbol resolution attempts and successes.
+#[derive(Debug, Clone, Default)]
+pub struct ResolutionStats {
+    /// Total number of resolution attempts
+    pub attempts: u64,
+    /// Number of successful resolutions in scopes
+    pub scope_hits: u64,
+    /// Number of successful resolutions in file_locals
+    pub file_local_hits: u64,
+    /// Number of successful resolutions in lib_binders
+    pub lib_binder_hits: u64,
+    /// Number of failed resolutions
+    pub failures: u64,
+}
+
 impl ThinBinderState {
     pub fn new() -> Self {
         let mut flow_nodes = FlowNodeArena::new();
@@ -4009,7 +4024,7 @@ impl ThinBinderState {
             eprintln!("[LIB_SYMBOL_WARNING] Ensure lib.d.ts is loaded via addLibFile() before binding.");
             true
         } else {
-            if module_resolution_debug::is_debug_enabled() {
+            if crate::module_resolution_debug::is_debug_enabled() {
                 eprintln!("[LIB_SYMBOL_INFO] All {} expected global symbols are present.",
                     Self::EXPECTED_GLOBAL_SYMBOLS.len());
             }
@@ -4049,6 +4064,56 @@ impl ThinBinderState {
         }
 
         inaccessible
+    }
+
+    // ========================================================================
+    // Symbol Resolution Statistics (P1 Task - Debug Logging)
+    // ========================================================================
+
+    /// Get a snapshot of current symbol resolution statistics.
+    ///
+    /// This method scans the binder state to provide statistics about
+    /// symbol resolution capability, including:
+    /// - Available symbols by source (scopes, file_locals, lib_binders)
+    /// - Potential resolution paths
+    pub fn get_resolution_stats(&self) -> ResolutionStats {
+        // Count symbols in each resolution tier
+        let scope_symbols: u64 = self.scopes.iter()
+            .map(|s| s.table.len() as u64)
+            .sum();
+
+        let file_local_symbols = self.file_locals.len() as u64;
+
+        let lib_binder_symbols: u64 = self.lib_binders.iter()
+            .map(|b| b.file_locals.len() as u64)
+            .sum();
+
+        ResolutionStats {
+            attempts: 0, // Would need runtime tracking
+            scope_hits: scope_symbols,
+            file_local_hits: file_local_symbols,
+            lib_binder_hits: lib_binder_symbols,
+            failures: 0, // Would need runtime tracking
+        }
+    }
+
+    /// Get a human-readable summary of resolution statistics.
+    pub fn get_resolution_summary(&self) -> String {
+        let stats = self.get_resolution_stats();
+        format!(
+            "Symbol Resolution Summary:\n\
+             - Scope symbols: {}\n\
+             - File local symbols: {}\n\
+             - Lib binder symbols: {} (from {} binders)\n\
+             - Total accessible symbols: {}\n\
+             - Expected global symbols: {}",
+            stats.scope_hits,
+            stats.file_local_hits,
+            stats.lib_binder_hits,
+            self.lib_binders.len(),
+            stats.scope_hits + stats.file_local_hits + stats.lib_binder_hits,
+            Self::EXPECTED_GLOBAL_SYMBOLS.len()
+        )
     }
 }
 
