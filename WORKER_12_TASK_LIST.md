@@ -3,7 +3,7 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [x] Reduce "Any" fallback in contextual type patterns (COMPLETE)
+- [ ] Reduce "Any" fallback in this-type patterns (Phase 4 - IN PROGRESS)
 
 ## Completed
 - [x] Phase 1: Type parameter defaults (7 locations)
@@ -18,37 +18,28 @@
 Worker 12 has been systematically reducing "Any" fallback usage to expose hidden bugs.
 
 ### Phase 1: Type Parameter Defaults (MERGED)
-Changed 7 locations in `thin_checker.rs` from `TypeId::ANY` to `TypeId::UNKNOWN`:
-1. Constructor signature instantiation
-2. Interface merging (base type params)
-3. Interface type params
-4. Type param handling/fallback
-
-**Impact**: Exposes bugs in generic function/method calls without explicit type args.
+Changed 7 locations in `thin_checker.rs` from `TypeId::ANY` to `TypeId::UNKNOWN`.
 
 ### Phase 2: Property Access Patterns (MERGED)
-Changed 5 locations in `thin_checker.rs`:
-- Lines 8470, 8554, 8758, 8981, 9361
-- `property_type.unwrap_or(TypeId::ANY)` → `.unwrap_or(TypeId::UNKNOWN)`
+Changed 5 locations in `thin_checker.rs`.
 
-**Impact**: Exposes bugs where properties are accessed without type checking.
+### Phase 3: Contextual Type Patterns (MERGED)
+Changed 3 locations in `thin_checker.rs`.
 
-### Phase 3: Contextual Type Patterns (JUST COMPLETED)
-Changed 3 locations in `thin_checker.rs`:
-1. Line ~9667: `helper.get_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
-2. Line ~9673: `contextual_type.unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
-3. Line ~15473: `self.current_return_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+### Phase 4: This-Type Patterns (IN PROGRESS)
+Target: Line ~629 in thin_checker.rs
+- `self.current_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
 
-**Impact**: Exposes bugs in callback contexts, return type inference, and this-type inference.
+**Impact**: Exposes bugs in class methods, arrow functions using `this`, and nested scopes.
 
 ## Queue
-- [ ] After merge, measure conformance impact
-- [ ] Tackle this-type fallbacks
+- [ ] After this-type fix, measure conformance impact
 - [ ] Tackle array element type fallbacks
+- [ ] Tackle remaining accessor fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Files Modified
-- `wasm/src/thin_checker.rs` - 15 total locations changed (7 type params + 5 property access + 3 contextual)
+- `wasm/src/thin_checker.rs` - 15 total locations changed (phases 1-3), phase 4 in progress
 
 ## Success Criteria
 - ✅ Code compiles without errors
@@ -57,5 +48,5 @@ Changed 3 locations in `thin_checker.rs`:
 
 ## Merge Status
 - **Date**: 2026-01-14
-- **Phase 3 Commit**: `31a2ae625 Complete: Reduce 'Any' fallback in contextual type patterns`
-- **Status**: Ready for merge to em-team-3
+- **Phases 1-3**: Merged to em-team-3
+- **Phase 4**: Task assigned, in progress
