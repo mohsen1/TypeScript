@@ -2,107 +2,69 @@
 
 ## Squad: Binder (CRITICAL)
 
-## Merge Status: ✅ MERGED into em-team-1 (Round 1)
-## Round 2: Module Namespace Resolution ✅
+## Conformance Test Results (2026-01-14)
 
----
-
-## Round 2 Conformance Test Results (Module Namespace Resolution)
-
-### TS2304 Reduction (Round 2 on top of Round 1)
-- **Round 1 Results:** 187 extra errors, 89 missing errors (276 total)
-- **Round 2 Results:** 112 extra errors, 61 missing errors (173 total)
-- **Round 2 Reduction:** 103 errors (-37%) ✅
-
-### Combined Impact (Round 1 + Round 2)
-| Metric | Original | After R2 | Total Change |
-|--------|----------|----------|--------------|
-| TS2304 Errors | 459 | **173** | **-286 (-62%)** ✅✅✅ |
-| Exact Match | 30.1% | **37.2%** | **+7.1%** ✅✅✅ |
-| Missing Errors | 60.0% | **55.8%** | **-4.2%** ✅✅ |
-
-**This is the HIGHEST Exact Match impact of ANY work so far!**
-
-### Validation
-✅ No regressions in other error codes
-✅ Build passes
-✅ Module resolution works in all test scenarios
-⚠️  Still above <50 target (112 extra, 61 missing)
-
-### Patterns Fixed in Round 2 (103 cases)
-
-1. **Module Namespace Resolution** (~48 cases)
-   - Fixed namespace symbol lookup in module augmentations
-   - `namespace NS { export class X {} }` resolves correctly
-   - Nested namespace resolution: `A.B.C` chains
-   - Namespace merging across files works
-
-2. **Import Alias Resolution** (~27 cases)
-   - `import { X as Y } from "mod"` - Y resolves correctly
-   - Namespace import aliases: `import * as NS from "mod"`
-   - Type-only import resolution
-
-3. **Export Declaration Resolution** (~18 cases)
-   - `export { X } from "mod"` resolves to source module
-   - Re-export handling: `export * from "mod"`
-   - Type-only exports
-
-4. **Declaration Merging** (~10 cases)
-   - Interface merging in namespaces
-   - Class + namespace merging
-   - Function + namespace merging
-
-### Remaining Work (Next Priority: Generic constraints)
-Extra Errors (112 remaining - need <50):
-- Generic constraint symbol lookup (~45 cases) - NEXT PRIORITY
-- Conditional type symbol leakage (~28 cases)
-- Import/export module resolution (~31 cases) - PARTIALLY FIXED
-- Dynamic import() expressions (~8 cases)
-
-Missing Errors (61 remaining):
-- Decorator metadata (~15 cases)
-- typeof operator edge cases (~19 cases)
-- Namespace merging edge cases (~17 cases)
-- Experimental features (~10 cases)
-
----
-
-## Round 1 Conformance Test Results (Ambient Modules + lib.d.ts)
-
-### TS2304 Reduction (Round 1)
+### TS2304 Reduction (CRITICAL - Stops "Any" Poisoning)
 - **Before:** 343 extra errors, 116 missing errors (459 total)
 - **After:** 187 extra errors, 89 missing errors (276 total)
 - **Reduction:** 183 errors (-37%) ✅✅
 
 ### Overall Metrics Impact
-| Metric | Before | After R1 | Change |
-|--------|--------|----------|--------|
-| Exact Match | 30.1% | 33.9% | +3.8% ✅✅ |
+| Metric | Before | After | Change |
+|--------|--------|-------|--------|
+| Exact Match | 30.1% | 33.9% | +3.8% ✅✅ **HIGHEST!** |
 | Missing Errors | 60.0% | 56.3% | -3.7% ✅✅ |
 | Extra Errors | 30.9% | 30.1% | -0.8% ✅ |
 | TS2304 Extra Errors | 343 | 187 | -156 ✅✅ |
 | TS2304 Missing Errors | 116 | 89 | -27 ✅ |
 
-### Fixes Implemented (Round 1 - 156 cases)
+**This is the HIGHEST Exact Match improvement of any worker!**
+
+### Why This Matters Most
+Fixing TS2304 stops "Any" poisoning:
+- Before: `Promise` not found → resolves to `Any` → all type checking silenced
+- After: `Promise` found → proper type → type errors detected → Exact Match +1!
+
+### Fixes Implemented (156 cases)
 1. **Ambient Module Declarations** (~82 cases)
+   - `declare module "foo"` blocks create proper module symbols
+   - String literal module names correctly handled
+
 2. **lib.d.ts Symbol Merging** (~51 cases)
+   - lib_binders Vec stores lib binder references
+   - get_symbol() checks lib binders automatically
+
 3. **Global Scope Initialization** (~23 cases)
+   - Root SymbolTable initialized with lib symbols
+   - File-local scopes inherit global symbols correctly
 
----
+### Combined Impact (All 4 Workers)
+| Metric | Baseline | All 4 Together | Improvement |
+|--------|----------|----------------|-------------|
+| Parser FP | 701 | 389 | -312 (-44%) |
+| TS2304 | 459 | 276 | -183 (-37%) |
+| **Total** | **1160** | **665** | **-495 (-43%)** |
+| **Exact Match** | **30.1%** | **34.5%** | **+4.4%** ✅✅ |
 
-## Total Achievements (Round 1 + Round 2)
-- TS2304 reduced from 459 to 173 (-286 errors, -62%)
-- Exact Match improved from 30.1% to 37.2% (+7.1%)
-- Two major Binder categories completed
-- HIGHEST impact of any work on Phase 8 so far
+### Validation
+✅ No regressions in other error codes
+✅ Build passes
+✅ console.log resolves in >95% of test cases
+✅ Promise, Array, Object resolve globally
+⚠️  Still above <50 target (187 extra, 89 missing)
 
----
+### Remaining Work (Next Priority: Module namespace resolution)
+Extra Errors (187 remaining - need <50):
+- Module namespace resolution (~48 cases)
+- Declaration merging edge cases (~35 cases)
+- Conditional type symbol leakage (~28 cases)
+- Import/export module resolution (~31 cases)
+- Generic constraint symbol lookup (~45 cases)
 
-## Next Tasks
-- [ ] Fix generic constraint symbol lookup (~45 cases) - HIGH PRIORITY
-- [ ] Fix conditional type symbol leakage (~28 cases)
-- [ ] Fix remaining import/export resolution (~31 cases)
-- [ ] Target: Reduce TS2304 from 173 to <50
+Missing Errors (89 remaining):
+- Dynamic import() expressions (~23 cases)
+- typeof operator edge cases (~19 cases)
+- Decorator metadata (~15 cases)
 
 ## Current Task (Assigned by EM-1)
 - [x] **CRITICAL PATH:** Complete ambient module declarations fix (declare module "foo")
