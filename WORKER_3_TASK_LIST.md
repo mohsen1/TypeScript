@@ -3,14 +3,19 @@
 ## Squad: Parser (Syntax)
 
 ## Current Task
-- [x] Identify patterns where parser emits multiple errors for single syntax issue
+- [ ] Test and verify cascading error fix impact - run conformance to measure TS1005 reduction
 
 ## Queue
-- [x] Fix cascading error emission to stop after first meaningful error
 - [ ] Coordinate with Workers 1 & 2 on remaining parser false positives
+- [ ] Address any remaining cascading error patterns not covered by the fix
+- [ ] Review and fix parser error emission in edge cases (e.g., ASI failures, type parameters)
 
 ## Completed
+- [x] Identify patterns where parser emits multiple errors for single syntax issue
+- [x] Fix cascading error emission to stop after first meaningful error
 - [x] Review parser error recovery logic in wasm/src/parser - ensure it doesn't emit spurious errors after recovery
+- [x] Implement position-based error tracking (last_error_pos field)
+- [x] Update parse_expected() and parse_expected_greater_than() to check last_error_pos
 
 ## Analysis Findings
 
