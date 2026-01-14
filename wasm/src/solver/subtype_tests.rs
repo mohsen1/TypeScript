@@ -47,16 +47,25 @@ fn test_legacy_null_undefined_subtyping() {
 }
 
 #[test]
-fn test_error_poisoning_subtyping() {
+fn test_error_type_strictness_subtyping() {
+    // ERROR types should NOT silently pass subtype checks.
+    // This prevents "error poisoning" where a TS2304 (cannot find name) masks
+    // downstream TS2322 (type not assignable) errors.
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
-    assert!(checker.is_subtype_of(TypeId::ERROR, TypeId::STRING));
-    assert!(checker.is_subtype_of(TypeId::STRING, TypeId::ERROR));
+    // ERROR is NOT a subtype of concrete types
+    assert!(!checker.is_subtype_of(TypeId::ERROR, TypeId::STRING));
+    // Concrete types are NOT subtypes of ERROR
+    assert!(!checker.is_subtype_of(TypeId::STRING, TypeId::ERROR));
+    // ERROR is a subtype of itself (reflexive)
+    assert!(checker.is_subtype_of(TypeId::ERROR, TypeId::ERROR));
 }
 
 #[test]
-fn test_error_poisoning_top_bottom() {
+fn test_error_type_not_top_or_bottom() {
+    // ERROR should NOT act as a top or bottom type.
+    // It should fail subtype checks with other types.
     let interner = TypeInterner::new();
     let mut checker = SubtypeChecker::new(&interner);
 
@@ -67,8 +76,10 @@ fn test_error_poisoning_top_bottom() {
         rest: false,
     }]);
 
-    assert!(checker.is_subtype_of(TypeId::ERROR, TypeId::OBJECT));
-    assert!(checker.is_subtype_of(tuple, TypeId::ERROR));
+    // ERROR is NOT a subtype of object types
+    assert!(!checker.is_subtype_of(TypeId::ERROR, TypeId::OBJECT));
+    // Tuples are NOT subtypes of ERROR
+    assert!(!checker.is_subtype_of(tuple, TypeId::ERROR));
 }
 
 #[test]
