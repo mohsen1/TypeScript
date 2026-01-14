@@ -236,6 +236,46 @@ All missing errors involve async/await transformations where:
 2. ⏸️ Mark tests as expected failures
 3. ⏸️ Implement fix (3 options with effort estimates provided)
 
+---
+
+## Additional Analysis: TS1109 Deep Dive ✅
+
+**Status:** ✅ COMPLETE
+**Date:** 2026-01-14
+**Self-Directed Work** - Continuing analysis of top missing error codes
+
+### Critical Finding: 100% Gap in TS1109 Detection
+
+**Created:** `wasm/differential-test/TS1109_ANALYSIS.md`
+
+**Results:**
+- **Files with TS1109 (TSC):** 30
+- **Files with TS1109 (WASM):** 0
+- **Missing by WASM:** 100% (all 30 files, 41 errors)
+- **Root Cause:** Parser does not validate await in invalid contexts
+
+**Impact:** HIGH severity - parser-level gap, potentially simpler fix than TS2300
+
+**Error Distribution:**
+- async: 26 files, 28 errors (await in parameter defaults)
+- classes: 4 files, 13 errors (await in static blocks, invalid heritage)
+
+**Tools Created:**
+- `analyze-ts1109.mjs` - Analyzes 500+ tests for TS1109 errors
+- `ts1109-analysis.json` - Detailed test data (30 affected files)
+
+**Key Patterns:**
+1. `await` in parameter defaults: `async (x = await p) => {}`
+2. `await` in static blocks: `static { await; }`
+3. `await` as identifier: `function f(await) {}`
+4. Invalid class heritage: `class C extends String {}`
+
+**Recommendation:** Fix TS1109 before TS2300 because:
+- Parser-level fix (no transformation integration needed)
+- Fewer files affected (30 vs 48)
+- More straightforward implementation
+- Catches errors earlier in compilation pipeline
+
 ## Recommendations for Next Phase
 
 **High Priority:**
