@@ -139,7 +139,16 @@ let dog: Dog = animal;  // Should error TS2322
 
 ## COMPLETED TASKS
 
-*None yet*
+### Task 1: Audit and Replace `any` Type Fallback in Checker ✅
+- Created AUDIT_ANYTYPE_FALLBACK.md with comprehensive analysis
+- Found 24 instances of `anyType` returns
+- Classified into: error cases (3), special semantics (5), type resolution failures (16)
+
+### Task 2: Replace `any` Fallback with `unknown` in Type Inference ✅
+- Changed 13 locations from `anyType` to `unknownType`
+- Remaining 11 `anyType` returns are intentional (JS files, explicit `any`, error cases)
+- Expected impact: +200-400 extra errors (exposing real bugs)
+- All changes tagged with `// EM-3:` comments
 
 ---
 
