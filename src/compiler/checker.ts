@@ -21471,6 +21471,35 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         return result;
     }
 
+    // Helper function to create a property-aware error message that shows the full type path
+    function createPropertyErrorMessage(propertyName: string | undefined, sourceType: Type, targetType: Type): DiagnosticMessageChain {
+        const sourceTypeName = typeToString(sourceType);
+        const targetTypeName = typeToString(targetType);
+
+        if (propertyName) {
+            // Create a message chain that shows the property context
+            // Main message: Type 'string' is not assignable to type 'number'
+            // Chained message: The error is in property 'age'
+            return chainDiagnosticMessages(
+                chainDiagnosticMessages(
+                    undefined,
+                    Diagnostics.Type_0_is_not_assignable_to_type_1,
+                    sourceTypeName,
+                    targetTypeName
+                ),
+                Diagnostics.The_error_is_in_property_0,
+                unescapeLeadingUnderscores(propertyName)
+            );
+        }
+        // No property context, return the base message
+        return chainDiagnosticMessages(
+            undefined,
+            Diagnostics.Type_0_is_not_assignable_to_type_1,
+            sourceTypeName,
+            targetTypeName
+        );
+    }
+
     type ElaborationIterator = IterableIterator<{ errorNode: Node; innerExpression: Expression | undefined; nameType: Type; errorMessage?: DiagnosticMessage | undefined; }>;
     /**
      * For every element returned from the iterator, checks that element to issue an error on a property of that element's type
@@ -21512,10 +21541,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         const sourceIsOptional = !!(propName && (getPropertyOfType(source, propName) || unknownSymbol).flags & SymbolFlags.Optional);
                         targetPropType = removeMissingType(targetPropType, targetIsOptional);
                         sourcePropType = removeMissingType(sourcePropType, targetIsOptional && sourceIsOptional);
-                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
+                        // Create a property-aware error message to show full type path
+                        const propertyErrorMessage = errorMessage || createPropertyErrorMessage(propertyName, sourcePropType, targetPropType);
+                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
                         if (result && specificSource !== sourcePropType) {
                             // If for whatever reason the expression type doesn't yield an error, make sure we still issue an error on the sourcePropType
-                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
+                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
                         }
                     }
                     if (resultObj.errors) {
@@ -21602,10 +21633,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         const sourceIsOptional = !!(propName && (getPropertyOfType(source, propName) || unknownSymbol).flags & SymbolFlags.Optional);
                         targetPropType = removeMissingType(targetPropType, targetIsOptional);
                         sourcePropType = removeMissingType(sourcePropType, targetIsOptional && sourceIsOptional);
-                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
+                        // Create a property-aware error message to show full type path
+                        const propertyErrorMessage = errorMessage || createPropertyErrorMessage(propName, sourcePropType, targetPropType);
+                        const result = checkTypeRelatedTo(specificSource, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
                         if (result && specificSource !== sourcePropType) {
                             // If for whatever reason the expression type doesn't yield an error, make sure we still issue an error on the sourcePropType
-                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, errorMessage, containingMessageChain, resultObj);
+                            checkTypeRelatedTo(sourcePropType, targetPropType, relation, prop, propertyErrorMessage, containingMessageChain, resultObj);
                         }
                     }
                 }

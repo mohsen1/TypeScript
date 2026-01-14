@@ -6069,6 +6069,10 @@
         "category": "Message",
         "code": 6501
     },
+    "The error is in property '{0}'": {
+        "category": "Message",
+        "code": 9512
+    },
     "The expected type comes from the return type of this signature.": {
         "category": "Message",
         "code": 6502

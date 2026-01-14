@@ -8,42 +8,6 @@
 
 ## CURRENT TASK
 
-### Task 1: Test the spike in errors after `Any`→`Unknown` fallback change
-**Status:** BLOCKED - Waiting for worker-9 and worker-10 to complete their audit and replacement tasks
-
-**Dependencies:**
-- worker-9: Audit all `any` return statements in checker.ts
-- worker-10: Replace `any` fallback with `unknown` in type checker
-
-**When unblocked:**
-1. Run conformance tests after the change
-2. Measure the spike in errors (expect +200-400 missing errors to become extra/exact)
-3. Verify the errors are CORRECT (not false positives)
-4. Document findings in a report
-
----
-
-## PENDING TASKS
-
-### Task 2: Enhance TS2322 Error Messages
-**Status:** READY TO START
-
-**File:** `src/compiler/checker.ts`, `src/compiler/diagnosticMessages.json`
-
-**Objective:** Improve "Type 'X' is not assignable to type 'Y'" error messages to match tsc format
-
-**Subtasks:**
-- [ ] Find TS2322 error generation in checker.ts
-- [ ] Add full type path to error messages (e.g., "Type 'string' is not assignable to type 'number' in property 'age'")
-- [ ] Include specific property/field causing the failure
-- [ ] Match tsc error message format in 90% of cases
-
-**Reference:**
-- Search for error code TS2322 in diagnosticMessages.json
-- Find where errors are emitted in checker.ts
-
----
-
 ### Task 3: Add Type Tracing to Errors
 **Status:** READY TO START
 
@@ -59,6 +23,43 @@
 **Success Criteria:**
 - Users can understand and fix errors without debugging
 - Error messages match tsc format in 90% of cases
+
+---
+
+## BLOCKED TASKS
+
+### Task 1: Test the spike in errors after `Any`→`Unknown` fallback change
+**Status:** BLOCKED - Waiting for worker-9 and worker-10 to complete their audit and replacement tasks
+
+**Dependencies:**
+- worker-9: Audit all `any` return statements in checker.ts
+- worker-10: Replace `any` fallback with `unknown` in type checker
+
+**When unblocked:**
+1. Run conformance tests after the change
+2. Measure the spike in errors (expect +200-400 missing errors to become extra/exact)
+3. Verify the errors are CORRECT (not false positives)
+4. Document findings in a report
+
+---
+
+## COMPLETED TASKS
+
+### Task 2: Enhance TS2322 Error Messages
+**Status:** COMPLETED
+
+**File:** `src/compiler/checker.ts`, `src/compiler/diagnosticMessages.json`
+
+**What was done:**
+- [x] Created `createPropertyErrorMessage()` helper function that builds property-aware error messages
+- [x] Added new diagnostic message "The error is in property '{0}'" (code 9512)
+- [x] Modified `elaborateElementwise()` to use property-aware messages when property context is available
+- [x] Enhanced error messages now show full type path including property names
+
+**Implementation:**
+- Added helper function in checker.ts (line ~21474)
+- Uses `chainDiagnosticMessages()` to append property context
+- Falls back to base message when no property context exists
 
 ---
 
