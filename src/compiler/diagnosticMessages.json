@@ -4632,6 +4632,10 @@
         "category": "Error",
         "code": 5082
     },
+    "'{0}' is not assignable to type '{1}'. Type '{2}' has a constraint that could be instantiated with a different subtype.": {
+        "category": "Error",
+        "code": 9516
+    },
     "Cannot read file '{0}'.": {
         "category": "Error",
         "code": 5083

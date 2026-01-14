@@ -22597,11 +22597,23 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 }
                 else {
                     errorInfo = undefined;
-                    reportError(
-                        Diagnostics._0_could_be_instantiated_with_an_arbitrary_type_which_could_be_unrelated_to_1,
-                        targetType,
-                        generalizedSourceType,
-                    );
+                    // When a type parameter has no constraint or a circular constraint, provide more context
+                    // Include whether the type parameter has a declared constraint
+                    if (constraint) {
+                        reportError(
+                            Diagnostics._0_is_not_assignable_to_type_1_Type_2_has_a_constraint_that_could_be_instantiated_with_a_different_subtype,
+                            generalizedSourceType,
+                            targetType,
+                            typeToString(target)
+                        );
+                    }
+                    else {
+                        reportError(
+                            Diagnostics._0_could_be_instantiated_with_an_arbitrary_type_which_could_be_unrelated_to_1,
+                            targetType,
+                            generalizedSourceType,
+                        );
+                    }
                 }
             }
 
