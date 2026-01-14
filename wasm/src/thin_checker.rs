@@ -4252,7 +4252,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -4923,7 +4923,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -7059,8 +7059,9 @@ impl<'a> ThinCheckerState<'a> {
             return self.get_type_of_node(var_decl.initializer);
         }
 
-        // No initializer - implicit any
-        TypeId::ANY
+        // No initializer - use UNKNOWN to enforce strict checking
+        // This requires explicit type annotation or prevents unsafe usage
+        TypeId::UNKNOWN
     }
 
     fn apply_this_substitution_to_call_return(
