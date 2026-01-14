@@ -831,6 +831,7 @@ impl TypeInterner {
         let mut class: Option<PrimitiveClass> = None;
         let mut has_primitive = false;
         let mut has_non_primitive = false;
+        let mut literals: smallvec::SmallVec<[TypeId; 4]> = SmallVec::new();
 
         for &member in members {
             let Some(member_class) = self.primitive_class_for(member) else {
@@ -846,6 +847,21 @@ impl TypeInterner {
             } else {
                 class = Some(member_class);
             }
+
+            // Track literals to detect different values of the same primitive type
+            if self.is_literal(member) {
+                literals.push(member);
+            }
+        }
+
+        // Check if we have multiple different literals of the same primitive class
+        // e.g., "hello" & "world" = never, 1 & 2 = never
+        if literals.len() > 1 {
+            // Check if all literals are the same value
+            let first = literals[0];
+            if !literals.iter().all(|&lit| lit == first) {
+                return true;
+            }
         }
 
         // If we have both primitives and non-primitives (objects), they're disjoint
@@ -854,6 +870,10 @@ impl TypeInterner {
         }
 
         false
+    }
+
+    fn is_literal(&self, type_id: TypeId) -> bool {
+        matches!(self.lookup(type_id), Some(TypeKey::Literal(_)))
     }
 
     fn is_object_like_type(&self, type_id: TypeId) -> bool {
