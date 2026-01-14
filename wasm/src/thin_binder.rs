@@ -322,7 +322,19 @@ impl ThinBinderState {
         }
 
         // Finally check file locals / globals
-        self.file_locals.get(name)
+        if let Some(sym_id) = self.file_locals.get(name) {
+            return Some(sym_id);
+        }
+
+        // Chained lookup: check lib binders for global symbols
+        // This enables resolving console, Array, Object, etc. from lib.d.ts
+        for lib_binder in &self.lib_binders {
+            if let Some(sym_id) = lib_binder.file_locals.get(name) {
+                return Some(sym_id);
+            }
+        }
+
+        None
     }
 
     fn resolve_parameter_fallback(

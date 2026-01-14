@@ -19,15 +19,25 @@
 ## Completed
 - [x] Branch created from em-team-3
 - [x] Reviewed TS1005_REDUCTION_RESULTS.md for patterns already fixed
-- [x] Previously: Investigated Binder TS2304 issues (reassigned)
+- [x] **TS2304 global scope binding fix** (Ready for Merge: Yes)
+  - Implemented chained lookup in `ThinBinderState::resolve_identifier`
+  - Added lib_binders check for resolving console, Array, Object, Promise, etc.
+  - All lib_loader tests pass
+  - Note: Conformance tests show 4941 crashes (pre-existing, not caused by this fix)
 - [x] Synced with em-team-3 (no new commits to merge)
 - [x] Reconfiguration check: Worker 11 reassigned to Parser squad (TS1005 patterns 11-15)
 
 ## Recent Merge Status
 - **Date**: 2026-01-14
-- **Result**: Already in sync (no new commits)
-- **Action Taken**: Verified worker-11 branch is fully merged into em-team-3
-- **Next**: Continue work on TS1005 patterns 11-15 (type params, return types, edge cases)
+- **Result**: Successfully merged TS2304 global scope binding fix
+- **Action Taken**:
+  - Rebased em-team-3 onto rust
+  - Merged worker-11 with --no-ff
+  - Build verification: PASSED
+- **Code Changes**:
+  - `wasm/src/thin_binder.rs`: Added chained lookup in `resolve_identifier` to check `lib_binders`
+  - Fixes TS2304 errors for globals (console, Array, Object, Promise, etc.)
+- **Next**: Continue work on TS1005 patterns 11-15
 - **Team Update**: Worker 12 re-added to EM-3 (now 4 workers: 9-12)
 
 ## Context
