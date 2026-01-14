@@ -66,7 +66,7 @@ The TypeScript compiler is being rewritten in Rust (codename: "Zang"). Current s
   - All 12 TS2564 tests pass
   - Tests include: required properties, optional properties, definite assignment assertions, initializers, static properties, constructor assignments, class expressions, derived classes, abstract classes, undefined unions
 
-#### Task 5: Switch Fallback from `Any` to `Unknown`
+#### ~~Task 5: Switch Fallback from `Any` to `Unknown`~~ ✅ COMPLETE
 - **Problem**: Failed inferences fall back to `Any`, hiding bugs
 - **Location**: `wasm/src/solver/`
 - **Files**: Check inference failure handling, constraint solving
@@ -74,10 +74,11 @@ The TypeScript compiler is being rewritten in Rust (codename: "Zang"). Current s
   - Unknown type used for failed inferences
   - Better error messages on type mismatches
   - No regression in valid inferences
-
----
-
-### MEDIUM PRIORITY: Parser Error Recovery
+- **Status**: ✅ Fixed in commits a3b70684a, 45fde7ddb
+  - Fixed 3 incorrect unknown_fallback tests (wrong assertions about TypeScript semantics)
+  - Fixed `are_this_parameters_compatible` to use invariant checking
+  - `this` parameter now correctly defaults to Unknown (not Any)
+  - All 5 unknown_fallback tests pass
 
 #### Task 6: Fix False Positive Syntax Errors
 - **Errors**: TS1005/TS1109 - "Expected '}'" on valid code
@@ -118,15 +119,16 @@ ALL tasks must pass:
 
 ## Current Status
 
-**Status**: ACTIVE - Working on Task 5
+**Status**: STANDBY - All Phase 8 priority tasks complete
 
 **Last Completed**:
+- Task 5: Switch Fallback from `Any` to `Unknown` (fixed this parameter)
 - Task 4: Property Initialization (verified already implemented by Worker 2)
 - Task 3: Variable Initialization Checking (verified already implemented)
 - Task 2: Fix Scope Chain Resolution (investigated, no bug found)
 - Task 1: Fix Global Scope and Lib Injection (fixed)
 
-**Next Task**: Task 5 (Switch Fallback from `Any` to `Unknown` - TS2322)
+**Next Task**: Task 6 (Parser Error Recovery - TS1005/TS1109)
 
 ---
 
