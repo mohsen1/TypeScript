@@ -375,6 +375,20 @@ impl ThinParserState {
         // Only emit error if we haven't already emitted one at this position
         // This prevents cascading TS1109 errors when TS1005 or other errors already reported
         if self.token_pos() != self.last_error_pos {
+            // Additional check: suppress TS1109 if we're very close to a recent error
+            // This catches cascading errors where the parser recovers to the next token
+            // after a TS1005 or similar error.
+            // Only apply this if we've actually emitted an error (last_error_pos > 0)
+            // and the current position is within 50 characters of the last error.
+            let current_pos = self.token_pos();
+            if self.last_error_pos > 0
+                && current_pos > self.last_error_pos
+                && current_pos < self.last_error_pos.saturating_add(50)
+            {
+                // We're very close to a recent error (likely cascading), suppress this TS1109
+                return;
+            }
+
             use crate::checker::types::diagnostics::diagnostic_codes;
             self.parse_error_at_current_token(
                 "Expression expected",
