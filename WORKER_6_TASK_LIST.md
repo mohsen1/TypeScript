@@ -42,7 +42,7 @@
 - [ ] Document any Rust-specific patterns discovered
 
 ## Completed
-- [x] Merge attempt - No commits to merge yet
+- [x] Merge attempt #2 - No commits to merge yet (still at base)
 
 ## Context
 TS1005 has 42 extra errors in conformance sample. Worker 1 fixed 5 patterns in TypeScript; adapt patterns 4-5 to Rust to reduce cascading and duplicate errors.
