@@ -6981,7 +6981,10 @@ namespace Parser {
         parseExpected(kind === SyntaxKind.BreakStatement ? SyntaxKind.BreakKeyword : SyntaxKind.ContinueKeyword);
         const label = canParseSemicolon() ? undefined : parseIdentifier();
 
-        parseSemicolon();
+        // Pattern 6: Use tryParseSemicolon to avoid false positive TS1005 when ASI succeeds
+        if (!tryParseSemicolon()) {
+            parseErrorAtCurrentToken(Diagnostics._0_expected, tokenToString(SyntaxKind.SemicolonToken));
+        }
         const node = kind === SyntaxKind.BreakStatement
             ? factory.createBreakStatement(label)
             : factory.createContinueStatement(label);
@@ -6993,7 +6996,10 @@ namespace Parser {
         const hasJSDoc = hasPrecedingJSDocComment();
         parseExpected(SyntaxKind.ReturnKeyword);
         const expression = canParseSemicolon() ? undefined : allowInAnd(parseExpression);
-        parseSemicolon();
+        // Pattern 6: Use tryParseSemicolon to avoid false positive TS1005 when ASI succeeds
+        if (!tryParseSemicolon()) {
+            parseErrorAtCurrentToken(Diagnostics._0_expected, tokenToString(SyntaxKind.SemicolonToken));
+        }
         return withJSDoc(finishNode(factory.createReturnStatement(expression), pos), hasJSDoc);
     }
 
