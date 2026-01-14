@@ -1,7 +1,7 @@
 # Team Structure - TypeScript Compiler (Rust)
 
 **Phase:** Phase 8 - Conformance, Convergence, and Hardening
-**Last Updated:** 2026-01-14
+**Last Updated:** 2026-01-14 (Post EM-1 merge)
 **Director:** claude-code-orchestrator
 
 ---
@@ -23,24 +23,35 @@
 
 ## Squad Assignments
 
-### EM_1: Binder Squad (CRITICAL)
+### EM_1: HYBRID Squad (Parser + Binder) - TRANSITIONAL
 **Branch:** `em-team-1`
 **Priority:** 🔴 HIGHEST
-**Target Error:** TS2304 (Cannot find name)
+**Target Errors:** TS2304 (Binder), TS1005/TS1109 (Parser)
+**Status:** 🟡 HYBRID - Awaiting validation cycle, then restructure
 
-**Focus:**
+**Director's Note:** This is a transitional hybrid squad. Workers 1-3 made progress on Parser work before formal squad structure. After validation, they will transfer to EM_2.
+
+**Focus (Worker 4 - Binder):**
 - Fix Global Scope binding
 - Ensure `lib.d.ts` symbols merge into root `SymbolTable`
 - Fix module augmentation resolution
 - Debug `console`, `Promise`, `Array` resolution failures
 - **Goal:** Reduce TS2304 extra errors to <50
 
-**Key Files:**
-- `src/lib_loader.rs`
-- `src/thin_binder.rs`
-- `src/symbol_table.rs` (if exists)
+**Focus (Workers 1-3 - Parser, TRANSFERRING):**
+- Fix TS1005 ("expected X") emission
+- Fix TS1109 ("expression expected")
+- Validate existing fixes and measure impact
+- **Goal:** Reduce parser false positives to <100
 
-**Success Metric:** TS2304 extra errors < 50
+**Key Files:**
+- `src/lib_loader.rs`, `src/thin_binder.rs` (Binder)
+- `src/compiler/parser.ts` (Parser)
+
+**Success Metrics:**
+- TS2304 extra errors < 50
+- Parser false positives < 100
+- **Complete validation cycle → Transfer workers 1-3 to EM_2**
 
 ---
 
@@ -48,6 +59,9 @@
 **Branch:** `em-team-2`
 **Priority:** 🟠 HIGH
 **Target Errors:** TS1005, TS1109
+**Status:** 🟡 AWAITING TRANSFER from EM_1
+
+**Incoming Workers:** Workers 1-3 (after validation cycle)
 
 **Focus:**
 - Fix TS1005 ("expected X") emission - over-triggering on valid syntax
@@ -56,7 +70,7 @@
 - **Goal:** Reduce parser false positives to <100
 
 **Key Files:**
-- `src/thin_parser.rs`
+- `src/compiler/parser.ts`
 - `src/scanner.rs` (if exists)
 - `src/error_recovery.rs` (if exists)
 
@@ -94,11 +108,17 @@
 
 ## Resource Allocation
 
-| EM | Squad | Assigned Workers | Total |
-|----|-------|------------------|-------|
-| EM_1 | Binder | workers 1-4 | 5 |
-| EM_2 | Parser | workers 5-6 | 3 |
-| EM_3 | Solver | workers 7-9 | 4 |
+| EM | Squad | Assigned Workers | Total | Notes |
+|----|-------|------------------|-------|-------|
+| EM_1 | **HYBRID** | workers 1-4 | 5 | Workers 1-3 transfer to EM_2 after validation |
+| EM_2 | Parser | (awaiting transfer 1-3) + 5-6 | 3 | Will expand to 6 workers after transfer |
+| EM_3 | Solver | workers 7-9 | 4 | Focus on `Unknown` fallback |
+
+### Pending Restructure
+After EM-1 validation cycle:
+- Workers 1-3 → EM_2 (Parser Squad)
+- EM_1 → Pure Binder Squad with new workers
+- Unassigned workers (10-12) → EM_1 or EM_3 based on priorities
 
 **Note:** CFA (Control Flow Analysis) work is on hold until TS2304 is under control.
 

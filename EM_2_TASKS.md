@@ -2,8 +2,8 @@
 
 **Branch:** `em-team-2`
 **Priority:** 🟠 HIGH
-**Assigned Workers:** workers 5-6
-**Last Updated:** 2026-01-14
+**Assigned Workers:** workers 5-6 (incoming: workers 1-3 from EM_1 after validation)
+**Last Updated:** 2026-01-14 (Director update - awaiting transfer)
 
 ---
 
@@ -60,19 +60,33 @@ The parser is likely:
 
 | File | Purpose | Action |
 |------|---------|--------|
-| `src/thin_parser.rs` | Main parser logic | Audit TS1005/TS1109 emission |
-| `src/scanner.rs` | Lexical analysis | Check tokenization edge cases |
-| `src/error_recovery.rs` | Error recovery | Implement/improve resynchronization |
+| `src/compiler/parser.ts` | Main parser logic | Audit TS1005/TS1109 emission |
+| `src/scanner.ts` (if exists) | Lexical analysis | Check tokenization edge cases |
+| `src/error_recovery.ts` (if exists) | Error recovery | Implement/improve resynchronization |
+
+**Note:** Workers 1-3 have already implemented fixes in `src/compiler/parser.ts`:
+- Worker 1: TS1005 patterns 1-5 (semicolon handling, return type arrow functions)
+- Worker 2: TS1109 definite assignment assertions
+- Worker 3: Cascading error tracking with `last_error_pos`
 
 ---
 
 ## Worker Assignment Strategy
 
-| Worker | Focus Area |
-|--------|-----------|
-| worker-5 | TS1005 investigation and fixes |
-| worker-6 | TS1109 investigation and fixes |
-| (Shared) | Error recovery implementation |
+| Worker | Focus Area | Status |
+|--------|-----------|--------|
+| worker-1 | TS1005 patterns 1-5 (DONE, needs validation) | Incoming from EM_1 |
+| worker-2 | TS1109 definite assignment (DONE, needs validation) | Incoming from EM_1 |
+| worker-3 | Cascading error tracking (DONE, needs validation) | Incoming from EM_1 |
+| worker-5 | TS1005 investigation and fixes | Current |
+| worker-6 | TS1109 investigation and fixes | Current |
+| (Shared) | Error recovery implementation | All workers |
+
+**Next Steps for EM_2:**
+1. Await EM-1 validation cycle completion
+2. Accept transfer of workers 1-3
+3. Validate their fixes (run conformance tests)
+4. Continue with remaining TS1005/TS1109 patterns
 
 ---
 
