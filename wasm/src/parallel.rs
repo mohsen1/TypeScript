@@ -348,12 +348,14 @@ fn parse_and_bind_parallel_with_libs(
 
             // Bind with lib symbols
             let mut binder = ThinBinderState::new();
-            binder.bind_source_file(&arena, source_file);
 
-            // Merge lib symbols into the binder
+            // IMPORTANT: Merge lib symbols BEFORE binding source file
+            // so that symbols like console, Array, Promise are available during binding
             if !lib_files.is_empty() {
                 binder.merge_lib_symbols(lib_files);
             }
+
+            binder.bind_source_file(&arena, source_file);
 
             BindResult {
                 file_name,
