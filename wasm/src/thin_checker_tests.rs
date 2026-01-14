@@ -15911,12 +15911,11 @@ const vertical: boolean = Direction.isVertical(Direction.Up);
 
     let error_count = checker.ctx.diagnostics.len();
 
-    // Currently expects 4 errors: enum member access not working
-    // Once enum member access works, change to expect 0 errors
-    if error_count != 4 {
+    // Enum member access now works! Changed from expecting 4 errors to 0 errors.
+    if error_count != 0 {
         eprintln!("=== Enum Namespace Merging Diagnostics ===");
         eprintln!(
-            "Expected 4 errors (enum member access not implemented), got {}",
+            "Expected 0 errors (enum member access working), got {}",
             error_count
         );
         for diag in &checker.ctx.diagnostics {
@@ -15925,8 +15924,8 @@ const vertical: boolean = Direction.isVertical(Direction.Up);
     }
 
     assert_eq!(
-        error_count, 4,
-        "Expected 4 errors for enum member access: {:?}",
+        error_count, 0,
+        "Expected 0 errors (enum member access working): {:?}",
         checker.ctx.diagnostics
     );
 }
