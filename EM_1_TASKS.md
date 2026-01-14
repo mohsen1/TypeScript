@@ -79,16 +79,17 @@ Before merging any worker branch:
 **Next:** After merge, prioritize new.target context validation (~52 cases)
 
 ### Worker 3 (Parser - Cascading Errors)
-**Status:** ✅ VALIDATED - Cascading error fix reduces parser FP by 21% (701→551)
+**Status:** ✅ MERGED - Cascading error fix reduces parser FP by 21% (701→551)
 **Results:** Biggest single-worker impact! Exact Match +1.8%, No regressions, Build passes
 **Synergy:** Amplifies Worker 1 & 2 results - combined: 701→389 (-44%, 312 errors)
-**Decision:** MERGE APPROVED - Ready to merge worker-3 into em-team-1
 **Lesson:** Should have been FIRST - cascading errors masked individual fix impact
 
 ### Worker 4 (Binder - CRITICAL)
-**Status:** Fixed lib.d.ts symbol merging, working on ambient modules
-**Next:** Complete ambient module fix, then module augmentation
-**Blocker:** None - this is the critical path
+**Status:** ✅ VALIDATED - Ambient module fix reduces TS2304 by 37% (459→276)
+**Results:** HIGHEST Exact Match impact! +3.8%, Stops "Any" poisoning
+**Synergy:** Unlocks full value of Parser fixes - all 4 workers: 30.1%→34.5% (+4.4%)
+**Decision:** MERGE APPROVED - Ready to merge worker-4 into em-team-1
+**Next:** Module namespace resolution (~48 cases)
 
 ---
 
