@@ -3756,3 +3756,77 @@ fn test_thin_parser_function_keyword_in_class_recovers() {
         parser.get_diagnostics()
     );
 }
+
+#[test]
+fn test_thin_parser_throw_statement_line_break_reports_ts1109() {
+    // Critical ASI bug fix: throw must have expression on same line
+    // Line break between throw and expression should report TS1109 (EXPRESSION_EXPECTED)
+    let source = r#"
+function f() {
+    throw
+    new Error("test");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    // Should report TS1109 (EXPRESSION_EXPECTED) for the line break
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
+    assert!(
+        codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Should emit TS1109 for line break after throw, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_throw_statement_same_line_ok() {
+    // throw with expression on same line should parse without error
+    let source = r#"
+function f() {
+    throw new Error("test");
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    // Should NOT report any errors
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Should not emit TS1109 for throw on same line, got: {:?}",
+        parser.get_diagnostics()
+    );
+}
+
+#[test]
+fn test_thin_parser_throw_statement_eof_ok() {
+    // throw at EOF (before closing brace) should be fine
+    let source = r#"
+function f() {
+    throw new Error("test")
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    parser.parse_source_file();
+
+    // Should NOT report any errors
+    let codes: Vec<u32> = parser
+        .get_diagnostics()
+        .iter()
+        .map(|diag| diag.code)
+        .collect();
+    assert!(
+        !codes.contains(&diagnostic_codes::EXPRESSION_EXPECTED),
+        "Should not emit TS1109 for throw before closing brace, got: {:?}",
+        parser.get_diagnostics()
+    );
+}

@@ -5385,6 +5385,16 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ThrowKeyword);
 
+        // CRITICAL: throw expression must be on same line (no ASI allowed)
+        // JavaScript spec: Line break between throw and expression is a syntax error
+        if self.scanner.has_preceding_line_break() {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Line break not allowed here",
+                diagnostic_codes::EXPRESSION_EXPECTED,
+            );
+        }
+
         let expression = self.parse_expression();
 
         self.parse_semicolon();
