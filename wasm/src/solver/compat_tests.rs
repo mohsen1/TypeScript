@@ -152,12 +152,20 @@ fn test_unknown_assignability() {
 }
 
 #[test]
-fn test_error_poisoning_assignability() {
+fn test_error_type_strictness() {
+    // ERROR types should NOT silently pass assignability checks.
+    // This prevents "error poisoning" where a TS2304 (cannot find name) masks
+    // downstream TS2322 (type not assignable) errors.
+    // This is a key design decision for catching more TS2322 errors.
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
 
-    assert!(checker.is_assignable(TypeId::ERROR, TypeId::STRING));
-    assert!(checker.is_assignable(TypeId::STRING, TypeId::ERROR));
+    // ERROR is NOT assignable to concrete types
+    assert!(!checker.is_assignable(TypeId::ERROR, TypeId::STRING));
+    // Concrete types are NOT assignable to ERROR
+    assert!(!checker.is_assignable(TypeId::STRING, TypeId::ERROR));
+    // ERROR is assignable to itself (reflexive)
+    assert!(checker.is_assignable(TypeId::ERROR, TypeId::ERROR));
 }
 
 #[test]
@@ -170,6 +178,8 @@ fn test_error_poisoning_union_normalization() {
 
 #[test]
 fn test_recursion_depth_limit_assignable() {
+    // Test that deep recursion doesn't crash and produces correct results.
+    // string[][][] should NOT be assignable to number[][][] regardless of depth.
     let interner = TypeInterner::new();
     let mut checker = CompatChecker::new(&interner);
 
@@ -184,7 +194,11 @@ fn test_recursion_depth_limit_assignable() {
     let deep_string = nest_array(&interner, TypeId::STRING, 120);
     let deep_number = nest_array(&interner, TypeId::NUMBER, 120);
 
-    assert!(checker.is_assignable(deep_string, deep_number));
+    // Incompatible array types should NOT be assignable (type safety)
+    assert!(!checker.is_assignable(deep_string, deep_number));
+    // Same types at same depth should be assignable
+    let deep_string2 = nest_array(&interner, TypeId::STRING, 120);
+    assert!(checker.is_assignable(deep_string, deep_string2));
 }
 
 #[test]

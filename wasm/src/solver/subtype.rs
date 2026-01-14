@@ -497,27 +497,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                         return SubtypeResult::True;
                     }
 
-                    // Different type parameters - check constraint compatibility
-                    match (s_info.constraint, t_info.constraint) {
-                        // Source has constraint, target has constraint - check if source's constraint is a subtype of target's constraint
-                        (Some(s_constraint), Some(t_constraint)) => {
-                            return self.check_subtype(s_constraint, t_constraint);
+                    // Different type parameters - check if source's constraint implies compatibility
+                    // TypeScript soundness: T <: U only if:
+                    // 1. Constraint(T) is exactly U (e.g., U extends T, checking U <: T)
+                    // 2. Constraint(T) extends U's constraint transitively
+                    //
+                    // NOT allowed: T <: U where both have same constraint but are different params
+                    // (e.g., T extends string, U extends string - they could be different subtypes)
+                    if let Some(s_constraint) = s_info.constraint {
+                        // Check if source's constraint IS the target type parameter itself
+                        // This handles: U extends T, checking U <: T
+                        if s_constraint == target {
+                            return SubtypeResult::True;
                         }
-                        // Only source has constraint - check if it satisfies the target type parameter
-                        (Some(s_constraint), None) => {
-                            return self.check_subtype(s_constraint, target);
-                        }
-                        // Only target has constraint - source (unconstrained) acts like unknown, which is not a subtype of constrained
-                        (None, Some(_)) => {
-                            return SubtypeResult::False;
-                        }
-                        // Both unconstrained - different type parameters are not guaranteed compatible
-                        // T <: U is only sound if we know T = U (handled above by name check)
-                        // Two different unconstrained parameters could be instantiated to incompatible types
-                        (None, None) => {
-                            return SubtypeResult::False;
+                        // Check if source's constraint is a subtype of the target type parameter
+                        // This handles transitive constraints
+                        if self.check_subtype(s_constraint, target).is_true() {
+                            return SubtypeResult::True;
                         }
                     }
+                    // Two different type parameters with independent constraints are not interchangeable
+                    return SubtypeResult::False;
                 }
 
                 // Type parameter vs concrete type
