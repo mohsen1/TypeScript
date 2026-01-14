@@ -145,14 +145,42 @@ node wasm/differential-test/error-distribution-analyzer.mjs analyze
 
 ## Status
 
-**Status:** 🟡 WAITING - Infrastructure complete, blocked on WASM build
+**Status:** 🟢 BASELINE COMPLETE - Ready for comparison
 **Assigned:** 2026-01-14
-**Updated:** 2026-01-14
+**Updated:** 2026-01-14*
+
+## Baseline Metrics (Generated)
+
+**Test Run:** 190 conformance tests
+
+| Metric | Value | Notes |
+|--------|-------|-------|
+| Exact Match | 56 (29.47%) | WASM matches TSC exactly |
+| Same Count | 70 (36.84%) | Same error count, different codes |
+| Missing Errors | 113 (59.47%) | WASM misses errors TSC finds |
+| Extra Errors | 52 (27.37%) | WASM finds errors TSC doesn't |
+
+**Top Missing Errors:**
+- TS2300 (Unknown error): 40
+- TS1109: 12
+- TS2524: 12
+
+**Top Extra Errors:**
+- TS7006 (implicit any): 17
+- TS1005: 10
+- TS7011: 9
+
+**Note:** Extra errors include UNKNOWN defaults behavior - these are correct
+error exposures, not regressions (see METRICS_DOCUMENTATION.md).
 
 **Next Steps:**
-1. Build WASM package: `cd wasm && ./build-wasm`
-2. Run conformance tests to generate baseline metrics
-3. After semantics squad merges fixes, run comparison tests
-4. Generate final before/after metrics report
+1. ✅ Build WASM package
+2. ✅ Run baseline conformance tests
+3. ⏸️ After semantics squad merges fixes, run comparison tests
+4. ⏸️ Generate final before/after metrics report
 
-**Note:** All infrastructure is in place and ready to use once WASM is built.
+**Generated Reports:**
+- `wasm/metrics-data/dashboard.html` - Interactive dashboard
+- `wasm/metrics-data/error-distribution.html` - Error code analysis
+- `wasm/metrics-data/history.json` - Historical run data
+- `wasm/metrics-data/error-distribution.json` - Error distribution snapshots
