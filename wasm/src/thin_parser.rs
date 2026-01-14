@@ -6038,6 +6038,11 @@ impl ThinParserState {
                     let result = self.parse_assignment_expression();
                     if result.is_none() {
                         self.resync_to_next_expression_boundary();
+                        // Error recovery: If right-side parsing failed and current token
+                        // cannot start an expression, break to prevent cascading errors
+                        if !self.is_token(SyntaxKind::EndOfFileToken) && !self.is_expression_start() {
+                            return left;
+                        }
                     }
                     result
                 } else {
@@ -6049,6 +6054,11 @@ impl ThinParserState {
                     let result = self.parse_binary_expression(next_min);
                     if result.is_none() {
                         self.resync_to_next_expression_boundary();
+                        // Error recovery: If right-side parsing failed and current token
+                        // cannot start an expression, break to prevent cascading errors
+                        if !self.is_token(SyntaxKind::EndOfFileToken) && !self.is_expression_start() {
+                            return left;
+                        }
                     }
                     result
                 };
