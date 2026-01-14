@@ -120,8 +120,47 @@ We are no longer building a "toy" compiler—the skeleton is complete. We are no
 
 ---
 
-### Code Hygiene
 
-**Code outside of `wasm/` should be read-only.**
+Based on the project documentation and current status, here is why your conformance scores are stagnant and what needs to happen next.
 
-If any changes were made outside of `wasm/`, please double check and revert if it was a mistake. We want to keep the TypeScript codebase pristine. The git remote `git@github.com:microsoft/TypeScript.git` is the source of truth for TypeScript code. 
+### Why Conformance Isn't Improving
+
+You are suffering from **"Error Poisoning" caused by the `Any` type**.
+
+1.  **The "Permissive" Trap:** Currently, when the compiler encounters something it doesn't understand (a missing symbol, a complex generic, or a syntax error), it defaults to `Any`.
+2.  **The Silencing Effect:** In TypeScript, `Any` shuts off type checking. If `x` becomes `Any` because the binder couldn't find its definition, **all** downstream errors related to `x` (missing properties, type mismatches, uninitialized usage) disappear.
+3.  **The Illusion:** You implement a new feature (like Control Flow Analysis), but because the underlying variables resolved to `Any` (due to binding failures), the new checks simply say "Looks good!" and emit nothing.
+
+You are fixing logic, but the data flowing into that logic is "poisoned" by `Any`, masking your progress.
+
+### What To Work On Next
+
+According to the **Phase 8 Directives** in `README.md`, you must shift focus from "adding features" to "fixing foundations".
+
+#### 1. 🔴 CRITICAL: Fix Global Scope Binding (TS2304)
+**The Problem:** The compiler cannot find basic globals like `Promise`, `Array`, or `console`.
+**The Impact:** These resolve to `Any`, poisoning almost every test case.
+**The Fix:**
+*   Verify `lib_loader.rs` is correctly merging `lib.d.ts` symbols into the root `SymbolTable`.
+*   Debug `src/thin_binder.rs` to ensure `file_locals` are correctly populated from the library context.
+*   **Target:** Reduce TS2304 extra errors to <50.
+
+#### 2. 🟠 PRIORITY: Fix Parser Error Recovery (TS1005 / TS1109)
+**The Problem:** The parser produces ~700 false positive syntax errors.
+**The Impact:** When parsing fails, the AST is incomplete. Missing nodes mean missing symbols, which leads to `TS2304`, which leads to `Any` poisoning.
+**The Fix:**
+*   Audit `src/thin_parser.rs`. The parser is likely too strict or bailing out too early on minor syntax deviations.
+*   Implement better error recovery ("resynchronization") to keep parsing after an error.
+
+#### 3. 🟠 STRATEGIC: Switch Solver Fallback to `Unknown`
+**The Problem:** The solver returns `Any` on failure.
+**The Fix:** Change the default return type for unresolved lookups in `src/solver/` from `TypeId::ANY` to `TypeId::UNKNOWN` or `TypeId::ERROR`.
+**The Result:** This will cause a **spike in errors** (breaking the build/metrics temporarily), but these errors will be *real*. It will expose exactly where the logic is failing instead of hiding it.
+
+### Summary Checklist for the Next Sprint
+
+1.  [ ] **Binder Squad:** Debug why `console.log` often fails to resolve (check `lib.dom.d.ts` loading).
+2.  [ ] **Syntax Squad:** Reduce parser false positives (TS1005) by 80%.
+3.  [ ] **Solver Squad:** Change `lower_type` to return `Error` instead of `Any` when resolution fails.
+
+**Do not add new features (like more CFA rules or Emitter transforms) until TS2304 (Binding) is under control.**

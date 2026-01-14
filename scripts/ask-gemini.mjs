@@ -18,7 +18,7 @@
 import { execFileSync } from "node:child_process";
 import fs from "node:fs";
 import path from "node:path";
-import { createInterface } from "node:readline";
+import readline from "node:readline";
 import { fileURLToPath } from "node:url";
 import { Command } from "commander";
 import chalk from "chalk";
@@ -149,24 +149,60 @@ async function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-async function fetchWithRetry(url, options, maxRetries = 5) {
+async function fetchWithRetry(url, options, maxRetries = 5, availableApiKeys) {
   let lastError;
+  let currentKeyIndex = 0;
+  const apiKeys = availableApiKeys || [options.apiKey];
+  
+  // Extract API key from URL or headers
+  if (!options.apiKey && url.includes('?key=')) {
+    const urlKey = url.split('?key=')[1].split('&')[0];
+    if (!apiKeys.includes(urlKey)) {
+      apiKeys.unshift(urlKey);
+    }
+  }
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    try {
-      const response = await fetch(url, options);
+    const currentApiKey = apiKeys[currentKeyIndex] || apiKeys[0];
+    
+    // Update URL and headers with current API key
+    const currentUrl = url.includes('?key=') 
+      ? url.replace(/(\?key=)[^&]+/, `$1${currentApiKey}`)
+      : url;
+    
+    const currentOptions = {
+      ...options,
+      headers: {
+        ...options.headers,
+        'x-goog-api-key': currentApiKey,
+      },
+    };
 
-      // If rate limited, retry with exponential backoff
+    try {
+      const response = await fetch(currentUrl, currentOptions);
+
+      // If rate limited, try next API key or retry with exponential backoff
       if (response.status === 429) {
+        // Try next API key first
+        if (currentKeyIndex + 1 < apiKeys.length) {
+          currentKeyIndex++;
+          log(`\n${colors.yellow}Rate limited with API key ${currentKeyIndex}. Trying next API key...${colors.reset}`, colors.yellow);
+          continue;
+        }
+        
+        // No more API keys, fall back to normal retry logic
         if (attempt === maxRetries) {
-          throw new Error(`Rate limited after ${maxRetries} retries`);
+          throw new Error(`Rate limited after ${maxRetries} retries with all available API keys`);
         }
 
         const retryAfter = response.headers.get('retry-after');
         const waitTime = retryAfter ? parseInt(retryAfter) * 1000 : Math.pow(2, attempt) * 1000;
 
-        log(`\n${colors.yellow}Rate limited. Waiting ${Math.round(waitTime/1000)}s before retry ${attempt + 1}/${maxRetries}...${colors.reset}`, colors.yellow);
+        log(`\n${colors.yellow}Rate limited on all API keys. Waiting ${Math.round(waitTime/1000)}s before retry ${attempt + 1}/${maxRetries}...${colors.reset}`, colors.yellow);
         await sleep(waitTime);
+        
+        // Reset to first API key for next attempt
+        currentKeyIndex = 0;
         continue;
       }
 
@@ -242,42 +278,49 @@ function loadEnvFile(filePath) {
 }
 
 function getApiKey() {
+  const keys = getAvailableApiKeys();
+  return keys.length > 0 ? keys[0] : null;
+}
+
+function getAvailableApiKeys() {
+  const keys = [];
+  
   // Check environment first (Vertex AI Express API key)
   if (process.env.GCP_VERTEX_EXPRESS_API_KEY) {
-    return process.env.GCP_VERTEX_EXPRESS_API_KEY;
+    keys.push(process.env.GCP_VERTEX_EXPRESS_API_KEY);
   }
   if (process.env.GOOGLE_API_KEY) {
-    return process.env.GOOGLE_API_KEY;
+    keys.push(process.env.GOOGLE_API_KEY);
   }
   if (process.env.GEMINI_API_KEY) {
-    return process.env.GEMINI_API_KEY;
+    keys.push(process.env.GEMINI_API_KEY);
   }
 
   // Load from .env.local
   const envLocal = loadEnvFile(path.join(REPO_ROOT, ".env.local"));
-  if (envLocal.GCP_VERTEX_EXPRESS_API_KEY) {
-    return envLocal.GCP_VERTEX_EXPRESS_API_KEY;
+  if (envLocal.GCP_VERTEX_EXPRESS_API_KEY && !keys.includes(envLocal.GCP_VERTEX_EXPRESS_API_KEY)) {
+    keys.push(envLocal.GCP_VERTEX_EXPRESS_API_KEY);
   }
-  if (envLocal.GOOGLE_API_KEY) {
-    return envLocal.GOOGLE_API_KEY;
+  if (envLocal.GOOGLE_API_KEY && !keys.includes(envLocal.GOOGLE_API_KEY)) {
+    keys.push(envLocal.GOOGLE_API_KEY);
   }
-  if (envLocal.GEMINI_API_KEY) {
-    return envLocal.GEMINI_API_KEY;
+  if (envLocal.GEMINI_API_KEY && !keys.includes(envLocal.GEMINI_API_KEY)) {
+    keys.push(envLocal.GEMINI_API_KEY);
   }
 
   // Try .env as fallback
   const envFile = loadEnvFile(path.join(REPO_ROOT, ".env"));
-  if (envFile.GCP_VERTEX_EXPRESS_API_KEY) {
-    return envFile.GCP_VERTEX_EXPRESS_API_KEY;
+  if (envFile.GCP_VERTEX_EXPRESS_API_KEY && !keys.includes(envFile.GCP_VERTEX_EXPRESS_API_KEY)) {
+    keys.push(envFile.GCP_VERTEX_EXPRESS_API_KEY);
   }
-  if (envFile.GOOGLE_API_KEY) {
-    return envFile.GOOGLE_API_KEY;
+  if (envFile.GOOGLE_API_KEY && !keys.includes(envFile.GOOGLE_API_KEY)) {
+    keys.push(envFile.GOOGLE_API_KEY);
   }
-  if (envFile.GEMINI_API_KEY) {
-    return envFile.GEMINI_API_KEY;
+  if (envFile.GEMINI_API_KEY && !keys.includes(envFile.GEMINI_API_KEY)) {
+    keys.push(envFile.GEMINI_API_KEY);
   }
 
-  return null;
+  return keys;
 }
 
 function parseArgs(args) {
@@ -404,6 +447,7 @@ function runYek(tokens, dirs, treeOnly = false) {
 }
 
 async function askGeminiStream(apiKey, codebaseContext, question, systemPrompt = null) {
+  const availableApiKeys = getAvailableApiKeys();
   const url = `${API_URL}/${DEFAULT_MODEL}:streamGenerateContent?key=${apiKey}&alt=sse`;
 
   // Read architecture doc dynamically
@@ -483,7 +527,8 @@ ${question}
       "Content-Type": "application/json",
     },
     body: JSON.stringify(requestBody),
-  });
+    apiKey,
+  }, 5, availableApiKeys);
 
   if (!response.ok) {
     const errorText = await response.text();
@@ -534,6 +579,7 @@ ${question}
 }
 
 async function askGemini(apiKey, codebaseContext, question, systemPrompt = null) {
+  const availableApiKeys = getAvailableApiKeys();
   const url = `${API_URL}/${DEFAULT_MODEL}:generateContent?key=${apiKey}`;
 
   // Read architecture doc dynamically
@@ -614,7 +660,8 @@ ${question}
       "x-goog-api-key": apiKey,
     },
     body: JSON.stringify(requestBody),
-  });
+    apiKey,
+  }, 5, availableApiKeys);
 
   const data = await response.json();
   const text = data?.candidates?.[0]?.content?.parts?.[0]?.text;
@@ -773,10 +820,16 @@ async function main() {
 
   // Check for API key
   const apiKey = getApiKey();
+  const availableKeys = getAvailableApiKeys();
+  
   if (!apiKey) {
-    log("\nError: GCP_VERTEX_EXPRESS_API_KEY not found.", colors.red);
-    log("Set GCP_VERTEX_EXPRESS_API_KEY in .env.local or as environment variable", colors.yellow);
+    log("\nError: No API key found.", colors.red);
+    log("Set GCP_VERTEX_EXPRESS_API_KEY or GEMINI_API_KEY in .env.local or as environment variable", colors.yellow);
     process.exit(1);
+  }
+  
+  if (availableKeys.length > 1) {
+    log(`${colors.dim}Found ${availableKeys.length} API keys for fallback${colors.reset}`, colors.dim);
   }
 
   // Review mode
