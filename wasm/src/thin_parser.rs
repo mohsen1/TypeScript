@@ -372,11 +372,15 @@ impl ThinParserState {
 
     /// Error: Expression expected (TS1109)
     fn error_expression_expected(&mut self) {
-        use crate::checker::types::diagnostics::diagnostic_codes;
-        self.parse_error_at_current_token(
-            "Expression expected",
-            diagnostic_codes::EXPRESSION_EXPECTED,
-        );
+        // Only emit error if we haven't already emitted one at this position
+        // This prevents cascading TS1109 errors when TS1005 or other errors already reported
+        if self.token_pos() != self.last_error_pos {
+            use crate::checker::types::diagnostics::diagnostic_codes;
+            self.parse_error_at_current_token(
+                "Expression expected",
+                diagnostic_codes::EXPRESSION_EXPECTED,
+            );
+        }
     }
 
     /// Error: Type expected (TS1110)
