@@ -1990,3 +1990,7 @@ pub fn is_word_character(ch: u32) -> bool {
 
 #[cfg(test)]
 mod lib_tests;
+
+// ASI Conformance tests for verifying TS1005/TS1109 patterns
+#[cfg(test)]
+mod asi_conformance_tests;
