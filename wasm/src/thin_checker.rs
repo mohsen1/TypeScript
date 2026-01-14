@@ -19610,6 +19610,7 @@ impl<'a> ThinCheckerState<'a> {
 
     /// Check that parameter default values (initializers) are assignable to declared parameter types.
     /// This emits TS2322 when the default value type doesn't match the parameter type annotation.
+    /// Also checks for undefined identifiers in default expressions (TS2304) regardless of type annotations.
     fn check_parameter_initializers(&mut self, parameters: &[NodeIndex]) {
         for &param_idx in parameters {
             let Some(param_node) = self.ctx.arena.get(param_idx) else {
@@ -19624,24 +19625,25 @@ impl<'a> ThinCheckerState<'a> {
                 self.check_for_nested_function_ts7006(param.initializer);
             }
 
-            // Only check if there's both a type annotation and an initializer
-            if param.type_annotation.is_none() || param.initializer.is_none() {
+            // Skip if there's no initializer
+            if param.initializer.is_none() {
+                continue;
+            }
+
+            // IMPORTANT: Always resolve the initializer expression to check for undefined identifiers (TS2304)
+            // This must happen regardless of whether there's a type annotation.
+            let init_type = self.get_type_of_node(param.initializer);
+
+            // Only check type assignability if there's a type annotation
+            if param.type_annotation.is_none() {
                 continue;
             }
 
             // Get the declared parameter type
             let declared_type = self.get_type_from_type_node(param.type_annotation);
 
-            // Get the type of the initializer
-            let prev_context = self.ctx.contextual_type;
-            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) {
-                self.ctx.contextual_type = Some(declared_type);
-            }
-            let init_type = self.get_type_of_node(param.initializer);
-            self.ctx.contextual_type = prev_context;
-
             // Check if the initializer type is assignable to the declared type
-            if declared_type != TypeId::ANY && !self.is_assignable_to(init_type, declared_type) {
+            if declared_type != TypeId::ANY && !self.type_contains_error(declared_type) && !self.is_assignable_to(init_type, declared_type) {
                 self.error_type_not_assignable_with_reason_at(init_type, declared_type, param_idx);
             }
         }
