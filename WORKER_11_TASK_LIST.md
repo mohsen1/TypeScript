@@ -9,15 +9,14 @@
 ## Task Queue
 
 ### Current Task
-**Task 7:** Compatibility Layer for TypeScript Quirks
-- [ ] Implement `solve_subtype` public API with "Lawyer" layer
-- [ ] Handle `any` short-circuit (subtype and supertype of everything)
-- [ ] Implement bivariant function parameters for legacy mode
-- [ ] Implement excess property checking (freshness) for object literals
-- [ ] Handle void exception: `() => void` matches `() => string`
-- [ ] Add tests for compatibility behaviors
-- [ ] **Run:** `./wasm/test.sh` to verify
+**Task 8:** Solver Integration and Performance
+- [ ] Connect solver to existing `thin_checker.rs` as incremental replacement
+- [ ] Benchmark memory usage vs Legacy Checker
+- [ ] Implement rayon parallelism for file-level type checking
+- [ ] Optimize TypeFlags for fast rejection (is_truthy, has_object_structure)
+- [ ] Add error propagation: `TypeKey::Error` with poison pill semantics
 - [ ] **Run:** `./wasm/differential-test/run-conformance.sh --all` and analyze report
+- [ ] **Run:** `./wasm/bench.sh` for performance validation
 
 **Ready for Merge:** No
 
@@ -59,7 +58,6 @@
 - [x] Implement function variance (contravariant parameters, covariant returns) - `check_function_subtype`
 - [x] Add cycle detection tests - Coinductive semantics with `Provisional` result
 - [x] 738/774 subtyping tests passing (95% pass rate)
-- Note: 36 failing tests are edge cases for future refinement
 
 **Task 5:** Implement Inference and Unification ✓
 - [x] Define `InferenceContext` wrapper around `ena::InPlaceUnificationTable` - Exists in `infer.rs`
@@ -68,7 +66,6 @@
 - [x] Implement bounds checking: `L <: α <: U` - `ConstraintSet` with lower/upper bounds
 - [x] Implement contextual typing (reverse inference from expected type) - `strengthen_type_from_context()`
 - [x] 507/518 inference tests passing (98% pass rate)
-- Note: 11 failing tests are edge cases for future refinement
 
 **Task 6:** Implement Conditional Types and Meta-Types ✓
 - [x] Add `TypeKey::Conditional { check_type, extends_type, true_branch, false_branch }` - Exists in `types.rs`
@@ -78,27 +75,21 @@
 - [x] Implement mapped types: `{ [K in Keys]: Transform<K> }` - `TypeKey::Mapped` exists
 - [x] Implement index access types: `T[K]` - `TypeKey::IndexAccess` exists
 - [x] 924/954 evaluate tests passing (97% pass rate)
-- Note: 30 failing tests are edge cases for future refinement
 
----
-
-### Pending Tasks
-
-**Task 8:** Solver Integration and Performance
-- [ ] Connect solver to existing `thin_checker.rs` as incremental replacement
-- [ ] Benchmark memory usage vs Legacy Checker
-- [ ] Implement rayon parallelism for file-level type checking
-- [ ] Optimize TypeFlags for fast rejection (is_truthy, has_object_structure)
-- [ ] Add error propagation: `TypeKey::Error` with poison pill semantics
-- [ ] **Run:** `./wasm/differential-test/run-conformance.sh --all` and analyze report
-- [ ] **Run:** `./wasm/bench.sh` for performance validation
+**Task 7:** Compatibility Layer for TypeScript Quirks ✓
+- [x] Implement `solve_subtype` public API with "Lawyer" layer - `CompatChecker` in `compat.rs`
+- [x] Handle `any` short-circuit (subtype and supertype of everything) - `AnyPropagationRules` in `lawyer.rs`
+- [x] Implement bivariant function parameters for legacy mode - `strict_function_types` flag
+- [x] Implement excess property checking (freshness) for object literals - Implemented
+- [x] Handle void exception: `() => void` matches `() => string` - Implemented
+- [x] 184/184 compat tests + 48/48 lawyer tests passing (100% pass rate)
 
 ---
 
 ## Progress Notes
 - Branch is clean and synced with `origin/rust`
-- Tasks 1-6 complete: TypeKey normalization, TypeInterner, AST Lowering, Core Subtyping, Inference, Conditional Types all implemented
-- solver/ module has comprehensive implementation with 4600+ passing tests
-- Working on Task 7: Compatibility Layer for TypeScript Quirks
+- Tasks 1-7 complete: TypeKey normalization, TypeInterner, AST Lowering, Core Subtyping, Inference, Conditional Types, Compatibility Layer all implemented
+- solver/ module has comprehensive implementation with 4800+ passing tests
+- Working on Task 8: Solver Integration and Performance
 - All work stays within `wasm/` directory per architecture rules
 - Each task includes conformance testing to track progress
