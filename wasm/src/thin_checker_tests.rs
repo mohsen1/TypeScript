@@ -24467,3 +24467,35 @@ const Derived = class extends Base {
         checker.ctx.diagnostics
     );
 }
+
+/// Test that abstract classes skip TS2564 check entirely
+#[test]
+fn test_ts2564_abstract_class_skips_check() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+abstract class AbstractBase {
+    name: string;  // No error - abstract class can't be instantiated
+    abstract getValue(): number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string());
+    checker.check_source_file(root);
+
+    // Abstract classes should not have TS2564 errors
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for abstract class, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}

@@ -15803,7 +15803,7 @@ impl<'a> ThinCheckerState<'a> {
         self.check_accessor_type_compatibility(&class.members.nodes);
 
         // Check strict property initialization (TS2564)
-        self.check_property_initialization(stmt_idx, &class, is_declared);
+        self.check_property_initialization(stmt_idx, &class, is_declared, is_abstract_class);
 
         // Check for property type compatibility with base class (error 2416)
         // Property type in derived class must be assignable to same property in base class
@@ -15854,10 +15854,14 @@ impl<'a> ThinCheckerState<'a> {
         _class_idx: NodeIndex,
         class: &crate::parser::thin_node::ClassData,
         is_declared: bool,
+        is_abstract: bool,
     ) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
 
-        if is_declared {
+        // Skip TS2564 for declared classes (ambient) and abstract classes
+        // Abstract classes can't be instantiated, so property initialization
+        // is the responsibility of the concrete derived class
+        if is_declared || is_abstract {
             return;
         }
 
