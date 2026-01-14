@@ -11379,7 +11379,15 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::SubtypeChecker;
         let env = self.ctx.type_env.borrow();
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
-        checker.is_subtype_of(source, target)
+        let result = checker.is_subtype_of(source, target);
+
+        // If depth was exceeded during subtype checking, set the context flag
+        // The checker will emit TS2589 at the appropriate location
+        if checker.depth_exceeded() {
+            *self.ctx.depth_exceeded.borrow_mut() = true;
+        }
+
+        result
     }
 
     /// Check if `source` type is a subtype of `target` type, resolving Ref types.
@@ -11393,7 +11401,14 @@ impl<'a> ThinCheckerState<'a> {
     ) -> bool {
         use crate::solver::SubtypeChecker;
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
-        checker.is_subtype_of(source, target)
+        let result = checker.is_subtype_of(source, target);
+
+        // If depth was exceeded during subtype checking, set the context flag
+        if checker.depth_exceeded() {
+            *self.ctx.depth_exceeded.borrow_mut() = true;
+        }
+
+        result
     }
 
     /// Check if two types are identical.

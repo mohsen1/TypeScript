@@ -153,6 +153,8 @@ pub struct SubtypeChecker<'a, R: TypeResolver = NoopResolver> {
     in_progress: HashSet<(TypeId, TypeId)>,
     /// Current recursion depth (for stack overflow prevention)
     depth: u32,
+    /// Whether recursion depth was exceeded (for TS2589 emission)
+    pub depth_exceeded: bool,
     /// Whether to use strict function types (contravariant parameters).
     /// Default: true (sound, correct behavior)
     pub strict_function_types: bool,
@@ -188,6 +190,7 @@ impl<'a> SubtypeChecker<'a, NoopResolver> {
             resolver: &NOOP,
             in_progress: HashSet::new(),
             depth: 0,
+            depth_exceeded: false,
             strict_function_types: true, // Default to strict (sound) behavior
             allow_void_return: false,
             allow_bivariant_rest: false,
@@ -209,6 +212,7 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             resolver,
             in_progress: HashSet::new(),
             depth: 0,
+            depth_exceeded: false,
             strict_function_types: true,
             allow_void_return: false,
             allow_bivariant_rest: false,
@@ -235,6 +239,12 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     /// This is the main entry point for subtype checking.
     pub fn is_subtype_of(&mut self, source: TypeId, target: TypeId) -> bool {
         self.check_subtype(source, target).is_true()
+    }
+
+    /// Check if recursion depth was exceeded during subtype checking.
+    /// Returns true if the depth limit (>100) was hit.
+    pub fn depth_exceeded(&self) -> bool {
+        self.depth_exceeded
     }
 
     /// Check if `source` is assignable to `target`.
@@ -307,9 +317,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         // =========================================================================
 
         if self.depth > 100 {
-            // Recursion too deep - return false to be conservative and prevent stack overflow
-            // This ensures complex generics don't silently accept invalid code
-            // Note: This differs from coinductive cycle detection which returns Provisional
+            // Recursion too deep - set flag and return False
+            // The checker will detect this flag and emit TS2589
+            self.depth_exceeded = true;
             return SubtypeResult::False;
         }
 
