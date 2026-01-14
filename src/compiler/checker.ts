@@ -12085,8 +12085,9 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
         const widened = getWidenedType(addOptionality(type, /*isProperty*/ false, definedInMethod && !definedInConstructor));
         if (symbol.valueDeclaration && isInJSFile(symbol.valueDeclaration) && filterType(widened, t => !!(t.flags & ~TypeFlags.Nullable)) === neverType) {
-            reportImplicitAny(symbol.valueDeclaration, anyType);
-            return anyType;
+            // EM-3: Changed anyType to unknownType to expose implicit any errors
+            reportImplicitAny(symbol.valueDeclaration, unknownType);
+            return unknownType;
         }
         return widened;
     }
@@ -12164,10 +12165,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return getTypeOfFirstParameterOfSignature(setSig);
                 }
             }
-            return anyType;
+            // EM-3: Changed anyType to unknownType - Object.defineProperty type inference failed
+            return unknownType;
         }
         if (containsSameNamedThisProperty(expression.left, expression.right)) {
-            return anyType;
+            // EM-3: Changed anyType to unknownType - this property edge case
+            return unknownType;
         }
         const isDirectExport = kind === AssignmentDeclarationKind.ExportsProperty && (isPropertyAccessExpression(expression.left) || isElementAccessExpression(expression.left)) && (isModuleExportsAccessExpression(expression.left.expression) || (isIdentifier(expression.left.expression) && isExportsIdentifier(expression.left.expression)));
         const type = resolvedSymbol ? getTypeOfSymbol(resolvedSymbol)
@@ -12837,7 +12840,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         // Circularities could also result from parameters in function expressions that end up
         // having themselves as contextual types following type argument inference. In those cases
         // we have already reported an implicit any error so we don't report anything here.
-        return anyType;
+        // EM-3: Changed anyType to unknownType to expose circular reference errors downstream
+        return unknownType;
     }
 
     function getTypeOfSymbolWithDeferredType(symbol: Symbol) {
@@ -16341,7 +16345,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             }
         }
 
-        return anyType;
+        // EM-3: Changed anyType to unknownType - module resolution failed
+        return unknownType;
     }
 
     function getThisTypeOfSignature(signature: Signature): Type | undefined {
@@ -17283,10 +17288,12 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                             const indexInfo = indexed === stringType || indexed === numberType ? [createIndexInfo(indexed, target, /*isReadonly*/ false)] : emptyArray;
                             return createAnonymousType(/*symbol*/ undefined, emptySymbols, emptyArray, emptyArray, indexInfo);
                         }
-                        return anyType;
+                        // EM-3: Changed anyType to unknownType - invalid JSDoc type syntax
+                        return unknownType;
                     }
                     checkNoTypeArguments(node);
-                    return !noImplicitAny ? anyType : undefined;
+                    // EM-3: Changed anyType to unknownType - JSDoc type with noImplicitAny
+                    return !noImplicitAny ? unknownType : undefined;
             }
         }
     }
@@ -20095,7 +20102,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
      */
     function getSpreadType(left: Type, right: Type, symbol: Symbol | undefined, objectFlags: ObjectFlags, readonly: boolean): Type {
         if (left.flags & TypeFlags.Any || right.flags & TypeFlags.Any) {
-            return anyType;
+            // EM-3: Changed anyType to unknownType - spread with any type
+            return unknownType;
         }
         if (left.flags & TypeFlags.Unknown || right.flags & TypeFlags.Unknown) {
             return unknownType;
@@ -33854,7 +33862,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         }
 
         if (hasSpreadAnyType) {
-            return anyType;
+            // EM-3: Changed anyType to unknownType - JSX spread contained any type
+            return unknownType;
         }
         if (typeToIntersect && spread !== emptyJsxObjectType) {
             return getIntersectionType([typeToIntersect, spread]);
@@ -34138,7 +34147,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
             return undefined;
         }
         // If we need to report an error, we already done so here. So just return any to prevent any more error downstream
-        return anyType;
+        // EM-3: Changed anyType to unknownType - prevent cascading errors but still catch real bugs
+        return unknownType;
     }
 
     function checkJsxReturnAssignableToAppropriateBound(refKind: JsxReferenceKind, elemInstanceType: Type, openingLikeElement: JsxOpeningLikeElement) {
@@ -34717,7 +34727,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         if (symbol) {
             markPropertyAsReferenced(symbol, /*nodeForCheckWriteOnly*/ undefined, /*isSelfTypeAccess*/ false);
         }
-        return anyType;
+        // EM-3: Changed anyType to unknownType - private identifier expression
+        return unknownType;
     }
 
     function getSymbolForPrivateIdentifierExpression(privId: PrivateIdentifier): Symbol | undefined {
@@ -34881,7 +34892,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     else if (noImplicitAny) {
                         error(right, Diagnostics.Element_implicitly_has_an_any_type_because_type_0_has_no_index_signature, typeToString(leftType));
                     }
-                    return anyType;
+                    // EM-3: Changed anyType to unknownType - globalThis without index signature
+                    return unknownType;
                 }
                 if (right.escapedText && !checkAndReportErrorForExtendingInterface(node)) {
                     reportNonexistentProperty(right, isThisTypeParameter(leftType) ? apparentType : leftType, isUncheckedJS);
@@ -37761,7 +37773,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                 if (noImplicitAny) {
                     error(node, Diagnostics.new_expression_whose_target_lacks_a_construct_signature_implicitly_has_an_any_type);
                 }
-                return anyType;
+                // EM-3: Changed anyType to unknownType - new expression lacks construct signature
+                return unknownType;
             }
         }
 
@@ -40782,7 +40795,8 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                         isTypeAssignableToKind(left, closeEnoughKind) &&
                         isTypeAssignableToKind(right, closeEnoughKind)
                     );
-                    return anyType;
+                    // EM-3: Changed anyType to unknownType - binary expression type check failed
+                    return unknownType;
                 }
 
                 if (operator === SyntaxKind.PlusEqualsToken) {
@@ -41341,10 +41355,11 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
         for (let i = getTypeReferenceArity(type); i < patternElements.length; i++) {
             const e = patternElements[i];
             if (i < patternElements.length - 1 || !(e.kind === SyntaxKind.BindingElement && e.dotDotDotToken)) {
-                elementTypes.push(!isOmittedExpression(e) && hasDefaultValue(e) ? getTypeFromBindingElement(e, /*includePatternInType*/ false, /*reportErrors*/ false) : anyType);
+                elementTypes.push(!isOmittedExpression(e) && hasDefaultValue(e) ? getTypeFromBindingElement(e, /*includePatternInType*/ false, /*reportErrors*/ false) : unknownType);
                 elementFlags.push(ElementFlags.Optional);
                 if (!isOmittedExpression(e) && !hasDefaultValue(e)) {
-                    reportImplicitAny(e, anyType);
+                    // EM-3: Changed anyType to unknownType - tuple element implicit any
+                    reportImplicitAny(e, unknownType);
                 }
             }
         }
