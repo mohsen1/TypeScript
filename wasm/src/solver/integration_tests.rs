@@ -1342,9 +1342,11 @@ mod unknown_fallback_tests {
         // Array<number>
         let array_number = interner.array(TypeId::NUMBER);
 
-        // number[] should NOT be assignable to unknown[]
-        // (Unknown is stricter than Any)
-        assert!(!checker.is_assignable(array_number, array_unknown));
+        // number[] is assignable to unknown[] (since unknown is a top type)
+        assert!(checker.is_assignable(array_number, array_unknown));
+
+        // But unknown[] is NOT assignable to number[] (unknown is strict)
+        assert!(!checker.is_assignable(array_unknown, array_number));
     }
 
     #[test]
@@ -1369,9 +1371,8 @@ mod unknown_fallback_tests {
         // (prevents silent acceptance of invalid code)
         assert!(!checker.is_assignable(unknown_type, type_a));
 
-        // But specific type should NOT be assignable to Unknown either
-        // (Unknown is not a bottom type)
-        assert!(!checker.is_assignable(type_a, unknown_type));
+        // Everything is assignable to Unknown (it's a top type)
+        assert!(checker.is_assignable(type_a, unknown_type));
     }
 
     #[test]
@@ -1398,8 +1399,8 @@ mod unknown_fallback_tests {
         // Everything is assignable to Any
         assert!(checker.is_assignable(type_a, TypeId::ANY));
 
-        // Specific type is NOT assignable to Unknown
-        assert!(!checker.is_assignable(type_a, TypeId::UNKNOWN));
+        // Everything is assignable to Unknown (it's a top type)
+        assert!(checker.is_assignable(type_a, TypeId::UNKNOWN));
     }
 }
 
