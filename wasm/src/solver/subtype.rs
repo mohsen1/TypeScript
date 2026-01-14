@@ -1882,6 +1882,82 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
     fn are_parameters_compatible(&mut self, source_type: TypeId, target_type: TypeId) -> bool {
         self.are_parameters_compatible_impl(source_type, target_type, false)
     }
+ 
+    /// Check if type predicates in functions are compatible.
+    ///
+    /// Type predicates make functions more specific. A function with a type predicate
+    /// can only be assigned to another function with a compatible predicate.
+    ///
+    /// Rules:
+    /// - No predicate vs no predicate: compatible
+    /// - Source has predicate, target doesn't: NOT compatible (source is more specific)
+    /// - Target has predicate, source doesn't: compatible (target is more specific, accepts source)
+    /// - Both have predicates: check if predicates are compatible
+    ///
+    /// For compatible predicates:
+    /// - Same parameter target (e.g., both `x is T`)
+    /// - Asserted types: source_predicate_type <: target_predicate_type
+    fn are_type_predicates_compatible(
+        &mut self,
+        source: &FunctionShape,
+        target: &FunctionShape,
+    ) -> bool {
+        match (&source.type_predicate, &target.type_predicate) {
+            // No predicates in either function - compatible
+            (None, None) => true,
+
+            // Source has predicate, target doesn't - source is MORE specific, not assignable
+            // Example: (x: string) => x is string cannot be assigned to (x: string) => boolean
+            (Some(_), None) => false,
+
+            // Source has no predicate, target has one - still compatible.
+            // This mirrors TypeScript's behavior: a less specific function (no predicate)
+            // can be used where a more specific function (with a predicate) is expected,
+            // because the predicate is an additional guarantee to the caller, not a stronger
+            // requirement on the implementation.
+            // Example: (x: string) => boolean is assignable to (x: string) => x is string.
+            (None, Some(_)) => true,
+
+            // Both have predicates - check compatibility
+            (Some(source_pred), Some(target_pred)) => {
+                // First, check if predicates target the same parameter
+                // The targets must match (both assert on the same parameter)
+                if source_pred.target != target_pred.target {
+                    return false;
+                }
+
+                // Check asserts compatibility
+                // Type guards (`x is T`) and assertions (`asserts x is T`) are NOT compatible
+                // They serve different purposes and cannot be assigned to each other
+                match (source_pred.asserts, target_pred.asserts) {
+                    // Source is type guard, target is assertion - NOT compatible
+                    // (x is T) cannot be assigned to (asserts x is U)
+                    (false, true) => false,
+
+                    // Source is assertion, target is type guard - NOT compatible
+                    // (asserts x is T) cannot be assigned to (x is U)
+                    (true, false) => false,
+                    // Both are type guards - check type compatibility
+                    // (x is T) assignable to (x is U) if T extends U
+                    // Both are assertions - check type compatibility
+                    // (asserts x is T) assignable to (asserts x is U) if T extends U
+                    //
+                    // For both cases, the logic is identical: check if the asserted types
+                    // are compatible (source <: target).
+                    (false, false) | (true, true) => {
+                        match (source_pred.type_id, target_pred.type_id) {
+                            (Some(source_type), Some(target_type)) => {
+                                self.check_subtype(source_type, target_type).is_true()
+                            }
+                            (None, Some(_)) => false,
+                            (Some(_), None) => true,
+                            (None, None) => true,
+                        }
+                    }
+                }
+            }
+        }
+    }
 
     /// Check parameter compatibility with method bivariance support.
     /// Methods are bivariant even when strict_function_types is enabled.
@@ -1900,8 +1976,10 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let is_contravariant = self.check_subtype(target_type, source_type).is_true();
 
         // Methods are bivariant regardless of strict_function_types setting
+        // UNLESS disable_method_bivariance is set
         // This matches TypeScript's behavior for method parameters
-        let use_bivariance = is_method || !self.strict_function_types;
+        let method_should_be_bivariant = is_method && !self.disable_method_bivariance;
+        let use_bivariance = method_should_be_bivariant || !self.strict_function_types;
 
         if !use_bivariance {
             if contains_this {
@@ -2096,10 +2174,20 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         let source_type = source_type.unwrap_or(TypeId::UNKNOWN);
         let target_type = target_type.unwrap_or(TypeId::UNKNOWN);
 
-        // this parameters must be EXACTLY the same type (invariant)
-        // Unlike regular parameters, `this` is not contravariant or bivariant
-        self.check_subtype(source_type, target_type).is_true()
-            && self.check_subtype(target_type, source_type).is_true()
+        // this parameters follow the same variance rules as regular parameters:
+        // - Strict mode: Contravariant (target <: source)
+        // - Non-strict mode: Bivariant (both directions)
+        // This behavior differs from an earlier implementation that used covariance.
+        // The key insight is that `this` is a pseudo-parameter, so it follows
+        // parameter variance rules, not return type variance rules.
+        if self.strict_function_types {
+            // Contravariant in strict mode
+            self.check_subtype(target_type, source_type).is_true()
+        } else {
+            // Bivariant in non-strict mode
+            self.check_subtype(source_type, target_type).is_true()
+                || self.check_subtype(target_type, source_type).is_true()
+        }
     }
 
     fn required_param_count(&self, params: &[ParamInfo]) -> usize {
@@ -2220,6 +2308,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::False;
         }
 
+        // Type predicates: a function with a type predicate is more specific
+        // than one without or with a less specific predicate
+        if !self.are_type_predicates_compatible(source, target) {
+            return SubtypeResult::False;
+        }
         // Method bivariance: if either source or target is a method, use bivariance for parameters
         let is_method = source.is_method || target.is_method;
 
@@ -3843,3 +3936,11 @@ mod callable_tests;
 #[cfg(test)]
 #[path = "union_tests.rs"]
 mod union_tests;
+
+#[cfg(test)]
+#[path = "typescript_quirks_tests.rs"]
+mod typescript_quirks_tests;
+
+#[cfg(test)]
+#[path = "type_predicate_tests.rs"]
+mod type_predicate_tests;
