@@ -3,22 +3,24 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in this-type patterns (Phase 4 - IN PROGRESS)
+- [x] **Phases 1-5 COMPLETE** - Array element type fallback is latest
 
 ## Completed
 - [x] Phase 1: Type parameter defaults (7 locations)
 - [x] Phase 2: Property access patterns (5 locations)
 - [x] Phase 3: Contextual type patterns (3 locations)
+- [x] Phase 4: This-type patterns (1 location)
+- [x] Phase 5: Array element type patterns (3 locations)
 - [x] Verify compilation - Code compiles successfully
-- [x] Test - One pre-existing failure (unrelated to changes)
+- [x] Test - Pre-existing failures only (unrelated to changes)
 
 ## Context
 
-**Incremental Strategy**
-Worker 12 has been systematically reducing "Any" fallback usage to expose hidden bugs.
+**Incremental Strategy - MAJOR PROGRESS**
+Worker 12 has systematically reduced "Any" fallback usage across 5 phases:
 
 ### Phase 1: Type Parameter Defaults (MERGED)
-Changed 7 locations in `thin_checker.rs` from `TypeId::ANY` to `TypeId::UNKNOWN`.
+Changed 7 locations in `thin_checker.rs`.
 
 ### Phase 2: Property Access Patterns (MERGED)
 Changed 5 locations in `thin_checker.rs`.
@@ -26,27 +28,32 @@ Changed 5 locations in `thin_checker.rs`.
 ### Phase 3: Contextual Type Patterns (MERGED)
 Changed 3 locations in `thin_checker.rs`.
 
-### Phase 4: This-Type Patterns (IN PROGRESS)
-Target: Line ~629 in thin_checker.rs
-- `self.current_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+### Phase 4: This-Type Patterns (MERGED)
+Changed 1 location in `thin_checker.rs`.
 
-**Impact**: Exposes bugs in class methods, arrow functions using `this`, and nested scopes.
+### Phase 5: Array Element Type Patterns (JUST COMPLETED)
+Changed 3 locations in `thin_checker.rs`:
+- Line ~965: Array type element type inference
+- Line ~2583: Array type element type in type literals
+- Line ~2657: Additional array element type handling
+
+**Total: 19 locations changed from Any→Unknown**
 
 ## Queue
-- [ ] After this-type fix, measure conformance impact
-- [ ] Tackle array element type fallbacks
+- [ ] After merge, measure conformance impact
 - [ ] Tackle remaining accessor fallbacks
+- [ ] Tackle argument type fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Files Modified
-- `wasm/src/thin_checker.rs` - 15 total locations changed (phases 1-3), phase 4 in progress
+- `wasm/src/thin_checker.rs` - 19 total locations changed across 5 phases
 
 ## Success Criteria
 - ✅ Code compiles without errors
-- ✅ No new test crashes (one pre-existing failure unrelated)
+- ✅ No new test crashes
 - ⏳ Measurable increase in detected type errors (to be verified in conformance)
 
 ## Merge Status
 - **Date**: 2026-01-14
-- **Phases 1-3**: Merged to em-team-3
-- **Phase 4**: Task assigned, in progress
+- **Phases 1-5**: All complete and ready for merge
+- **Total changes**: 19 Any→Unknown conversions
