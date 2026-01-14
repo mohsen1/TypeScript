@@ -1,17 +1,23 @@
 # Worker 1 Task List
 
-## Squad: Parser (Syntax)
-
 ## Current Task
-- [ ] Audit TS1005 ("expected X") emission in wasm/src/parser - identify where it over-triggers on valid syntax
+All CFA tasks completed!
 
 ## Queue
-- [ ] Create a list of specific test cases where TS1005 fires incorrectly
-- [ ] Fix the top 5 most common TS1005 false positive patterns
-- [ ] Run conformance tests to verify TS1005 reductions
-
-## Completed
 (none yet)
 
-## Context
-TS1005 has 439 false positives. This is polluting all measurements. Focus on the parser error emission logic in wasm/src/parser.
+## Completed
+- [x] Integrate with Checker for flow queries
+  - Add `check_flow_usage()` method to Checker
+  - Wire FlowGraph into type checking pipeline
+- [x] Add basic block identification logic
+  - Detect block boundaries (if/else, loops, try/catch)
+  - Track variable declarations and assignments
+- [x] Design FlowGraph data structure as side-table (separate from AST nodes)
+  - Create `wasm/crates/swc_typescript/src/checker/flow_graph.rs`
+  - Define `FlowGraph`, `FlowNode`, `FlowEdge` types
+  - Ensure no mutation of AST nodes (ThinNode SoA architecture)
+  - Add to Checker module exports
+- [x] Implement flow graph builder interface
+  - Add `build_flow_graph()` function that traverses bound AST
+  - Create entry points for function bodies, block statements
