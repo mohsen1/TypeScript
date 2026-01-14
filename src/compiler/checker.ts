@@ -36201,12 +36201,44 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
 
         function maybeAddMissingAwaitInfo(errorNode: Node | undefined, source: Type, target: Type) {
             if (errorNode && reportErrors && errorOutputContainer.errors && errorOutputContainer.errors.length) {
-                // Bail if target is Promise-like---something else is wrong
-                if (getAwaitedTypeOfPromise(target)) {
+                const awaitedTypeOfTarget = getAwaitedTypeOfPromise(target);
+
+                // If both source and target are Promise-like, show the unwrapped types
+                const awaitedTypeOfSource = getAwaitedTypeOfPromise(source);
+                if (awaitedTypeOfSource && awaitedTypeOfTarget) {
+                    addRelatedInfo(
+                        errorOutputContainer.errors[0],
+                        createDiagnosticForNode(
+                            errorNode,
+                            Diagnostics.Promise_0_has_unwrapped_type_1_and_Promise_2_has_unwrapped_type_3,
+                            typeToString(source),
+                            typeToString(awaitedTypeOfSource),
+                            typeToString(target),
+                            typeToString(awaitedTypeOfTarget),
+                        ),
+                    );
+                    // Also show the unwrapped type relationship
+                    if (!isTypeRelatedTo(awaitedTypeOfSource, awaitedTypeOfTarget, relation)) {
+                        addRelatedInfo(
+                            errorOutputContainer.errors[0],
+                            createDiagnosticForNode(
+                                errorNode,
+                                Diagnostics.Unwrapped_types_Colon_0_is_not_assignable_to_1,
+                                typeToString(awaitedTypeOfSource),
+                                typeToString(awaitedTypeOfTarget),
+                            ),
+                        );
+                    }
+                }
+
+                // Bail if target is Promise-like but source is not---something else is wrong
+                // (unless we already added the unwrapped type info above)
+                if (awaitedTypeOfTarget && !awaitedTypeOfSource) {
                     return;
                 }
-                const awaitedTypeOfSource = getAwaitedTypeOfPromise(source);
-                if (awaitedTypeOfSource && isTypeRelatedTo(awaitedTypeOfSource, target, relation)) {
+
+                // If source is Promise-like and target is not, suggest using await
+                if (awaitedTypeOfSource && !awaitedTypeOfTarget && isTypeRelatedTo(awaitedTypeOfSource, target, relation)) {
                     addRelatedInfo(errorOutputContainer.errors[0], createDiagnosticForNode(errorNode, Diagnostics.Did_you_forget_to_use_await));
                 }
             }

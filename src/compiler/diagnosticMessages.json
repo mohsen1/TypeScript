@@ -8555,5 +8555,13 @@
     "The expected type comes from a mapped type with constraint '{0}' and template type '{1}'.": {
         "category": "Error",
         "code": 9521
+    },
+    "Unwrapped types: '{0}' is not assignable to '{1}'.": {
+        "category": "Error",
+        "code": 9522
+    },
+    "Promise '{0}' has unwrapped type '{1}', and Promise '{2}' has unwrapped type '{3}'.": {
+        "category": "Error",
+        "code": 9523
     }
 }
