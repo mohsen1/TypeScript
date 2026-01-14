@@ -5645,21 +5645,46 @@ impl<'a> ThinCheckerState<'a> {
     /// 1. Literal types (e.g., `let key: "a"`)
     /// 2. Unions of literals (e.g., `let key: "a" | "b"`)
     /// 3. Types that include `undefined` (e.g., `let obj: Foo | undefined`)
+    /// 4. `any` type - TypeScript doesn't check definite assignment for `any`
+    /// 5. `typeof undefined` - resolves to `undefined`, which allows uninitialized use
     fn symbol_type_allows_uninitialized(&mut self, sym_id: SymbolId) -> bool {
-        use crate::solver::{LiteralValue, TypeKey};
+        use crate::binder::SymbolId as BinderSymbolId;
+        use crate::solver::{LiteralValue, SymbolRef, TypeKey};
 
         let declared_type = self.get_type_of_symbol(sym_id);
-        let Some(type_key) = self.ctx.types.lookup(declared_type) else {
-            return false;
-        };
 
-        // Check if it's a single literal type
-        if matches!(type_key, TypeKey::Literal(_)) {
+        // TypeScript doesn't check definite assignment for `any` typed variables
+        if declared_type == TypeId::ANY {
             return true;
         }
 
         // Check if it's undefined type
         if declared_type == TypeId::UNDEFINED {
+            return true;
+        }
+
+        let Some(type_key) = self.ctx.types.lookup(declared_type) else {
+            return false;
+        };
+
+        // Handle TypeQuery (typeof x) - resolve the underlying type
+        if let TypeKey::TypeQuery(SymbolRef(ref_sym_id)) = type_key {
+            let resolved = self.get_type_of_symbol(BinderSymbolId(ref_sym_id));
+            // Check if resolved type allows uninitialized use
+            if resolved == TypeId::UNDEFINED || resolved == TypeId::ANY {
+                return true;
+            }
+            // Also check if the resolved type is a union containing undefined
+            if let Some(TypeKey::Union(members)) = self.ctx.types.lookup(resolved) {
+                let member_ids = self.ctx.types.type_list(members);
+                if member_ids.contains(&TypeId::UNDEFINED) {
+                    return true;
+                }
+            }
+        }
+
+        // Check if it's a single literal type
+        if matches!(type_key, TypeKey::Literal(_)) {
             return true;
         }
 
