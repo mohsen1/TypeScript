@@ -1,6 +1,6 @@
 # Worker-8 Task List
 
-**Squad:** Semantics (Solver Strictness)
+**Squad:** Syntax (Parser Error Recovery)
 **Branch:** `worker-8`
 **EM:** EM-2
 *Assigned: 2025-01-14*
@@ -20,106 +20,169 @@
 - Verified working via conformance tests
 - Not in missing errors list
 
+### 3. Invert Solver Defaults ✅
+- Changed function return defaults from ANY to UNKNOWN (3 locations)
+- Changed variable defaults from ANY to UNKNOWN (3 locations)
+- Changed expression defaults from ANY to UNKNOWN (4 locations)
+- Total: 13 fixes, tests show improved strictness
+
 ---
 
 ## Priority Mission
 
-**Invert Solver Defaults - Stop Being "Nice"**
+**Fix Parser Noise - Error Resynchronization**
 
-Currently the compiler returns `TypeId::ANY` when it encounters unknown types or resolution failures. This suppresses legitimate errors and hides bugs.
+**Current Issue:** 701 extra parser errors (TS1005: 439, TS1109: 262) are false positives. The parser emits errors on valid TypeScript syntax, then crashes or produces malformed ASTs, making semantic checking unreliable.
 
-**Goal:** Change defaults to `UNKNOWN` or `ERROR` to expose failing logic.
+**Root Cause:** When the ThinParser hits unexpected tokens, it:
+1. Emits an error (correct)
+2. Returns early or creates error nodes (WRONG - should continue parsing)
+3. Doesn't resynchronize to the next valid token (WRONG)
 
-**Target Impact:** Reduce missing errors from 2961 (60%) to <15%
+**Goal:** Implement error resynchronization so the parser can recover and continue parsing the rest of the file.
+
+**Target Impact:** Reduce TS1005/TS1109 from 701 to <40
 
 ---
 
 ## New Assigned Tasks
 
-### 1. Invert Function Return Type Defaults
-**Priority:** P0 - Strategic
-**File:** `wasm/src/checker/` and `wasm/src/solver/`
+### 1. Implement Error Resynchronization in Parser
+**Priority:** P0 - Critical
+**File:** `wasm/src/parser/thin_parser.rs`
 
-**Issue:** Functions without return type annotations default to `ANY` instead of `UNKNOWN`. This suppresses type mismatch errors.
+**Issue:** Parser doesn't resynchronize after errors, causing cascading failures.
 
 **Solution:**
-1. Find all places where function return types default to `ANY`
-2. Change to return `UNKNOWN` or infer from function body
-3. Locations to check:
-   - `check_function_declaration` in `thin_checker.rs`
-   - `check_function_expression` in `thin_checker.rs`
-   - `check_arrow_function` in `thin_checker.rs`
-   - Solver's `get_function_return_type` methods
+1. Add `synchronize()` method that advances to the next synchronization point
+2. Synchronization points: `;`, `}`, `)`, `]`, end of file
+3. Call `synchronize()` after emitting parser errors
+4. Continue parsing instead of returning early
 
 **Test Case:**
 ```typescript
-// Should error: Type 'string' is not assignable to 'number'
-function foo(): number {
-    return "hello";  // Currently silent, should emit TS2322
-}
-```
-
-**Success Criteria:**
-- Function return types default to `UNKNOWN` when not annotated
-- Type mismatches in return statements are caught
-- No regression in valid code
-
-**Status:** ⏳ TODO
-
----
-
-### 2. Invert Variable Declaration Defaults
-**Priority:** P1 - High Impact
-**File:** `wasm/src/checker/`
-
-**Issue:** Variables without type annotations default to `ANY` from initializer, suppressing TS7006 (implicit any) and type mismatch errors.
-
-**Solution:**
-1. Change `get_type_of_variable_declaration` to infer more strictly
-2. If initializer exists and type annotation missing:
-   - Use inferred type (not widened to `ANY`)
-   - Emit TS7006 if inferred type is `ANY` or `UNKNOWN`
-3. Ensure `strictNullChecks` is respected
-
-**Test Case:**
-```typescript
-// @strict: true
-let x = 5;
-x = "string";  // Should error: Type 'string' is not assignable to 'number'
-```
-
-**Success Criteria:**
-- Variables infer narrower types from initializers
-- Re-assignment with wrong type emits TS2322
-- TS7006 emitted when type cannot be inferred
-
-**Status:** ⏳ TODO
-
----
-
-### 3. Invert Expression Statement Defaults
-**Priority:** P2
-**File:** `wasm/src/checker/`
-
-**Issue:** Expression failures in type checking often return `ANY`, cascading into silence.
-
-**Solution:**
-1. Audit `get_type_of_binary_expression`, `get_type_of_call_expression`, etc.
-2. Return `UNKNOWN` or `ERROR` when type checking fails
-3. Ensure diagnostic is emitted before returning error type
-
-**Test Case:**
-```typescript
+// Current: Fails to parse after first error
 function foo() {
-    return undefined;
+    return 1,
 }
-const x: number = foo();  // Should error: Type 'undefined' not assignable to 'number'
+
+function bar() {  // Never reached
+    return 2;
+}
+
+// Target: Parse both functions, emit error on line 2, continue
+```
+
+**Code Locations:**
+- `parse_statement()` - add resync after error
+- `parse_expression_statement()` - add resync after error
+- `parse_function_body()` - add resync after error
+- Anywhere `emit_error()` is called
+
+**Success Criteria:**
+- Parser continues after syntax errors
+- Rest of file is parsed correctly
+- Fewer cascading errors
+- AST is well-formed even with syntax errors
+
+**Status:** ⏳ TODO
+
+---
+
+### 2. Fix ASI (Automatic Semicolon Insertion)
+**Priority:** P1 - High Impact
+**File:** `wasm/src/parser/thin_parser.rs`
+
+**Issue:** Missing or incorrect semicolon insertion causes TS1005 errors.
+
+**Solution:**
+1. Review TypeScript's ASI rules from spec
+2. Implement rules:
+   - Insert `;` at end of line if next token is `}`, `)`, `]`
+   - Insert `;` at end of line if statement could be complete
+   - Don't insert if would create `for ( ; ... )` pattern
+   - Handle `do...while` correctly
+3. Match TypeScript's ASI exactly
+
+**Test Cases:**
+```typescript
+// ASI should insert semicolon here
+let x = 5
+console.log(x)  // Should work, not error
+
+// ASI should NOT insert here (for loop)
+for (let i = 0
+     i < 10
+     i++) {  // Should parse correctly
+}
+
+// do-while ASI
+do {
+    break
+} while (false)  // Semicolon inserted here
 ```
 
 **Success Criteria:**
-- Failed type resolution returns `UNKNOWN` not `ANY`
-- Errors are emitted for invalid operations
-- No silent acceptance of invalid code
+- ASI matches TypeScript exactly
+- No false positive TS1005 from missing semicolons
+- `for` loops with line breaks parse correctly
+- `do...while` loops parse correctly
+
+**Status:** ⏳ TODO
+
+---
+
+### 3. Fix Binary Expression Error Recovery
+**Priority:** P2
+**File:** `wasm/src/parser/thin_parser.rs`
+
+**Issue:** Invalid binary expressions cause parser to give up instead of skipping to next token.
+
+**Solution:**
+1. When binary expression parsing fails:
+   - Emit error for the invalid expression
+   - Skip to the next statement-ending token
+   - Continue with next statement
+2. Don't let expression errors cascade
+
+**Test Case:**
+```typescript
+// Invalid expression, but rest should parse
+let x = a + * b  // Error: invalid expression
+let y = 5  // Should be parsed correctly
+```
+
+**Success Criteria:**
+- Expression errors don't cascade
+- Next statement is parsed
+- Only the invalid expression gets an error
+
+**Status:** ⏳ TODO
+
+---
+
+### 4. Improve Error Node Handling
+**Priority:** P3
+**File:** `wasm/src/parser/thin_parser.rs` and downstream
+
+**Issue:** Error nodes from parser aren't handled consistently by the checker.
+
+**Solution:**
+1. Ensure `ERROR` nodes are always created (not `None`)
+2. Type check `ERROR` nodes gracefully (return `TypeId::ERROR`)
+3. Don't emit cascading errors from already-errorred nodes
+4. Use `is_error()` checks before processing
+
+**Test Case:**
+```typescript
+let x = invalid syntax here  // Error from parser
+let y = x + 1  // Should not emit additional errors (x is error)
+```
+
+**Success Criteria:**
+- Error nodes don't cause cascading errors
+- Checker handles `ERROR` nodes gracefully
+- One syntax error = one diagnostic (ideally)
 
 **Status:** ⏳ TODO
 
@@ -127,78 +190,92 @@ const x: number = foo();  // Should error: Type 'undefined' not assignable to 'n
 
 ## Implementation Plan
 
-### Phase 1: Analysis (1-2 hours)
-1. Search codebase for `TypeId::ANY` returns
-2. Identify which are "optimistic" defaults vs intentional
-3. Create list of locations to fix
+### Phase 1: Add Synchronization Infrastructure (2-3 hours)
+1. Implement `synchronize_to(tokens: &[SyntaxKind]) -> bool`
+2. Implement `skip_to_statement_end() -> bool`
+3. Add `can_resume_from(token: SyntaxKind) -> bool`
+4. Unit tests for sync behavior
 
-### Phase 2: Function Returns (2-3 hours)
-1. Update `get_function_return_type` in solver
-2. Update function checking in `thin_checker.rs`
-3. Add tests for return type mismatches
+### Phase 2: Update Error Sites to Use Sync (3-4 hours)
+1. Find all `emit_error()` call sites
+2. Add `synchronize()` call after each error
+3. Test on failing conformance cases
+4. Verify AST is still well-formed
 
-### Phase 3: Variable Declarations (2-3 hours)
-1. Update `get_type_of_variable_declaration`
-2. Implement proper type inference from initializers
-3. Test with strictNullChecks enabled
+### Phase 3: Fix ASI (2-3 hours)
+1. Review TypeScript ASI spec/implementation
+2. Implement ASI rules in `try_insert_semicolon()`
+3. Add ASI tests
+4. Verify against TypeScript behavior
 
-### Phase 4: Expressions (2-3 hours)
-1. Audit and fix expression type resolution
-2. Ensure error propagation works correctly
-3. Test complex expressions
+### Phase 4: Expression Recovery (1-2 hours)
+1. Update `parse_binary_expression()` to resync
+2. Update `parse_assignment_expression()` to resync
+3. Test on complex invalid expressions
 
-### Phase 5: Validation (1 hour)
-1. Run conformance tests (expect extra errors - this is good!)
-2. Verify no crashes
-3. Check that new errors are legitimate (not false positives)
+### Phase 5: Error Node Handling (1-2 hours)
+1. Audit checker for `ERROR` node handling
+2. Add guards where needed
+3. Ensure no crashes on error nodes
+4. Test cascading error scenarios
+
+### Phase 6: Validation (1 hour)
+1. Run conformance tests
+2. Measure TS1005/TS1109 reduction
+3. Verify no regressions
+4. Check for new false positives
 
 ---
 
 ## Success Metrics
 
 ### Before Implementation
-- **Missing Errors:** 2961 (60%)
-- **TS2322 Missing:** 184 occurrences
-- **TS7006 Missing:** 357 occurrences
+- **TS1005 (Parser):** 439 extra errors
+- **TS1109 (Parser):** 262 extra errors
+- **Total Parser Noise:** 701 errors
+- **Parser Crashes:** Some tests fail to parse completely
 
 ### After Implementation (Target)
-- **Missing Errors:** <15% (from 60%)
-- **TS2322 Detected:** Most cases caught
-- **TS7006 Detected:** Most cases caught
-- **Extra Errors:** Will increase (this is expected and good)
+- **TS1005/TS1109:** <40 total (95% reduction)
+- **Parser Crashes:** 0
+- **Error Recovery:** Parser continues after syntax errors
+- **AST Quality:** Well-formed even with syntax errors
 
 ---
 
 ## Notes
 
-**Expected Outcome:**
-- **"Extra Errors" WILL increase** - This is intentional and good!
-- We will see where the compiler was being too permissive
-- Some errors may be false positives that need refinement
+**Dependencies:**
+- Parser changes affect entire pipeline
+- Must work with existing token stream
+- Can't change token positions (affects error reporting)
 
 **Risks:**
-- May need to adjust error thresholds
-- Some valid code might incorrectly error (needs tuning)
-- Performance impact from more error checking
-
-**Dependencies:**
-- Solver changes require careful testing
-- Must coordinate with Semantics Squad
-- May reveal issues in other components
+- ASI is subtle and complex
+- Sync points might skip too much (under-parsing)
+- Sync points might skip too little (over-parsing)
+- Need to match TypeScript's exact behavior
 
 **Synergies:**
-- Exposes bugs in other parts of the compiler
-- Makes the type checker more strict and correct
-- Aligns with TypeScript's actual behavior
+- Fixes semantic checking (AST is well-formed)
+- Enables better error messages
+- Improves conformance across all tests
+
+**Testing Strategy:**
+1. Unit tests for sync logic
+2. Compare with TypeScript on invalid syntax
+3. Use conformance tests with `@error` directive
+4. Manual testing on edge cases
 
 ---
 
 ## Next Steps
 
-1. **Phase 1:** Analyze codebase for `TypeId::ANY` usage
-2. **Phase 2:** Fix function return defaults
-3. **Phase 3:** Fix variable declaration defaults
-4. **Phase 4:** Fix expression defaults
-5. **Phase 5:** Run tests and validate
+1. **Phase 1:** Add sync infrastructure
+2. **Phase 2:** Update error sites with sync
+3. **Phase 3:** Fix ASI
+4. **Phase 4:** Expression recovery
+5. **Phase 5:** Error node handling
+6. **Phase 6:** Validate and measure
 
 **When complete:** Push to `worker-8` branch and notify EM-2 for review.
