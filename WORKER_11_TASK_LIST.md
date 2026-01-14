@@ -12,7 +12,7 @@
 - [x] ~~Fix TS1005 in statement parsing - semicolon insertion edge cases~~ (Verified: No fixes needed)
 - [x] ~~Fix TS1005 in class member parsing - property declarations~~ (Verified: No fixes needed)
 - [x] ~~Fix TS1005 in decorator parsing edge cases~~ (Verified: No fixes needed)
-- [ ] Assist with TS1109 class member parsing (secondary focus)
+- [x] ~~Assist with TS1109 class member parsing (secondary focus)~~ (Verified: Position deduplication already implemented)
 - [ ] Run conformance tests and measure TS1005 reduction
 - [ ] Coordinate with Workers 9 & 10 to avoid duplicate work
 
@@ -33,13 +33,20 @@
   - Pattern 15 (Decorators): parse_decorators line 2142 uses parse_left_hand_side_expression
   - All 225 parser tests pass
   - No code changes needed for any patterns 11-15
+- [x] **TS1109 Class Member Parsing Review** (Completed)
+  - Reviewed TS1109_ANALYSIS.md
+  - Verified: Position deduplication already implemented in error_expression_expected (line 377)
+  - All TS1109 errors go through helper with position deduplication
+  - Prevents cascading TS1109 errors when TS1005 already fired at same position
+  - All 225 parser tests pass
+  - No code changes needed
 - [x] Synced with em-team-3 (no new commits to merge)
 - [x] Reconfiguration check: Worker 11 reassigned to Parser squad (TS1005 patterns 11-15)
 
 ## Recent Merge Status
 - **Date**: 2026-01-14
 - **Result**: Successfully merged TS2304 global scope binding fix (eba0e94b6)
-- **Latest**: TS1005 WASM Parser Analysis complete (All patterns 11-15)
+- **Latest**: TS1109 Class Member Parsing review complete
 - **Action Taken**:
   - Rebased em-team-3 onto rust
   - Merged worker-11 with --no-ff
@@ -47,10 +54,11 @@
 - **Code Changes**:
   - `wasm/src/thin_binder.rs`: Added chained lookup in `resolve_identifier` to check `lib_binders`
   - Fixes TS2304 errors for globals (console, Array, Object, Promise, etc.)
-- **TS1005 Analysis Findings**:
-  - Patterns 11-15: NO false positives (all correctly implemented)
+- **Analysis Findings**:
+  - TS1005 patterns 11-15: NO false positives (all correctly implemented)
+  - TS1109: Position deduplication already implemented (line 377)
   - All 225 parser tests pass
-  - No code changes needed for any patterns 11-15
+  - No code changes needed for any reviewed patterns
 - **Next**: Awaiting EM-3 assignment for remaining tasks
 - **Team Update**: EM-1 achieved major milestone with Pattern 6 validation; Worker 12 re-added to EM-3 (now 4 workers: 9-12)
 
