@@ -24297,3 +24297,173 @@ const prop = win.myCustomProperty;
         codes
     );
 }
+
+// ===== TS2564 Edge Case Tests (Worker 14) =====
+
+/// Test that class expressions emit TS2564 for uninitialized properties
+#[test]
+fn test_ts2564_class_expression_emits_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const MyClass = class {
+    value: number;  // Should emit TS2564
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true, // strict mode
+    );
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        has_2564,
+        "Expected TS2564 for class expression with uninitialized property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that class expressions with constructor assignments skip TS2564
+#[test]
+fn test_ts2564_class_expression_constructor_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const MyClass = class {
+    value: number;
+
+    constructor() {
+        this.value = 42;  // Properly initialized
+    }
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true, // strict mode
+    );
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for class expression with initialized property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that named class expressions emit TS2564 for uninitialized properties
+#[test]
+fn test_ts2564_named_class_expression_emits_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const MyClass = class NamedClass {
+    value: string;  // Should emit TS2564
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true, // strict mode
+    );
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        has_2564,
+        "Expected TS2564 for named class expression with uninitialized property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that class expressions extending a base class emit TS2564
+#[test]
+fn test_ts2564_class_expression_derived_emits_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class Base {
+    baseValue: number = 0;
+}
+
+const Derived = class extends Base {
+    derivedValue: string;  // Should emit TS2564
+};
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true, // strict mode
+    );
+    checker.check_source_file(root);
+
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        has_2564,
+        "Expected TS2564 for derived class expression with uninitialized property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
