@@ -3,11 +3,15 @@
 ## Squad: CFA Squad (TS2454 Focus)
 
 ## Current Task
-- [x] Identify patterns where our CFA thinks variable is unassigned but tsc accepts it
+- [ ] Fix early return/throw handling in check_definite_assignment() (Pattern 4.1, 4.2)
+  - Verify UNREACHABLE is set correctly after return/throw statements
+  - Ensure BRANCH_LABEL skips unreachable branches at merge points
+  - This is HIGH impact, LOW complexity based on analysis
 
 ## Queue
-- [ ] Fix flow analysis for loops, try/catch, and conditional assignments
-- [ ] Add test cases for patterns that cause false positive TS2454
+- [ ] Fix finally block handling in flow graph (Pattern 7.1)
+- [ ] Fix do-while loop handling in check_definite_assignment() (Pattern 3.1)
+- [ ] Add test cases for fixed patterns
 
 ## Completed
 - [x] Review narrowing logic in `wasm/src/solver/narrowing.rs` for over-aggressive unassigned detection
