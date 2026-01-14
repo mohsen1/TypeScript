@@ -1,10 +1,14 @@
 # Worker 1 Task List
 
+## Squad: Parser (Syntax) - Reassigned after CFA completion
+
 ## Current Task
-All CFA tasks completed!
+- [ ] Audit TS1005 ("expected X") emission patterns - find specific parser locations emitting false positives
 
 ## Queue
-(none yet)
+- [ ] Focus on parse_statement.rs and parse_expr.rs error emission points
+- [ ] Identify the top 5 patterns causing TS1005 false positives
+- [ ] Implement fixes to reduce TS1005 from 439 to <100
 
 ## Completed
 - [x] Integrate with Checker for flow queries
