@@ -1330,7 +1330,7 @@ impl ThinParserState {
         self.next_token(); // skip namespace/module
         let is_decl = matches!(
             self.token(),
-            SyntaxKind::Identifier | SyntaxKind::StringLiteral
+            SyntaxKind::Identifier | SyntaxKind::StringLiteral | SyntaxKind::OpenBraceToken
         );
 
         self.scanner.restore_state(snapshot);
@@ -4314,7 +4314,23 @@ impl ThinParserState {
             )
         } else {
             self.next_token();
-            if self.is_token(SyntaxKind::StringLiteral) {
+            // Check for anonymous module: module { ... }
+            // This is invalid syntax but should parse gracefully without cascading errors
+            if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Create a missing identifier for anonymous module
+                let name_start = self.token_pos();
+                let name_end = self.token_pos();
+                self.arena.add_identifier(
+                    SyntaxKind::Identifier as u16,
+                    name_start,
+                    name_end,
+                    IdentifierData {
+                        escaped_text: String::new(),
+                        original_text: None,
+                        type_arguments: None,
+                    },
+                )
+            } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else {
                 self.parse_identifier()
@@ -4375,7 +4391,23 @@ impl ThinParserState {
             )
         } else {
             self.next_token();
-            if self.is_token(SyntaxKind::StringLiteral) {
+            // Check for anonymous module: module { ... }
+            // This is invalid syntax but should parse gracefully without cascading errors
+            if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Create a missing identifier for anonymous module
+                let name_start = self.token_pos();
+                let name_end = self.token_pos();
+                self.arena.add_identifier(
+                    SyntaxKind::Identifier as u16,
+                    name_start,
+                    name_end,
+                    IdentifierData {
+                        escaped_text: String::new(),
+                        original_text: None,
+                        type_arguments: None,
+                    },
+                )
+            } else if self.is_token(SyntaxKind::StringLiteral) {
                 self.parse_string_literal()
             } else {
                 self.parse_identifier()
