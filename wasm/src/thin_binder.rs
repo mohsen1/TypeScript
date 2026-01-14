@@ -2752,6 +2752,25 @@ impl ThinBinderState {
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
                                 }
                             } else if let Some(named) = arena.get_named_imports(bindings_node) {
+                                // Handle namespace import: import * as ns from 'module'
+                                if !named.name.is_none() {
+                                    if let Some(name) =
+                                        self.get_identifier_name(arena, named.name)
+                                    {
+                                        let sym_id = self
+                                            .symbols
+                                            .alloc(symbol_flags::ALIAS, name.to_string());
+                                        if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                            sym.declarations.push(named.name);
+                                            sym.is_type_only = clause_type_only;
+                                        }
+                                        self.current_scope.set(name.to_string(), sym_id);
+                                        self.node_symbols.insert(named.name.0, sym_id);
+                                        self.node_symbols
+                                            .insert(clause.named_bindings.0, sym_id);
+                                    }
+                                }
+                                // Handle named imports: import { foo, bar } from 'module'
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
