@@ -49,6 +49,11 @@
 ### Merge Status
 - [x] Merged to em-team-2 (commit: `55b2c0a71`)
 - [x] All position deduplication work integrated
+- [x] **Latest Merge Check (2026-01-14):** Worker 7 branch behind em-team-2
+  - worker-7 at commit 4a076f55f
+  - em-team-2 at commit 707aad9e0 (after rebase)
+  - All previous work (position dedup, TS1128 fix) already integrated
+  - No new work to merge
 
 ---
 
