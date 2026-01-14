@@ -1772,9 +1772,12 @@ impl<'a> ThinCheckerState<'a> {
         type_arguments: Option<&NodeList>,
     ) -> Option<TypeId> {
         if let Some(name) = self.heritage_name_text(expr_idx) {
+            // Filter out primitive types and literals that cannot be used in class extends
             if matches!(
                 name.as_str(),
                 "null" | "undefined" | "true" | "false" | "void" | "0"
+                    | "number" | "string" | "boolean"
+                    | "never" | "unknown" | "any"
             ) {
                 return None;
             }
@@ -13444,6 +13447,16 @@ impl<'a> ThinCheckerState<'a> {
                 | "URIError"
                 | "ReferenceError"
                 | "SyntaxError"
+                // Primitive types (lowercase)
+                | "number"
+                | "string"
+                | "boolean"
+                | "void"
+                | "null"
+                | "undefined"
+                | "never"
+                | "unknown"
+                | "any"
         )
     }
 

@@ -59,64 +59,108 @@ Added lib.d.ts loading in CLI driver:
 
 ---
 
-## Current Task: Built-in Type Resolution Fixes [✅ COMPLETED]
+## Current Task: Fix Primitive Types in Class Extends [IN PROGRESS]
 
 ### Goal
-Fix TS2304 errors for built-in utility types (Exclude, ReturnType, Parameters, etc.)
-Estimated impact: ~173 errors (11.1% of TS2304 errors)
+Fix 9 remaining TS2304 errors caused by primitive types (`number`, `string`, `boolean`) used in class `extends` clauses.
+Target: Emit correct semantic error instead of TS2304 "Cannot find name"
 
-### Investigation Results
+### Problem Statement
 
-**Status: Already Fixed by Tasks 1 & 2**
+**Current Behavior (WASM):**
+```typescript
+class C extends number { }  // TS2304: Cannot find name 'number'
+class C2 extends string { }  // TS2304: Cannot find name 'string'
+class C3 extends boolean { }  // TS2304: Cannot find name 'boolean'
+```
 
-The lib.d.ts loading fix implemented in Tasks 1 & 2 has **already resolved all built-in type resolution issues**.
+**Expected Behavior (TSC):**
+```typescript
+class C extends number { }  // TS2569: Type 'number' is not a constructor function type
+// Or similar semantic error about invalid heritage clause
+```
 
-**Verification:**
-1. Created test file with 10 utility types: Exclude, ReturnType, Parameters, Partial, Required, Readonly, Record, Pick, Omit, Awaited
-2. All utility types resolve correctly with **zero TS2304 errors**
-3. Re-ran TS2304 analysis on 500 conformance files
-4. **No `builtin_type` category errors found** - all utility types working
+### Root Cause
+1. The parser treats `number`, `string`, `boolean` as identifiers in extends clauses
+2. The checker tries to resolve them as symbols but they're not in the symbol table
+3. TS2304 is emitted: "Cannot find name 'number'"
+4. In reality, these ARE valid type names but they're primitive types, not class types
 
-**Current TS2304 Error State (500 files):**
-- **Total: 10 extra TS2304 errors** (significantly reduced from original estimate)
-- **9 local_reference (90%)**: Primitive types in class extends clauses
-- **1 user_defined_type (10%)**: Edge case
-- **0 builtin_type errors**: All utility types resolving ✅
+### Solution Approach
 
-**Conclusion:**
-No additional work needed for built-in type resolution. The lib.d.ts loading fix successfully addressed this category.
+**Option 1: Add primitives to lib.d.ts symbol table**
+- Modify lib.d.ts loading to recognize primitive types as built-in types
+- Add them to a special "primitive types" category
+- Resolution succeeds, then emit semantic error
+
+**Option 2: Special case in heritage clause validation**
+- In class extends clause parsing, check for primitive type names
+- Emit specific error: "Cannot extend primitive type 'number'"
+- More direct, clearer error message
+
+**Option 3: Hybrid approach**
+- Recognize primitives as valid type references
+- Validate heritage clause allows only class/interface types
+- Emit appropriate semantic error
+
+### Implementation Plan
+
+1. **Identify where heritage clauses are parsed/validated**
+   - File: `src/thin_checker.rs`
+   - Look for: class declaration type checking
+   - Function: likely checks heritage clauses
+
+2. **Add primitive type detection**
+   - Create list of primitive types: `number`, `string`, `boolean`, `void`, `null`, `undefined`, `never`, `unknown`, `any`
+   - Check if extends target is a primitive type
+
+3. **Emit correct error**
+   - Use existing error emission functions
+   - Error code: TS2569 or similar (not TS2304)
+   - Message: "Type '{0}' is not a constructor function type or cannot extend primitive type '{0}'"
+
+4. **Test with conformance suite**
+   - Verify `classExtendingPrimitive.ts` no longer emits TS2304
+   - Verify appropriate semantic error is emitted
+
+### Key Files
+- `src/thin_checker.rs` - Type checking, error emission
+- `src/checker/context.rs` - Type resolution
+- `src/scanner.rs` - SyntaxKind definitions
+- Test file: `classes/classDeclarations/classHeritageSpecification/classExtendingPrimitive.ts`
+
+### Success Criteria
+- No TS2304 errors for `class C extends number/string/boolean`
+- Appropriate semantic error emitted instead
+- Conformance test `classExtendingPrimitive.ts` passes correctly
+- Other valid class extends still work (interfaces, classes)
 
 ---
 
 ## Previous Tasks
-- [x] **Task 1 & 2: TS2304 Fix via lib.d.ts loading** - Implemented complete solution (also fixed built-in types)
-- [x] **Local Reference Resolution Investigation** - Completed: Found issue is primitive types in class extends, not scope chain
-- [x] **Built-in Type Resolution Verification** - Completed: Confirmed already working via lib.d.ts loading
+- [x] **Task 1 & 2: TS2304 Fix via lib.d.ts loading** - Implemented complete solution
+- [x] **Local Reference Resolution Investigation** - Found primitive types in class extends issue
+- [x] **Built-in Type Resolution Verification** - Confirmed already working via lib.d.ts loading
+
+---
+
+## Next Steps (after current task)
+- [ ] Investigate user_defined_type edge cases (1 error remaining)
+- [ ] Coordinate with EM-3 Worker 11's chained lookup fix (if needed)
+- [ ] Run larger conformance test (5000 files) to verify TS2304 reduction
 
 ---
 
 ## Current TS2304 State Summary
 
 **Total Extra Errors (500 files): 10**
-- 9x local_reference: `class C extends number {}` (primitive types in extends)
+- 9x local_reference: `class C extends number {}` ← **CURRENT TASK**
 - 1x user_defined_type: Edge case
 
 **Resolved Categories:**
 - ✅ global_object (12 errors) - Fixed by lib.d.ts loading
 - ✅ builtin_type (173 errors) - Fixed by lib.d.ts loading
 - ✅ global_constant - Fixed by lib.d.ts loading
-
-**Remaining Work (if any):**
-- Fix primitive type handling in class extends clauses (semantic error, not TS2304)
-- Investigate user_defined_type edge cases
-
----
-
-## Next Steps
-Based on remaining error patterns:
-1. **Fix primitive types in class extends** - Should emit semantic error, not TS2304
-2. **Coordinate with EM-3 Worker 11** - Chained lookup approach (if still relevant)
-3. **Investigate type parameter resolution** - If patterns emerge in larger test set
 
 ---
 
