@@ -60,6 +60,11 @@
   - em-team-2 has Worker 7's TS1128 deduplication
   - worker-8 branch doesn't have these fixes
   - No merge needed - em-team-2 already has all Worker 8 work
+- [x] **EM-2 Merge Verification (2026-01-14):** Worker 8 fully merged
+  - All worker-8 commits already present in em-team-2
+  - Rebased em-team-2 onto rust branch (14 commits applied)
+  - Worker 8 error recovery implementation preserved
+  - Status: COMPLETE - Ready for new assignment
 
 ---
 
