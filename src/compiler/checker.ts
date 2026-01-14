@@ -21546,6 +21546,70 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                                 );
                             }
                         }
+
+                        // Add mapped type context if the property comes from a mapped type
+                        if (targetProp && getCheckFlags(targetProp) & CheckFlags.Mapped) {
+                            const mappedSymbol = targetProp as MappedSymbol;
+                            const mappedType = mappedSymbol.links.mappedType;
+                            if (mappedType && propertyName) {
+                                // Add information about the mapped type transformation
+                                const constraintType = getConstraintTypeFromMappedType(mappedType);
+                                const templateType = getTemplateTypeFromMappedType(mappedType);
+                                const keyType = mappedSymbol.links.keyType;
+                                const mappedNameType = mappedSymbol.links.nameType;
+
+                                // Show the mapped type constraint and template
+                                if (constraintType && templateType && mappedType.declaration) {
+                                    addRelatedInfo(
+                                        reportedDiag,
+                                        createDiagnosticForNode(
+                                            mappedType.declaration,
+                                            Diagnostics.The_expected_type_comes_from_a_mapped_type_with_constraint_0_and_template_type_1,
+                                            typeToString(constraintType),
+                                            typeToString(templateType),
+                                        ),
+                                    );
+                                }
+
+                                // If key remapping was used, show that information
+                                if (mappedNameType && keyType && keyType !== mappedNameType && mappedType.declaration) {
+                                    const keyTypeName = typeToString(keyType);
+                                    const nameTypeName = typeToString(mappedNameType);
+                                    addRelatedInfo(
+                                        reportedDiag,
+                                        createDiagnosticForNode(
+                                            mappedType.declaration,
+                                            Diagnostics.Property_0_is_a_remapped_key_in_a_mapped_type_The_original_key_1_was_remapped_to_2,
+                                            propertyName && !(mappedNameType.flags & TypeFlags.UniqueESSymbol) ? unescapeLeadingUnderscores(propertyName) : typeToString(mappedNameType),
+                                            keyTypeName,
+                                            nameTypeName,
+                                        ),
+                                    );
+                                }
+
+                                // Show the specific property transformation
+                                const sourceProp = propertyName !== undefined ? getPropertyOfType(source, propertyName) : undefined;
+                                if (sourceProp && mappedType.declaration) {
+                                    const sourcePropType = getTypeOfSymbol(sourceProp);
+                                    const targetPropType = getTypeOfSymbol(targetProp);
+                                    if (sourcePropType && targetPropType) {
+                                        const nameForDisplay = propertyName && (!mappedNameType || !(mappedNameType.flags & TypeFlags.UniqueESSymbol))
+                                            ? unescapeLeadingUnderscores(propertyName)
+                                            : typeToString(mappedNameType || nameType);
+                                        addRelatedInfo(
+                                            reportedDiag,
+                                            createDiagnosticForNode(
+                                                mappedType.declaration,
+                                                Diagnostics.Property_0_in_mapped_type_has_transformed_type_1_but_the_source_type_is_2,
+                                                nameForDisplay,
+                                                typeToString(targetPropType),
+                                                typeToString(sourcePropType),
+                                            ),
+                                        );
+                                    }
+                                }
+                            }
+                        }
                     }
                 }
             }
