@@ -7108,17 +7108,28 @@ impl<'a> ThinCheckerState<'a> {
             .unwrap_or(&[]);
 
         // Check if callee is any/error (don't report for those)
-        if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+        if callee_type == TypeId::ANY {
             // Still need to check arguments for definite assignment (TS2454) and other errors
             // Create a dummy context helper that returns None for all parameter types
             let ctx_helper = ContextualTypeContext::new(self.ctx.types);
             let check_excess_properties = false;
             self.collect_call_argument_types_with_context(
                 args,
-                |_i, _arg_count| None, // No parameter type info for ANY/ERROR callee
+                |_i, _arg_count| None, // No parameter type info for ANY callee
                 check_excess_properties,
             );
             return TypeId::ANY;
+        }
+        if callee_type == TypeId::ERROR {
+            // Still need to check arguments for definite assignment (TS2454) and other errors
+            let ctx_helper = ContextualTypeContext::new(self.ctx.types);
+            let check_excess_properties = false;
+            self.collect_call_argument_types_with_context(
+                args,
+                |_i, _arg_count| None, // No parameter type info for ERROR callee
+                check_excess_properties,
+            );
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         }
 
         let mut nullish_cause = None;
@@ -7129,8 +7140,11 @@ impl<'a> ThinCheckerState<'a> {
                 return TypeId::UNDEFINED;
             };
             callee_type = non_nullish;
-            if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+            if callee_type == TypeId::ANY {
                 return TypeId::ANY;
+            }
+            if callee_type == TypeId::ERROR {
+                return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
             }
         }
 
@@ -7927,8 +7941,11 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         }
 
-        if constructor_type == TypeId::ANY || constructor_type == TypeId::ERROR {
+        if constructor_type == TypeId::ANY {
             return TypeId::ANY;
+        }
+        if constructor_type == TypeId::ERROR {
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         }
 
         let construct_type = match self.ctx.types.lookup(constructor_type) {
@@ -7964,7 +7981,7 @@ impl<'a> ThinCheckerState<'a> {
                 }
 
                 if instance_types.is_empty() {
-                    return TypeId::ANY;
+                    return TypeId::ERROR; // No construct signatures in intersection - expose error
                 } else if instance_types.len() == 1 {
                     return instance_types[0];
                 } else {
@@ -7976,7 +7993,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         let Some(construct_type) = construct_type else {
-            return TypeId::ANY;
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         };
 
         let args = new_expr
@@ -8367,8 +8384,11 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Don't report errors for any/error types
-        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+        if object_type == TypeId::ANY {
             return TypeId::ANY;
+        }
+        if object_type == TypeId::ERROR {
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         }
 
         // Check for merged class/enum/function + namespace symbols
@@ -8424,8 +8444,11 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             let object_type_for_access = self.resolve_type_for_property_access(object_type);
-            if object_type_for_access == TypeId::ANY || object_type_for_access == TypeId::ERROR {
+            if object_type_for_access == TypeId::ANY {
                 return TypeId::ANY;
+            }
+            if object_type_for_access == TypeId::ERROR {
+                return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
             }
 
             // Use solver QueryDatabase to resolve the property access
@@ -8689,11 +8712,14 @@ impl<'a> ThinCheckerState<'a> {
             }
         };
 
-        if object_type_for_check == TypeId::ANY
-            || object_type_for_check == TypeId::ERROR
-            || object_type_for_check == TypeId::UNKNOWN
-        {
+        if object_type_for_check == TypeId::ANY {
             return TypeId::ANY;
+        }
+        if object_type_for_check == TypeId::ERROR {
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
+        }
+        if object_type_for_check == TypeId::UNKNOWN {
+            return TypeId::ANY; // UNKNOWN remains ANY for now (could be stricter)
         }
 
         // For private member access, use nominal typing based on private brand.
@@ -8898,13 +8924,19 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Don't report errors for any/error types
-        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+        if object_type == TypeId::ANY {
             return TypeId::ANY;
+        }
+        if object_type == TypeId::ERROR {
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         }
 
         let object_type = self.resolve_type_for_property_access(object_type);
-        if object_type == TypeId::ANY || object_type == TypeId::ERROR {
+        if object_type == TypeId::ANY {
             return TypeId::ANY;
+        }
+        if object_type == TypeId::ERROR {
+            return TypeId::ERROR; // Return ERROR instead of ANY to expose type errors
         }
 
         let (object_type_for_access, nullish_cause) = self.split_nullish_type(object_type);
@@ -9113,7 +9145,7 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(string_index) = shape.string_index.as_ref() {
                         return string_index.value_type;
                     }
-                    return TypeId::ANY;
+                    return TypeId::ERROR; // No matching index signature - expose error
                 }
 
                 if index_type == TypeId::NUMBER {
@@ -9123,7 +9155,7 @@ impl<'a> ThinCheckerState<'a> {
                     if let Some(string_index) = shape.string_index.as_ref() {
                         return string_index.value_type;
                     }
-                    return TypeId::ANY;
+                    return TypeId::ERROR; // No matching index signature - expose error
                 }
 
                 if index_type == TypeId::STRING {
