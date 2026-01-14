@@ -16038,9 +16038,20 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
-            let Some(name) = self.get_property_name(prop.name) else {
-                continue;
-            };
+            // Get property name for error message. Use fallback for complex computed properties.
+            let name = self.get_property_name(prop.name).unwrap_or_else(|| {
+                // For complex computed properties (e.g., [getKey()]), use a descriptive fallback
+                match &key {
+                    PropertyKey::Computed(ComputedKey::Ident(s)) => format!("[{}]", s),
+                    PropertyKey::Computed(ComputedKey::String(s)) => format!("[\"{}\"]", s),
+                    PropertyKey::Computed(ComputedKey::Number(n)) => format!("[{}]", n),
+                    PropertyKey::Computed(ComputedKey::Qualified(q)) => format!("[{}]", q),
+                    PropertyKey::Computed(ComputedKey::Symbol(Some(s))) => format!("[Symbol({})]", s),
+                    PropertyKey::Computed(ComputedKey::Symbol(None)) => "[Symbol()]".to_string(),
+                    PropertyKey::Private(s) => format!("#{}", s),
+                    PropertyKey::Ident(s) => s.clone(),
+                }
+            });
 
             tracked.insert(key.clone());
             properties.push((key, name, prop.name));

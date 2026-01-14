@@ -19362,6 +19362,98 @@ class Foo {
     );
 }
 
+/// Test that computed properties with identifier keys emit TS2564
+#[test]
+fn test_ts2564_computed_property_emits_error() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const key1 = "computedKey";
+class Foo {
+    [key1]: number;
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true,
+    );
+    checker.check_source_file(root);
+
+    // Should have TS2564 for computed property without initialization
+    let count = checker
+        .ctx
+        .diagnostics
+        .iter()
+        .filter(|d| d.code == 2564)
+        .count();
+    assert_eq!(
+        count, 1,
+        "Expected TS2564 for computed property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test that computed properties initialized in constructor pass TS2564 check
+#[test]
+fn test_ts2564_computed_property_initialized_passes() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const key2 = "initInConstructor";
+class Foo {
+    [key2]: number;
+    constructor() {
+        this[key2] = 42;
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true,
+    );
+    checker.check_source_file(root);
+
+    // Should NOT have TS2564 for property initialized in constructor
+    let has_2564 = checker.ctx.diagnostics.iter().any(|d| d.code == 2564);
+    assert!(
+        !has_2564,
+        "Expected no TS2564 for initialized computed property, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
 #[test]
 fn test_recursive_mapped_type_stack_guard() {
     use crate::thin_parser::ThinParserState;
