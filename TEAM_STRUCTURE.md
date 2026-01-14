@@ -73,28 +73,27 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 
 ---
 
-### EM_2: Task Master - Multi-Squad (Binder + Parser + Solver)
+### EM_2: Parser Squad (Parser-only focus)
 **Branch:** `em-team-2`
 **Priority:** 🟠 HIGH
-**Target Errors:** TS2304, TS1005, TS1109, TS2322
-**Status:** 🟢 ACTIVE - Managing 4 workers across 3 focus areas
+**Target Errors:** TS1005, TS1109
+**Status:** 🟢 ACTIVE - Managing 4 workers on Parser work
 
-**Director's Note:** EM-2 has taken a "Task Master" approach, managing workers 5-8 across all three focus areas. This deviates from the squad-based structure but is delivering results.
+**Director's Note:** EM-2 was initially a "Task Master" managing all three focus areas, but has now reassigned all workers to Parser work.
 
 **Workers:**
-- worker-5, worker-6: Binder (TS2304)
-- worker-7: Parser (TS1005/TS1109) - **DELIVERED: TS1109 cascading error fix**
-- worker-8: Solver (TS2322/TS7006)
+- worker-5: TS1005 audit and fixes
+- worker-6: TS1005 audit and fixes
+- worker-7: TS1109 focus - **DELIVERED: TS1109 cascading error fix (commit `afba575b5`)**
+- worker-8: Error recovery and resynchronization
 
 **Progress:**
-- Worker 7 implemented TS1109 cascading error fix (committed `afba575b5`)
+- Worker 7 implemented TS1109 cascading error fix
   - Prevents TS1109 errors when TS1005 already reported at same position
   - Reduces false positive pollution in conformance measurements
 
 **Success Metrics:**
-- Parser false positives < 100 (worker-7 active)
-- TS2304 extra errors < 50 (workers 5-6 assigned)
-- Solver `Unknown` fallback (worker-8 assigned)
+- Parser false positives < 100 (all workers active)
 
 ---
 
@@ -135,14 +134,20 @@ Squad-based structure not being followed by EMs. Director adapting to reality.
 | EM | Squad | Assigned Workers | Total | Notes |
 |----|-------|------------------|-------|-------|
 | EM_1 | **HYBRID** | workers 1-4 | 5 | Parser + Binder, awaiting validation |
-| EM_2 | **Task Master** | workers 5-8 | 5 | Binder + Parser + Solver, delivering results |
+| EM_2 | **Parser** | workers 5-8 | 5 | All workers on Parser (reassigned) |
 | EM_3 | **Parser** | workers 9-11 | 4 | Parser-only focus (worker 12 reassigned) |
 
 **Current Status:**
 - Workers 1-11 are active across all 3 EMs
-- All 3 EMs are contributing to Parser work (de facto priority)
+- **All 3 EMs are 100% focused on Parser work** (de facto priority)
+- **Binder work** (critical path for TS2304) only has worker-4 (EM_1)
+- **Solver work** (switching to `Unknown` fallback) is not being actively pursued
 - Worker 12 status unclear (removed from EM_3 task lists)
-- **Solver work** (EM_3's original assignment) is not being actively pursued
+
+**Director Assessment:**
+Parser work is consuming all capacity. The squad structure has completely broken down. Need to decide:
+1. Accept Parser-focused approach and reassign EMs accordingly
+2. Or enforce original squad assignments (may disrupt ongoing work)
 
 **Note:** CFA (Control Flow Analysis) work is on hold until TS2304 is under control.
 
