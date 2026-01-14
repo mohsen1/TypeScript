@@ -24518,7 +24518,14 @@ export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
                     return Ternary.False;
                 }
             }
-            const requireOptionalProperties = (relation === subtypeRelation || relation === strictSubtypeRelation) && !isObjectLiteralType(source) && !isEmptyArrayLiteralType(source) && !isTupleType(source);
+            // EM-3: Require optional properties for assignableRelation in non-literal cases
+            // This prevents: let animal: Animal; let dog: Dog = animal; where Dog has extra required properties
+            const requireOptionalProperties = !isObjectLiteralType(source) && !isEmptyArrayLiteralType(source) && !isTupleType(source) && (
+                relation === subtypeRelation ||
+                relation === strictSubtypeRelation ||
+                // For assignable relation, require optional properties when target is not a fresh object literal
+                (relation === assignableRelation && (!isObjectLiteralType(target) || !(getObjectFlags(target) & ObjectFlags.FreshLiteral)))
+            );
             const unmatchedProperty = getUnmatchedProperty(source, target, requireOptionalProperties, /*matchDiscriminantProperties*/ false);
             if (unmatchedProperty) {
                 if (reportErrors && shouldReportUnmatchedPropertyError(source, target)) {
