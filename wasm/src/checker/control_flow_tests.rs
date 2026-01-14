@@ -1469,27 +1469,51 @@ const outer = () => {
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
 
-    // Get the outer arrow function
-    let outer_func_idx = *source_file.statements.nodes.get(2).expect("outer arrow function");
-    let outer_func_node = arena.get(outer_func_idx).expect("outer func node");
-    let outer_func = arena.get_function(outer_func_node).expect("outer func data");
+    // Get the outer arrow function (inside a VariableStatement -> VariableDeclarationList -> VariableDeclaration)
+    let outer_var_stmt_idx = *source_file.statements.nodes.get(2).expect("outer variable statement");
+    let outer_var_stmt_node = arena.get(outer_var_stmt_idx).expect("outer var stmt node");
+    let outer_var_stmt = arena.get_variable(outer_var_stmt_node).expect("outer var stmt data");
+    let outer_decl_list_idx = *outer_var_stmt.declarations.nodes.first().expect("outer declaration list");
+    let outer_decl_list_node = arena.get(outer_decl_list_idx).expect("outer decl list node");
+    let outer_decl_list = arena.get_variable(outer_decl_list_node).expect("outer decl list data");
+    let outer_decl_idx = *outer_decl_list.declarations.nodes.first().expect("outer declaration");
+    let outer_decl_node = arena.get(outer_decl_idx).expect("outer decl node");
+    let outer_decl = arena.get_variable_declaration(outer_decl_node).expect("outer decl data");
+    let outer_arrow_idx = outer_decl.initializer;
+    let outer_arrow_node = arena.get(outer_arrow_idx).expect("outer arrow node");
+    let outer_func = arena.get_function(outer_arrow_node).expect("outer func data");
 
     // Get the outer body block
     let outer_body_node = arena.get(outer_func.body).expect("outer body node");
     let outer_body = arena.get_block(outer_body_node).expect("outer body");
 
-    // Get the inner arrow function declaration
-    let inner_func_idx = *outer_body.statements.nodes.first().expect("inner arrow function");
-    let inner_func_node = arena.get(inner_func_idx).expect("inner func node");
-    let inner_func = arena.get_function(inner_func_node).expect("inner func data");
+    // Get the inner arrow function declaration (inside a VariableStatement -> VariableDeclarationList -> VariableDeclaration)
+    let inner_var_stmt_idx = *outer_body.statements.nodes.first().expect("inner variable statement");
+    let inner_var_stmt_node = arena.get(inner_var_stmt_idx).expect("inner var stmt node");
+    let inner_var_stmt = arena.get_variable(inner_var_stmt_node).expect("inner var stmt data");
+    let inner_decl_list_idx = *inner_var_stmt.declarations.nodes.first().expect("inner declaration list");
+    let inner_decl_list_node = arena.get(inner_decl_list_idx).expect("inner decl list node");
+    let inner_decl_list = arena.get_variable(inner_decl_list_node).expect("inner decl list data");
+    let inner_decl_idx = *inner_decl_list.declarations.nodes.first().expect("inner declaration");
+    let inner_decl_node = arena.get(inner_decl_idx).expect("inner decl node");
+    let inner_decl = arena.get_variable_declaration(inner_decl_node).expect("inner decl data");
+    let inner_arrow_idx = inner_decl.initializer;
+    let inner_arrow_node = arena.get(inner_arrow_idx).expect("inner arrow node");
+    let inner_func = arena.get_function(inner_arrow_node).expect("inner func data");
 
     // Get the inner body block
     let inner_body_node = arena.get(inner_func.body).expect("inner body node");
     let inner_body = arena.get_block(inner_body_node).expect("inner body");
 
-    // Get the y declaration statement
-    let y_decl_stmt = *inner_body.statements.nodes.first().expect("y declaration");
-    let y_decl_node = arena.get(y_decl_stmt).expect("y decl node");
+    // Get the y declaration statement (inside a VariableStatement -> VariableDeclarationList -> VariableDeclaration)
+    let y_var_stmt_idx = *inner_body.statements.nodes.first().expect("y variable statement");
+    let y_var_stmt_node = arena.get(y_var_stmt_idx).expect("y var stmt node");
+    let y_var_stmt = arena.get_variable(y_var_stmt_node).expect("y var stmt data");
+    let y_decl_list_idx = *y_var_stmt.declarations.nodes.first().expect("y declaration list");
+    let y_decl_list_node = arena.get(y_decl_list_idx).expect("y decl list node");
+    let y_decl_list = arena.get_variable(y_decl_list_node).expect("y decl list data");
+    let y_decl_idx = *y_decl_list.declarations.nodes.first().expect("y declaration");
+    let y_decl_node = arena.get(y_decl_idx).expect("y decl node");
     let y_decl = arena.get_variable_declaration(y_decl_node).expect("y decl data");
     let x_ref_in_inner = y_decl.initializer;
 

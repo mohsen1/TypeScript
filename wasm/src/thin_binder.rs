@@ -1123,8 +1123,9 @@ impl ThinBinderState {
                 }
             }
 
-            // Expression statements - traverse into the expression
+            // Expression statements - record flow and traverse into the expression
             k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                self.record_flow(idx);
                 if let Some(expr_stmt) = arena.get_expression_statement(node) {
                     self.bind_node(arena, expr_stmt.expression);
                 }

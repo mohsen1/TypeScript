@@ -1699,6 +1699,123 @@ function test() {
     assert_eq!(x_count, 2);
 }
 
+/// Test that deeply nested functions create proper scope chains.
+/// This verifies scope chain traversal works correctly through multiple levels.
+#[test]
+fn test_deeply_nested_scope_chain() {
+    use crate::binder::ContainerKind;
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const outerVar = 1;
+
+function outer() {
+    const middleVar = 2;
+
+    function middle() {
+        const innerVar = 3;
+
+        function inner() {
+            // This function should be able to reference all outer variables
+            const localVar = outerVar + middleVar + innerVar;
+            return localVar;
+        }
+
+        return inner();
+    }
+
+    return middle();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // Verify file_locals has the expected symbols
+    assert!(binder.file_locals.has("outerVar"), "outerVar should be in file_locals");
+    assert!(binder.file_locals.has("outer"), "outer function should be in file_locals");
+
+    // Verify middleVar, innerVar, and localVar are NOT in file_locals (they're nested)
+    assert!(!binder.file_locals.has("middleVar"), "middleVar should NOT be in file_locals");
+    assert!(!binder.file_locals.has("innerVar"), "innerVar should NOT be in file_locals");
+    assert!(!binder.file_locals.has("localVar"), "localVar should NOT be in file_locals");
+    assert!(!binder.file_locals.has("middle"), "middle function should NOT be in file_locals");
+    assert!(!binder.file_locals.has("inner"), "inner function should NOT be in file_locals");
+
+    // Verify we have multiple function scopes created
+    let function_scope_count = binder.scopes.iter()
+        .filter(|s| s.kind == ContainerKind::Function)
+        .count();
+    assert!(function_scope_count >= 3, "Should have at least 3 function scopes (outer, middle, inner)");
+
+    // Find the innermost scope and verify its parent chain exists
+    let mut found_inner_scope = false;
+    for scope in binder.scopes.iter() {
+        if scope.table.has("localVar") {
+            found_inner_scope = true;
+            // Verify this scope has a parent
+            assert!(!scope.parent.is_none(), "innermost scope should have a parent");
+            break;
+        }
+    }
+    assert!(found_inner_scope, "Should find the innermost scope with localVar");
+
+    // Verify each nested variable is in a different scope
+    let mut scopes_with_vars = Vec::new();
+    for (idx, scope) in binder.scopes.iter().enumerate() {
+        if scope.table.has("middleVar") || scope.table.has("innerVar") || scope.table.has("localVar") {
+            scopes_with_vars.push(idx);
+        }
+    }
+    assert_eq!(scopes_with_vars.len(), 3, "middleVar, innerVar, and localVar should each be in different scopes");
+}
+
+/// Test that class methods can access outer scope variables.
+#[test]
+fn test_class_method_outer_scope_access() {
+    use crate::thin_binder::ThinBinderState;
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+const globalConfig = { debug: true };
+
+class MyClass {
+    private value: number;
+
+    constructor() {
+        this.value = 0;
+    }
+
+    doSomething() {
+        // Should be able to reference globalConfig from outer scope
+        if (globalConfig.debug) {
+            console.log(this.value);
+        }
+    }
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let arena = parser.get_arena();
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    // globalConfig should be in file_locals
+    assert!(binder.file_locals.has("globalConfig"), "globalConfig should be in file_locals");
+    assert!(binder.file_locals.has("MyClass"), "MyClass should be in file_locals");
+
+    // The class methods should create their own scopes
+    // Verify we have class/constructor/method scopes
+    assert!(binder.scopes.len() >= 2, "Should have multiple scopes for class and methods");
+}
+
 #[test]
 fn test_block_scope_let_const() {
     use crate::thin_binder::ThinBinderState;
