@@ -609,6 +609,9 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.node_resolution_stack.pop();
         self.ctx.node_resolution_set.remove(&idx);
 
+        // Check for type instantiation depth exceeded (TS2589)
+        self.check_depth_exceeded(idx);
+
         // Cache result
         self.ctx.node_types.insert(idx.0, result);
 
@@ -11381,7 +11384,15 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::SubtypeChecker;
         let env = self.ctx.type_env.borrow();
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
-        checker.is_subtype_of(source, target)
+        let result = checker.is_subtype_of(source, target);
+
+        // If depth was exceeded during subtype checking, set the context flag
+        // The checker will emit TS2589 at the appropriate location
+        if checker.depth_exceeded() {
+            *self.ctx.depth_exceeded.borrow_mut() = true;
+        }
+
+        result
     }
 
     /// Check if `source` type is a subtype of `target` type, resolving Ref types.
@@ -11395,7 +11406,14 @@ impl<'a> ThinCheckerState<'a> {
     ) -> bool {
         use crate::solver::SubtypeChecker;
         let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
-        checker.is_subtype_of(source, target)
+        let result = checker.is_subtype_of(source, target);
+
+        // If depth was exceeded during subtype checking, set the context flag
+        if checker.depth_exceeded() {
+            *self.ctx.depth_exceeded.borrow_mut() = true;
+        }
+
+        result
     }
 
     /// Check if two types are identical.
@@ -20011,6 +20029,23 @@ impl<'a> ThinCheckerState<'a> {
             code,
             related_information: Vec::new(),
         });
+    }
+
+    /// Check if type instantiation depth was exceeded and emit TS2589 if so.
+    /// This should be called after type checking expressions that might recurse deeply.
+    fn check_depth_exceeded(&mut self, node_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        if *self.ctx.depth_exceeded.borrow() {
+            // Reset the flag after emitting to avoid duplicate errors
+            *self.ctx.depth_exceeded.borrow_mut() = false;
+
+            self.error_at_node(
+                node_idx,
+                diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+                diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+            );
+        }
     }
 
     fn class_member_is_static(&self, member_idx: NodeIndex) -> bool {

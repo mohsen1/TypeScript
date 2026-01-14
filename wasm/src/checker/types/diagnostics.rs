@@ -165,6 +165,8 @@ pub mod diagnostic_messages {
     pub const GENERIC_TYPE_REQUIRES_ARGS: &str =
         "Generic type '{0}' requires {1} type argument(s).";
     pub const TYPE_IS_NOT_GENERIC: &str = "Type '{0}' is not generic.";
+    pub const TYPE_INSTANTIATION_EXCESSIVELY_DEEP: &str =
+        "Type instantiation is excessively deep and possibly infinite.";
 
     // Module/ambient errors
     pub const AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME: &str =
@@ -353,6 +355,7 @@ pub mod diagnostic_codes {
     pub const TYPE_PARAMETER_CONSTRAINT_NOT_SATISFIED: u32 = 2344;
     pub const TYPE_PARAMETER_CANNOT_HAVE_VARIANCE_MODIFIER: u32 = 2637;
     pub const CONSTRAINT_OF_TYPE_PARAMETER: u32 = 2313;
+    pub const TYPE_INSTANTIATION_EXCESSIVELY_DEEP: u32 = 2589;
 
     // Enum errors
     pub const ENUM_MEMBER_MUST_HAVE_INITIALIZER: u32 = 2432;

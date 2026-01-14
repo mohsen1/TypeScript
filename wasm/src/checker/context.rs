@@ -208,6 +208,9 @@ pub struct CheckerContext<'a> {
     /// Current depth of recursive type instantiation.
     pub instantiation_depth: RefCell<u32>,
 
+    /// Whether type instantiation depth was exceeded (for TS2589 emission).
+    pub depth_exceeded: RefCell<bool>,
+
     /// Current depth of call expression resolution.
     pub call_depth: RefCell<u32>,
 
@@ -302,6 +305,7 @@ impl<'a> CheckerContext<'a> {
             type_parameter_scope: HashMap::new(),
             contextual_type: None,
             instantiation_depth: RefCell::new(0),
+            depth_exceeded: RefCell::new(false),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             this_type_stack: Vec::new(),
@@ -362,6 +366,7 @@ impl<'a> CheckerContext<'a> {
             type_parameter_scope: HashMap::new(),
             contextual_type: None,
             instantiation_depth: RefCell::new(0),
+            depth_exceeded: RefCell::new(false),
             call_depth: RefCell::new(0),
             return_type_stack: Vec::new(),
             this_type_stack: Vec::new(),
