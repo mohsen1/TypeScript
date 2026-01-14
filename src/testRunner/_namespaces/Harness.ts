@@ -8,5 +8,4 @@ export { Parallel };
 export * from "../fourslashRunner.js";
 export * from "../compilerRunner.js";
 export * from "../transpileRunner.js";
-export * from "../wasmRunner.js";
 export * from "../runner.js";

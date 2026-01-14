@@ -12,7 +12,6 @@ import {
     setShards,
     TestRunnerKind,
     TranspileRunner,
-    WasmCompilerRunner,
 } from "./_namespaces/Harness.js";
 import * as project from "./_namespaces/project.js";
 import * as ts from "./_namespaces/ts.js";
@@ -70,8 +69,6 @@ export function createRunner(kind: TestRunnerKind): RunnerBase {
             return new project.ProjectRunner();
         case "transpile":
             return new TranspileRunner();
-        case "wasm":
-            return new WasmCompilerRunner();
     }
     return ts.Debug.fail(`Unknown runner kind ${kind}`);
 }

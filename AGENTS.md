@@ -67,4 +67,17 @@ This is a complex compiler project. Take time to understand the code before maki
 ## We work in wasm/
 
 Unless it's absolutely necessary, do not modify code outside `wasm/`. The TypeScript codebase is read-only.
+
+**🚨 CRITICAL VIOLATIONS TO AVOID:**
+- **NEVER add 800+ lines of Rust integration code to `src/compiler/parser.ts`**
+- **NEVER create new files like `src/compiler/wasm.ts`** - WASM bridge code belongs in `wasm/`
+- **NEVER modify `src/compiler/scanner.ts`, `src/compiler/checker.ts` with WASM-specific code**
+- **NEVER add loose test files to project root** - put them in `wasm/test-files/` or appropriate test directories
+- **NEVER modify core TypeScript namespace exports** for WASM integration
+
+**✅ ACCEPTABLE minimal changes:**
+- Small integration hooks (< 10 lines total across all files)
+- Build system modifications (`Herebyfile.mjs`, `package.json`)
+- Test infrastructure that doesn't modify core compiler logic
+
 if previous work has modified code outside `wasm/`, please document the reason in your plan. Or if it's a mistake undo those changes. The git remote `git@github.com:microsoft/TypeScript.git` is source of truth for TypeScript code. 
