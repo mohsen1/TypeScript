@@ -499,6 +499,16 @@ impl ThinBinderState {
 
     /// Bind a source file using ThinNodeArena.
     pub fn bind_source_file(&mut self, arena: &ThinNodeArena, root: NodeIndex) {
+        // Preserve lib symbols that were merged before binding (e.g., in parallel.rs)
+        // When merge_lib_symbols is called before bind_source_file, lib symbols are stored
+        // in file_locals and need to be preserved across the binding process.
+        let lib_symbols: FxHashMap<String, SymbolId> = self
+            .file_locals
+            .iter()
+            .map(|(k, v)| (k.clone(), *v))
+            .collect();
+        let has_lib_symbols = !lib_symbols.is_empty();
+
         // Initialize scope chain with source file scope (legacy)
         self.scope_chain.clear();
         self.scope_chain
@@ -514,6 +524,15 @@ impl ThinBinderState {
 
         // Create root persistent scope for the source file
         self.enter_persistent_scope(ContainerKind::SourceFile, root);
+
+        // Pre-populate root persistent scope with lib symbols if they were merged before binding
+        if has_lib_symbols {
+            if let Some(root_scope) = self.scopes.first_mut() {
+                for (name, sym_id) in &lib_symbols {
+                    root_scope.table.set(name.clone(), *sym_id);
+                }
+            }
+        }
 
         // Create START flow node for the file
         let start_flow = self.flow_nodes.alloc(flow_flags::START);
@@ -538,8 +557,23 @@ impl ThinBinderState {
 
         self.sync_current_scope_to_persistent();
 
-        // Store file locals
-        self.file_locals = std::mem::take(&mut self.current_scope);
+        // Store file locals, merging with lib symbols if they were pre-merged
+        let user_symbols = std::mem::take(&mut self.current_scope);
+
+        // Set file_locals to user symbols
+        self.file_locals = user_symbols;
+
+        // Restore lib symbols from the saved lib_symbols map (if they were pre-merged)
+        // We use the saved map instead of the root scope because sync_current_scope_to_persistent
+        // may have overwritten lib symbols in the root scope with user symbols.
+        // User symbols take precedence - only add lib symbols if no user symbol exists.
+        if has_lib_symbols {
+            for (name, sym_id) in &lib_symbols {
+                if !self.file_locals.has(name) {
+                    self.file_locals.set(name.clone(), *sym_id);
+                }
+            }
+        }
     }
 
     /// Merge lib file symbols into the current scope.
