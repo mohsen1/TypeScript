@@ -3,10 +3,14 @@
 ## Squad: Binder (CRITICAL)
 
 ## Current Task
-(none - all tasks completed)
+- [ ] Implement module augmentation resolution (merging `interface Window` across files)
+  - Trace how TypeScript handles declaration merging across files
+  - Implement symbol merging for interface augmentations
+  - Add tests for common patterns (global augmentation, module augmentation)
 
 ## Queue
-(empty)
+- [ ] Debug console/Array resolution failures in complex scenarios
+- [ ] Fix ambient module declarations (declare module "foo")
 
 ## Completed
 - [x] Investigate lib.d.ts loading and symbol merging into root SymbolTable
