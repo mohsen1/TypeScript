@@ -6342,27 +6342,29 @@ impl ThinParserState {
                 )
             }
             SyntaxKind::AwaitKeyword => {
-                // Only parse as await expression if we're in an async context
-                // Outside async context, 'await' is a valid identifier
-                if self.in_async_context() {
-                    let start_pos = self.token_pos();
-                    self.next_token();
-                    let expression = self.parse_unary_expression();
-                    let end_pos = self.token_end();
+                // Always parse as await expression (even outside async context)
+                // The semantic checker will report an error if await is used incorrectly
+                let start_pos = self.token_pos();
+                self.next_token();
 
-                    self.arena.add_unary_expr_ex(
-                        syntax_kind_ext::AWAIT_EXPRESSION,
-                        start_pos,
-                        end_pos,
-                        UnaryExprDataEx {
-                            expression,
-                            asterisk_token: false,
-                        },
-                    )
-                } else {
-                    // Outside async context, parse 'await' as an identifier
-                    self.parse_postfix_expression()
+                // Check for missing operand (e.g., just "await" with nothing after it)
+                if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_expression_expected();
                 }
+
+                let expression = self.parse_unary_expression();
+                let end_pos = self.token_end();
+
+                self.arena.add_unary_expr_ex(
+                    syntax_kind_ext::AWAIT_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    UnaryExprDataEx {
+                        expression,
+                        asterisk_token: false,
+                    },
+                )
             }
             SyntaxKind::YieldKeyword => {
                 let start_pos = self.token_pos();
