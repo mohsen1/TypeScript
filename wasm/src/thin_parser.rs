@@ -1323,6 +1323,7 @@ impl ThinParserState {
     }
 
     /// Look ahead to see if "namespace"/"module" starts a declaration.
+    /// Updated to recognize anonymous modules: module { ... }
     fn look_ahead_is_module_declaration(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
         let current = self.current_token;
@@ -4305,6 +4306,12 @@ impl ThinParserState {
             // Check for anonymous module: module { ... }
             // This is invalid syntax but should parse gracefully without cascading errors
             if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Emit appropriate error for anonymous module (missing name)
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Namespace must be given a name.",
+                    diagnostic_codes::IDENTIFIER_EXPECTED,
+                );
                 // Create a missing identifier for anonymous module
                 let name_start = self.token_pos();
                 let name_end = self.token_pos();
@@ -4382,6 +4389,12 @@ impl ThinParserState {
             // Check for anonymous module: module { ... }
             // This is invalid syntax but should parse gracefully without cascading errors
             if self.is_token(SyntaxKind::OpenBraceToken) {
+                // Emit appropriate error for anonymous module (missing name)
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Namespace must be given a name.",
+                    diagnostic_codes::IDENTIFIER_EXPECTED,
+                );
                 // Create a missing identifier for anonymous module
                 let name_start = self.token_pos();
                 let name_end = self.token_pos();

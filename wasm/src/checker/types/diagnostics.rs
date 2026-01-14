@@ -183,9 +183,8 @@ pub mod diagnostic_messages {
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: &str = "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.";
     pub const CANNOT_FIND_NAME_DID_YOU_MEAN: &str = "Cannot find name '{0}'. Did you mean '{1}'?";
 
-    // Type instantiation errors
-    pub const TYPE_INSTANTIATION_EXCESSIVELY_DEEP: &str =
-        "Type instantiation is excessively deep and possibly infinite.";
+    // Type instantiation errors (defined above at line 168)
+    // TYPE_INSTANTIATION_EXCESSIVELY_DEEP is already defined
 
     // Scanner/parser errors
     pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str =
@@ -359,9 +358,6 @@ pub mod diagnostic_codes {
     pub const TYPE_PARAMETER_CONSTRAINT_NOT_SATISFIED: u32 = 2344;
     pub const TYPE_PARAMETER_CANNOT_HAVE_VARIANCE_MODIFIER: u32 = 2637;
     pub const CONSTRAINT_OF_TYPE_PARAMETER: u32 = 2313;
-    pub const TYPE_INSTANTIATION_EXCESSIVELY_DEEP: u32 = 2589;
-
-    // Type instantiation errors
     pub const TYPE_INSTANTIATION_EXCESSIVELY_DEEP: u32 = 2589;
 
     // Enum errors
