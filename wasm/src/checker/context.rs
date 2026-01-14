@@ -250,6 +250,7 @@ pub struct CheckerContext<'a> {
 }
 
 /// Context for a lib file (arena + binder) for global type resolution.
+#[derive(Clone)]
 pub struct LibContext {
     /// The AST arena for this lib file.
     pub arena: Arc<ThinNodeArena>,
