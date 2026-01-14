@@ -1,95 +1,97 @@
 # Worker 4 Task List
 
-## Squad: Forge
+## Squad: Parser
 **Target Branch:** `rust`
 **Worker:** 4
-**Status:** Ready
+**Status:** In Progress
 
 ---
 
-## Current Assignment: Control Flow Analysis (Priority 1)
+## Current Assignment: Parser False Positive Reduction (Priority 1)
 
 ### Context
-Project Zang is in Phase 8 (Convergence). The highest priority conformance gap is **Control Flow Analysis**:
-- **TS2454**: Variable used before assignment (573 missing errors)
-- **TS2564**: Property not initialized (443 missing errors)
-- **Combined Impact**: +1,016 tests
+Project Zang is in Phase 8 (Convergence). The highest priority conformance gap for Parser Squad is **False Positive Reduction**:
+- **TS1005**: "expected X" - likely over-triggering (701 total parser false positives)
+- **TS1109**: "expression expected" - false positives on edge cases
+- **Combined Target**: Reduce to <100 false positives
 
 ### Architecture Understanding
 From `WASM_ARCHITECTURE.md` and current codebase:
-- Parser uses `ThinNode` (Struct-of-Arrays) for performance
-- Current `src/checker/control_flow.rs` exists but appears disconnected from checking
-- `thin_checker.rs:check_identifier` needs to query Flow Graph for every identifier usage
-- Must default to "Unassigned" (not "Assigned") when flow state is unknown
+- Parser uses `thin_parser.rs` with error recovery mechanisms
+- Flow graph improvements from previous work provide better context
+- Need better "resynchronization" after syntax errors
+- Parser should continue after minor syntax errors
 
 ---
 
 ## Tasks
 
-### Task 1: Investigate Current Control Flow Implementation
+### Task 1: Audit TS1005 Emission
 **Status:** PENDING
-**Estimated Impact:** Foundation for all subsequent work
+**Estimated Impact:** Foundation for reducing false positives
 
 **Sub-tasks:**
-- [ ] Read `src/checker/control_flow.rs` completely
-- [ ] Read `src/checker/thin_checker.rs` focusing on `check_identifier`
-- [ ] Read `WASM_ARCHITECTURE.md` section on Flow Graph design
-- [ ] Identify: Does Flow Graph construction exist? Is it called?
-- [ ] Identify: Is `check_identifier` querying flow state?
+- [ ] Read `src/thin_parser.rs` focusing on TS1005 emission points
+- [ ] Identify all locations where "expected X" errors are raised
+- [ ] Run `node wasm/differential-test/find-ts1005.mjs` to get baseline
+- [ ] Identify patterns: When is TS1005 a false positive?
+- [ ] Document common false positive scenarios
 
-**Deliverable:** Brief analysis document documenting:
-1. Current state of Flow Graph infrastructure
-2. Current state of identifier checking
-3. Gap analysis: What's missing between the two
+**Deliverable:** Analysis document documenting:
+1. All TS1005 emission locations in thin_parser.rs
+2. Current false positive baseline count
+3. Common false positive patterns
+4. Proposed fix strategies
 
 **Acceptance Criteria:**
-- Clear understanding of existing code
-- Documented list of missing components
+- Clear understanding of TS1005 emission logic
+- Documented list of false positive patterns
+- Baseline metrics established
 
 ---
 
-### Task 2: Implement Flow Graph Side-Table
+### Task 2: Audit TS1109 Emission
 **Status:** BLOCKED (waiting for Task 1)
-**Estimated Impact:** Core infrastructure
+**Estimated Impact:** Complements TS1005 work
 
 **Sub-tasks:**
-- [ ] Design side-table structure: `HashMap<NodeId, FlowState>` or similar
-- [ ] Implement Flow Graph construction pass (runs after binding, before checking)
-- [ ] Add FlowNode types: Uninitialized, DefinitelyAssigned, MaybeAssigned
-- [ ] Implement basic control flow tracking for:
-  - Variable declarations (`let`, `const`, `var`)
-  - Assignment expressions
-  - Return statements
-  - Control flow branches (`if`, `for`, `while`)
+- [ ] Read `src/thin_parser.rs` focusing on TS1109 emission points
+- [ ] Identify all locations where "expression expected" errors are raised
+- [ ] Run `node wasm/differential-test/find-ts1109.mjs` to get baseline
+- [ ] Identify patterns: When is TS1109 a false positive?
+- [ ] Document common edge cases (e.g., trailing commas, missing semicolons)
 
-**Deliverable:** Working Flow Graph construction that can be queried by the checker
+**Deliverable:** Analysis document documenting:
+1. All TS1109 emission locations
+2. Current false positive baseline count
+3. Common edge case patterns
+4. Proposed fix strategies
 
 **Acceptance Criteria:**
-- Flow Graph pass compiles
-- Unit tests for basic scenarios (declared-before-use, used-before-decl)
-- Integration into `WasmProgram` pipeline
+- Clear understanding of TS1109 emission logic
+- Documented list of edge case patterns
+- Baseline metrics established
 
 ---
 
-### Task 3: Connect Flow Graph to Checker
+### Task 3: Implement Better Error Recovery
 **Status:** BLOCKED (waiting for Task 2)
-**Estimated Impact:** Enables TS2454/TS2564 detection
+**Estimated Impact:** Core infrastructure improvement
 
 **Sub-tasks:**
-- [ ] Modify `thin_checker.rs:check_identifier` to query Flow Graph
-- [ ] Add TS2454 error emission when variable used before assignment
-- [ ] Add TS2564 error emission for class properties not initialized in constructor
-- [ ] Handle edge cases:
-  - Destructuring patterns
-  - Conditional declarations
-  - Union of control paths
+- [ ] Implement "resynchronization" logic in `thin_parser.rs`
+- [ ] Add lookahead to detect recovery points (statement boundaries, blocks, etc.)
+- [ ] Modify error emission to suppress cascading errors after recovery
+- [ ] Ensure parser state is consistent after recovery
+- [ ] Add unit tests for error recovery scenarios
 
-**Deliverable:** Checker that reports TS2454/TS2564 errors
+**Deliverable:** Working error recovery mechanism
 
 **Acceptance Criteria:**
-- `node wasm/differential-test/find-ts2454.mjs` shows reduction in missing errors
-- `node wasm/differential-test/find-ts2564.mjs` shows reduction in missing errors
-- Zero regressions in Extra Errors
+- Parser continues after minor syntax errors
+- No cascading false positives after recovery
+- Unit tests for recovery scenarios pass
+- Integration into `WasmProgram` pipeline
 
 ---
 
@@ -99,16 +101,16 @@ From `WASM_ARCHITECTURE.md` and current codebase:
 
 **Sub-tasks:**
 - [ ] Run `./wasm/differential-test/run-conformance.sh --max=10000`
-- [ ] Measure TS2454 missing error reduction (target: 400+)
-- [ ] Measure TS2564 missing error reduction (target: 300+)
-- [ ] Check Extra Errors for regressions
-- [ ] Fix any regressions or false positives
+- [ ] Measure TS1005 false positive reduction (target: 300+)
+- [ ] Measure TS1109 false positive reduction (target: 200+)
+- [ ] Check for regressions in other error types
+- [ ] Fix any regressions or false negatives
 
 **Deliverable:** Documented conformance improvement
 
 **Acceptance Criteria:**
-- Combined TS2454+TS2564 missing errors reduced by 500+
-- Extra Errors increase < 50
+- Combined TS1005+TS1109 false positives reduced to <100 (from 701)
+- No regressions in other error types
 - All existing unit tests pass
 
 ---
@@ -122,10 +124,10 @@ From `WASM_ARCHITECTURE.md` and current codebase:
 ---
 
 ## Workflow
-1. Complete Task 1 → Write analysis
-2. Implement Task 2 → Unit test
-3. Implement Task 3 → Conformance test
-4. Validate Task 4 → Document results
+1. Complete Task 1 → Write TS1005 analysis
+2. Complete Task 2 → Write TS1109 analysis
+3. Implement Task 3 → Error recovery with unit tests
+4. Validate Task 4 → Document conformance results
 
 ## Commit Protocol
 - After each task: `git add -A && git commit -m "Worker4: Complete Task N" && git push origin worker-4 --force`
@@ -137,14 +139,14 @@ From `WASM_ARCHITECTURE.md` and current codebase:
 
 | Task | Status | Last Updated |
 |------|--------|--------------|
-| Task 1: Investigation | ✅ COMPLETE | 2025-01-14 |
-| Task 2: Flow Graph | ✅ COMPLETE | 2025-01-14 |
-| Task 3: Checker Integration | ✅ COMPLETE | 2025-01-14 |
-| Task 4: Validation | ✅ COMPLETE | 2025-01-14 |
+| Task 1: TS1005 Audit | ⏳ PENDING | 2026-01-14 |
+| Task 2: TS1109 Audit | 🔒 BLOCKED | 2026-01-14 |
+| Task 3: Error Recovery | 🔒 BLOCKED | 2026-01-14 |
+| Task 4: Validation | 🔒 BLOCKED | 2026-01-14 |
 
 ---
 
-## Merge Results - COMPLETE ✅
+## Previous Work: Control Flow Analysis (COMPLETE ✅)
 
 **Date:** 2025-01-14
 **Merged to:** em-team-1
