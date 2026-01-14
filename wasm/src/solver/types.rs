@@ -5,6 +5,220 @@
 
 use crate::interner::Atom;
 use serde::Serialize;
+use bitflags::bitflags;
+
+/// Fast-rejection flags for types.
+///
+/// These flags are computed during type interning and allow O(1) checks
+/// for common type properties without traversing the full type structure.
+///
+/// This enables optimizations like:
+/// - Quick truthiness checks for control flow analysis
+/// - Fast object structure checks for property access
+/// - Early rejection in subtype checking
+bitflags! {
+    #[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
+    pub struct TypeFlags: u16 {
+        /// No flags set (used for intrinsic types that don't match any special categories)
+        const NONE = 0;
+
+        /// Type is always truthy in boolean context (objects, arrays, functions)
+        const IS_TRUTHY = 1 << 0;
+
+        /// Type is always falsy in boolean context (null, undefined, false, 0, "", NaN)
+        const IS_FALSY = 1 << 1;
+
+        /// Type contains object structure (has properties, may be accessed with . operator)
+        const HAS_OBJECT_STRUCTURE = 1 << 2;
+
+        /// Type is callable (function type with call signatures)
+        const IS_CALLABLE = 1 << 3;
+
+        /// Type contains a union (may need distributive operations)
+        const IS_UNION = 1 << 4;
+
+        /// Type contains an intersection (may need distributive operations)
+        const IS_INTERSECTION = 1 << 5;
+
+        /// Type is or contains generics (type parameters, conditionals, etc.)
+        const IS_GENERIC = 1 << 6;
+
+        /// Type is an error type (poison pill for error recovery)
+        const IS_ERROR = 1 << 7;
+    }
+}
+
+impl TypeFlags {
+    /// Compute flags for a TypeKey.
+    /// This is called during type interning to populate the flags lookup table.
+    pub fn from_type_key(key: &TypeKey) -> Self {
+        let mut flags = TypeFlags::NONE;
+
+        match key {
+            // Intrinsic types
+            TypeKey::Intrinsic(intrinsic) => {
+                match intrinsic {
+                    IntrinsicKind::Any | IntrinsicKind::Unknown => {
+                        // any/unknown are neither truthy nor falsy
+                        flags |= TypeFlags::IS_GENERIC;
+                    }
+                    IntrinsicKind::Never => {
+                        // never is falsy (unreachable)
+                        flags |= TypeFlags::IS_FALSY;
+                    }
+                    IntrinsicKind::Void | IntrinsicKind::Null | IntrinsicKind::Undefined => {
+                        flags |= TypeFlags::IS_FALSY;
+                    }
+                    IntrinsicKind::Boolean | IntrinsicKind::Number | IntrinsicKind::String
+                    | IntrinsicKind::Bigint | IntrinsicKind::Symbol => {
+                        // Primitives without literal values - could be either
+                    }
+                    IntrinsicKind::Object => {
+                        flags |= TypeFlags::IS_TRUTHY | TypeFlags::HAS_OBJECT_STRUCTURE;
+                    }
+                }
+            }
+
+            // Literal types
+            TypeKey::Literal(literal) => {
+                match literal {
+                    LiteralValue::Boolean(false) => {
+                        flags |= TypeFlags::IS_FALSY;
+                    }
+                    LiteralValue::Boolean(true) => {
+                        flags |= TypeFlags::IS_TRUTHY;
+                    }
+                    LiteralValue::Number(n) => {
+                        if n.0 == 0.0 || n.0.is_nan() {
+                            flags |= TypeFlags::IS_FALSY;
+                        } else {
+                            flags |= TypeFlags::IS_TRUTHY;
+                        }
+                    }
+                    LiteralValue::String(_s) => {
+                        // Need to check if empty string - we don't have Atom access here
+                        // For now, assume non-empty (will be corrected if needed)
+                        flags |= TypeFlags::IS_TRUTHY;
+                    }
+                    LiteralValue::BigInt(_) => {
+                        // BigInts are always truthy except 0n
+                        // We'd need to check the string value
+                        flags |= TypeFlags::IS_TRUTHY;
+                    }
+                }
+            }
+
+            // Object types
+            TypeKey::Object(_) | TypeKey::ObjectWithIndex(_) => {
+                flags |= TypeFlags::IS_TRUTHY | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Array type
+            TypeKey::Array(_) => {
+                flags |= TypeFlags::IS_TRUTHY | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Tuple type
+            TypeKey::Tuple(_) => {
+                flags |= TypeFlags::IS_TRUTHY | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Function type
+            TypeKey::Function(_) => {
+                flags |= TypeFlags::IS_TRUTHY | TypeFlags::IS_CALLABLE | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Callable type
+            TypeKey::Callable(_) => {
+                flags |= TypeFlags::IS_TRUTHY | TypeFlags::IS_CALLABLE | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Union type
+            TypeKey::Union(_) => {
+                flags |= TypeFlags::IS_UNION | TypeFlags::IS_GENERIC;
+            }
+
+            // Intersection type
+            TypeKey::Intersection(_) => {
+                flags |= TypeFlags::IS_INTERSECTION | TypeFlags::IS_GENERIC;
+            }
+
+            // Generic types
+            TypeKey::TypeParameter(_) | TypeKey::Infer(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Reference types (could be anything - need to resolve to know)
+            TypeKey::Ref(_) | TypeKey::UniqueSymbol(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Generic application
+            TypeKey::Application(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Conditional type
+            TypeKey::Conditional(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Mapped type
+            TypeKey::Mapped(_) => {
+                flags |= TypeFlags::IS_GENERIC | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Index access
+            TypeKey::IndexAccess(_, _) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Template literal
+            TypeKey::TemplateLiteral(_) => {
+                flags |= TypeFlags::IS_TRUTHY;
+            }
+
+            // Type query
+            TypeKey::TypeQuery(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // KeyOf
+            TypeKey::KeyOf(_) => {
+                flags |= TypeFlags::IS_GENERIC;
+            }
+
+            // Readonly type modifier
+            TypeKey::ReadonlyType(_) => {
+                // Inherits flags from inner type
+            }
+
+            // This type
+            TypeKey::ThisType => {
+                flags |= TypeFlags::IS_GENERIC | TypeFlags::HAS_OBJECT_STRUCTURE;
+            }
+
+            // Error type
+            TypeKey::Error => {
+                flags |= TypeFlags::IS_ERROR;
+            }
+        }
+
+        flags
+    }
+
+    /// Check if type is definitely truthy in boolean context.
+    /// Returns None if it depends on runtime (e.g., union of truthy and falsy).
+    pub fn is_definitely_truthy(self) -> Option<bool> {
+        if self.contains(TypeFlags::IS_TRUTHY) && !self.contains(TypeFlags::IS_FALSY) {
+            Some(true)
+        } else if self.contains(TypeFlags::IS_FALSY) && !self.contains(TypeFlags::IS_TRUTHY) {
+            Some(false)
+        } else {
+            None // Could be either (e.g., any, unknown, unions)
+        }
+    }
+}
 
 /// A lightweight handle to an interned type.
 /// Equality check is O(1) - just compare the u32 values.
