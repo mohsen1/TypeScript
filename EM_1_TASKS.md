@@ -85,10 +85,9 @@ Before merging any worker branch:
 **Lesson:** Should have been FIRST - cascading errors masked individual fix impact
 
 ### Worker 4 (Binder - CRITICAL)
-**Status:** ✅ VALIDATED - Ambient module fix reduces TS2304 by 37% (459→276)
+**Status:** ✅ MERGED - Ambient module fix reduces TS2304 by 37% (459→276)
 **Results:** HIGHEST Exact Match impact! +3.8%, Stops "Any" poisoning
 **Synergy:** Unlocks full value of Parser fixes - all 4 workers: 30.1%→34.5% (+4.4%)
-**Decision:** MERGE APPROVED - Ready to merge worker-4 into em-team-1
 **Next:** Module namespace resolution (~48 cases)
 
 ---
