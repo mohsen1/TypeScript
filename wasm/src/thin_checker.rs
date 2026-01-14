@@ -609,6 +609,9 @@ impl<'a> ThinCheckerState<'a> {
         self.ctx.node_resolution_stack.pop();
         self.ctx.node_resolution_set.remove(&idx);
 
+        // Check for type instantiation depth exceeded (TS2589)
+        self.check_depth_exceeded(idx);
+
         // Cache result
         self.ctx.node_types.insert(idx.0, result);
 
@@ -19881,6 +19884,23 @@ impl<'a> ThinCheckerState<'a> {
             code,
             related_information: Vec::new(),
         });
+    }
+
+    /// Check if type instantiation depth was exceeded and emit TS2589 if so.
+    /// This should be called after type checking expressions that might recurse deeply.
+    fn check_depth_exceeded(&mut self, node_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+
+        if *self.ctx.depth_exceeded.borrow() {
+            // Reset the flag after emitting to avoid duplicate errors
+            *self.ctx.depth_exceeded.borrow_mut() = false;
+
+            self.error_at_node(
+                node_idx,
+                diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+                diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
+            );
+        }
     }
 
     fn class_member_is_static(&self, member_idx: NodeIndex) -> bool {
