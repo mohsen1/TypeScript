@@ -27,12 +27,15 @@
 //! ```
 
 use crate::binder::{Scope, ScopeId, SymbolArena, SymbolId, SymbolTable};
+use crate::checker::context::LibContext;
+use crate::lib_loader;
 use crate::parser::NodeIndex;
 use crate::parser::thin_node::ThinNodeArena;
 use crate::thin_binder::ThinBinderState;
 use crate::thin_parser::{ParseDiagnostic, ThinParserState};
 use rayon::prelude::*;
 use rustc_hash::{FxHashMap, FxHashSet};
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 /// Result of parsing a single file
@@ -232,6 +235,141 @@ pub fn parse_and_bind_with_stats(files: Vec<(String, String)>) -> (Vec<BindResul
     };
 
     (results, stats)
+}
+
+/// Load lib.d.ts files and create LibContext objects for the binder.
+///
+/// This function loads the specified lib.d.ts files (e.g., lib.dom.d.ts, lib.es*.d.ts)
+/// and returns LibContext objects that can be used during binding to resolve global
+/// symbols like `console`, `Array`, `Promise`, etc.
+///
+/// This is similar to `load_lib_files_for_contexts` in driver.rs but returns
+/// Arc<LibFile> objects for use with `merge_lib_symbols`.
+pub fn load_lib_files_for_binding(lib_files: &[&Path]) -> Vec<Arc<lib_loader::LibFile>> {
+    use crate::thin_parser::ThinParserState;
+
+    let mut lib_files_loaded = Vec::new();
+
+    // If no lib files are specified, try to load the default lib.d.ts
+    let files_to_load = if lib_files.is_empty() {
+        // Try to load default lib.d.ts from tests/lib directory
+        let default_lib_paths = vec![
+            PathBuf::from("tests/lib/lib.d.ts"),
+            PathBuf::from("tests/lib/lib.dom.d.ts"),
+        ];
+        default_lib_paths
+    } else {
+        lib_files.iter().map(|p| p.to_path_buf()).collect()
+    };
+
+    for lib_path in files_to_load {
+        // Skip if the file doesn't exist
+        if !lib_path.exists() {
+            continue;
+        }
+
+        // Read the lib file content
+        let source_text = match std::fs::read_to_string(&lib_path) {
+            Ok(content) => content,
+            Err(_) => continue,
+        };
+
+        // Parse the lib file
+        let file_name = lib_path.to_string_lossy().to_string();
+        let mut lib_parser = ThinParserState::new(file_name.clone(), source_text);
+        let source_file_idx = lib_parser.parse_source_file();
+
+        // Skip if there are parse errors
+        if !lib_parser.get_diagnostics().is_empty() {
+            continue;
+        }
+
+        // Bind the lib file
+        let mut lib_binder = ThinBinderState::new();
+        lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+        // Create the LibFile
+        let arena = Arc::new(lib_parser.into_arena());
+        let binder = Arc::new(lib_binder);
+
+        let lib_file = Arc::new(lib_loader::LibFile::new(file_name, arena, binder));
+        lib_files_loaded.push(lib_file);
+    }
+
+    lib_files_loaded
+}
+
+/// Parse and bind multiple files in parallel with lib symbol injection.
+///
+/// This is the main entry point for compilation that includes lib.d.ts symbols.
+/// Lib files are loaded first, then each file is parsed and bound with lib symbols
+/// merged into its binder.
+///
+/// # Arguments
+/// * `files` - Vector of (file_name, source_text) pairs
+/// * `lib_files` - Optional list of lib file paths to load
+///
+/// # Returns
+/// Vector of BindResult for each file
+pub fn parse_and_bind_parallel_with_lib_files(
+    files: Vec<(String, String)>,
+    lib_files: &[&Path],
+) -> Vec<BindResult> {
+    // Load lib files for binding
+    let lib_contexts = load_lib_files_for_binding(lib_files);
+
+    // Parse and bind with lib symbols
+    parse_and_bind_parallel_with_libs(files, &lib_contexts)
+}
+
+/// Parse and bind multiple files in parallel with lib contexts.
+///
+/// Lib symbols are injected into each file's binder during binding,
+/// enabling resolution of global symbols like `console`, `Array`, etc.
+///
+/// # Arguments
+/// * `files` - Vector of (file_name, source_text) pairs
+/// * `lib_files` - Lib files to merge into each binder
+///
+/// # Returns
+/// Vector of BindResult for each file
+fn parse_and_bind_parallel_with_libs(
+    files: Vec<(String, String)>,
+    lib_files: &[Arc<lib_loader::LibFile>],
+) -> Vec<BindResult> {
+    files
+        .into_par_iter()
+        .map(|(file_name, source_text)| {
+            // Parse
+            let mut parser = ThinParserState::new(file_name.clone(), source_text);
+            let source_file = parser.parse_source_file();
+
+            let (arena, parse_diagnostics) = parser.into_parts();
+
+            // Bind with lib symbols
+            let mut binder = ThinBinderState::new();
+            binder.bind_source_file(&arena, source_file);
+
+            // Merge lib symbols into the binder
+            if !lib_files.is_empty() {
+                binder.merge_lib_symbols(lib_files);
+            }
+
+            BindResult {
+                file_name,
+                source_file,
+                arena: Arc::new(arena),
+                symbols: binder.symbols,
+                file_locals: binder.file_locals,
+                declared_modules: binder.declared_modules,
+                node_symbols: binder.node_symbols,
+                scopes: binder.scopes,
+                node_scope_ids: binder.node_scope_ids,
+                parse_diagnostics,
+                global_augmentations: binder.global_augmentations,
+            }
+        })
+        .collect()
 }
 
 // =============================================================================
@@ -559,8 +697,11 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
 /// Full pipeline: Parse → Bind (parallel) → Merge (sequential)
 ///
 /// This is the main entry point for multi-file compilation.
+/// Lib files are automatically loaded and merged during binding.
 pub fn compile_files(files: Vec<(String, String)>) -> MergedProgram {
-    let bind_results = parse_and_bind_parallel(files);
+    // Load lib files for binding (console, Array, Promise, etc.)
+    let lib_paths: Vec<&Path> = Vec::new(); // Empty = use defaults (lib.d.ts, lib.dom.d.ts)
+    let bind_results = parse_and_bind_parallel_with_lib_files(files, &lib_paths);
     merge_bind_results(bind_results)
 }
 
