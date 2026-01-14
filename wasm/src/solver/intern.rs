@@ -829,11 +829,16 @@ impl TypeInterner {
 
     fn intersection_has_disjoint_primitives(&self, members: &[TypeId]) -> bool {
         let mut class: Option<PrimitiveClass> = None;
+        let mut has_primitive = false;
+        let mut has_non_primitive = false;
 
         for &member in members {
             let Some(member_class) = self.primitive_class_for(member) else {
+                // Not a primitive - check if it's an object-like type
+                has_non_primitive = self.is_object_like_type(member);
                 continue;
             };
+            has_primitive = true;
             if let Some(existing) = class {
                 if existing != member_class {
                     return true;
@@ -843,7 +848,21 @@ impl TypeInterner {
             }
         }
 
+        // If we have both primitives and non-primitives (objects), they're disjoint
+        if has_primitive && has_non_primitive {
+            return true;
+        }
+
         false
+    }
+
+    fn is_object_like_type(&self, type_id: TypeId) -> bool {
+        match self.lookup(type_id) {
+            Some(TypeKey::Object(_)) | Some(TypeKey::ObjectWithIndex(_)) => true,
+            Some(TypeKey::Function(_)) | Some(TypeKey::Callable(_)) => true,
+            Some(TypeKey::Array(_)) | Some(TypeKey::Tuple(_)) => true,
+            _ => false,
+        }
     }
 
     fn intersection_has_disjoint_object_literals(&self, members: &[TypeId]) -> bool {
