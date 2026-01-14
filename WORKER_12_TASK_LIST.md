@@ -3,58 +3,55 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [x] Reduce "Any" fallback in property access patterns
-
-## Completed
-- [x] Locate property access fallback locations (found 5)
-- [x] Change all 5 locations from TypeId::ANY to TypeId::UNKNOWN
-- [x] Verify compilation - Code compiles successfully
-- [x] Test - One pre-existing failure (unrelated to changes)
+- [ ] Reduce "Any" fallback in contextual type patterns
 
 ## Context
 
-**Previous Work**
-Worker 12 has been incrementally reducing "Any" fallback usage to expose hidden bugs. The type parameter defaults change (7 locations) was implemented but not yet merged to rust.
+**Previous Work Completed**
+Worker 12 has been incrementally reducing "Any" fallback usage:
+1. ✅ Type parameter defaults (7 locations) - implemented, not merged to rust
+2. ✅ Property access fallbacks (5 locations) - just merged to rust
 
-**New Focus: Property Access Fallbacks**
-Property access is a critical source of "Any" poisoning:
-- When accessing `obj.property` where the property type is unknown
-- The checker returns `Any` instead of `Unknown`
-- This `Any` then propagates through all subsequent operations on that property
+**New Focus: Contextual Type Fallbacks**
+Contextual types are used to provide type hints during type inference:
+- When a value is used in a context that expects a specific type
+- The checker provides contextual information to guide inference
+- When the context type is unknown, it currently falls back to `Any`
 
 **Targeted Changes**
-Change property access fallbacks in `thin_checker.rs`:
+Change contextual type fallbacks in `thin_checker.rs`:
 
-1. Lines 8470, 8554, 8758, 8981, 9361: `property_type.unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+1. Line ~9667: `helper.get_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+2. Line ~9673: `contextual_type.unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+3. Line ~15473: `self.current_return_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
 
 These are in:
-- Property type resolution for spread operators
-- Property access expressions
-- Union type construction
-- Object literal property types
+- Call expression this-type inference
+- Contextual type helpers
+- Return type contextual typing
 
 **Why This Matters**
-When you access `obj.foo` and `foo` doesn't exist or has no type:
-- Current: Returns `Any` (silently accepts invalid code)
-- New: Returns `Unknown` (will emit errors for unsafe operations)
+When contextual typing can't determine the expected type:
+- **Current**: Returns `Any` (loses type safety, accepts invalid code)
+- **New**: Returns `Unknown` (maintains strictness, emits errors for mismatches)
 
-This will expose bugs where:
-- Properties are accessed without type checking
-- Optional chaining isn't used where it should be
-- Type assertions are missing
+This will expose bugs in:
+- Callback contexts without type annotations
+- Return statements without inferred return types
+- This-type inference in methods
 
 ## Queue
-- [ ] After property access fix, measure conformance impact
-- [ ] Tackle contextual type fallbacks
+- [ ] After contextual type fix, measure conformance impact
 - [ ] Tackle this-type fallbacks
+- [ ] Tackle array element type fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
 ## Implementation Steps
 
 1. **Make targeted changes**
-   - Change property access fallbacks from `TypeId::ANY` to `TypeId::UNKNOWN`
-   - Search pattern: `property_type.unwrap_or(TypeId::ANY)`
-   - Found 5 locations in thin_checker.rs
+   - Change contextual type fallbacks from `TypeId::ANY` to `TypeId::UNKNOWN`
+   - Focus on: this-type, contextual type, and return type fallbacks
+   - Found ~3 locations in thin_checker.rs
 
 2. **Test incrementally**
    - Run `./wasm/test.sh` after changes
@@ -66,7 +63,7 @@ This will expose bugs where:
    - Identify patterns in exposed bugs
 
 ## Files to Modify
-- `wasm/src/thin_checker.rs` - Property access fallbacks (5 locations)
+- `wasm/src/thin_checker.rs` - Contextual type fallbacks (~3 locations)
 
 ## Success Criteria
 - Code compiles without errors
@@ -74,11 +71,4 @@ This will expose bugs where:
 - Measurable increase in detected type errors
 
 ## Ready for Merge
-Yes - Implementation complete and tested.
-
-## Changes Summary
-- **Files modified**: 1 (`wasm/src/thin_checker.rs`)
-- **Lines changed**: 5 locations
-- **Change**: `property_type.unwrap_or(TypeId::ANY)` → `.unwrap_or(TypeId::UNKNOWN)`
-- **Commit**: `75c0eefe6 Complete: Reduce 'Any' fallback in property access patterns`
-- **Pushed to**: origin/worker-12
+No (task in progress)
