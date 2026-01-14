@@ -2934,12 +2934,13 @@ fn create_binder_from_bound_file(
         }
     }
 
-    let mut binder = ThinBinderState::from_bound_state_with_scopes(
+    let mut binder = ThinBinderState::from_bound_state_with_scopes_and_augmentations(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
         file.scopes.clone(),
         file.node_scope_ids.clone(),
+        file.global_augmentations.clone(),
     );
 
     binder.declared_modules = program.declared_modules.clone();

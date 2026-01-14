@@ -132,6 +132,8 @@ pub struct BindResult {
     pub node_scope_ids: FxHashMap<u32, ScopeId>,
     /// Parse diagnostics
     pub parse_diagnostics: Vec<ParseDiagnostic>,
+    /// Global augmentations (interface declarations inside `declare global` blocks)
+    pub global_augmentations: FxHashMap<String, Vec<NodeIndex>>,
 }
 
 /// Parse and bind multiple files in parallel
@@ -169,6 +171,7 @@ pub fn parse_and_bind_parallel(files: Vec<(String, String)>) -> Vec<BindResult> 
                 scopes: binder.scopes,
                 node_scope_ids: binder.node_scope_ids,
                 parse_diagnostics,
+                global_augmentations: binder.global_augmentations,
             }
         })
         .collect()
@@ -195,6 +198,7 @@ pub fn parse_and_bind_single(file_name: String, source_text: String) -> BindResu
         scopes: binder.scopes,
         node_scope_ids: binder.node_scope_ids,
         parse_diagnostics,
+        global_augmentations: binder.global_augmentations,
     }
 }
 
@@ -250,6 +254,8 @@ pub struct BoundFile {
     pub node_scope_ids: FxHashMap<u32, ScopeId>,
     /// Parse diagnostics
     pub parse_diagnostics: Vec<ParseDiagnostic>,
+    /// Global augmentations (interface declarations inside `declare global` blocks)
+    pub global_augmentations: FxHashMap<String, Vec<NodeIndex>>,
 }
 
 use crate::solver::TypeInterner;
@@ -529,6 +535,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
             scopes: remapped_scopes,
             node_scope_ids: result.node_scope_ids.clone(),
             parse_diagnostics: result.parse_diagnostics.clone(),
+            global_augmentations: result.global_augmentations.clone(),
         });
     }
 
@@ -811,12 +818,13 @@ fn create_binder_from_bound_file(
         }
     }
 
-    let mut binder = ThinBinderState::from_bound_state_with_scopes(
+    let mut binder = ThinBinderState::from_bound_state_with_scopes_and_augmentations(
         program.symbols.clone(),
         file_locals,
         file.node_symbols.clone(),
         file.scopes.clone(),
         file.node_scope_ids.clone(),
+        file.global_augmentations.clone(),
     );
 
     binder.declared_modules = program.declared_modules.clone();
