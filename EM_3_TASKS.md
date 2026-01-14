@@ -1,9 +1,10 @@
 # EM-3 Task List
 
 ## Team: Engineering Manager 3
-- **Workers**: worker-9, worker-10, worker-11, worker-12
+- **Workers**: worker-9, worker-10, worker-11
 - **Branch**: em-team-3
 - **Worktree**: /tmp/orchestrator-workspace/worktrees/em-3
+- **Squad Focus**: Parser/Scanner ONLY (TS1005/TS1109)
 
 ## Mission Phase: Phase 8 - Conformance, Convergence, and Hardening
 
@@ -22,8 +23,8 @@ The compiler defaults to `Any` when it encounters unresolved symbols, silencing 
 
 ## Squad Assignments
 
-### Squad 1: Parser/Scanner (2 workers) - TS1005/TS1109 Focus
-**Workers**: worker-9, worker-10
+### Parser/Scanner Squad (3 workers) - TS1005/TS1109 Focus
+**Workers**: worker-9, worker-10, worker-11
 **Priority**: HIGH - 701 false positives inflate "Extra Errors" by 14%
 
 **Directive**:
@@ -40,49 +41,15 @@ The compiler defaults to `Any` when it encounters unresolved symbols, silencing 
 **Success Metrics**:
 - TS1005: 439 → <100
 - TS1109: 262 → <50
+- Total parser false positives: 701 → <100
 
----
+### Worker Breakdown
 
-### Squad 2: Binder & Scope Resolution (1 worker) - TS2304 Focus
-**Worker**: worker-11
-**Priority**: CRITICAL - TS2304 is the #1 source of error poisoning
-
-**Directive**:
-- Fix Global Scope and Lib injection
-- Ensure `lib.d.ts` symbols are correctly merged into root `SymbolTable`
-- Debug why basic globals like `console` and `Array` fail to resolve
-- Fix module augmentation resolution (merging `interface Window` across files)
-
-**Key Files**:
-- `src/compiler/binder.ts` (194K lines)
-- `src/compiler/program.ts` (268K lines)
-- Check `lib_loader.rs` equivalent for library symbol merging
-- Check `file_locals` population from library context
-
-**Success Metrics**:
-- TS2304 extra errors: 343 → <50
-- TS2304 missing errors: 116 → <20
-
----
-
-### Squad 3: Solver Strictness (1 worker) - TS2322/TS7006 Focus
-**Worker**: worker-12
-**Priority**: STRATEGIC - Switch default from `Any` to `Unknown`
-
-**Directive**:
-- Change default fallback from `Any` to `Unknown` or `Error`
-- Harden `solve_subtype` logic
-- Implement "Lawyer" layer for TypeScript quirks (function bivariance, void return exceptions)
-- Stop being nice—compiler needs to be meaner to match `tsc`
-
-**Key Files**:
-- `src/compiler/checker.ts` (3.1M lines) - main type checking logic
-- `src/compiler/types.ts` (487K lines)
-- `specs/SOLVER.md` - reference for subtyping rules
-
-**Success Metrics**:
-- Convert "Missing TS2322" into "Exact Match" or "Extra TS2322" (better too strict than unsound)
-- Reduce TS7006 (Implicit Any) missing errors
+| Worker | Primary Focus | Secondary Focus |
+|--------|---------------|-----------------|
+| **worker-9** | TS1005 patterns 6-10 (object/array literals) | TS1109 statement parsing |
+| **worker-10** | TS1109 expression expected errors | TS1005 type parameters |
+| **worker-11** | TS1005 patterns 11-15 (edge cases) | TS1109 class member parsing |
 
 ---
 
@@ -121,8 +88,7 @@ npm run test -- --grep "TS2304"
 
 1. **Worker 9**: Fix TS1005 patterns 6-10 (object literals, arrays, edge cases)
 2. **Worker 10**: Fix TS1109 false positives (expression expected errors)
-3. **Worker 11**: Debug global scope binding - why `console.log` fails to resolve
-4. **Worker 12**: Change solver fallback from `Any` to `Unknown` in `checker.ts`
+3. **Worker 11**: Fix TS1005 patterns 11-15 (edge cases: type parameters, return types, statements)
 
 ---
 
@@ -130,7 +96,7 @@ npm run test -- --grep "TS2304"
 
 - [x] Create WORKER_9_TASK_LIST.md
 - [x] Create WORKER_10_TASK_LIST.md
-- [x] Create WORKER_11_TASK_LIST.md
-- [x] Create WORKER_12_TASK_LIST.md
+- [x] Update WORKER_11_TASK_LIST.md (Parser focus)
+- [x] Remove WORKER_12_TASK_LIST.md (reassigned)
 - [ ] Run baseline conformance tests
-- [ ] Assign initial tasks to each worker
+- [ ] Assign updated tasks to workers 9-11
