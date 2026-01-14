@@ -16322,9 +16322,10 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
             k if k == syntax_kind_ext::WHILE_STATEMENT
-                || k == syntax_kind_ext::DO_STATEMENT
                 || k == syntax_kind_ext::FOR_STATEMENT =>
             {
+                // For while/for loops: body might not execute, so assignments
+                // in the body don't count for definite assignment
                 if let Some(loop_data) = self.ctx.arena.get_loop(node) {
                     let mut assigned = assigned_in.clone();
                     if !loop_data.initializer.is_none() {
@@ -16351,8 +16352,38 @@ impl<'a> ThinCheckerState<'a> {
                             tracked,
                         );
                     }
+                    if !loop_data.incrementor.is_none() {
+                        self.collect_assignments_in_expression(
+                            loop_data.incrementor,
+                            &mut assigned,
+                            tracked,
+                        );
+                    }
+                    // Note: We deliberately DON'T analyze the loop body for definite assignment
+                    // because while/for loops might not execute at all
                     return FlowResult {
                         normal: Some(assigned),
+                        exits: None,
+                    };
+                }
+            }
+            k if k == syntax_kind_ext::DO_STATEMENT =>
+            {
+                // do-while loops always execute at least once
+                if let Some(loop_data) = self.ctx.arena.get_loop(node) {
+                    let mut assigned = assigned_in.clone();
+                    // Analyze the loop body (executes at least once)
+                    let body_result = self.analyze_statement(loop_data.statement, &assigned, tracked);
+                    if !loop_data.condition.is_none() {
+                        self.collect_assignments_in_expression(
+                            loop_data.condition,
+                            &mut assigned,
+                            tracked,
+                        );
+                    }
+                    // Use the assignments from the body
+                    return FlowResult {
+                        normal: body_result.normal,
                         exits: None,
                     };
                 }
@@ -16515,18 +16546,39 @@ impl<'a> ThinCheckerState<'a> {
         let mut normal: Option<FxHashSet<PropertyKey>> = None;
         let mut exits: Option<FxHashSet<PropertyKey>> = None;
 
+        let mut has_default_clause = false;
+
         for &clause_idx in &case_block.statements.nodes {
             let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
                 continue;
             };
             if let Some(clause) = self.ctx.arena.get_case_clause(clause_node) {
+                // Check if this is a default clause (no expression)
+                if clause.expression.is_none() {
+                    has_default_clause = true;
+                }
                 let result = self.analyze_block(&clause.statements.nodes, &assigned, tracked);
                 normal = self.combine_flow_sets(normal, result.normal);
                 exits = self.combine_flow_sets(exits, result.exits);
             }
         }
 
-        if normal.is_none() && exits.is_none() {
+        // If there's no default clause, the switch might not execute any case
+        // Properties are only definitely assigned if ALL cases assign them
+        // AND the switch covers all possible values (has default)
+        if !has_default_clause {
+            // Without a default, we can't guarantee any case will execute
+            // Return empty normal flow to indicate properties are not definitely assigned
+            return FlowResult {
+                normal: None,
+                exits: Some(assigned.clone()),
+            };
+        }
+
+        // With a default clause, use the combined assignments
+        if normal.is_none() && exits.is_some() {
+            normal = exits.clone();
+        } else if normal.is_none() && exits.is_none() {
             normal = Some(assigned);
         }
 
@@ -16729,7 +16781,98 @@ impl<'a> ThinCheckerState<'a> {
                     self.collect_assignment_target(unary.expression, assigned, tracked);
                 }
             }
+            // Handle destructuring assignments: ({ a: this.a, b: this.b } = obj)
+            k if k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
+                self.collect_destructuring_assignments(target_idx, assigned, tracked);
+            }
+            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION => {
+                self.collect_array_destructuring_assignments(target_idx, assigned, tracked);
+            }
             _ => {}
+        }
+    }
+
+    /// Collect property assignments from object destructuring patterns.
+    /// Handles: ({ a: this.a, b: this.b } = data)
+    fn collect_destructuring_assignments(
+        &self,
+        literal_idx: NodeIndex,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        let Some(node) = self.ctx.arena.get(literal_idx) else {
+            return;
+        };
+        let Some(literal) = self.ctx.arena.get_literal_expr(node) else {
+            return;
+        };
+
+        for &elem_idx in &literal.elements.nodes {
+            let Some(elem_node) = self.ctx.arena.get(elem_idx) else {
+                continue;
+            };
+
+            // Handle property assignment: { a: this.a }
+            if elem_node.kind == syntax_kind_ext::PROPERTY_ASSIGNMENT {
+                if let Some(prop) = self.ctx.arena.get_property_assignment(elem_node) {
+                    // Check if the value being assigned is a property access like this.a
+                    if let Some(key) = self.property_key_from_access(prop.initializer) {
+                        self.record_property_assignment(key, assigned, tracked);
+                    }
+                }
+            }
+            // Handle shorthand property assignment: { this.a }
+            // (This is less common but syntactically valid in destructuring)
+            else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
+                if let Some(prop) = self.ctx.arena.get_shorthand_property(elem_node) {
+                    if let Some(key) = self.property_key_from_access(prop.name) {
+                        self.record_property_assignment(key, assigned, tracked);
+                    }
+                }
+            }
+            // Handle nested destructuring (recursively)
+            else if elem_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                self.collect_destructuring_assignments(elem_idx, assigned, tracked);
+            }
+            else if elem_node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
+                self.collect_array_destructuring_assignments(elem_idx, assigned, tracked);
+            }
+        }
+    }
+
+    /// Collect property assignments from array destructuring patterns.
+    /// Handles: [this.a, this.b] = arr
+    fn collect_array_destructuring_assignments(
+        &self,
+        literal_idx: NodeIndex,
+        assigned: &mut FxHashSet<PropertyKey>,
+        tracked: &FxHashSet<PropertyKey>,
+    ) {
+        let Some(node) = self.ctx.arena.get(literal_idx) else {
+            return;
+        };
+        let Some(literal) = self.ctx.arena.get_literal_expr(node) else {
+            return;
+        };
+
+        for &elem_idx in &literal.elements.nodes {
+            // Skip holes in array destructuring: [a, , b]
+            if elem_idx.is_none() {
+                continue;
+            }
+
+            // Check if the element is a property access like this.a
+            if let Some(key) = self.property_key_from_access(elem_idx) {
+                self.record_property_assignment(key, assigned, tracked);
+            }
+            // Handle nested destructuring
+            else if let Some(elem_node) = self.ctx.arena.get(elem_idx) {
+                if elem_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
+                    self.collect_destructuring_assignments(elem_idx, assigned, tracked);
+                } else if elem_node.kind == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION {
+                    self.collect_array_destructuring_assignments(elem_idx, assigned, tracked);
+                }
+            }
         }
     }
 
