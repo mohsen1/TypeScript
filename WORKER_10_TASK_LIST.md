@@ -1,6 +1,6 @@
 # Worker-10 Task List
 
-**Squad:** Syntax Support
+**Squad:** Semantics (Property Initialization)
 **Branch:** `worker-10`
 **EM:** EM-3
 *Assigned: 2026-01-14*
@@ -9,47 +9,54 @@
 
 ## Priority Mission
 
-Fix parser edge cases to support TS1005/TS1109 reduction efforts. **Target: Reduce edge case parser failures by 50%.**
+Implement `strictPropertyInitialization` check (TS2564). **Target: Reduce from 413 to <20 missing errors.**
 
 ---
 
 ## Assigned Tasks
 
-### 1. Audit ASI (Automatic Semicolon Insertion) Edge Cases
-**Priority:** P0 - High
-**File:** `wasm/src/parser/`
+### 1. Implement Strict Property Initialization Check
+**Priority:** P0 - Critical
+**File:** `wasm/src/checker/thin_checker.rs`
 
-**Focus Areas:**
-1. Line terminators before `++`/`--`
-2. `return`, `throw`, `yield` statements without semicolons
-3. `break`, `continue` with labels
-4. Arrow functions with block-less bodies
-
-### 2. Fix Complex Synchronization Points
-**Priority:** P1
-**File:** `wasm/src/parser/`
+**Problem:** TS2564 is the #1 missing error (413 occurrences). "Property 'x' has no initializer..." means we aren't running this check.
 
 **Tasks:**
-1. Improve recovery after unexpected tokens in class bodies
-2. Handle `interface` declarations with malformed extends clauses
-3. Recover from errors in template literal expressions
-4. Handle object destructuring patterns with missing commas
+1. Detect class properties without initializers
+2. Check constructor assigns all properties
+3. Handle definite assignment assertions (`!`)
+4. Handle optional properties (`?`)
+5. Handle `declare` properties correctly
 
-### 3. Support Worker-1/Worker-5 Parser Noise Efforts
+### 2. Control Flow Analysis for Property Assignment
 **Priority:** P1
+**File:** `wasm/src/checker/`
+
 **Tasks:**
-1. Run conformance tests to identify remaining TS1005/TS1109 patterns
-2. Categorize by syntactic context (statement/declaration/expression)
-3. Report findings to EM-1 and EM-2 teams
-4. Implement fixes for edge cases not covered by main parser work
+1. Track property assignments in constructor
+2. Handle conditional assignments
+3. Handle property assignments in called functions
+4. Handle assignment in all code paths
+
+### 3. Test Edge Cases
+**Priority:** P2
+
+**Test Cases:**
+- Properties with initializers
+- Properties assigned in constructor
+- Properties with definite assignment assertion
+- Optional properties
+- Abstract class properties
+- `declare` properties
 
 ---
 
 ## Success Criteria
-- [ ] ASI edge cases identified and documented
-- [ ] Parser recovery improved in complex contexts
-- [ ] Support EM-1/EM-2 with categorized error patterns
-- [ ] Edge case failure rate reduced by 50%
+- [ ] TS2564 errors detected for non-initialized properties
+- [ ] No false positives on constructor-initialized props
+- [ ] Handles `declare` properties correctly
+- [ ] Handles definite assignment assertion correctly
+- [ ] Reduce missing TS2564 from 413 to <20
 
 ---
 
