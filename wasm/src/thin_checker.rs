@@ -9664,13 +9664,13 @@ impl<'a> ThinCheckerState<'a> {
                         self.get_type_from_type_node(param.type_annotation)
                     } else if is_this_param {
                         if let Some(ref helper) = ctx_helper {
-                            helper.get_this_type().unwrap_or(TypeId::ANY)
+                            helper.get_this_type().unwrap_or(TypeId::UNKNOWN)
                         } else {
                             TypeId::ANY
                         }
                     } else {
                         // Infer from contextual type
-                        contextual_type.unwrap_or(TypeId::ANY)
+                        contextual_type.unwrap_or(TypeId::UNKNOWN)
                     };
 
                     if is_this_param {
@@ -15470,7 +15470,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the expected return type from the function context
-        let expected_type = self.current_return_type().unwrap_or(TypeId::ANY);
+        let expected_type = self.current_return_type().unwrap_or(TypeId::UNKNOWN);
 
         // Get the type of the return expression (if any)
         let return_type = if !return_data.expression.is_none() {
