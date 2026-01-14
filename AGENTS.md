@@ -53,7 +53,8 @@ Commit frequently and atomically
 This is not optional. This is not a suggestion. DO IT.
 
 - **Stay on your assignment**; do not self-switch tasks.
- -**wasm only** - All code changes for this migration must be within `wasm/` directory.
+- **🚨 CRITICAL: NO TypeScript compiler modifications** - DO NOT modify ANY files in `src/compiler/`, `src/services/`, `src/server/` etc.
+- **wasm only** - All code changes for this migration must be within `wasm/` directory.
 - **Docker-only Rust tests**: `./wasm/test.sh` (never `cargo test/bench`).
 - **Separate test files**: `foo.rs` and `foo_tests.rs` or `tests/foo.rs`.
 - **Commit and push** to your worker branch frequently; do not push to `origin/rust` or squad branches.
@@ -64,6 +65,16 @@ This is not optional. This is not a suggestion. DO IT.
 
 This is a complex compiler project. Take time to understand the code before making changes. Reading architecture docs, tracing call paths, and understanding existing patterns is valuable work - not wasted time.
 
+
+## 🚨🚨🚨 ABSOLUTE RED LINES - NEVER CROSS THESE 🚨🚨🚨
+
+**TypeScript compiler source files are 100% OFF-LIMITS for this migration:**
+- **NEVER modify ANYTHING in `src/compiler/`** - not checker.ts, parser.ts, scanner.ts, binder.ts, transformer.ts, emitter.ts, or ANY other file
+- **NEVER modify ANYTHING in `src/services/`** - language service files are forbidden  
+- **NEVER modify ANYTHING in `src/server/`** - tsserver files are forbidden
+- **NEVER modify ANYTHING in `src/lib/`** - library definitions are forbidden
+
+**🚨 VIOLATION = IMMEDIATE REVERT** - Any commit that touches these files will be reverted without discussion.
 
 ## We work in wasm/
 
