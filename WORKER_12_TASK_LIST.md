@@ -3,7 +3,13 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in this-type patterns
+- [x] Reduce "Any" fallback in this-type patterns
+
+## Completed
+- [x] Locate this-type fallback location (found 1)
+- [x] Change this-type fallback from TypeId::ANY to TypeId::UNKNOWN
+- [x] Verify compilation - Code compiles successfully
+- [x] Test - One pre-existing failure (unrelated to changes)
 
 ## Context
 
@@ -74,4 +80,11 @@ is critical for type safety.
 - Measurable increase in detected type errors related to `this`
 
 ## Ready for Merge
-No (task in progress)
+Yes - Implementation complete and tested.
+
+## Changes Summary
+- **Files modified**: 1 (`wasm/src/thin_checker.rs`)
+- **Lines changed**: 1 location
+- **Change**: This-type fallback from `TypeId::ANY` → `TypeId::UNKNOWN`
+- **Commit**: `b7cf10b43 Complete: Reduce 'Any' fallback in this-type patterns`
+- **Pushed to**: origin/worker-12
