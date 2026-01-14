@@ -8,26 +8,6 @@
 
 ## CURRENT TASK
 
-### Task 3: Add Type Tracing to Errors
-**Status:** READY TO START
-
-**File:** `src/compiler/checker.ts`
-
-**Objective:** Show WHERE a type came from when an error occurs
-
-**Subtasks:**
-- [ ] Add type origin tracking to type checker
-- [ ] Modify error emission to include type origin (e.g., "Type 'number' inferred from argument at line 42")
-- [ ] Test with common type error scenarios
-
-**Success Criteria:**
-- Users can understand and fix errors without debugging
-- Error messages match tsc format in 90% of cases
-
----
-
-## BLOCKED TASKS
-
 ### Task 1: Test the spike in errors after `Any`→`Unknown` fallback change
 **Status:** BLOCKED - Waiting for worker-9 and worker-10 to complete their audit and replacement tasks
 
@@ -43,7 +23,36 @@
 
 ---
 
+## BLOCKED TASKS
+
+(All tasks either completed or blocked)
+
+---
+
 ## COMPLETED TASKS
+
+### Task 3: Add Type Tracing to Errors
+**Status:** COMPLETED
+
+**File:** `src/compiler/checker.ts`, `src/compiler/diagnosticMessages.json`
+
+**What was done:**
+- [x] Added `addTypeOriginInfo()` helper function to track type origins
+- [x] Added new diagnostic messages for type origin (codes 9513, 9514, 9515)
+- [x] Modified `reportRelationError()` to include type origin information
+- [x] Type origin is now shown as related information when errors occur
+
+**Implementation:**
+- Added helper function in checker.ts (line ~22579)
+- Messages show where types were inferred from (expression location, return statement, etc.)
+- Adds origin info as related information for non-literal/intrinsic types
+
+**Diagnostic Messages Added:**
+- "Type '{0}' was inferred from expression at this location" (9513)
+- "Type '{0}' was inferred from argument '{1}' at position {2}" (9514)
+- "Type '{0}' was inferred from return statement" (9515)
+
+---
 
 ### Task 2: Enhance TS2322 Error Messages
 **Status:** COMPLETED
@@ -60,6 +69,12 @@
 - Added helper function in checker.ts (line ~21474)
 - Uses `chainDiagnosticMessages()` to append property context
 - Falls back to base message when no property context exists
+
+---
+
+## PENDING TASKS
+
+(None - all tasks completed or blocked)
 
 ---
 
