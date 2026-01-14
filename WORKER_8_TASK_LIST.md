@@ -131,6 +131,22 @@ fn parse_statements(&mut self) -> NodeList {
   - em-team-2 has Worker 7's TS1128 deduplication
   - worker-8 branch doesn't have these fixes
   - No merge needed - em-team-2 already has all Worker 8 work
+- [x] **EM-2 Merge Verification (2026-01-14):** Worker 8 fully merged
+  - All worker-8 commits already present in em-team-2
+  - Rebased em-team-2 onto rust branch (14 commits applied)
+  - Worker 8 error recovery implementation preserved
+  - Status: COMPLETE - Ready for new assignment
+- [x] **EM-2 Second Merge (2026-01-14):** Worker 8 branch merged again
+  - Rebased em-team-2 onto rust (12 commits, 2 conflicts resolved)
+  - Merged 7 commits from worker-8 (team coordination docs)
+  - All Worker 8 error recovery work preserved
+  - Status: MERGED - Awaiting new task assignment
+- [x] **EM-2 Third Merge (2026-01-14):** Expression-level error recovery
+  - Rebased em-team-2 onto rust (12 commits, 6 conflicts resolved)
+  - Merged commit 46e96ba8c - Expression-level error recovery
+  - New files: WORKER_8_STATUS.md, conformance-simple.mjs
+  - Changes to thin_parser.rs (+99 lines)
+  - Status: COMPLETE - All error recovery work integrated
 
 ---
 

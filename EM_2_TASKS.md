@@ -2,8 +2,8 @@
 
 **Branch:** `em-team-2`
 **Priority:** 🟠 HIGH
-**Assigned Workers:** workers 1, 2, 3 (transferred from EM-1 after validation)
-**Last Updated:** 2026-01-14 (Post EM-1 validation)
+**Assigned Workers:** workers 1, 2, 3 (from EM-1), worker 5 (reassigned from TS2304), workers 7-8 (original EM-2)
+**Last Updated:** 2026-01-14 (Worker 5 reassigned to TS1005)
 
 ---
 
@@ -38,6 +38,22 @@ Focus areas:
 ---
 
 ## Worker Assignments
+
+### Worker 5 (TS1005 - Type Parameters & Templates)
+**Expertise:** TS1005 patterns, type parameter parsing
+**Status:** Reassigned from TS2304 (Binder) ✅
+**Priority Target:** ~79 cases (52 type params + 27 templates)
+
+**Tasks:**
+1. Fix type parameter parsing edge cases (~52 cases)
+   - Generic constraint syntax errors
+   - Default type parameter handling
+   - Variance annotations (`in`/`out`)
+   - Conditional type parsing
+2. Fix template literal expression parsing (~27 cases)
+   - Template literal type expressions
+   - Tagged template parsing
+   - Nested template literals
 
 ### Worker 1 (TS1005 - Comma & Statement Focus)
 **Expertise:** TS1005 patterns, semicolon/ASI handling
@@ -135,7 +151,8 @@ Before merging any worker branch:
 None - all workers can start in parallel
 
 ## Next Actions
-1. Assign tasks to worker-5 through worker-8
-2. Monitor progress via WORKER_*_TASK_LIST.md updates
-3. Merge completed work to em-team-2
-4. Run conformance to measure impact
+1. ✅ Assign Worker 5 to TS1005 (Type Parameters & Templates)
+2. Assign Worker 6 to TS1005 (coordinate with Worker 5)
+3. Monitor progress via WORKER_*_TASK_LIST.md updates
+4. Merge completed work to em-team-2
+5. Run conformance to measure impact

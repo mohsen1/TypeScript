@@ -2,97 +2,89 @@
 
 ## Squad: Parser/Scanner - Error Recovery Focus
 
+## Current Task (Phase 6)
+- [ ] Implement binary expression right-side error recovery
+- [ ] Add resynchronization after failed right-side expression parsing
+- [ ] Test and measure impact on false positive reduction
+
+## Queue
+- [ ] Investigate TS1005 patterns in WASM parser (coordinate with Workers 5/6)
+- [ ] Implement sequence expression recovery (Priority 2)
+- [ ] Parser error analysis for remaining optimization opportunities
+
 ## Completed ✅
 
 ### Phase 1: TS1109 Cascading Error Fix
 **Status:** ✅ Complete (93% reduction!)
-
-**Implementation:**
-- Added position deduplication check to TS1109 error emission
-- Prevents duplicate errors at same position
-- Commit: Merged to em-team-2
-
-**Results:**
-- TS1109: 262 → 17 occurrences (**93% reduction**)
+- TS1109: 262 → 17 occurrences (93% reduction)
 - Goal of <50 achieved ✓
-- Exact Match: +3.0% improvement (30.1% → 33.1%)
 
-### Phase 2: Extended Position Deduplication
+### Phase 2-3: Comprehensive Position Deduplication
 **Status:** ✅ Complete
+- Extended position deduplication to all major parser error types
+- All 7 major error types now have position deduplication
 
-**Implementation:**
-- Extended position deduplication to all major parser error types:
-  - TS1003 (Identifier expected)
-  - TS1005 (Token expected)
-  - TS1110 (Type expected)
-  - TS1129 (Statement expected)
-  - TS1146 (Declaration expected)
+### Phase 4: Expression-Level Error Recovery Analysis
+**Status:** ✅ Complete
+- Created `EXPRESSION_LEVEL_ERROR_RECOVERY_ANALYSIS.md`
+- Identified Priority 1: Binary expression right-side recovery
 
-**Created Documentation:**
-- `POSITION_DEDUPLICATION_STRATEGY.md` - Strategy guide for other workers
-
-### Phase 3: TS1128 Position Deduplication
-**Status:** ✅ Complete (commit: `f87ae5bef`)
-
-**Implementation:**
-- Added position deduplication to `parse_source_file_statements()` closing brace error
-- Added position deduplication to `parse_class_member()` statement keyword error
-- Prevents cascading TS1128 errors during error recovery
-
-**File Modified:** `wasm/src/thin_parser.rs` (+24 lines, -32 lines)
-
-**Impact:**
-- Further reduces false positives during error recovery
-- Complements Worker 8's statement-level resync
-- Reduces "Declaration or statement expected" noise
+### Phase 5: Remaining Error Type Analysis
+**Status:** ✅ Complete (merged: `d915c88ff`)
+- Analyzed remaining parser error types beyond TS1005/TS1109
+- Conclusion: No additional position deduplication needed
 
 ### Merge Status
-- [x] Merged to em-team-2 (commit: `55b2c0a71`)
-- [x] All position deduplication work integrated
-
----
-
-## Queue
-- [x] Apply position deduplication to other error types (ACHIEVED - all major types covered)
-- [x] Investigate TS1128 patterns (COMPLETE - deduplication added)
-- [ ] Investigate TS1005 patterns in WASM parser (coordinate with Workers 5/6)
-- [ ] Consider: TS1129, TS1146 additional improvements (if needed)
-
----
-
-## Summary of Achievements
-
-**All major parser error emission points now have position deduplication:**
-- ✅ TS1003 (Identifier expected)
-- ✅ TS1005 (Token expected)
-- ✅ TS1109 (Expression expected) - **93% reduction**
-- ✅ TS1110 (Type expected)
-- ✅ TS1128 (Declaration/statement expected) - **NEW**
-- ✅ TS1129 (Statement expected)
-- ✅ TS1146 (Declaration expected)
-
-**Impact:**
-- Comprehensive position deduplication across parser
-- Reduces cascading errors during error recovery
-- Improves error message quality (less noise)
-- Supports Worker 8's statement-level resync
+- [x] All phases 1-5 integrated to em-team-2
+- [x] Documentation preserved: POSITION_DEDUPLICATION_STRATEGY.md, TS1005_ANALYSIS.md, EXPRESSION_LEVEL_ERROR_RECOVERY_ANALYSIS.md, REMAINING_PARSER_ERROR_TYPES_ANALYSIS.md
+- [x] **EM-2 Latest Merge (2026-01-14):** Phase 6 assignment merged
+  - Commit: 0fc85f52f - Binary expression recovery assignment
+  - Rebased em-team-2 onto rust (10 commits, clean)
+  - Status: IN PROGRESS - Working on Phase 6 implementation
 
 ---
 
 ## Context
-Worker 7 has successfully implemented comprehensive position deduplication across all major parser error emission points, achieving significant reductions in false positives.
+Worker 7 has completed comprehensive position deduplication (Phases 1-3) and analysis of error recovery opportunities (Phases 4-5).
+
+With EM-1 achieving 99.9% TS1005 elimination and position deduplication complete, Phase 6 focuses on implementing the Priority 1 improvement identified in the expression-level analysis: **binary expression right-side error recovery**.
+
+### Phase 6 Implementation Plan
+
+**Objective:** Add resynchronization to `parse_binary_expression()` when right-side expression parsing fails.
+
+**Current Behavior:**
+```rust
+// When right-side parsing fails in: x = a + * b + c
+// Parser emits error at *, then tries to parse rest
+// May emit cascading errors for '+ c'
+```
+
+**Proposed Solution:**
+Add resynchronization check after failed right-side parse:
+```rust
+let right = if self.can_follow_operator() {
+    self.parse_binary_expression(next_min)
+} else {
+    // Recovery: Skip to next operator or end-of-expression marker
+    self.resync_to_next_binary_operator();
+    NodeIndex::NONE
+};
+```
+
+**Expected Impact:**
+- Prevents cascading errors in complex expressions with invalid syntax
+- Particularly helpful for: `a + * b + c` type scenarios
+- Reduces noise when binary expression parsing fails mid-expression
 
 ### Key Files
-- `wasm/src/thin_parser.rs` - main parser implementation
-- `POSITION_DEDUPLICATION_STRATEGY.md` - strategy documentation
+- `wasm/src/thin_parser.rs` - main parser implementation (target for Phase 6)
+- `EXPRESSION_LEVEL_ERROR_RECOVERY_ANALYSIS.md` - detailed analysis from Phase 4
 
 ### Goal
-✅ **ACHIEVED:** Reduce parser false positives through position deduplication and error recovery improvements.
+Implement expression-level error recovery to further reduce parser false positives beyond the comprehensive position deduplication already achieved.
 
 ---
 
-## Next Steps
-- [x] Ready for new task assignment
-- [ ] Consider: Investigate TS1005 false positives (coordinate with Workers 5/6)
-- [ ] Consider: Parser error analysis for remaining optimization opportunities
-- [ ] Consider: Expression-level error recovery (within statements)
+## Next Focus
+Implement binary expression right-side recovery (Priority 1 from expression-level analysis) to prevent cascading errors in complex expressions.

@@ -590,6 +590,86 @@ impl ThinParserState {
         }
     }
 
+    // =========================================================================
+    // Expression-Level Error Recovery
+    // =========================================================================
+
+    /// Check if current token can start an expression
+    fn is_expression_start(&self) -> bool {
+        match self.token() {
+            // Literals
+            SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NoSubstitutionTemplateLiteral
+            | SyntaxKind::TemplateHead
+            | SyntaxKind::TemplateMiddle
+            | SyntaxKind::TemplateTail
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Identifiers and expression keywords
+            SyntaxKind::Identifier
+            | SyntaxKind::ThisKeyword
+            | SyntaxKind::SuperKeyword
+            | SyntaxKind::ImportKeyword
+            | SyntaxKind::TypeKeyword
+            | SyntaxKind::AsyncKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword
+            | SyntaxKind::NewKeyword
+            | SyntaxKind::ClassKeyword
+            | SyntaxKind::FunctionKeyword
+            | SyntaxKind::DeleteKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::InstanceOfKeyword => true,
+            // Unary operators
+            SyntaxKind::PlusToken
+            | SyntaxKind::MinusToken
+            | SyntaxKind::TildeToken
+            | SyntaxKind::ExclamationToken
+            | SyntaxKind::PlusPlusToken
+            | SyntaxKind::MinusMinusToken => true,
+            // Open parentheses/brackets/angle brackets
+            SyntaxKind::OpenParenToken
+            | SyntaxKind::OpenBracketToken
+            | SyntaxKind::LessThanToken => true,
+            // Decorators
+            SyntaxKind::AtToken => true,
+            _ => false,
+        }
+    }
+
+    /// Check if current token is a binary operator
+    fn is_binary_operator(&self) -> bool {
+        let precedence = self.get_operator_precedence(self.token());
+        precedence > 0
+    }
+
+    /// Resynchronize to next expression boundary after parse error
+    fn resync_to_next_expression_boundary(&mut self) {
+        let max_iterations = 100;
+        for _ in 0..max_iterations {
+            if self.is_token(SyntaxKind::EndOfFileToken) {
+                break;
+            }
+            if self.is_token(SyntaxKind::SemicolonToken)
+                || self.is_token(SyntaxKind::CloseBraceToken)
+                || self.is_token(SyntaxKind::CloseParenToken)
+                || self.is_token(SyntaxKind::CloseBracketToken)
+            {
+                break;
+            }
+            if self.is_binary_operator() {
+                break;
+            }
+            if self.is_expression_start() {
+                break;
+            }
+            self.next_token();
+        }
+    }
+
     /// Try to rescan `>` as a compound token (`>>`, `>>>`, `>=`, `>>=`, `>>>=`)
     /// Returns the rescanned token (which may be unchanged if no compound token found)
     fn try_rescan_greater_token(&mut self) -> SyntaxKind {
@@ -5882,8 +5962,14 @@ impl ThinParserState {
             // Handle conditional expression
             if op == SyntaxKind::QuestionToken {
                 let when_true = self.parse_assignment_expression();
+                if when_true.is_none() {
+                    self.resync_to_next_expression_boundary();
+                }
                 self.parse_expected(SyntaxKind::ColonToken);
                 let when_false = self.parse_assignment_expression();
+                if when_false.is_none() {
+                    self.resync_to_next_expression_boundary();
+                }
                 let end_pos = self.token_end();
 
                 left = self.arena.add_conditional_expr(
@@ -5920,17 +6006,26 @@ impl ThinParserState {
                 );
 
                 let right = if is_assignment {
-                    // Allow arrow functions on RHS of assignment
-                    self.parse_assignment_expression()
+                    let result = self.parse_assignment_expression();
+                    if result.is_none() {
+                        self.resync_to_next_expression_boundary();
+                    }
+                    result
                 } else {
                     let next_min = if op == SyntaxKind::AsteriskAsteriskToken {
                         precedence // right associative
                     } else {
                         precedence + 1
                     };
-                    self.parse_binary_expression(next_min)
+                    let result = self.parse_binary_expression(next_min);
+                    if result.is_none() {
+                        self.resync_to_next_expression_boundary();
+                    }
+                    result
                 };
                 let end_pos = self.token_end();
+
+                let final_right = if right.is_none() { left } else { right };
 
                 left = self.arena.add_binary_expr(
                     syntax_kind_ext::BINARY_EXPRESSION,
@@ -5939,7 +6034,7 @@ impl ThinParserState {
                     BinaryExprData {
                         left,
                         operator_token,
-                        right,
+                        right: final_right,
                     },
                 );
             }
