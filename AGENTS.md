@@ -53,6 +53,7 @@ Commit frequently and atomically
 This is not optional. This is not a suggestion. DO IT.
 
 - **Stay on your assignment**; do not self-switch tasks.
+ -**wasm only** - All code changes for this migration must be within `wasm/` directory.
 - **Docker-only Rust tests**: `./wasm/test.sh` (never `cargo test/bench`).
 - **Separate test files**: `foo.rs` and `foo_tests.rs` or `tests/foo.rs`.
 - **Commit and push** to your worker branch frequently; do not push to `origin/rust` or squad branches.
