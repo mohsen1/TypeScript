@@ -2,53 +2,124 @@
 
 ## Squad: Parser/Scanner - Error Recovery Focus
 
-## Completed ✅
+## Current Task - Statement-Level Resynchronization
 
-### Task 1 & 2: Statement-Level Error Recovery Implementation
-**Status:** ✅ Complete and Verified
+### Task 1: Statement Recovery Enhancement
+**Problem:** When `parse_statement()` encounters an error, it may not properly resynchronize to the next statement, causing cascading errors throughout the block.
 
-**Implementation Details:**
-- Added `is_statement_start()` - Identifies statement boundary tokens (keywords, identifiers, braces)
-- Added `resync_after_error()` - Skips tokens to next statement boundary after errors
-- Enhanced `parse_source_file_statements()` - Uses resync on parse failures
-- Enhanced `parse_statements()` - Uses resync with infinite loop protection
+**Solution:** Implement statement-level resynchronization that skips to the next statement start after encountering a parse error.
 
-**File Modified:** `wasm/src/thin_parser.rs` (+130 lines from commit `aac4ace7c`)
+**Implementation Locations:**
+- `wasm/src/thin_parser.rs:716` - `parse_statement()`
+- `wasm/src/thin_parser.rs:695` - `parse_statements()`
 
-### Test Results (Error Recovery Verification)
-**Test File:** `wasm/test-error-recovery-v2.mjs` (commit `934ac45c2`)
+**Strategy:**
+1. After emitting an error in `parse_statement()`, check if we can resynchronize
+2. Look ahead for statement start tokens:
+   - Keywords: `function`, `class`, `if`, `for`, `while`, `do`, `switch`, `try`, `var`, `let`, `const`, `return`, `break`, `continue`, `throw`, `import`, `export`, `type`, `interface`, `enum`, `namespace`
+   - Identifiers (for expression statements)
+   - `{` (block statements)
+3. If current token can't start a statement, consume tokens until we find one that can
+4. Add `fn can_start_statement(&self) -> bool` helper method
 
-**Results:** ✅ **5/5 tests passed (100%)**
+**Reference Pattern:**
+```rust
+fn parse_statement(&mut self) -> NodeIndex {
+    let start = self.token_pos();
 
-| Test | Nodes | Errors | Result |
-|------|-------|--------|--------|
-| Valid code (baseline) | 12 | 0 | ✓ No errors |
-| Missing semicolon | 12 | 0 | ✓ ASI recovery |
-| Extra closing brace | 18 | 1 | ✓ Recovered |
-| Invalid syntax mid-file | 25 | 3 | ✓ Recovered |
-| Mismatched braces | 18 | 1 | ✓ Recovered |
+    match self.token() {
+        SyntaxKind::OpenBraceToken => self.parse_block(),
+        // ... other statement types ...
+        _ => {
+            // Error: unexpected token
+            self.error_unexpected_token();
 
-**Summary:**
-- Total Tests: 5
-- Passed: 5 (100%)
-- Total Nodes: 85
-- Error Recovery: **WORKING ✓**
+            // RESYNCHRONIZE: Skip to next statement
+            self.resynchronize_to_next_statement();
 
-### Impact
-- Parser continues building complete ASTs despite syntax errors
-- Prevents cascading errors across statement boundaries
-- Improves LSP experience (partial AST for code intelligence)
-- Reports errors without stopping compilation
+            // Return empty statement node to continue parsing
+            self.create_missing_node(SyntaxKind::ExpressionStatement, start)
+        }
+    }
+}
 
----
+fn resynchronize_to_next_statement(&mut self) {
+    while !self.is_at_end() && !self.can_start_statement() {
+        self.next_token();
+    }
+}
+
+fn can_start_statement(&self) -> bool {
+    match self.token() {
+        // Keywords that start statements
+        SyntaxKind::FunctionKeyword |
+        SyntaxKind::ClassKeyword |
+        SyntaxKind::IfKeyword |
+        SyntaxKind::ForKeyword |
+        SyntaxKind::WhileKeyword |
+        SyntaxKind::DoKeyword |
+        SyntaxKind::SwitchKeyword |
+        SyntaxKind::TryKeyword |
+        SyntaxKind::VarKeyword |
+        SyntaxKind::LetKeyword |
+        SyntaxKind::ConstKeyword |
+        SyntaxKind::ReturnKeyword |
+        SyntaxKind::BreakKeyword |
+        SyntaxKind::ContinueKeyword |
+        SyntaxKind::ThrowKeyword |
+        SyntaxKind::ImportKeyword |
+        SyntaxKind::ExportKeyword |
+        SyntaxKind::TypeKeyword |
+        SyntaxKind::InterfaceKeyword |
+        SyntaxKind::EnumKeyword |
+        SyntaxKind::NamespaceKeyword |
+        SyntaxKind::OpenBraceToken |
+        SyntaxKind::Identifier => true,
+        _ => false,
+    }
+}
+```
+
+### Task 2: Block-Level Recovery
+**Problem:** When parsing statements inside a block (`parse_block`), errors in one statement can cause the parser to fail to parse subsequent statements.
+
+**Solution:** Ensure `parse_statements()` continues parsing after errors by catching failures and resynchronizing.
+
+**Implementation Location:**
+- `wasm/src/thin_parser.rs:695-706` - `parse_statements()`
+
+**Current Code Pattern:**
+```rust
+fn parse_statements(&mut self) -> NodeList {
+    let mut statements = NodeList::default();
+    while self.token() != SyntaxKind::EndOfFileToken && self.token() != SyntaxKind::CloseBraceToken {
+        statements.push(self.parse_statement());
+    }
+    statements
+}
+```
+
+**Enhanced Version:**
+```rust
+fn parse_statements(&mut self) -> NodeList {
+    let mut statements = NodeList::default();
+    while self.token() != SyntaxKind::EndOfFileToken && self.token() != SyntaxKind::CloseBraceToken {
+        // Safety: catch infinite loops
+        if self.token_pos() == self.last_error_pos {
+            // Already emitted error here and couldn't recover
+            break;
+        }
+        statements.push(self.parse_statement());
+    }
+    statements
+}
+```
 
 ## Queue
-- [x] Reduce cascading errors through better recovery (ACHIEVED)
-- [x] Test parser changes on conformance suite (DONE - 33.1% exact match)
-- [x] Coordinate with Workers 5-7 on error emission patterns (COMPLETE)
-- [x] Ensure parser doesn't bail early on syntax deviations (ACHIEVED)
-
----
+- [ ] Test parser changes on conformance suite to measure impact
+- [ ] Coordinate with Workers 5-7 on error emission patterns
+- [ ] Measure reduction in cascading errors
+- [ ] Document recovery patterns for future workers
 
 ## Completed
 - [x] **Task 1 & 2:** Statement-level error recovery (commit: `aac4ace7c`)
@@ -79,20 +150,31 @@
 
 ---
 
+- [x] **Task 1: Statement Recovery Enhancement** - Implemented is_statement_start() and resync_after_error()
+- [x] **Task 2: Block-Level Recovery** - Enhanced parse_source_file_statements() and parse_statements() with resync
+- [x] Merged to em-team-2 (commit: `aac4ace7c`)
+- [x] **Conformance Test Results (1000 tests):**
+  - Exact Match: 33.1% (unchanged - error recovery helps within files, not across test boundaries)
+  - Throughput: 15.6 tests/sec
+  - **Note:** Error recovery prevents cascading errors within complex files, improving LSP experience and AST completeness
+  - Real benefit is fewer incomplete ASTs and better error recovery in multi-statement blocks
+
+- [x] Merge attempt #2 - No commits to merge yet
+
 ## Context
 Error recovery is critical to prevent one syntax error from poisoning the entire file. When the parser bails early, the incomplete AST leads to missing symbols and cascading errors.
 
+### Key Insight
+Worker 7's TS1109 fix showed that tracking `last_error_pos` and avoiding duplicate emissions is effective. Apply similar pattern to statement-level recovery.
+
 ### Key Files
-- `wasm/src/thin_parser.rs` - main parser implementation (statement recovery)
-- `wasm/test-error-recovery-v2.mjs` - verification tests
+- `wasm/src/thin_parser.rs` - main parser implementation
+- `src/compiler/parser.ts:3400-3500` - TypeScript's `parseStatement()` with recovery
 
-### Success Metric
-✅ **ACHIEVED:** Parser recovers from syntax errors and continues parsing. All 5 test cases pass.
+### Success Metrics
+- Fewer "Extra Errors" in conformance tests
+- More complete ASTs (fewer missing symbols due to parse failures)
+- Parser continues after syntax errors instead of bailing
 
----
-
-## Next Steps
-- [x] Ready for new task assignment
-- [ ] Consider: Expression-level error recovery (within statements)
-- [ ] Consider: Declaration-level resynchronization
-- [ ] Consider: Block-level recovery improvements (nested blocks)
+### Goal
+Improve parser resilience so it can recover from syntax errors and continue parsing, reducing incomplete ASTs and cascading errors.

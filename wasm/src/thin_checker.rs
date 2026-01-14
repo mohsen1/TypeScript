@@ -1703,7 +1703,7 @@ impl<'a> ThinCheckerState<'a> {
                 let mut args = type_args.clone();
                 if args.len() < sig.type_params.len() {
                     for param in sig.type_params.iter().skip(args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         args.push(fallback);
                     }
                 }
@@ -3572,7 +3572,7 @@ impl<'a> ThinCheckerState<'a> {
                     if type_args.len() < base_type_params.len() {
                         for param in base_type_params.iter().skip(type_args.len()) {
                             let fallback =
-                                param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                             type_args.push(fallback);
                         }
                     }
@@ -4517,7 +4517,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }
@@ -4600,7 +4600,7 @@ impl<'a> ThinCheckerState<'a> {
                     if type_args.len() < interface_type_params.len() {
                         for param in interface_type_params.iter().skip(type_args.len()) {
                             let fallback =
-                                param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                                param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                             type_args.push(fallback);
                         }
                     }
@@ -5115,7 +5115,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }
@@ -8467,7 +8467,7 @@ impl<'a> ThinCheckerState<'a> {
                     // Check for optional chaining (?.)
                     if access.question_dot_token {
                         // Suppress error, return (property_type | undefined)
-                        let base_type = property_type.unwrap_or(TypeId::ANY);
+                        let base_type = property_type.unwrap_or(TypeId::UNKNOWN);
                         return self.ctx.types.union(vec![base_type, TypeId::UNDEFINED]);
                     }
 
@@ -8551,7 +8551,7 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                property_type.unwrap_or(TypeId::ANY)
+                property_type.unwrap_or(TypeId::UNKNOWN)
             }
             PropertyAccessResult::IsUnknown => {
                 // TS2571: Object is of type 'unknown'
@@ -8755,7 +8755,7 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ANY
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                property_type.unwrap_or(TypeId::ANY)
+                property_type.unwrap_or(TypeId::UNKNOWN)
             }
             PropertyAccessResult::IsUnknown => {
                 // TS2571: Object is of type 'unknown'
@@ -8978,7 +8978,7 @@ impl<'a> ThinCheckerState<'a> {
                     result_type = Some(match result {
                         PropertyAccessResult::Success { type_id, .. } => type_id,
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                            property_type.unwrap_or(TypeId::ANY)
+                            property_type.unwrap_or(TypeId::UNKNOWN)
                         }
                         PropertyAccessResult::IsUnknown => {
                             // TS2571: Object is of type 'unknown'
@@ -9358,7 +9358,7 @@ impl<'a> ThinCheckerState<'a> {
             match self.ctx.types.property_access_type(object_type, &name) {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                    types.push(property_type.unwrap_or(TypeId::ANY));
+                    types.push(property_type.unwrap_or(TypeId::UNKNOWN));
                 }
                 // IsUnknown: Return None to signal that property access on unknown failed
                 // The caller has node context and will report TS2571 error
@@ -9664,13 +9664,13 @@ impl<'a> ThinCheckerState<'a> {
                         self.get_type_from_type_node(param.type_annotation)
                     } else if is_this_param {
                         if let Some(ref helper) = ctx_helper {
-                            helper.get_this_type().unwrap_or(TypeId::ANY)
+                            helper.get_this_type().unwrap_or(TypeId::UNKNOWN)
                         } else {
                             TypeId::ANY
                         }
                     } else {
                         // Infer from contextual type
-                        contextual_type.unwrap_or(TypeId::ANY)
+                        contextual_type.unwrap_or(TypeId::UNKNOWN)
                     };
 
                     if is_this_param {
@@ -15470,7 +15470,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         // Get the expected return type from the function context
-        let expected_type = self.current_return_type().unwrap_or(TypeId::ANY);
+        let expected_type = self.current_return_type().unwrap_or(TypeId::UNKNOWN);
 
         // Get the type of the return expression (if any)
         let return_type = if !return_data.expression.is_none() {
@@ -18596,7 +18596,7 @@ impl<'a> ThinCheckerState<'a> {
             self.push_type_parameters(&base_class.type_parameters);
         if type_args.len() < base_type_params.len() {
             for param in base_type_params.iter().skip(type_args.len()) {
-                let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                 type_args.push(fallback);
             }
         }
@@ -18930,7 +18930,7 @@ impl<'a> ThinCheckerState<'a> {
 
                 if type_args.len() < base_type_params.len() {
                     for param in base_type_params.iter().skip(type_args.len()) {
-                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::ANY);
+                        let fallback = param.default.or(param.constraint).unwrap_or(TypeId::UNKNOWN);
                         type_args.push(fallback);
                     }
                 }

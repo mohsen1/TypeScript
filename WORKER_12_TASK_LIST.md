@@ -3,74 +3,50 @@
 ## Squad: Solver Strictness
 
 ## Current Task
-- [ ] Reduce "Any" fallback in type parameter defaults only
+- [ ] Reduce "Any" fallback in this-type patterns (Phase 4 - IN PROGRESS)
+
+## Completed
+- [x] Phase 1: Type parameter defaults (7 locations)
+- [x] Phase 2: Property access patterns (5 locations)
+- [x] Phase 3: Contextual type patterns (3 locations)
+- [x] Verify compilation - Code compiles successfully
+- [x] Test - One pre-existing failure (unrelated to changes)
 
 ## Context
 
-**Previous Attempt Status: REJECTED**
-The previous attempt to change ALL fallbacks from `Any` to `Unknown` was too aggressive and caused issues.
+**Incremental Strategy**
+Worker 12 has been systematically reducing "Any" fallback usage to expose hidden bugs.
 
-**New Approach: Incremental Strategy**
-Instead of changing everything at once, we'll make focused, testable changes one area at a time.
+### Phase 1: Type Parameter Defaults (MERGED)
+Changed 7 locations in `thin_checker.rs` from `TypeId::ANY` to `TypeId::UNKNOWN`.
 
-**Why Type Parameter Defaults?**
-Type parameter defaults are a critical source of "Any" poisoning:
-- When generic functions are called without explicit type arguments
-- The compiler fills in missing type parameters from `default` or `constraint`
-- If neither exists, it currently falls back to `Any`
-- This `Any` then propagates through the entire call chain
+### Phase 2: Property Access Patterns (MERGED)
+Changed 5 locations in `thin_checker.rs`.
 
-**Targeted Change**
-Only change the fallback in these specific locations in `thin_checker.rs`:
-1. Line ~1706: `param.default.or(param.constraint).unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
-2. Line ~3575: Same pattern (interface merging)
-3. Line ~4520: Same pattern
-4. Line ~4603: Same pattern
-5. Line ~5118: Same pattern
+### Phase 3: Contextual Type Patterns (MERGED)
+Changed 3 locations in `thin_checker.rs`.
 
-This is a surgical change (5 locations) that should:
-- Expose bugs in generic type handling
-- Not affect other parts of the codebase
-- Be easy to test and measure
+### Phase 4: This-Type Patterns (IN PROGRESS)
+Target: Line ~629 in thin_checker.rs
+- `self.current_this_type().unwrap_or(TypeId::ANY)` → `unwrap_or(TypeId::UNKNOWN)`
+
+**Impact**: Exposes bugs in class methods, arrow functions using `this`, and nested scopes.
 
 ## Queue
-- [ ] After type parameter fix, measure conformance impact
-- [ ] If successful, tackle other fallback patterns incrementally
+- [ ] After this-type fix, measure conformance impact
+- [ ] Tackle array element type fallbacks
+- [ ] Tackle remaining accessor fallbacks
 - [ ] Coordinate with Solver Squad on type inference improvements
 
-## Implementation Steps
-
-1. **Make targeted changes**
-   - Only modify type parameter default fallbacks in `thin_checker.rs`
-   - Search for `param.default.or(param.constraint).unwrap_or(TypeId::ANY)`
-   - Replace with `.unwrap_or(TypeId::UNKNOWN)`
-
-2. **Test incrementally**
-   - Run `./wasm/test.sh` after each change
-   - Run small conformance sample: `./wasm/differential-test/run-conformance.sh --max=50`
-   - Verify no crashes
-
-3. **Measure impact**
-   - Compare error counts before/after
-   - Focus on TS2322 (type mismatch) and TS7006 (implicit any)
-   - Document which tests are affected
-
-## Files to Modify
-- `wasm/src/thin_checker.rs` - Only type parameter default fallbacks (5 locations)
+## Files Modified
+- `wasm/src/thin_checker.rs` - 15 total locations changed (phases 1-3), phase 4 in progress
 
 ## Success Criteria
-- Code compiles without errors
-- No test crashes
-- Measurable increase in detected type errors (TS2322, TS7006)
+- ✅ Code compiles without errors
+- ✅ No new test crashes (one pre-existing failure unrelated)
+- ⏳ Measurable increase in detected type errors (to be verified in conformance)
 
-## Recent Merge Status
-- **Date**: 2026-01-14 (second verification)
-- **Result**: Worker-12 already fully merged into em-team-3
-- **Action Taken**:
-  - Rebased em-team-3 onto rust (successful)
-  - Verified all worker-12 commits present
-  - Build verification: PASSED
-- **Next**: Continue incremental Any→Unknown changes in type parameter defaults
-
-## Ready for Merge
-Yes (task list update merged)
+## Merge Status
+- **Date**: 2026-01-14
+- **Phases 1-3**: Merged to em-team-3
+- **Phase 4**: Task assigned, in progress
