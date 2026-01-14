@@ -274,6 +274,23 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             return SubtypeResult::True;
         }
 
+        // =========================================================================
+        // Meta-type evaluation (must happen before NEVER target check)
+        // =========================================================================
+        // Evaluate meta-types (KeyOf, Conditional, etc.) before the NEVER check
+        // because keyof {} = never, and we need to evaluate that first
+        let source_eval = self.evaluate_type(source);
+        let target_eval = self.evaluate_type(target);
+
+        // If evaluation changed anything, recurse with the simplified types
+        if source_eval != source || target_eval != target {
+            return self.check_subtype(source_eval, target_eval);
+        }
+
+        // =========================================================================
+        // Post-evaluation fast paths
+        // =========================================================================
+
         // Nothing (except never) is assignable to never
         if target == TypeId::NEVER {
             return SubtypeResult::False;
@@ -321,16 +338,9 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         result
     }
 
-    /// Inner subtype check (after cycle detection)
+    /// Inner subtype check (after cycle detection and type evaluation)
     fn check_subtype_inner(&mut self, source: TypeId, target: TypeId) -> SubtypeResult {
-        // Evaluate meta-types (conditionals, index access, etc.) before comparing
-        let source_eval = self.evaluate_type(source);
-        let target_eval = self.evaluate_type(target);
-
-        // If evaluation changed anything, recurse with the simplified types
-        if source_eval != source || target_eval != target {
-            return self.check_subtype(source_eval, target_eval);
-        }
+        // Types are already evaluated in check_subtype, so no need to re-evaluate here
 
         if !self.strict_null_checks && (source == TypeId::NULL || source == TypeId::UNDEFINED) {
             return SubtypeResult::True;
@@ -2258,6 +2268,18 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         for i in 0..fixed_compare_count {
             let s_param = &source.params[i];
             let t_param = &target.params[i];
+
+            // Check optional compatibility:
+            // - Required param can substitute for optional param (if types match)
+            // - Optional param CANNOT substitute for required param (unless type accepts undefined)
+            if s_param.optional && !t_param.optional {
+                // Source is optional, target is required
+                // Optional param can only substitute for required if the type accepts undefined
+                if !self.check_subtype(TypeId::UNDEFINED, t_param.type_id).is_true() {
+                    return SubtypeResult::False;
+                }
+            }
+
             // Check parameter compatibility (contravariant in strict mode, bivariant in legacy)
             // Methods use bivariance even in strict mode
             if !self.are_parameters_compatible_impl(s_param.type_id, t_param.type_id, is_method) {
