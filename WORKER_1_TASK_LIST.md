@@ -31,15 +31,18 @@
 5. Miscellaneous edge cases (~110 cases)
 
 ## Current Task (Assigned by EM-1)
-- [x] **IMMEDIATE:** Run conformance tests to measure TS1005 reduction impact from patterns 1-5
-- [x] Document exact TS1005 count before and after your fixes
-- [x] Report metrics to EM-1 for validation before proceeding
+- [ ] **PATTERN 6:** Fix statement termination edge cases (~38 cases)
+  - Modify parseBreakOrContinueStatement, parseReturnStatement to use tryParseSemicolon()
+  - Avoid false positive TS1005 when ASI (Automatic Semicolon Insertion) succeeds
+  - Pattern: Replace `parseSemicolon()` with conditional error emission
+  - Test and verify reduction in conformance suite
+  - Target: Reduce from 312 to <275 TS1005 errors
 
-## Queue (On Hold - Awaiting Baseline)
-- [ ] Continue fixing remaining TS1005 false positive patterns (target: <100 total)
-- [ ] Fix object literal comma handling edge cases
+## Queue
+- [ ] Fix object literal comma handling edge cases (~85 cases)
 - [ ] Fix array literal missing element handling
-- [ ] Fix type parameter parsing edge cases
+- [ ] Fix type parameter parsing edge cases (~52 cases)
+- [ ] Fix template literal expression parsing (~27 cases)
 - [ ] Coordinate with Workers 2 & 3 on remaining parser false positives
 
 ## Completed
