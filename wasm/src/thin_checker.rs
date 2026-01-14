@@ -962,7 +962,7 @@ impl<'a> ThinCheckerState<'a> {
                         .as_ref()
                         .and_then(|args| args.nodes.first().copied())
                         .map(|idx| self.get_type_from_type_node(idx))
-                        .unwrap_or(TypeId::ANY);
+                        .unwrap_or(TypeId::UNKNOWN);
                     let array_type = self.ctx.types.array(elem_type);
                     if name == "ReadonlyArray" {
                         return self
@@ -2580,7 +2580,7 @@ impl<'a> ThinCheckerState<'a> {
                             .as_ref()
                             .and_then(|args| args.nodes.first().copied())
                             .map(|idx| self.get_type_from_type_node_in_type_literal(idx))
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         let array_type = self.ctx.types.array(elem_type);
                         if name == "ReadonlyArray" {
                             return self.ctx.types.intern(TypeKey::ReadonlyType(array_type));
@@ -2654,7 +2654,7 @@ impl<'a> ThinCheckerState<'a> {
                         .as_ref()
                         .and_then(|args| args.nodes.first().copied())
                         .map(|idx| self.get_type_from_type_node_in_type_literal(idx))
-                        .unwrap_or(TypeId::ANY);
+                        .unwrap_or(TypeId::UNKNOWN);
                     let array_type = self.ctx.types.array(elem_type);
                     if name == "ReadonlyArray" {
                         return self.ctx.types.intern(TypeKey::ReadonlyType(array_type));
