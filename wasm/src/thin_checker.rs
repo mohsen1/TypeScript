@@ -7098,8 +7098,26 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the callee
         let mut callee_type = self.get_type_of_node(call.expression);
 
+        // Get arguments list (may be None for calls without arguments)
+        // IMPORTANT: We must check arguments even if callee is ANY/ERROR to catch definite assignment errors
+        let args = call
+            .arguments
+            .as_ref()
+            .map(|a| &a.nodes)
+            .map(|n| n.as_slice())
+            .unwrap_or(&[]);
+
         // Check if callee is any/error (don't report for those)
         if callee_type == TypeId::ANY || callee_type == TypeId::ERROR {
+            // Still need to check arguments for definite assignment (TS2454) and other errors
+            // Create a dummy context helper that returns None for all parameter types
+            let ctx_helper = ContextualTypeContext::new(self.ctx.types);
+            let check_excess_properties = false;
+            self.collect_call_argument_types_with_context(
+                args,
+                |_i, _arg_count| None, // No parameter type info for ANY/ERROR callee
+                check_excess_properties,
+            );
             return TypeId::ANY;
         }
 
@@ -7116,13 +7134,7 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Get arguments list (may be None for calls without arguments)
-        let args = call
-            .arguments
-            .as_ref()
-            .map(|a| &a.nodes)
-            .map(|n| n.as_slice())
-            .unwrap_or(&[]);
+        // args is already defined above before the ANY/ERROR check
 
         let overload_signatures = match self.ctx.types.lookup(callee_type) {
             Some(TypeKey::Callable(shape_id)) => {

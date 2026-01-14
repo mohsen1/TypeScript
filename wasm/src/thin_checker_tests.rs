@@ -24498,3 +24498,135 @@ abstract class AbstractBase {
         checker.ctx.diagnostics
     );
 }
+
+/// Test TS2454 - Variable used before assignment (basic case)
+#[test]
+fn test_ts2454_variable_used_before_assignment() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    let x: string;
+    console.log(x);  // Should report TS2454
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let has_2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(
+        has_2454,
+        "Expected TS2454 for variable used before assignment, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test TS2454 - Variable used in conditional (only one path assigns)
+#[test]
+fn test_ts2454_conditional_assignment_one_path() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    let x: string;
+    if (Math.random() > 0.5) {
+        x = "hello";
+    }
+    console.log(x);  // Should report TS2454 (not all paths assign)
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let has_2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(
+        has_2454,
+        "Expected TS2454 for conditional assignment (one path), got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test TS2454 - All paths assign (should NOT report error)
+#[test]
+fn test_ts2454_all_paths_assign() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    let x: string;
+    if (Math.random() > 0.5) {
+        x = "hello";
+    } else {
+        x = "world";
+    }
+    console.log(x);  // Should NOT report TS2454 (all paths assign)
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let has_2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(
+        !has_2454,
+        "Expected NO TS2454 when all paths assign, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
+
+/// Test TS2454 - Variable with initializer (should NOT report error)
+#[test]
+fn test_ts2454_variable_with_initializer() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+function test() {
+    let x: string = "hello";
+    console.log(x);  // Should NOT report TS2454 (has initializer)
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(parser.get_diagnostics().is_empty(), "Parse errors: {:?}", parser.get_diagnostics());
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(parser.get_arena(), &binder, &types, "test.ts".to_string(), false);
+    checker.check_source_file(root);
+
+    let has_2454 = checker.ctx.diagnostics.iter().any(|d| d.code == 2454);
+    assert!(
+        !has_2454,
+        "Expected NO TS2454 for variable with initializer, got: {:?}",
+        checker.ctx.diagnostics
+    );
+}
