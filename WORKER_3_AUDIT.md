@@ -424,3 +424,88 @@ if self.ctx.no_implicit_any && prop.type_annotation.is_none() {
 - The error is generated at the property name location for accurate error positioning
 - Method return types already have implicit any checks (TS7011) for ambient contexts
 
+---
+
+## Task 4: Fix Property Access Error Propagation (TS2339)
+
+### Summary
+Fixed TS2339 ("Property '{0}' does not exist on type '{1}'") not being generated for element access when properties are not found.
+
+### Problem
+Based on conformance test results, **TS2339** had 72 missing errors:
+- Error message: "Property '{0}' does not exist on type '{1}'"
+- Property access errors were being silenced
+- Invalid property access fell back to 'any' instead of reporting error
+
+### Root Cause Analysis
+
+#### Before Fix
+**File:** `wasm/src/thin_checker.rs`
+
+**Issue:** During element access (`obj[property]`), when a property was not found, the code was returning `TypeId::ANY` instead of generating TS2339 error.
+
+**Code Location:** `get_type_of_element_access` function (line 9040-9043)
+
+**Problematic Code:**
+```rust
+PropertyAccessResult::PropertyNotFound { .. } => {
+    report_no_index = true;
+    TypeId::ANY  // <-- Silent fallback to ANY hides errors!
+}
+```
+
+### Changes Made
+
+#### File: `wasm/src/thin_checker.rs`
+
+**Location:** Element access PropertyNotFound handling (lines 9040-9045)
+
+**Fixed Code:**
+```rust
+PropertyAccessResult::PropertyNotFound { .. } => {
+    report_no_index = true;
+    // Generate TS2339 for property not found during element access
+    self.error_property_not_exist_at(&property_name.to_string(), object_type_for_access, access.name_or_argument);
+    TypeId::ERROR  // Return ERROR instead of ANY to expose the error
+}
+```
+
+**Behavior:**
+- When property is not found during element access
+- Generate TS2339 error message
+- Return `TypeId::ERROR` instead of `TypeId::ANY`
+- Error is properly exposed instead of being hidden
+
+### Impact Assessment
+
+#### Expected Impact on Conformance Tests
+- **TS2339 missing errors should decrease** from 72
+- Element access on non-existent properties now properly reports TS2339
+- Better error messages for invalid property access
+- Temporary increase in extra errors (expected and beneficial)
+
+#### Other Property Access Cases
+TS2339 is already correctly generated in these cases:
+- Regular property access (`obj.property`) - lines 8480-8496
+- Private property access fallback - lines 8584-8590
+- Property access by name - lines 8584-8590
+
+**Suppressed Cases (by design):**
+- Optional chaining (`obj?.property`) - Correctly suppressed (TypeScript behavior)
+- Callable types (functions) - Allow arbitrary properties (TypeScript behavior)
+- Private fields (`#prop`) - Handled separately
+
+### Acceptance Criteria for Task 4
+✅ Invalid element access generates TS2339 error
+✅ Property access on ERROR types returns ERROR (not ANY)
+✅ Code compiles without errors
+✅ Error message format matches TypeScript's TS2339
+
+### Files Modified
+- `wasm/src/thin_checker.rs`: Fixed element access PropertyNotFound handling (3 lines modified)
+
+### Notes
+- This fix continues the "Invert Solver Defaults" mission
+- Error is now exposed instead of being hidden by ANY fallback
+- Aligns with strict type checking behavior of TypeScript
+

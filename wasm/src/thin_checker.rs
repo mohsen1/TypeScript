@@ -9039,7 +9039,9 @@ impl<'a> ThinCheckerState<'a> {
                         }
                         PropertyAccessResult::PropertyNotFound { .. } => {
                             report_no_index = true;
-                            TypeId::ANY
+                            // Generate TS2339 for property not found during element access
+                            self.error_property_not_exist_at(&property_name.to_string(), object_type_for_access, access.name_or_argument);
+                            TypeId::ERROR  // Return ERROR instead of ANY to expose the error
                         }
                     });
                 }
