@@ -1,10 +1,10 @@
 # EM-3 Task List
 
 ## Team: Engineering Manager 3
-- **Workers**: worker-9, worker-10, worker-11
+- **Workers**: worker-9, worker-10, worker-11, worker-12
 - **Branch**: em-team-3
 - **Worktree**: /tmp/orchestrator-workspace/worktrees/em-3
-- **Squad Focus**: Parser/Scanner ONLY (TS1005/TS1109)
+- **Squad Focus**: Parser (TS1005/TS1109) + Solver Strictness (Any→Unknown)
 
 ## Mission Phase: Phase 8 - Conformance, Convergence, and Hardening
 
@@ -43,6 +43,28 @@ The compiler defaults to `Any` when it encounters unresolved symbols, silencing 
 - TS1109: 262 → <50
 - Total parser false positives: 701 → <100
 
+---
+
+### Solver Strictness Squad (1 worker) - "Any" to "Unknown" Migration
+**Worker**: worker-12
+**Priority**: STRATEGIC - Stop "Any" poisoning to expose real bugs
+
+**Directive**:
+- Change default fallback from `Any` to `Unknown` or `Error`
+- Harden `solve_subtype` logic
+- Implement "Lawyer" layer for TypeScript quirks (function bivariance, void return exceptions)
+- Stop being nice—compiler needs to be meaner to match `tsc`
+
+**Key Files**:
+- `src/compiler/checker.ts` (3.1M lines) - main type checking logic
+- `src/compiler/types.ts` (487K lines)
+- `specs/SOLVER.md` - reference for subtyping rules
+
+**Success Metrics**:
+- Convert "Missing TS2322" into "Exact Match" or "Extra TS2322"
+- Reduce TS7006 (Implicit Any) missing errors
+- **Expected**: Temporary spike in errors (this is GOOD - exposes real bugs)
+
 ### Worker Breakdown
 
 | Worker | Primary Focus | Secondary Focus |
@@ -50,6 +72,7 @@ The compiler defaults to `Any` when it encounters unresolved symbols, silencing 
 | **worker-9** | TS1005 patterns 6-10 (object/array literals) | TS1109 statement parsing |
 | **worker-10** | TS1109 expression expected errors | TS1005 type parameters |
 | **worker-11** | TS1005 patterns 11-15 (edge cases) | TS1109 class member parsing |
+| **worker-12** | Solver: Any→Unknown migration | Harden solve_subtype logic |
 
 ---
 
@@ -89,6 +112,7 @@ npm run test -- --grep "TS2304"
 1. **Worker 9**: Fix TS1005 patterns 6-10 (object literals, arrays, edge cases)
 2. **Worker 10**: Fix TS1109 false positives (expression expected errors)
 3. **Worker 11**: Fix TS1005 patterns 11-15 (edge cases: type parameters, return types, statements)
+4. **Worker 12**: Change solver fallback from Any to Unknown in checker.ts
 
 ---
 
@@ -97,6 +121,6 @@ npm run test -- --grep "TS2304"
 - [x] Create WORKER_9_TASK_LIST.md
 - [x] Create WORKER_10_TASK_LIST.md
 - [x] Update WORKER_11_TASK_LIST.md (Parser focus)
-- [x] Remove WORKER_12_TASK_LIST.md (reassigned)
+- [x] Restore WORKER_12_TASK_LIST.md (re-added to EM-3)
 - [ ] Run baseline conformance tests
-- [ ] Assign updated tasks to workers 9-11
+- [ ] Assign updated tasks to workers 9-12
