@@ -8,13 +8,93 @@
 
 ## CURRENT TASK
 
-No pending tasks - awaiting new assignment from EM-3.
+### Task 8: Enhance Error Messages for Conditional Types
+**Status:** READY TO START
+
+**Priority:** MEDIUM
+**Expected Impact:** Better error messages for complex conditional types
+
+**Objective:** When conditional type checking fails, show better information about WHICH branch condition failed and WHY.
+
+**Subtasks:**
+- [ ] Find conditional type error reporting in checker.ts
+- [ ] Add context showing which condition branch was evaluated
+- [ ] Show the distributive condition that failed
+- [ ] Example: "Type 'string' does not satisfy condition 'extends number' in conditional type"
+
+**Key Files:**
+- `src/compiler/checker.ts` (conditional type checking)
+- `src/compiler/diagnosticMessages.json`
+
+**Example:**
+```typescript
+// Before: Type 'string' is not assignable to type 'string | number'.
+// After:  In conditional type 'T extends number ? string : never',
+//         type 'string' does not satisfy condition 'T extends number'
+```
 
 ---
 
 ## PENDING TASKS
 
-(None - all assigned tasks completed)
+### Task 9: Improve Error Messages for Mapped Types
+**Status:** PENDING
+
+**Priority:** LOW
+**Expected Impact:** Better error messages for complex mapped types
+
+**Objective:** When mapped type property access fails, show better information about which property and transformation failed.
+
+**Subtasks:**
+- [ ] Find mapped type error reporting
+- [ ] Add context showing the original property and transformed type
+- [ ] Show key remapping information
+- [ ] Example: "Property 'foo' in mapped type has transformed type 'string' but source has 'number'"
+
+**Key Files:**
+- `src/compiler/checker.ts` (mapped type checking)
+- `src/compiler/diagnosticMessages.json`
+
+---
+
+### Task 10: Add Type Tracing for Async/Await Error Messages
+**Status:** PENDING
+
+**Priority:** MEDIUM
+**Expected Impact:** Better error messages for Promise/async-await type mismatches
+
+**Objective:** When async/await type checking fails, trace through Promise unwrapping to show the root cause.
+
+**Subtasks:**
+- [ ] Find Promise unwrapping logic in type checker
+- [ ] Add diagnostic messages for Promise type unwrapping
+- [ ] Show both wrapped and unwrapped types in errors
+- [ ] Example: "Promise<string> is not assignable to Promise<number>. Unwrapped types: string is not assignable to number"
+
+**Key Files:**
+- `src/compiler/checker.ts` (Promise type handling)
+- `src/compiler/diagnosticMessages.json`
+
+---
+
+### Task 11: Enhance Error Messages for Template Literal Types
+**Status:** PENDING
+
+**Priority:** LOW
+**Expected Impact:** Better error messages for template literal type mismatches
+
+**Objective:** When template literal type checking fails, show which parts of the template pattern matched or failed.
+
+**Subtasks:**
+- [ ] Find template literal type checking logic
+- [ ] Add context showing template matching details
+- [ ] Show which literal types failed to match
+- [ ] Example: "Type 'foo-bar' does not match template pattern '${string}-baz'"
+
+**Key Files:**
+- `src/compiler/checker.ts` (template literal type checking)
+- `src/compiler/types.ts` (template literal type representation)
+- `src/compiler/diagnosticMessages.json`
 
 ---
 
@@ -165,6 +245,7 @@ After:  error TS9518: Type parameter 'T' has constraint 'number', but type argum
   - Lines 21000-23000: Type checking and subtyping
   - Lines 18000-19000: Freshness and excess property checking
   - Lines 22000-22700: Error reporting
+  - Line ~35919: Generic type argument checking
 
 - `src/compiler/types.ts` - Type representation
 - `src/compiler/diagnosticMessages.json` - Error message definitions
