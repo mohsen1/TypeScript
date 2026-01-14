@@ -138,23 +138,50 @@
 
 ## Resource Allocation
 
-| EM | Squad | Assigned Workers | Total | Status | Notes |
-|----|-------|------------------|-------|--------|-------|
-| EM_1 | **HYBRID** | workers 1-4 | 5 | ✅ VALIDATED | +4.4% Exact Match, keep together |
-| EM_2 | **Parser** | workers 5-8 | 5 | 🟡 ACTIVE | All workers on Parser |
-| EM_3 | **Parser + Solver** | workers 9-12 | 5 | 🟢 ACTIVE | 3 Parser, 1 Solver (worker-12) |
+| EM | Squad | Assigned Workers | Total + EM | Status | Action Needed |
+|----|-------|------------------|------------|--------|---------------|
+| EM_1 | **Binder** | worker-4 | **2** ✅ | Pure Binder focus | None - within limit |
+| EM_2 | **Parser** | workers 1-3, 5-8 | **9** 🔴 | Expanded squad | **SPLIT into 2 squads** |
+| EM_3 | **Parser + Solver** | workers 9-12 | **5** 🔴 | Hybrid squad | **TRANSFER 1 worker** |
 
-**Current Status (Post-Rebalancing):**
-- All 12 workers are now active
-- **Binder:** Worker 4 only (1 worker) - still under-resourced
-- **Solver:** Worker 12 only (1 worker) - critical work started ✅
-- **Parser:** Workers 1-3, 5-11 (10 workers) - well-resourced
+**Actual Worker Distribution (after EM-1→EM-2 transfer):**
+- EM_1: Worker 4 only (1 worker) - Pure Binder
+- EM_2: Workers 1-3 (from EM-1) + Workers 5-8 = 8 workers - Parser squad
+- EM_3: Workers 9-12 = 4 workers - Parser + Solver
 
-**Director Assessment:**
-- ✅ EM-1 validated, high-performing team
-- ✅ EM-3 added Solver worker (addresses critical gap)
-- 🟡 EM-2 still 100% on Parser (consider reassigning 1 to Binder)
-- 🔴 Binder work still under-resourced (only Worker 4)
+**🔴 TEAM SIZE ISSUES:**
+- EM_2: 8 workers + EM = **9 total** (limit is 4, need to remove 5)
+- EM_3: 4 workers + EM = **5 total** (limit is 4, need to remove 1)
+
+---
+
+## Director's Orders: Team Rebalancing
+
+### Required Actions
+
+**1. SPLIT EM-2 into two squads:**
+- EM-2A: Workers 1-3 (transferred from EM-1, high-performing team)
+- EM-2B: Workers 5-8 (original EM-2 workers)
+- Both squads focus on Parser (TS1005/TS1109)
+
+**2. RESIZE EM-3:**
+- Transfer **Worker 10** to EM-1 (Binder squad)
+- EM-3 will have Workers 9, 11, 12 (3 workers + EM = 4 total)
+
+**3. REASSIGN Worker 10 to Binder:**
+- Worker 10 joins EM-1 to support Worker 4
+- Focus: TS2304 reduction (276 → <50)
+
+### Resulting Structure (After Rebalancing)
+
+| EM | Workers | Total | Focus |
+|----|---------|-------|-------|
+| EM_1 | 4, 10 | 3 + EM = **4** ✅ | Binder |
+| EM_2A | 1, 2, 3 | 3 + EM = **4** ✅ | Parser (from EM-1) |
+| EM_2B | 5, 6, 7, 8 | 4 + EM = **5** 🔴 | Parser - still need to split |
+| EM_3 | 9, 11, 12 | 3 + EM = **4** ✅ | Parser + Solver |
+
+**Note:** EM_2B still at 5 total. Need to create EM-4 or further rebalance.
 
 **Note:** CFA (Control Flow Analysis) work remains on hold until TS2304 is under control.
 
