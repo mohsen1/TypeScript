@@ -730,8 +730,101 @@ impl TypeInterner {
             return flat[0];
         }
 
+        // If all members are objects, merge them into a single object
+        if let Some(merged) = self.try_merge_objects_in_intersection(&flat) {
+            return merged;
+        }
+
         let list_id = self.intern_type_list(flat.into_vec());
         self.intern(TypeKey::Intersection(list_id))
+    }
+
+    fn try_merge_objects_in_intersection(&self, members: &[TypeId]) -> Option<TypeId> {
+        let mut objects: Vec<Arc<ObjectShape>> = Vec::new();
+
+        // Check if all members are objects
+        for &member in members {
+            match self.lookup(member) {
+                Some(TypeKey::Object(shape_id)) | Some(TypeKey::ObjectWithIndex(shape_id)) => {
+                    objects.push(self.object_shape(shape_id));
+                }
+                _ => return None, // Not all objects, can't merge
+            }
+        }
+
+        // Merge all object properties
+        let mut merged_props: Vec<PropertyInfo> = Vec::new();
+        let mut merged_string_index: Option<IndexSignature> = None;
+        let mut merged_number_index: Option<IndexSignature> = None;
+
+        for obj in &objects {
+            // Merge properties
+            for prop in &obj.properties {
+                // Check if property already exists
+                if let Some(existing) = merged_props.iter_mut().find(|p| p.name == prop.name) {
+                    // Property exists - intersect the types for stricter checking
+                    // In TypeScript, if same property has different types, use intersection
+                    if existing.type_id != prop.type_id {
+                        existing.type_id = self.intersection2(existing.type_id, prop.type_id);
+                    }
+                    if existing.write_type != prop.write_type {
+                        existing.write_type = self.intersection2(existing.write_type, prop.write_type);
+                    }
+                    // Merge flags: required wins over optional, readonly is cumulative
+                    // For optional: only optional if ALL are optional (required wins)
+                    existing.optional = existing.optional && prop.optional;
+                    // For readonly: readonly if ANY is readonly
+                    existing.readonly = existing.readonly || prop.readonly;
+                } else {
+                    merged_props.push(prop.clone());
+                }
+            }
+
+            // Merge index signatures
+            match (&obj.string_index, &merged_string_index) {
+                (Some(idx), None) => merged_string_index = Some(IndexSignature {
+                    key_type: idx.key_type,
+                    value_type: idx.value_type,
+                    readonly: idx.readonly,
+                }),
+                (Some(idx), Some(existing)) => {
+                    merged_string_index = Some(IndexSignature {
+                        key_type: existing.key_type,
+                        value_type: self.intersection2(existing.value_type, idx.value_type),
+                        readonly: existing.readonly || idx.readonly,
+                    });
+                }
+                _ => {}
+            }
+
+            match (&obj.number_index, &merged_number_index) {
+                (Some(idx), None) => merged_number_index = Some(IndexSignature {
+                    key_type: idx.key_type,
+                    value_type: idx.value_type,
+                    readonly: idx.readonly,
+                }),
+                (Some(idx), Some(existing)) => {
+                    merged_number_index = Some(IndexSignature {
+                        key_type: existing.key_type,
+                        value_type: self.intersection2(existing.value_type, idx.value_type),
+                        readonly: existing.readonly || idx.readonly,
+                    });
+                }
+                _ => {}
+            }
+        }
+
+        // Sort properties by name for consistent hashing
+        merged_props.sort_by_key(|p| p.name.0);
+
+        let shape = ObjectShape {
+            properties: merged_props,
+            string_index: merged_string_index,
+            number_index: merged_number_index,
+        };
+
+        let shape_id = self.intern_object_shape(shape);
+        Some(self.intern(TypeKey::Object(shape_id)))
     }
 
     fn intersection_has_disjoint_primitives(&self, members: &[TypeId]) -> bool {
