@@ -8467,7 +8467,7 @@ impl<'a> ThinCheckerState<'a> {
                     // Check for optional chaining (?.)
                     if access.question_dot_token {
                         // Suppress error, return (property_type | undefined)
-                        let base_type = property_type.unwrap_or(TypeId::ANY);
+                        let base_type = property_type.unwrap_or(TypeId::UNKNOWN);
                         return self.ctx.types.union(vec![base_type, TypeId::UNDEFINED]);
                     }
 
@@ -8551,7 +8551,7 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ERROR
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                property_type.unwrap_or(TypeId::ANY)
+                property_type.unwrap_or(TypeId::UNKNOWN)
             }
             PropertyAccessResult::IsUnknown => {
                 // TS2571: Object is of type 'unknown'
@@ -8755,7 +8755,7 @@ impl<'a> ThinCheckerState<'a> {
                 TypeId::ANY
             }
             PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                property_type.unwrap_or(TypeId::ANY)
+                property_type.unwrap_or(TypeId::UNKNOWN)
             }
             PropertyAccessResult::IsUnknown => {
                 // TS2571: Object is of type 'unknown'
@@ -8978,7 +8978,7 @@ impl<'a> ThinCheckerState<'a> {
                     result_type = Some(match result {
                         PropertyAccessResult::Success { type_id, .. } => type_id,
                         PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                            property_type.unwrap_or(TypeId::ANY)
+                            property_type.unwrap_or(TypeId::UNKNOWN)
                         }
                         PropertyAccessResult::IsUnknown => {
                             // TS2571: Object is of type 'unknown'
@@ -9358,7 +9358,7 @@ impl<'a> ThinCheckerState<'a> {
             match self.ctx.types.property_access_type(object_type, &name) {
                 PropertyAccessResult::Success { type_id, .. } => types.push(type_id),
                 PropertyAccessResult::PossiblyNullOrUndefined { property_type, .. } => {
-                    types.push(property_type.unwrap_or(TypeId::ANY));
+                    types.push(property_type.unwrap_or(TypeId::UNKNOWN));
                 }
                 // IsUnknown: Return None to signal that property access on unknown failed
                 // The caller has node context and will report TS2571 error
