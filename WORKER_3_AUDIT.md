@@ -509,3 +509,162 @@ TS2339 is already correctly generated in these cases:
 - Error is now exposed instead of being hidden by ANY fallback
 - Aligns with strict type checking behavior of TypeScript
 
+---
+
+## Task 5: Fix Variable Type Inference (TS7005)
+
+### Summary
+Fixed TS7005 ("Variable '{0}' implicitly has an '{1}' type") not being generated for variable declarations without type annotations when `noImplicitAny` is enabled.
+
+### Problem
+Based on conformance test results, **TS7005** had 54 missing errors:
+- Error message: "Variable '{0}' implicitly has an '{1}' type"
+- Variables without type annotations were falling back to 'any' without reporting error
+- This is similar to TS7008 (members) and TS7006 (parameters) but for variables
+
+### Root Cause Analysis
+
+#### Before Fix
+**File:** `wasm/src/thin_checker.rs`
+
+**Issue:** During variable declaration checking, when a variable had no type annotation and no initializer (or initializer that inferred to `any`), the code was NOT generating TS7005 error when `noImplicitAny` was enabled.
+
+**Code Location:** `check_variable_declaration` function (around line 14800-14803)
+
+**Missing Logic:**
+```rust
+// This check was MISSING for variable declarations
+if self.ctx.no_implicit_any && var_decl.type_annotation.is_none() && final_type == TypeId::ANY {
+    // Generate TS7005 error
+}
+```
+
+### Changes Made
+
+#### File 1: `wasm/src/checker/types/diagnostics.rs`
+
+**Location:** Message constants (line 179)
+
+**Added Message Constant:**
+```rust
+pub const VARIABLE_IMPLICIT_ANY: &str = "Variable '{0}' implicitly has an '{1}' type.";
+```
+
+**Purpose:** Provides the error message template for TS7005 (variable implicit any errors)
+
+#### File 2: `wasm/src/solver/diagnostics.rs`
+
+**Location 1:** Error codes module (lines 271-272)
+
+**Added Error Code:**
+```rust
+/// Variable '{0}' implicitly has an '{1}' type.
+pub const IMPLICIT_ANY: u32 = 7005;
+```
+
+**Location 2:** Message templates (line 334)
+
+**Added Message Template:**
+```rust
+codes::IMPLICIT_ANY => "Variable '{0}' implicitly has an '{1}' type.",
+```
+
+**Location 3:** Diagnostic builder (lines 964-974)
+
+**Added Diagnostic Function:**
+```rust
+/// Create a "Variable implicitly has an 'any' type" diagnostic (TS7005).
+///
+/// This is emitted when noImplicitAny is enabled and a variable declaration
+/// has no type annotation and the inferred type is 'any'.
+pub fn implicit_any_variable(&mut self, var_name: &str, var_type: TypeId) -> TypeDiagnostic {
+    let type_str = self.formatter.format(var_type);
+    TypeDiagnostic::error(
+        format!("Variable '{}' implicitly has an '{}' type.", var_name, type_str),
+        codes::IMPLICIT_ANY,
+    )
+}
+```
+
+**Note:** While the `implicit_any_variable` function was added to the diagnostic builder, the actual implementation in `thin_checker.rs` uses the direct error reporting approach (similar to TS7008) rather than calling this function.
+
+#### File 3: `wasm/src/thin_checker.rs`
+
+**Location:** Variable declaration checking (lines 14805-14826)
+
+**Added TS7005 Generation:**
+```rust
+// TS7005: Variable implicitly has an 'any' type
+// Report this error when noImplicitAny is enabled and the variable has no type annotation
+// and the inferred type is 'any'
+if self.ctx.no_implicit_any
+    && var_decl.type_annotation.is_none()
+    && final_type == TypeId::ANY
+{
+    if let Some(ref name) = var_name {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
+        };
+        let message = format_message(
+            diagnostic_messages::VARIABLE_IMPLICIT_ANY,
+            &[name, "any"],
+        );
+        self.error_at_node(
+            var_decl.name,
+            &message,
+            diagnostic_codes::IMPLICIT_ANY,
+        );
+    }
+}
+```
+
+**Behavior:**
+- When `noImplicitAny` is enabled (`self.ctx.no_implicit_any == true`)
+- AND the variable has no type annotation (`var_decl.type_annotation.is_none()`)
+- AND the inferred/final type is ANY (`final_type == TypeId::ANY`)
+- THEN generate TS7005 error with the variable name
+
+**Placement:**
+- Check is added AFTER `final_type` is computed (line 14802)
+- Check is added BEFORE variable redeclaration checking (line 14828)
+- This ensures we have the final type to check before reporting errors
+
+### Impact Assessment
+
+#### Expected Impact on Conformance Tests
+- **TS7005 missing errors should decrease** from 54
+- Variables without type annotations will now properly report TS7005 when `noImplicitAny` is enabled
+- Better error messages for developers using `noImplicitAny`
+- Consistent with TS7006 (parameters) and TS7008 (members) fixes
+
+#### Scope of Fix
+The fix applies to these variable declaration scenarios:
+1. `let x;` - No initializer, no type annotation → infers to `any` → TS7005
+2. `let x = someAnyValue;` - Initializer is `any`, no type annotation → TS7005
+3. `const y;` - No initializer, no type annotation → infers to `any` → TS7005
+
+**Does NOT affect:**
+- Variables with explicit type annotations (`let x: any;` - explicitly typed, no error)
+- Variables with inferable initializers (`let x = 5;` - infers to `number`, no error)
+- Code without `noImplicitAny` enabled
+- Catch clause variables (handled separately with `use_unknown_in_catch_variables`)
+
+### Acceptance Criteria for Task 5
+✅ Variables without types generate TS7005 when noImplicitAny is enabled
+✅ Variable type inference errors are exposed (not hidden by ANY fallback)
+✅ Code compiles without errors
+✅ Error message format matches TypeScript's TS7005
+
+### Files Modified
+1. `wasm/src/checker/types/diagnostics.rs`: Added `VARIABLE_IMPLICIT_ANY` message constant (1 line)
+2. `wasm/src/solver/diagnostics.rs`: Added `IMPLICIT_ANY` code, message template, and diagnostic function (9 lines)
+3. `wasm/src/thin_checker.rs`: Added TS7005 generation in `check_variable_declaration` (22 lines)
+
+**Total: 32 lines added across 3 files**
+
+### Notes
+- This fix aligns with TypeScript's `noImplicitAny` compiler option
+- The error is generated at the variable name location for accurate error positioning
+- The pattern follows the same approach as TS7008 (members) for consistency
+- Check is placed after final type computation to ensure accurate type inference
+

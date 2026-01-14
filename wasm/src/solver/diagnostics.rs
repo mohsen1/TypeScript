@@ -268,6 +268,9 @@ pub mod codes {
     // Implicit Any Errors (7xxx series)
     // =========================================================================
 
+    /// Variable '{0}' implicitly has an '{1}' type.
+    pub const IMPLICIT_ANY: u32 = 7005;
+
     /// Parameter '{0}' implicitly has an '{1}' type.
     pub const IMPLICIT_ANY_PARAMETER: u32 = 7006;
 
@@ -328,6 +331,7 @@ pub fn get_message_template(code: u32) -> &'static str {
             "Object literal may only specify known properties, and '{0}' does not exist in type '{1}'."
         }
         // Implicit any errors (7xxx series)
+        codes::IMPLICIT_ANY => "Variable '{0}' implicitly has an '{1}' type.",
         codes::IMPLICIT_ANY_PARAMETER => "Parameter '{0}' implicitly has an '{1}' type.",
         codes::IMPLICIT_ANY_MEMBER => "Member '{0}' implicitly has an '{1}' type.",
         codes::IMPLICIT_ANY_RETURN => {
@@ -958,6 +962,18 @@ impl<'a> DiagnosticBuilder<'a> {
         TypeDiagnostic::error(
             format!("Member '{}' implicitly has an 'any' type.", member_name),
             codes::IMPLICIT_ANY_MEMBER,
+        )
+    }
+
+    /// Create a "Variable implicitly has an 'any' type" diagnostic (TS7005).
+    ///
+    /// This is emitted when noImplicitAny is enabled and a variable declaration
+    /// has no type annotation and the inferred type is 'any'.
+    pub fn implicit_any_variable(&mut self, var_name: &str, var_type: TypeId) -> TypeDiagnostic {
+        let type_str = self.formatter.format(var_type);
+        TypeDiagnostic::error(
+            format!("Variable '{}' implicitly has an '{}' type.", var_name, type_str),
+            codes::IMPLICIT_ANY,
         )
     }
 

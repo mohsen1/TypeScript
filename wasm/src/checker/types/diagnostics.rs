@@ -176,6 +176,7 @@ pub mod diagnostic_messages {
         "Cannot find module '{0}' or its corresponding type declarations.";
 
     // Implicit any errors
+    pub const VARIABLE_IMPLICIT_ANY: &str = "Variable '{0}' implicitly has an '{1}' type.";
     pub const PARAMETER_IMPLICIT_ANY: &str = "Parameter '{0}' implicitly has an '{1}' type.";
     pub const MEMBER_IMPLICIT_ANY: &str = "Member '{0}' implicitly has an '{1}' type.";
     pub const IMPLICIT_ANY_RETURN: &str =
