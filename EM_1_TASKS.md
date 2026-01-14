@@ -1,0 +1,94 @@
+# EM-1 Team Tasks
+
+## Team Composition
+- **Workers:** worker-1, worker-2, worker-3, worker-4
+- **Branch:** em-team-1
+- **Sync Base:** rust
+
+## Overall Mission: Phase 8 - Stop the "Any" Poisoning
+
+### Current Status (from PROJECT_DIRECTION.md)
+| Metric | Current | Target |
+|--------|---------|--------|
+| **Exact Match** | 30.1% | **40%** |
+| **Missing Errors** | 60.0% | **<50%** |
+| **Parser false positives** | 701 | **<100** |
+| **TS2304 extra errors** | 343 | **<50** |
+
+### Squad Allocation (4 workers)
+| Squad | Workers | Focus Area | Status |
+|-------|---------|------------|--------|
+| **Parser (Syntax)** | worker-1, worker-2, worker-3 | TS1005/TS1109 false positives | 🟠 Active |
+| **Binder (CRITICAL)** | worker-4 | TS2304 error poisoning | 🔴 Critical Path |
+
+---
+
+## EM-1 Responsibilities
+
+### 1. Branch Hygiene
+- [x] Sync em-team-1 with rust (merged via origin/rust)
+- [ ] Merge worker branches locally only after validation
+- [ ] Run full conformance suite before any merge to rust
+- [ ] Escalate to Director only when metrics show stable improvement
+
+### 2. Task Assignment Strategy
+
+#### Priority 1: Fix TS2304 (Binder) - Error Poisoning Root Cause
+- Worker 4 is on the critical path
+- TS2304 causes `Any` fallback which silences all downstream errors
+- Must fix before solver work can be accurately validated
+
+#### Priority 2: Fix Parser False Positives (TS1005/TS1109)
+- Workers 1-3 working in parallel on different patterns
+- 701 parser errors inflate "Extra Errors" by 14%
+- Cascading errors compound the problem
+
+### 3. Validation Protocol
+Before merging any worker branch:
+1. Worker must run conformance tests and report metrics
+2. Verify no regressions in other error codes
+3. Ensure build passes (`cargo build --release`)
+4. Check that the specific metric improved (e.g., TS1005 count decreased)
+
+---
+
+## Current Worker Assignments
+
+### Worker 1 (Parser - TS1005)
+**Status:** Implemented patterns 1-5, needs validation
+**Next:** Run conformance to measure impact
+**Blocker:** Waiting for metrics validation before continuing
+
+### Worker 2 (Parser - TS1109)
+**Status:** Fixed definite assignment assertions, needs baseline
+**Next:** Run conformance to measure impact
+**Blocker:** Need baseline before prioritizing next patterns
+
+### Worker 3 (Parser - Cascading Errors)
+**Status:** Implemented `last_error_pos` tracking, needs validation
+**Next:** Run conformance to measure impact
+**Blocker:** Waiting for metrics validation
+
+### Worker 4 (Binder - CRITICAL)
+**Status:** Fixed lib.d.ts symbol merging, working on ambient modules
+**Next:** Complete ambient module fix, then module augmentation
+**Blocker:** None - this is the critical path
+
+---
+
+## Next Actions for EM-1
+
+1. **IMMEDIATE:** Have all workers run conformance tests to establish baselines
+2. **TODAY:** Review Worker 4's ambient module fix (critical path)
+3. **THIS WEEK:** Merge validated fixes in order: Worker 4 → Worker 3 → Worker 1 → Worker 2
+4. **CONTINUOUS:** Monitor metrics - target is <100 parser false positives and <50 TS2304 errors
+
+---
+
+## Success Criteria
+- Exact Match increases from 30.1% to 40%
+- Missing Errors decreases from 60% to <50%
+- Parser false positives (TS1005 + TS1109) reduced from 701 to <100
+- TS2304 extra errors reduced from 343 to <50
+- All worker branches validated and merged locally
+- Ready to escalate to Director with stable metrics improvement

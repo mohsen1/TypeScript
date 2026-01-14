@@ -2,16 +2,18 @@
 
 ## Squad: Binder (CRITICAL)
 
-## Current Task
-- [ ] Fix ambient module declarations (declare module "foo")
+## Current Task (Assigned by EM-1)
+- [ ] **CRITICAL PATH:** Complete ambient module declarations fix (declare module "foo")
   - Investigate how ambient modules are currently bound
   - Ensure `declare module "foo"` blocks create proper module symbols
   - Fix any issues with string literal module names
   - Add tests for ambient module scenarios
+  - Run conformance to measure TS2304 reduction
 
-## Queue
-- [ ] Debug console/Array resolution failures in complex scenarios
+## Queue (High Priority - TS2304 is #1 blocker)
 - [ ] Implement module augmentation resolution (merging `interface Window` across files)
+- [ ] Debug console/Array resolution failures in complex scenarios
+- [ ] Target: Reduce TS2304 extra errors from 343 to <50
 
 ## Completed
 - [x] Investigate lib.d.ts loading and symbol merging into root SymbolTable
