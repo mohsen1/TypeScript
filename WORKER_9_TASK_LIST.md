@@ -127,10 +127,94 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ---
 
-## Current Task
-_None assigned._ Awaiting EM-3 directive.
+## Active Task
+
+### Task 7: Refine TS1005 and TS1109 Parser Error Recovery
+
+**Priority:** 🔴 CRITICAL (286 combined errors: 90 missing TS1005 + 69 missing TS1109 + 15 extra TS1109 + 196 extra TS1005)
+
+**Problem:**
+Parser error suppression is too aggressive or incomplete:
+- **TS1005:** 90 missing (should emit but don't) + 196 extra (emit but shouldn't)
+- **TS1109:** 69 missing + 15 extra
+- The current `can_recover_from_error()` and `is_at_expression_end()` logic needs refinement
+
+**Current State:**
+- Worker 1 added `can_recover_from_error()` method
+- Worker 5 added `is_at_expression_end()` method
+- Both combined with OR logic: `can_recover_from_error() || is_at_expression_end()`
+- This is causing both false positives and false negatives
+
+**Action Items:**
+
+1. **Analyze Current Error Suppression**
+   - Search for all TS1005 and TS1109 emission points
+   - Trace `can_recover_from_error()` and `is_at_expression_end()` logic
+   - Find where errors are incorrectly suppressed or emitted
+   - File: `wasm/src/thin_parser.rs`
+
+2. **Improve Recovery Detection**
+   - Make `can_recover_from_error()` more specific
+   - Make `is_at_expression_end()` more precise
+   - Add context-aware suppression:
+     - Don't suppress if we're in a type annotation
+     - Don't suppress if we're in an object literal key
+     - Don't suppress if we're in a destructuring pattern
+   - Consider statement boundaries vs expression boundaries
+
+3. **Fix TS1005 (Expected Token)**
+   - Only suppress if next token continues current construct
+   - Don't suppress if we're clearly at a statement boundary
+   - Better handling of:
+     - Missing commas in arrays/objects
+     - Missing semicolons
+     - Missing colons in object types
+     - Missing parentheses
+
+4. **Fix TS1109 (Expression Expected)**
+   - Better detection of when expression is actually required
+   - Don't emit if we're at a valid statement end
+   - Handle:
+     - Empty statements (just semicolons)
+     - Labelled statements
+     - Block statements
+     - Control flow statements
+
+5. **Testing**
+   - Run conformance tests focusing on parser directories
+   - Check `statements/*`, `parser/*`, `expressions/*` tests
+   - Verify no regression in valid code
+   - Verify errors appear where expected
+
+**Success Criteria:**
+- Reduce Missing TS1005 from 90 to <15
+- Reduce Missing TS1109 from 69 to <10
+- Reduce Extra TS1005 from 196 to <50
+- Reduce Extra TS1109 from 15 to <5
+- Overall parser parity improvement: 36% → 50%+
+
+**Files to Work On:**
+- `wasm/src/thin_parser.rs`
+  - `can_recover_from_error()` method (line ~700+)
+  - `is_at_expression_end()` method
+  - `is_expression_start()` method (line ~800)
+  - `error_expression_expected()` method
+  - TS1005 and TS1109 emission points
+
+**Related Work:**
+- Builds on Task 2 (ASI implementation)
+- Builds on Task 3 (error poisoning fix)
+- Coordinates with Worker 1's parser error suppression
+- Coordinates with Worker 5's expression end detection
+
+**Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --all` after changes
+- Focus on parser and statement test categories
+- Measure improvement in exact match percentage
 
 ---
 
 ## Pending Tasks
-_None yet._
+_Awaiting completion of Task 7_
