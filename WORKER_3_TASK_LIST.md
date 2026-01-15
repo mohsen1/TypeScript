@@ -98,3 +98,28 @@ The TS2564 task still requires:
 - **Missing TS2564:** Reduce from 413 to <20
 - **Exact Match:** Should increase significantly
 - **No regressions:** Don't break existing working tests
+- **Accuracy:** Minimize false positives/negatives
+
+## Deliverables
+1. Code changes in `wasm/src/checker/thin_checker.rs`
+2. Control flow analysis implementation (if needed)
+3. Tests for TS2564 scenarios
+4. Conformance test report showing improvement
+5. Set `Ready for Merge: Yes` in your plan when complete
+
+## Workflow
+1. Sync: `git fetch origin && git merge origin/rust --no-edit`
+2. **ASK GEMINI FIRST** (see Phase 1)
+3. Write code following Gemini's guidance
+4. Test: `./wasm/test.sh`
+5. Commit: `[wasm] checker: implement strictPropertyInitialization (TS2564)`
+6. Push to worker-3 branch
+7. Run conformance tests and analyze report
+8. Mark `Ready for Merge: Yes` in your plan
+
+## Status
+- **Merged to em-team-1:** Yes (ff506c83f)
+- **Original Task (TS2564) Completed:** ❌ NO - Different work was done
+- **Tests Passed:** ✅ Yes
+- **Last Updated:** 2026-01-14 (EM-1 review)
+- **Next Action:** Director review - accept off-task work and reassign TS2564
