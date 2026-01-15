@@ -537,6 +537,16 @@ impl ThinParserState {
 
     /// Check if we can parse a semicolon (ASI rules)
     /// Returns true if current token is semicolon or ASI applies
+    ///
+    /// ASI (Automatic Semicolon Insertion) rules:
+    /// 1. Explicit semicolon
+    /// 2. Before closing brace
+    /// 3. At EOF
+    /// 4. After line break IF next token starts a statement
+    ///
+    /// Note: Statement start detection is enhanced to include expression literals
+    /// (numbers, booleans, null, this, super) and prefix operators (!, ~, +, -, etc.)
+    /// to improve ASI for expression statements.
     fn can_parse_semicolon(&self) -> bool {
         // Explicit semicolon
         if self.is_token(SyntaxKind::SemicolonToken) {
@@ -612,9 +622,30 @@ impl ThinParserState {
             SyntaxKind::Identifier
             | SyntaxKind::StringLiteral
             | SyntaxKind::AtToken => true,
+            // Expression literals that can start statements (enhanced ASI support)
+            SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::ThisKeyword
+            | SyntaxKind::SuperKeyword => true,
+            // Prefix operators that can start expression statements
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => true,
             // Structural tokens that can start statements
-            SyntaxKind::OpenBraceToken
-            | SyntaxKind::SemicolonToken => true,
+            SyntaxKind::OpenBraceToken  // block
+            | SyntaxKind::SemicolonToken  // empty statement
+            | SyntaxKind::OpenParenToken  // parenthesized expression
+            | SyntaxKind::OpenBracketToken  // array literal/destructuring
+            | SyntaxKind::LessThanToken  // JSX/type argument => true,
             _ => false,
         }
     }
