@@ -212,7 +212,8 @@ impl<'a> ThinCheckerState<'a> {
             } else if !param.type_annotation.is_none() {
                 Some(self.get_type_from_type_node(param.type_annotation))
             } else {
-                Some(TypeId::ANY)
+                // Return UNKNOWN instead of ANY for parameter without type annotation
+                Some(TypeId::UNKNOWN)
             };
             self.pop_symbol_dependency();
 
@@ -673,7 +674,8 @@ impl<'a> ThinCheckerState<'a> {
                     self.check_class_expression(idx, &class);
                     self.get_class_constructor_type(idx, &class)
                 } else {
-                    TypeId::ANY
+                    // Return UNKNOWN instead of ANY when class expression cannot be resolved
+                    TypeId::UNKNOWN
                 }
             }
 
@@ -739,7 +741,8 @@ impl<'a> ThinCheckerState<'a> {
                     self.promise_like_return_type_argument(expr_type)
                         .unwrap_or(expr_type)
                 } else {
-                    TypeId::ANY
+                    // Return UNKNOWN instead of ANY when await expression cannot be resolved
+                    TypeId::UNKNOWN
                 }
             }
 
@@ -748,7 +751,8 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
                     self.get_type_of_node(paren.expression)
                 } else {
-                    TypeId::ANY
+                    // Return UNKNOWN instead of ANY when parenthesized expression cannot be resolved
+                    TypeId::UNKNOWN
                 }
             }
 
@@ -2927,12 +2931,14 @@ impl<'a> ThinCheckerState<'a> {
                 let key_type = if !param_data.type_annotation.is_none() {
                     self.get_type_from_type_node_in_type_literal(param_data.type_annotation)
                 } else {
-                    TypeId::ANY
+                    // Return UNKNOWN instead of ANY for index signature key without annotation
+                    TypeId::UNKNOWN
                 };
                 let value_type = if !index_sig.type_annotation.is_none() {
                     self.get_type_from_type_node_in_type_literal(index_sig.type_annotation)
                 } else {
-                    TypeId::ANY
+                    // Return UNKNOWN instead of ANY for index signature value without annotation
+                    TypeId::UNKNOWN
                 };
                 let readonly = self.has_readonly_modifier(&index_sig.modifiers);
                 let info = IndexSignature {
@@ -4176,7 +4182,8 @@ impl<'a> ThinCheckerState<'a> {
                     } else if !prop.initializer.is_none() {
                         self.get_type_of_node(prop.initializer)
                     } else {
-                        TypeId::ANY
+                        // Return UNKNOWN instead of ANY for property without annotation or initializer
+                        TypeId::UNKNOWN
                     };
 
                     properties.insert(
@@ -4420,8 +4427,9 @@ impl<'a> ThinCheckerState<'a> {
             let brand_atom = self.ctx.types.intern_string(&brand_name);
             properties.entry(brand_atom).or_insert(PropertyInfo {
                 name: brand_atom,
-                type_id: TypeId::ANY,
-                write_type: TypeId::ANY,
+                // Use UNKNOWN instead of ANY for brand property type
+                type_id: TypeId::UNKNOWN,
+                write_type: TypeId::UNKNOWN,
                 optional: false,
                 readonly: true,
                 is_method: false,
@@ -4847,7 +4855,8 @@ impl<'a> ThinCheckerState<'a> {
                     } else if !prop.initializer.is_none() {
                         self.get_type_of_node(prop.initializer)
                     } else {
-                        TypeId::ANY
+                        // Return UNKNOWN instead of ANY for property without annotation or initializer
+                        TypeId::UNKNOWN
                     };
 
                     properties.insert(
@@ -5309,7 +5318,10 @@ impl<'a> ThinCheckerState<'a> {
             "NaN" | "Infinity" => TypeId::NUMBER,
             // Symbol constructor - synthesize proper type for call signature validation
             "Symbol" => self.get_symbol_constructor_type(),
-            _ if self.is_known_global_value_name(name) => TypeId::ANY,
+            _ if self.is_known_global_value_name(name) => {
+                // Return UNKNOWN instead of ANY for known globals without resolved type
+                TypeId::UNKNOWN
+            }
             _ => {
                 // Check if we're inside a class and the name matches a static member (error 2662)
                 // Clone values to avoid borrow issues
@@ -6922,7 +6934,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::NUMBER;
         }
 
-        TypeId::ANY
+        // Return UNKNOWN instead of ANY for unknown binary operand types
+        TypeId::UNKNOWN
     }
 
     /// Get type of binary expression.
@@ -6935,7 +6948,8 @@ impl<'a> ThinCheckerState<'a> {
 
         while let Some((node_idx, visited)) = stack.pop() {
             let Some(node) = self.ctx.arena.get(node_idx) else {
-                type_stack.push(TypeId::ANY);
+                // Return UNKNOWN instead of ANY when node cannot be found
+                type_stack.push(TypeId::UNKNOWN);
                 continue;
             };
 
@@ -6945,7 +6959,8 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
-                type_stack.push(TypeId::ANY);
+                // Return UNKNOWN instead of ANY when binary expression cannot be extracted
+                type_stack.push(TypeId::UNKNOWN);
                 continue;
             };
 
@@ -6972,8 +6987,9 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             }
 
-            let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
-            let left_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            // Return UNKNOWN instead of ANY when type_stack is empty
+            let right_type = type_stack.pop().unwrap_or(TypeId::UNKNOWN);
+            let left_type = type_stack.pop().unwrap_or(TypeId::UNKNOWN);
             if op_kind == SyntaxKind::CommaToken as u16 {
                 if self.is_side_effect_free(left_idx)
                     && !self.is_indirect_call(node_idx, left_idx, right_idx)
@@ -8137,7 +8153,10 @@ impl<'a> ThinCheckerState<'a> {
         let member_type = match self.enum_kind(sym_id) {
             Some(EnumKind::String) => TypeId::STRING,
             Some(EnumKind::Numeric) => TypeId::NUMBER,
-            None => TypeId::ANY,
+            None => {
+                // Return UNKNOWN instead of ANY for enum without explicit kind
+                TypeId::UNKNOWN
+            }
         };
 
         for &decl_idx in &symbol.declarations {
@@ -10543,7 +10562,10 @@ impl<'a> ThinCheckerState<'a> {
         let member_type = match self.enum_kind(sym_id) {
             Some(EnumKind::String) => TypeId::STRING,
             Some(EnumKind::Numeric) => TypeId::NUMBER,
-            None => TypeId::ANY,
+            None => {
+                // Return UNKNOWN instead of ANY for enum without explicit kind
+                TypeId::UNKNOWN
+            }
         };
 
         let mut props: FxHashMap<Atom, PropertyInfo> = FxHashMap::default();
