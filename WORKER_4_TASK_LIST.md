@@ -151,3 +151,123 @@ fn check_type_recursive(&mut self, type_id: TypeId) -> Type {
 
 ### Reassigned:
 - **Recursion Guards** - Reassigned to worker-3 (investigation complete, already implemented)
+
+---
+
+## 🎯 NEW ASSIGNMENT: Fix Class Property Initialization (TS2564) 🟠
+**Priority:** HIGH (Strategic - #1 missing error category)
+**Assigned:** 2026-01-15
+**Owner:** worker-4
+**Branch:** worker-4
+**Status:** 🔄 READY TO START
+
+### Task Description
+Implement the `strictPropertyInitialization` check in `wasm/src/checker/thin_checker.rs`. TS2564 ("Property 'x' has no initializer and is not definitely assigned in the constructor") is the #1 missing error category with 413 occurrences.
+
+### Problem Analysis
+From PROJECT_DIRECTION.md:
+- **Missing Errors:** 413 TS2564 errors
+- **Root Cause:** We are simply *not running* the check that verifies class properties are initialized in the constructor
+- **Impact:** HIGH - This is the single biggest missing error category
+
+### Action Items
+
+#### Phase 1: Investigation
+- [ ] Search for existing TS2564 implementation in `wasm/src/checker/thin_checker.rs`
+- [ ] Check if `strictPropertyInitialization` compiler option is respected
+- [ ] Find class declaration checking logic
+- [ ] Run conformance tests to get baseline:
+  ```bash
+  cd /tmp/orchestrator-workspace/worktrees/worker-4/wasm
+  ./differential-test/run-conformance.sh --all | grep TS2564
+  ```
+
+#### Phase 2: Implementation
+- [ ] Implement property initialization checking
+- [ ] Track definite assignment analysis in constructor
+- [ ] Emit TS2564 when property not initialized:
+  - No initializer in declaration
+  - Not definitely assigned in constructor
+  - No definite assignment assertion (!)
+- [ ] Handle edge cases:
+  - Property declarations with type annotations
+  - Properties initialized in constructor
+  - Properties declared with definite assignment assertion (!)
+  - Optional properties (?)
+
+#### Phase 3: Validation
+- [ ] Run `./wasm/test.sh` (Docker-only!)
+- [ ] Run conformance tests: `./wasm/differential-test/run-conformance.sh --all`
+- [ ] Verify TS2564 missing errors reduced from 413 to <20
+- [ ] Check for regressions in previously passing tests
+- [ ] Verify no false positives (errors that TypeScript doesn't report)
+
+### Success Metrics
+- **TS2564 Missing:** Reduce from 413 to <20 (95% reduction)
+- **Exact Match:** Increase conformance score
+- **No Regressions:** Don't break existing working tests
+
+### Implementation Guidance
+
+**Pattern to Implement:**
+
+```rust
+// In thin_checker.rs, class declaration checking:
+
+fn check_class_property(&mut self, property: &ClassElementDeclaration) {
+    // Check if strictPropertyInitialization is enabled
+    if !self.strict_property_initialization {
+        return;
+    }
+
+    // Check if property has initializer
+    if property.initializer.is_some() {
+        return; // Has initializer, OK
+    }
+
+    // Check if property is optional
+    if property.is_optional {
+        return; // Optional properties don't need initialization
+    }
+
+    // Check if property has definite assignment assertion
+    if property.has_definite_assignment_assertion {
+        return; // Property explicitly marked as definitely assigned
+    }
+
+    // Check if property is definitely assigned in constructor
+    if self.is_definitely_assigned_in_constructor(property.name) {
+        return; // Definitely assigned, OK
+    }
+
+    // Emit TS2564 error
+    self.error(Diagnostic {
+        code: TS2564,
+        message: format!("Property '{}' has no initializer and is not definitely assigned in the constructor", property.name),
+        span: property.span,
+    });
+}
+```
+
+**Key Files:**
+- `wasm/src/checker/thin_checker.rs` - Class declaration checking
+- Look for `check_class_declaration` function
+- Look for existing property checking logic
+
+**Definite Assignment Analysis:**
+- Track which properties are assigned in constructor body
+- Handle property assignments via `this.property = value`
+- Handle assignments in all constructor branches
+- Handle assignments in super() calls
+
+### Deliverables
+1. Implementation of `strictPropertyInitialization` check
+2. Conformance test report showing TS2564 reduction from 413 to <20
+3. Updated task list with "Complete" status
+4. Set `Ready for Merge: Yes` when complete
+
+### Status
+- **Previous Tasks:** ✅ Flow Recording, ✅ Application Expansion
+- **Current Task:** 🟠 TS2564 Class Property Initialization
+- **Ready to Start:** ✅ YES
+- **Last Updated:** 2026-01-15
