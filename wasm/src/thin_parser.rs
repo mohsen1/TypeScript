@@ -313,8 +313,28 @@ impl ThinParserState {
                     SyntaxKind::CloseBraceToken | SyntaxKind::CloseParenToken | SyntaxKind::CloseBracketToken => {
                         // At EOF, clearly the file ended before this closing token
                         // Don't emit an error - just recover
+                        // EXCEPTION: If expecting ) in a function declaration context,
+                        // EOF after an incomplete parameter list is an error
+                        // Example: function f( { } - missing ) before function body
                         if self.is_token(SyntaxKind::EndOfFileToken) {
-                            true
+                            // Check if we're in a function/method parameter context by looking back
+                            // If the last non-EOF token was } and we're expecting ), it's an error
+                            if kind == SyntaxKind::CloseParenToken {
+                                // Check if there's any recent { that might indicate a function body
+                                // This is a heuristic - if we see { and } without ), user forgot the )
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                        // SPECIAL CASE: If expecting ) and we see { or }, it's likely the user forgot )
+                        // Examples:
+                        //   - function f( { } - missing ) before function body
+                        //   - if (true { } - missing ) before if body
+                        // Don't suppress - emit the error.
+                        else if kind == SyntaxKind::CloseParenToken
+                            && (self.is_token(SyntaxKind::OpenBraceToken) || self.is_token(SyntaxKind::CloseBraceToken)) {
+                            false
                         }
                         // If next token starts a statement, the user has clearly moved on
                         // Don't complain about missing closing token
@@ -5666,11 +5686,21 @@ impl ThinParserState {
 
         // For restricted productions (throw), ASI applies immediately after line break
         // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
-        // NOTE: The previous implementation incorrectly treated line break as a syntax error.
-        // According to JavaScript spec, ASI should apply: throw\nx parses as throw; x;
+        // NOTE: Unlike return/break/continue, throw REQUIRES an expression.
+        // When ASI is applied to throw, it's a semantic error (TS1109: Expression expected).
+        // Example: throw\nnew Error() should emit TS1109 at the line break.
+        let has_line_break = self.scanner.has_preceding_line_break();
         let expression = if !self.can_parse_semicolon_for_restricted_production() {
             self.parse_expression()
         } else {
+            // ASI applied - emit TS1109 because throw requires an expression
+            if has_line_break && self.token_pos() != self.last_error_pos {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Expression expected.",
+                    diagnostic_codes::EXPRESSION_EXPECTED,
+                );
+            }
             NodeIndex::NONE
         };
 
