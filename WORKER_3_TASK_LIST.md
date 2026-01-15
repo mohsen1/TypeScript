@@ -1,10 +1,36 @@
 # Worker-3 Task List
 
+## 🔔 READY FOR MERGE - EM-1 Review Requested
+
+**Status:** ✅ COMPLETE - Ready for EM-1 merge review
+**Date:** 2026-01-14
+**Branch:** `origin/worker-3` (commit: `35a077182`)
+**Request:** EM-1 please review and merge worker-3 branch
+
+---
+
 ## ✅ COMPLETED: Class Property Initialization (TS2564)
 **Priority:** 🟡 TACTICAL (High ROI)
 **Owner:** worker-3
 **Branch:** worker-3
-**Status:** ✅ COMPLETE - Awaiting merge review
+**Status:** ✅ COMPLETE - Ready for merge review
+
+### For EM-1: Quick Summary
+
+**Task:** Implement TS2564 strictPropertyInitialization check
+**Target:** Reduce Missing TS2564 from 413 to <20
+**Implementation:**
+- ✅ Code complete in `wasm/src/checker/declarations.rs` (~63 lines)
+- ✅ 4 comprehensive unit tests - all passing
+- ✅ Pushed to `origin/worker-3`
+- ⚠️ Phase 1: Reports all properties without initializers (some false positives in constructor-initialized code)
+- 📋 Phase 2 (future): Add control flow analysis to reduce false positives
+
+**Next Action for EM-1:**
+1. Review commits `98bc0887c` and `4fed0c8cb`
+2. Run unit tests: `cargo test --lib declarations::tests::test_ts2564`
+3. Merge if acceptable (Phase 1 with known limitations)
+4. Assign Phase 2 (CFA) as follow-up if needed
 
 ---
 
