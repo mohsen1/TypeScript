@@ -2153,6 +2153,15 @@ impl ThinBinderState {
             return true;
         }
 
+        // Allow INTERFACE to merge with VALUE symbols (e.g., `interface Object` + `declare var Object`)
+        // This enables global types like Object, Array, Promise to be used as both types and constructors
+        if (existing_flags & symbol_flags::INTERFACE) != 0 && (new_flags & symbol_flags::VALUE) != 0 {
+            return true;
+        }
+        if (new_flags & symbol_flags::INTERFACE) != 0 && (existing_flags & symbol_flags::VALUE) != 0 {
+            return true;
+        }
+
         false
     }
 
