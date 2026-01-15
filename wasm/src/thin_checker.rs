@@ -5600,6 +5600,17 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
+        // Quick check: if lib_contexts is not empty and symbol is not in main binder's arena,
+        // it's likely from lib.d.ts which is all ambient
+        if !self.ctx.lib_contexts.is_empty() {
+            // Check if symbol exists in main binder's symbol arena
+            let is_from_lib = self.ctx.binder.get_symbols().get(sym_id).is_none();
+            if is_from_lib {
+                // Symbol is from lib.d.ts, which is all ambient (declare statements)
+                return true;
+            }
+        }
+
         for &decl_idx in &symbol.declarations {
             // Check if the variable statement has a declare modifier
             if let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) {
