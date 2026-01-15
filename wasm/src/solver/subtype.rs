@@ -1549,6 +1549,27 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         source_shape_id: Option<ObjectShapeId>,
         target: &[PropertyInfo],
     ) -> SubtypeResult {
+        // Private brand checking for nominal typing of classes with private fields
+        // If both source and target have private brands, they must be the same
+        let source_brand = source.iter().find(|p| {
+            let name = self.interner.resolve_atom(p.name);
+            name.starts_with("__private_brand_")
+        });
+        let target_brand = target.iter().find(|p| {
+            let name = self.interner.resolve_atom(p.name);
+            name.starts_with("__private_brand_")
+        });
+
+        // If both have private brands (both are classes with private fields), check they match
+        if let (Some(s_brand), Some(t_brand)) = (source_brand, target_brand) {
+            let s_brand_name = self.interner.resolve_atom(s_brand.name);
+            let t_brand_name = self.interner.resolve_atom(t_brand.name);
+            if s_brand_name != t_brand_name {
+                // Different private brands means different class declarations
+                return SubtypeResult::False;
+            }
+        }
+
         // For each property in target, source must have a compatible property
         for t_prop in target {
             let s_prop = self.lookup_property(source, source_shape_id, t_prop.name);
