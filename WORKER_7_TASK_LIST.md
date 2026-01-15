@@ -488,3 +488,124 @@ Worker-7 had started implementing module import resolution:
 2. EM-2 to assess worker-7 capability and code quality
 3. Make decision on salvage vs reassign
 
+
+---
+
+## EM-2 Decision: SALVAGE with Reassignment (2026-01-15 12:40)
+
+### Decision: 🟢 SALVAGE PARTIAL WORK
+
+**Rationale:** The core implementation is architecturally sound and uses existing infrastructure correctly.
+
+### Code Quality Analysis
+
+**✅ Strengths:**
+1. **Correct Architecture:** Uses existing `module_exports`, `import_module`, `import_name` infrastructure
+2. **Sound Logic:** Basic import resolution flow is correct:
+   - Check if symbol is import → Get export name → Look up in module_exports → Return resolved SymbolId
+3. **Good Documentation:** Clear comments explaining the purpose
+4. **Proper Integration:** Called at all 3 correct locations in `resolve_identifier()`
+5. **Debug Support:** Includes debug logging for troubleshooting
+
+**⚠️ Weaknesses:**
+1. **Incomplete Implementation:** Only handles named imports (`import { foo } from 'bar'`)
+2. **Missing Features:**
+   - Namespace imports (`import * as ns from 'x'`)
+   - Default exports
+   - Re-exports (`export * from 'x'`)
+   - Type-only imports
+   - Dynamic imports (TS2792)
+3. **No Test Coverage:** No test cases or validation documented
+4. **Placeholder Commit:** Suggests rushed/unstable work
+
+### Implementation Details
+
+**File Modified:** `wasm/src/thin_binder.rs` (+50 lines, -3 lines)
+
+**Function Added:**
+```rust
+fn resolve_import_if_needed(&self, sym_id: SymbolId) -> Option<SymbolId>
+```
+
+**Logic Flow:**
+1. Get symbol and check `import_module` (is it an import?)
+2. Determine export name (use `import_name` for renamed imports, else `escaped_text`)
+3. Look up module's exports in `module_exports` table
+4. Return resolved SymbolId or original if not import/resolution fails
+
+### Next Steps
+
+**Immediate Actions:**
+1. ✅ Preserve worker-7's code (it's on worker-7 branch)
+2. ⏳ Merge worker-7 into em-team-2 to integrate the code
+3. ⏳ Reassign task to complete remaining features
+4. ⏳ Add test coverage for basic import resolution
+5. ⏳ Validate against conformance tests
+
+**Expected Impact:**
+- Should reduce TS7005/TS7008 errors for basic named imports
+- Will not fully resolve all module resolution issues
+- Provides solid foundation for remaining work
+
+### Task Reassignment Plan
+
+**Recommended:** Assign Module Symbol Resolution completion to **worker-7** after restart
+- They have context on the problem
+- Their code is salvageable
+- Can build on existing work
+
+**Alternative:** Assign to **worker-6** (Binder Squad) if worker-7 is not ready
+- worker-6 has binder expertise
+- Can complete implementation faster
+- worker-7 takes different task
+
+### Test Plan
+
+Once merged, verify:
+1. Basic named imports work: `import { foo } from './file'`
+2. Renamed imports work: `import { foo as bar } from './file'`
+3. Run conformance tests to measure TS7005/TS7008 reduction
+4. Add unit tests for `resolve_import_if_needed()`
+
+
+---
+
+## EM-2 Merge Results (2026-01-15 12:41)
+
+### Merge Status: ✅ SUCCESS
+
+**Merge Commit:** `9ca7e3aaf`
+**Worker Commit:** `e70385846` - "Complete: <task description>"
+
+### Changes from Worker 7
+**Module Import Resolution - Partial Implementation:**
+- Added `resolve_import_if_needed()` function to `ThinBinderState`
+- Integrates with existing `module_exports` infrastructure
+- Handles named imports and renamed imports
+- Called from 3 locations in `resolve_identifier()`
+
+### File Changed
+- `wasm/src/thin_binder.rs`: +50 lines, -3 lines
+
+### Implementation Status
+✅ **Basic Import Resolution:** Named imports (`import { foo }`)
+✅ **Renamed Imports:** (`import { foo as bar }`)
+⚠️ **Incomplete:** Namespace imports, default exports, re-exports
+⚠️ **Incomplete:** Type-only imports, dynamic imports (TS2792)
+⚠️ **No Tests:** Test coverage needed
+
+### Merge Strategy
+- Clean merge using 'ort' strategy
+- No conflicts
+
+### Next Steps
+1. Add unit tests for `resolve_import_if_needed()`
+2. Run conformance tests to measure TS7005/TS7008 impact
+3. Implement missing features (namespace, default, re-exports)
+4. Handle TS2792 dynamic import resolution
+
+### Task Status
+✅ **Partial Work Salvaged:** Code successfully merged
+🟡 **Incomplete:** Needs additional features and tests
+**Worker 7 Status:** Ready for reassignment to complete implementation
+
