@@ -1,132 +1,192 @@
-# WORKER-14 Task List
+# Worker 14 Task List
 
-**EM:** EM-4
-**Focus:** Symbol Resolution (Tier 3) - Fix TS2304 and TS2524 missing errors
+**Maintained by**: EM-4
+**Worker**: Worker 14
+**Worktree**: /var/folders/57/xp3brw212ygckhkk_ml783fr0000gn/T/cco-workspace-TypeScript-1768508073410/worktrees/worker-14
+**Target Branch**: rust
+**Squad**: Type Checking Squad (provisional - pending EM-4 activation)
 
-## Mission
+---
 
-Fix symbol and module resolution - ensure "Cannot find name" (TS2304) and module member resolution (TS2524) errors are emitted when appropriate.
+## Tasks
 
-## Current Baseline
+### [ ] Task 1: Fix TS2322 False Positives in Union Type Assignability
 
-From conformance tests (200 files):
-- **TS2304 Missing:** 7 occurrences - Symbol not found but should emit error
-- **TS2304 Extra:** 5 occurrences - False positives on valid symbols
-- **TS2524 Missing:** 12 occurrences - Module member resolution not checked
+**Priority:** 🔴 CRITICAL (Tier 2 - Type Checker Accuracy)
+**Assigned:** 2026-01-15
+**Status:** 🟡 READY TO START
 
-### What These Errors Mean
+### Problem
 
-**TS2304:** "Cannot find name 'X'"
+The thin checker emits **TS2322 "Type X is not assignable to type Y"** errors for valid union type assignments. This creates false positives when:
+- A union type contains all constituents of the target type
+- Assigning to a supertype through a union
+- Generic type parameter constraints are satisfied but not recognized
 
-This error should be emitted when:
-- A variable/function/type is used but not declared
-- A symbol is not in scope
-- Global symbols are not properly merged
+**Current Impact:** ~548 extra TS2322 errors in conformance tests
 
-**TS2524:** " 'X' is not a module and cannot be imported using 'import { ... } from'"
+**Root Cause**
 
-This error should be emitted when:
-- Importing a member from a non-module file
-- The file doesn't have appropriate exports
+The type assignability checker in `thin_checker.rs` doesn't properly handle:
+1. **Union type compatibility:** `A | B` should be assignable to `A | B | C`
+2. **Widening through unions:** `A` should be assignable to `A | B`
+3. **Generic constraints:** Type parameters with compatible constraints should pass
+4. **Never/unknown handling:** Special types in union contexts
 
-## Key Files
+### Action Items
 
-| File | Purpose |
-|------|---------|
-| `wasm/src/binder/` | Symbol table and scope management |
-| `wasm/src/thin_binder.rs` | Main binder implementation |
-| `wasm/src/thin_checker.rs` | Symbol usage checking |
-| `wasm/src/parallel.rs` | Module handling |
+#### Phase 1: Investigation
 
-## Steps
+1. **Analyze existing test failures**
+   ```bash
+   # Run conformance tests and capture TS2322 errors
+   cd wasm/differential-test
+   bash run-conformance.sh --max=500 --workers=4 2>&1 | grep TS2322
+   ```
 
-### 1. Verify Error Codes Exist
+2. **Categorize false positives**
+   - Create categories: Union-to-Union, Base-to-Union, Generic-to-Generic
+   - Find patterns in test files that fail incorrectly
+   - Document minimal repro cases for each category
 
-Check if TS2304 and TS2524 are defined:
-```bash
-grep -n "TS2304\|TS2524" wasm/src/checker/types/diagnostics.rs
-```
+3. **Study the assignability function**
+   - Locate `check_type_assignability()` in `wasm/src/thin_checker.rs`
+   - Understand current union type handling logic
+   - Identify where compatibility check fails
 
-### 2. Understand the Binder
+#### Phase 2: Implementation
 
-The binder (`wasm/src/binder/`) builds the symbol table:
-- Reads declarations
-- Creates symbol entries
-- Tracks scope chains
+1. **Fix union-to-union assignability**
+   ```rust
+   // Pseudo-code: A | B should be assignable to A | B | C
+   fn is_union_subtype(source: &Type, target: &Type) -> bool {
+       if let (Type::Union(src_members), Type::Union(tgt_members)) = (source, target) {
+           // Every member of source should exist in target
+           return src_members.iter().all(|m| tgt_members.contains(m));
+       }
+       false
+   }
+   ```
 
-The checker then:
-- Looks up symbols when used
-- Emits TS2304 if not found
-- Checks module imports for TS2524
+2. **Fix base-to-union assignability**
+   ```rust
+   // Pseudo-code: A should be assignable to A | B
+   fn is_assignable_to_union(source: &Type, target: &UnionType) -> bool {
+       // Source type should match at least one union member
+       target.members.iter().any(|m| is_same_type(source, m))
+   }
+   ```
 
-### 3. Find Missing Test Cases
+3. **Handle generic type constraints**
+   - Check type parameter bounds before assignability
+   - Use constraint information to guide compatibility check
+   - Ensure constrained generics are recognized as compatible
 
-From the conformance output, identify specific test files:
-- Look in `ambient/` and `Symbols/` categories
-- Files with TS2304/TS2524 missing
+4. **Add test cases**
+   ```typescript
+   // Should NOT emit TS2322
+   type T1 = string | number;
+   type T2 = string | number | boolean;
+   let x: T1 = "hello";
+   let y: T2 = x; // Valid: T1 is subset of T2
 
-### 4. Create Test Repros
+   // Should NOT emit TS2322
+   function foo<T extends string>(x: T): T | number {
+       return x; // Valid: T is assignable to T | number
+   }
 
-```typescript
-// /tmp/test2304.ts
-// Should emit TS2304 for "undeclaredVar"
-console.log(undeclaredVar);
-```
+   // SHOULD emit TS2322
+   let a: string = 5; // Invalid: number not assignable to string
+   ```
 
-```typescript
-// /tmp/test2524.ts
-// file1.ts - not a module
-const x = 1;
+#### Phase 3: Validation
 
-// file2.ts - trying to import from non-module
-import { x } from "./file1";  // Should emit TS2524
-```
+1. **Run targeted tests**
+   ```typescript
+   // Create test file: test_union_assignability.ts
+   // Verify no TS2322 on valid union assignments
+   // Verify TS2322 still emitted on invalid assignments
+   ```
 
-### 5. Fix Symbol Resolution
+2. **Run conformance suite**
+   ```bash
+   cd wasm/differential-test
+   bash run-conformance.sh --max=1000 --workers=4
+   ```
+   - Track TS2322 count (target: reduce from 548 to <300)
+   - Ensure no regression - valid errors still emitted
+   - Document reduction in false positives
 
-**For TS2304 Missing:**
-1. Check binder is creating symbols for all declarations
-2. Verify symbol lookup in checker handles all scope types
-3. Check global symbol merging across files
-4. Ensure undeclared symbols trigger the error
+3. **Compare with tsc output**
+   ```bash
+   # Verify our errors match TypeScript compiler
+   tsc --noEmit test_union_assignability.ts
+   wasm/differential-test/run-single.sh test_union_assignability.ts
+   ```
 
-**For TS2524 Missing:**
-1. Track which files are modules (have imports/exports)
-2. When processing import, check if source is a module
-3. Emit TS2524 if importing from non-module
+### Files to Work On
 
-**For TS2304 Extra (false positives):**
-1. Verify global symbols (Promise, Array, etc.) are available
-2. Check interface merging works across files
-3. Ensure ambient declarations are processed
+- **Primary:** `wasm/src/thin_checker.rs`
+  - Locate `check_type_assignability()` function
+  - Add union type compatibility checks
+  - Fix base-to-union assignability logic
 
-### 6. Validate
+- **Tests:** Create `tests/union_type_assignability.test.ts`
+  - Cover all union assignment scenarios
+  - Include edge cases with never/unknown
+  - Test generic type constraints
 
-```bash
-# Build
-cd wasm && wasm-pack build --target web --out-dir pkg
+### Success Criteria
 
-# Test symbols/ambient categories
-cd differential-test
-bash run-conformance.sh --max=200 --workers=4 | grep -A10 "Symbols\|ambient"
-```
+| Metric | Current | Target |
+|--------|---------|--------|
+| TS2322 extra errors | ~548 | <300 |
+| Union-to-union assignments | Failing | Passing |
+| Base-to-union assignments | Failing | Passing |
+| Generic constraint checks | Failing | Passing |
 
-## Success Criteria
+### Reference
 
-- **TS2304 Missing:** Reduced from 7 to ≤2
-- **TS2524 Missing:** Reduced from 12 to ≤4
-- **TS2304 Extra:** Reduced from 5 to ≤2
+- **PROJECT_DIRECTION.md:** Tier 2 rules for type checking
+- **EM_3_TASKS.md:** Type checking squad priorities (similar focus)
+- **missing-ts2322-by-category.txt:** Categorized error list
 
-## Resources
+### Instructions
 
-- Binder: `wasm/src/binder/mod.rs`, `wasm/src/thin_binder.rs`
-- Symbol table: `wasm/src/binder/symbol.rs`
-- Module handling: `wasm/src/parallel.rs`
-- Checker symbol lookup: `wasm/src/thin_checker.rs` (search for `resolve_symbol`)
+1. Sync with rust branch: `git fetch origin && git pull origin rust`
+2. Create feature branch from rust: `git checkout -b worker-14-union-assignability`
+3. Work on union type assignability ONLY
+4. Commit frequently with descriptive messages:
+   - `feat(wasm): add union-to-union type assignability check`
+   - `fix(wasm): handle base-to-union type assignments`
+   - `feat(wasm): improve generic constraint type checking`
+5. Push to worker-14 branch: `git push origin worker-14`
+6. Run tests locally before considering complete
+7. Update this task list with status
+8. Notify EM-4 when ready for review
 
-## Submit Your Work
+### Validation Checklist Before Merge
 
-1. Create branch: `git checkout -b worker-14-symbol-fixes`
-2. Commit with clear messages
-3. Run validation: `bash run-conformance.sh --max=500 --workers=8`
-4. Notify EM-4 for review
+- [ ] TS2322 errors reduced by target amount (548 → <300)
+- [ ] Union-to-union assignments work correctly
+- [ ] Base-to-union assignments work correctly
+- [ ] Generic constraints properly recognized
+- [ ] No regression in valid error detection
+- [ ] Conformance tests show improvement
+- [ ] Test cases added for new functionality
+- [ ] Code follows existing patterns in thin_checker.rs
+
+---
+
+## Completed Tasks
+
+*None yet - awaiting completion of Task 1*
+
+---
+
+## Notes
+
+- **EM-4 Status:** Pending activation - currently operating provisionally
+- **Team Alignment:** Similar focus to EM-3's Type Checking Squad
+- **Mentorship:** Coordinate with Workers 1-2 (EM-3) for type checking expertise
+- **Priority:** Union type assignability is foundational - fixes will unblock other type checking improvements
