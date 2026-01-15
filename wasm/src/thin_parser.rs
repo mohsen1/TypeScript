@@ -798,6 +798,46 @@ impl ThinParserState {
         }
     }
 
+    /// Check if the current token could be the start of an array element expression
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals that can be array elements
+            SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NoSubstitutionTemplateLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Identifiers and keywords that can start expressions
+            SyntaxKind::Identifier => true,
+            // This and super
+            SyntaxKind::ThisKeyword | SyntaxKind::SuperKeyword => true,
+            // Prefix operators that can start expressions
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword => true,
+            // Structural tokens
+            SyntaxKind::OpenParenToken => true,  // parenthesized expression
+            SyntaxKind::OpenBracketToken => true,  // nested array
+            SyntaxKind::OpenBraceToken => true,  // object literal
+            SyntaxKind::LessThanToken => true,  // type argument or JSX
+            SyntaxKind::SlashToken => true,  // regex literal (might be division)
+            SyntaxKind::SlashEqualsToken => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Resynchronize after a parse error by skipping to the next statement boundary
     /// This prevents cascading errors by finding a known good synchronization point
     fn resync_after_error(&mut self) {
@@ -6591,29 +6631,34 @@ impl ThinParserState {
                 )
             }
             SyntaxKind::AwaitKeyword => {
-                // Always parse as await expression (even outside async context)
-                // The semantic checker will report an error if await is used incorrectly
-                let start_pos = self.token_pos();
-                self.next_token();
+                // Only parse as await expression if we're in an async context
+                // Otherwise, parse as an identifier (await can be used as a variable name)
+                if self.in_async_context() {
+                    let start_pos = self.token_pos();
+                    self.next_token();
 
-                // Check for missing operand (e.g., just "await" with nothing after it)
-                if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
-                    use crate::checker::types::diagnostics::diagnostic_codes;
-                    self.error_expression_expected();
+                    // Check for missing operand (e.g., just "await" with nothing after it)
+                    if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+                        use crate::checker::types::diagnostics::diagnostic_codes;
+                        self.error_expression_expected();
+                    }
+
+                    let expression = self.parse_unary_expression();
+                    let end_pos = self.token_end();
+
+                    self.arena.add_unary_expr_ex(
+                        syntax_kind_ext::AWAIT_EXPRESSION,
+                        start_pos,
+                        end_pos,
+                        UnaryExprDataEx {
+                            expression,
+                            asterisk_token: false,
+                        },
+                    )
+                } else {
+                    // In non-async contexts, await is just an identifier
+                    self.parse_primary_expression()
                 }
-
-                let expression = self.parse_unary_expression();
-                let end_pos = self.token_end();
-
-                self.arena.add_unary_expr_ex(
-                    syntax_kind_ext::AWAIT_EXPRESSION,
-                    start_pos,
-                    end_pos,
-                    UnaryExprDataEx {
-                        expression,
-                        asterisk_token: false,
-                    },
-                )
             }
             SyntaxKind::YieldKeyword => {
                 let start_pos = self.token_pos();
@@ -7037,7 +7082,9 @@ impl ThinParserState {
             | SyntaxKind::NeverKeyword
             | SyntaxKind::UnknownKeyword
             | SyntaxKind::RequireKeyword
-            | SyntaxKind::ModuleKeyword => self.parse_keyword_as_identifier(),
+            | SyntaxKind::ModuleKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword => self.parse_keyword_as_identifier(),
             _ => {
                 if self.is_identifier_or_keyword() {
                     self.parse_identifier_name()
