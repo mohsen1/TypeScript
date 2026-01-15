@@ -1,96 +1,156 @@
-# WORKER-12 Task List
+# WORKER 12 TASK LIST
 
-**EM:** EM-4
-**Focus:** Parser Accuracy (Tier 1) - Fix TS1109 and TS1005 extra errors
+## Worker: worker-12
+## Reports to: EM-3
+## EM Branch: em-team-3
+## Worker Branch: worker-12
+## Base Branch: rust
+
+---
+
+## Assignment: TS2571 Over-reporting Fix
+
+**Priority:** EM-3 Priority 2
+**Status:** 🔵 Active
+**Started:** 2026-01-15
+
+---
 
 ## Mission
 
-Fix parser false positives that cause "Expression expected" (TS1109) and "X expected" (TS1005) errors on valid TypeScript code.
+Fix TS2571 ("Object is of type 'unknown'") false positives that should instead be TS2683 ("'this' implicitly has type 'any'"). These errors represent the same underlying type checking issue in different contexts.
 
-## Current Baseline
+---
 
-From conformance tests (200 files):
-- **TS1109 Extra:** 7 occurrences - parser emits "Expression expected" for valid syntax
-- **TS1005 Extra:** 5 occurrences - parser emits "X expected" for valid constructs
-- **TS1109 Missing:** 7 occurrences - parser should emit but doesn't
+## Problem Analysis
 
-This indicates the parser has edge cases in:
-- Expression statement detection
-- Automatic Semicolon Insertion (ASI)
-- Distinguishing declarations from expressions
+**Current Behavior:**
+- WASM emits TS2571 when `this` is typed as `unknown` in non-method functions
+- TypeScript correctly emits TS2683 for implicit `this` in regular functions
+- Both errors indicate the same problem: `this` lacks explicit typing
+
+**Why This Matters:**
+- TS2683 is more specific and actionable for users
+- TS2571 is a generic "unknown" error that doesn't convey the real issue
+- Consistency with TypeScript's error messages is critical for user trust
+
+---
+
+## Task Breakdown
+
+### Phase 1: Investigation (DO THIS FIRST)
+- [ ] Run conformance tests to capture TS2571 errors
+  ```bash
+  ./wasm/differential-test/run-conformance.sh --max=100 --workers=4
+  ```
+- [ ] Analyze TS2571 emissions: categorize by context
+  - Arrow functions
+  - Regular functions
+  - Callbacks
+  - Event handlers
+  - Object methods
+- [ ] Identify which should be TS2683 instead
+
+### Phase 2: Code Analysis
+- [ ] Review `current_this_type()` in `wasm/src/thin_checker.rs`
+  - This is where Worker 1 fixed TS2683
+  - Understand the logic for detecting non-method functions
+- [ ] Find all locations where TS2571 is emitted
+  ```bash
+  grep -r "TS2571" wasm/src/
+  ```
+- [ ] Map TS2571 emissions to their use cases
+
+### Phase 3: Implementation
+- [ ] Modify type inference for `this` in non-class contexts:
+  - When `this` would be `unknown`, check if function is a method
+  - If NOT a method, emit TS2683 instead of TS2571
+  - Ensure arrow functions capture `this` correctly from enclosing scope
+- [ ] Test with edge cases:
+  - Nested functions
+  - Callbacks passed to higher-order functions
+  - Event listeners
+  - Object property functions
+
+### Phase 4: Validation
+- [ ] Run Rust tests: `./wasm/test.sh` (Docker required)
+- [ ] Run conformance tests:
+  ```bash
+  ./wasm/differential-test/run-conformance.sh --max=500 --workers=4
+  ```
+- [ ] Verify metrics improvement:
+  - TS2571 should decrease significantly
+  - TS2683 should increase (filling gaps)
+  - Overall error count should stay similar (reclassification)
+
+---
 
 ## Key Files
 
 | File | Purpose |
 |------|---------|
-| `wasm/src/thin_parser.rs` | Main parser (~8k lines) |
-| `wasm/src/scanner.rs` | Tokenization |
-| `wasm/src/checker/types/diagnostics.rs` | Error code definitions |
+| `wasm/src/thin_checker.rs` | Main type checking logic, `current_this_type()` function |
+| `wasm/src/checker/` | Checker subsystem (if exists) |
+| `wasm/differential-test/` | Conformance test suite |
 
-## Steps
-
-### 1. Reproduce the Issue
-
-Find failing test files:
-```bash
-cd wasm/differential-test
-bash run-conformance.sh --max=200 --workers=4 | grep -A2 "TS1109\|TS1005"
-```
-
-Look for files like:
-- `async/es2017/asyncArrowFunction/asyncArrowFunction3_es2017.ts`
-- `async/es2017/functionDeclarations/asyncFunctionDeclaration3_es2017.ts`
-- `async/es2017/asyncArrowFunction/asyncArrowFunction7_es2017.ts`
-
-### 2. Create Minimal Repro
-
-For each failing test, extract the minimal pattern that triggers the false positive:
-
-```javascript
-// Example repro file in /tmp/test1109.ts
-// Run: tsc /tmp/test1109.ts  (should pass)
-// Run: node test.mjs with WASM (currently fails)
-```
-
-### 3. Compare Parse Trees
-
-Add debug logging to see what the parser is doing vs what TSC does:
-- Check expression statement parsing
-- Check ASI handling
-- Check how async arrows are detected
-
-### 4. Fix the Parser
-
-Common TS1109/TS1005 causes:
-1. **ExpressionStatement vs Declaration:** Parser misidentifies `async` as a statement
-2. **ASI Edge Cases:** Missing newline detection before certain tokens
-3. **Contextual Keywords:** `async`, `await` as identifiers vs keywords
-
-### 5. Validate
-
-```bash
-# Build
-cd wasm && wasm-pack build --target web --out-dir pkg
-
-# Quick test (should see reduction in TS1109/TS1005 extra errors)
-cd differential-test && bash run-conformance.sh --max=200 --workers=4
-```
+---
 
 ## Success Criteria
 
-- **TS1109 Extra Errors:** Reduced from 7 to ≤2
-- **TS1005 Extra Errors:** Reduced from 5 to ≤1
-- **No Regressions:** TS1109 Missing errors don't increase significantly
+| Metric | Before | Target |
+|--------|--------|--------|
+| TS2571 extra errors | Unknown | <50 |
+| TS2683 missing | Unknown | Fill gaps |
+| Error reclassification | N/A | TS2571→TS2683 for non-method `this` |
 
-## Resources
+---
 
-- Parser: `wasm/src/thin_parser.rs:1-8500`
-- Diagnostics: `wasm/src/checker/types/diagnostics.rs`
-- Spec: `wasm/specs/` for architecture context
+## Workflow
 
-## Submit Your Work
+1. **Sync with EM-3:**
+   ```bash
+   git fetch origin
+   git pull origin em-team-3 --rebase
+   ```
 
-1. Create branch: `git checkout -b worker-12-parser-fixes`
-2. Commit with clear messages
-3. Run validation: `bash run-conformance.sh --max=500 --workers=8`
-4. Notify EM-4 for review
+2. **Work on task:**
+   - Make changes in `wasm/` directory only
+   - Commit frequently: `git commit -m "[wasm] checker: <description>"`
+   - Push to worker-12: `git push origin worker-12`
+
+3. **Validation:**
+   - Run `./wasm/test.sh` before pushing
+   - Document test results in commit messages
+
+4. **When complete:**
+   - Update this task list with completion status
+   - Notify EM-3 for merge review
+
+---
+
+## Progress Log
+
+### 2026-01-15
+- ✅ Assigned to EM-3, Priority 2 (TS2571 Over-reporting)
+- 🔵 Phase 1: Investigation pending
+
+---
+
+## Notes
+
+- **READ-ONLY:** Never modify `src/compiler/` (TypeScript source)
+- **Docker required:** Rust tests need Docker environment
+- **Commit format:** `[wasm] checker: <clear description>`
+- **Target:** Consistent error messages with TypeScript
+- **Reference:** Worker 1's commit c958fc9cb for TS2683 implementation
+
+---
+
+## Escalation Path
+
+1. Worker 12 commits → worker-12 branch
+2. EM-3 reviews → merges to em-team-3
+3. EM-3 validates → escalates to Director
+4. Director reviews → merges to rust
+
+**STOP after pushing to worker-12 and wait for EM-3 merge approval.**
