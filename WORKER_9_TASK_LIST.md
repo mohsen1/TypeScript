@@ -129,36 +129,27 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ## Active Task
 
-### Task 7: Refine TS1005 and TS1109 Parser Error Recovery ✅ COMPLETED
+### Task 7: Refine TS1005 and TS1109 Parser Error Recovery 🔄 STARTED
 
 **Started:** 2024-01-14
-**Completed:** 2025-01-15
-**Priority:** 🔴 CRITICAL (24 combined errors: 13 missing TS1109 + 11 extra TS1005)
+**Priority:** 🔴 CRITICAL (27 combined errors: 13 missing TS1109 + 14 extra TS1005)
 
-**Final Results (Full 487 Tests):**
-- **TS1005 Extra:** 33 → 26 (-21% improvement!)
-- **TS1109 Missing:** 27 → 27 (baseline established)
-- **Combined Scope:** 60 → 53 errors (-12% improvement)
-- **Exact Match:** 31.2% → 31.4% (maintained)
-- **WASM Crashes:** 0 (perfect stability)
+**Latest Conformance Results (rust branch - 2024-01-14):**
+- **TS1109 Missing:** 13 occurrences (down from 69 baseline!)
+- **TS1005 Extra:** 14 occurrences (down from 196 baseline!)
+- **Combined Scope:** 27 errors (much improved from 286 baseline)
 
-**Iteration 1 Results (2024-01-14):**
-- **TS1005 Extra:** 14 → 11 (-21% improvement!)
-- **TS1109 Missing:** 13 → 13 (no change)
-- **Combined Scope:** 27 → 24 errors (-11% improvement)
-- **Exact Match:** 44.2% (maintained)
+**Problem:**
+Parser error suppression needs refinement to reduce remaining false positives/negatives:
+- **TS1005:** 14 extra errors (emit but shouldn't) - syntax error detection
+- **TS1109:** 13 missing errors (should emit but don't) - expression expected
+- The current `can_recover_from_error()` and `is_at_expression_end()` logic needs refinement
 
-**Iterations 2-4 (2025-01-15):**
-- **Iteration 2:** Reduced cascading error suppression distance
-- **Iteration 3:** Made can_recover_from_error more selective
-- **Iteration 4:** Increased TS1109 error budget (3 → 20) to reduce missing errors
-- **TS1005 Error Budget:** 2 → 10 (maintained reduction)
-
-**Progress:**
-- Iterations 1-4 successfully reduced TS1005 extra errors
-- `can_recover_from_error()` enhancements working as expected
-- Error budget tuning for better balance
-- All 4 iterations merged to em-team-3 and rust
+**Progress Note:**
+Previous work (Tasks 1-6) has dramatically reduced the scope:
+- Missing TS1109: 69 → 13 (-81% improvement)
+- Extra TS1005: 196 → 14 (-93% improvement)
+- Remaining 27 errors are the "hard cases" requiring targeted fixes
 
 **Current State:**
 - Worker 1 added `can_recover_from_error()` method
