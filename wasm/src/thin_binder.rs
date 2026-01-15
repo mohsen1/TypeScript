@@ -347,10 +347,10 @@ impl ThinBinderState {
                                 name, scope_depth, sym_id.0);
                         }
                         // Resolve import if this symbol is imported from another module
-                        if let Some(resolved) = self.resolve_import_if_needed(*sym_id) {
+                        if let Some(resolved) = self.resolve_import_if_needed(sym_id) {
                             return Some(resolved);
                         }
-                        return Some(*sym_id);
+                        return Some(sym_id);
                     }
                     scope_id = scope.parent;
                     scope_depth += 1;
@@ -380,10 +380,10 @@ impl ThinBinderState {
                     name, sym_id.0);
             }
             // Resolve import if this symbol is imported from another module
-            if let Some(resolved) = self.resolve_import_if_needed(*sym_id) {
+            if let Some(resolved) = self.resolve_import_if_needed(sym_id) {
                 return Some(resolved);
             }
-            return Some(*sym_id);
+            return Some(sym_id);
         }
 
         // Chained lookup: check lib binders for global symbols
@@ -395,7 +395,7 @@ impl ThinBinderState {
                         name, i, sym_id.0);
                 }
                 // Note: lib symbols are not imports, so no need to resolve
-                return Some(*sym_id);
+                return Some(sym_id);
             }
         }
 
@@ -451,7 +451,7 @@ impl ThinBinderState {
         // Determine the export name:
         // - If import_name is set, use it (for renamed imports like `import { foo as bar }`)
         // - Otherwise use the symbol's escaped_name
-        let export_name = sym.import_name.as_ref().unwrap_or(&sym.escaped_text);
+        let export_name = sym.import_name.as_ref().unwrap_or(&sym.escaped_name);
 
         // Look up the module's exports in module_exports
         let module_table = self.module_exports.get(module_specifier)?;
@@ -467,7 +467,7 @@ impl ThinBinderState {
             );
         }
 
-        Some(*exported_sym_id)
+        Some(exported_sym_id)
     }
 
     /// Find the enclosing scope for a given node by walking up the AST.
