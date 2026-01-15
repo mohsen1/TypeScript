@@ -236,7 +236,72 @@ Current baseline from rust branch (commit 74df9fd30d):
 5. 🔴 **Daily EM-2 sync NOT happening** - Critical blocker identified
 6. ✅ Worker 8 complete - LSP TypeScript config integration merged
 7. 📋 Track semantic error counts (TS7005: 489, TS7008: 336, TS2792: 161)
-8. 🚨 **IMMEDIATE ACTION REQUIRED:** Start daily sync with Workers 6-7 or reassign
+8. 🚨 **DIRECTOR'S DECISION (2025-01-15 15:30):** MODULE RESOLUTION REASSIGNED
+
+---
+
+## ⚠️ DIRECTOR'S REASSIGNMENT DECISION (2025-01-15 15:30)
+
+### Finding: EM-2 Module Resolution CRITICAL BLOCKER
+
+**Problem:**
+- Workers 6-7 have ZERO commits on module resolution (45+ minutes)
+- 800+ errors blocked (TS7005: 489, TS7008: 336, TS2792: 161)
+- Other teams making progress (Workers 1, 2, 10, 11, 14 all completed fixes)
+- Two-pronged approach NOT working
+
+### Decision: REASSIGN MODULE RESOLUTION
+
+**Module resolution (Workers 6-7 task) is reassigned to:**
+- **Worker 1** (EM-3): TS7005/TS7008 symbol resolution
+- **Worker 10** (EM-1): TS2792 import() type resolution
+
+**Rationale:**
+- Workers 1, 10 have proven high throughput (completed TS2683, TS2571 fixes in 20-30 min)
+- Workers 6-7 have 2× time with 0× results
+- Module resolution too critical for further delays
+
+### NEW Assignments for Workers 6-7
+
+**Worker 6 - REASSIGNED to Tier 0 Quality Tasks:**
+- Focus: Definite assignment gaps (TS2565)
+- Priority: Lower complexity, build confidence
+- Location: `wasm/src/thin_checker.rs`
+- Action: Review existing TS2564 implementation, find gaps
+
+**Worker 7 - REASSIGNED to LSP Integration:**
+- Focus: Help Worker 8 with TypeScript config integration
+- Priority: Support role, lower complexity
+- Location: `wasm/src/lsp/`
+- Action: Complete LSP strict mode integration (if Worker 8 needs help)
+
+### EM-2 New Focus
+
+**EM-2 shifts from "Module Resolution" to "LSP + Tier 0 Support":**
+
+| Worker | New Focus | Priority | Complexity |
+|--------|-----------|----------|------------|
+| Worker 6 | Definite assignment (TS2565) | P2 | Low |
+| Worker 7 | LSP config integration | P2 | Low |
+| Worker 8 | LSP lead (config complete) | P1 | Complete ✅ |
+
+**Module Resolution Status:**
+- **TRANSITIONING** to EM-1/EM-3 ownership
+- Workers 1, 10 will take over TS7005/TS7008/TS2792
+- EM-2 to focus on support tasks until capacity permits
+
+### EM-2 Capacity Status
+
+**Current:** 3 workers (all reassigned to lower-priority tasks)
+**Capacity:** Available for support work
+**Action:** Await module resolution completion by Workers 1, 10
+
+### Timeline
+
+- **Immediate:** Workers 6-7 stop module resolution work
+- **Within 1 hour:** Workers 1, 10 start module resolution
+- **Checkpoint:** 2 hours for initial progress from Workers 1, 10
+- **Full Week:** Module resolution completion target
 
 ---
 
