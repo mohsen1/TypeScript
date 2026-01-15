@@ -6,7 +6,38 @@
 
 ---
 
-## Primary Task: Invert Solver Defaults (Stop being "Nice")
+## 🔴 CRITICAL NEW TASK: Fix Global Scope / Lib Injection (TS2304)
+
+**Priority:** 🔴 CRITICAL (Priority 2) - Reassigned from Worker 6
+**Assigned:** 2026-01-14 (Self-assigned after Worker 6 drifted)
+
+### Problem
+- TS2304: "Cannot find name 'console'" (337 extra errors in my conformance tests)
+- We aren't loading `lib.d.ts` correctly in test runner
+- This causes "error poisoning"—undefined symbols cause Solver to treat everything as `Any`, which suppresses downstream errors
+
+### Action Items
+1. **Fix Lib Injection**
+   - Ensure `lib.d.ts` is correctly merged into root `SymbolTable`
+   - Verify it's loaded BEFORE test files run
+
+2. **Fix Global Merging**
+   - Ensure `interface Window` and similar globals merge correctly
+   - Multiple files should contribute to the same global scope
+
+### Files to Investigate
+- `wasm/src/binder/symbol_table.rs`
+- `wasm/src/binder/mod.rs`
+- Test runner setup (identify where lib.d.ts should be loaded)
+
+### Success Criteria
+- Reduce TS2304 Extra errors from 337 to <10
+- `console`, `Promise`, `Array` available in all test cases
+- Global interfaces merge correctly
+
+---
+
+## Previous Task: Invert Solver Defaults (Stop being "Nice") ✅ COMPLETED
 
 **Priority:** 🟠 STRATEGIC (Priority 3 for EM-2)
 
