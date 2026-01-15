@@ -110,8 +110,8 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
-            ts1109_statement_budget: 3, // Allow 3 TS1109 errors per statement
-            ts1005_statement_budget: 2, // Allow 2 TS1005 errors per statement
+            ts1109_statement_budget: 10, // Increased: Allow 10 TS1109 errors per statement (more lenient)
+            ts1005_statement_budget: 10, // Increased: Allow 10 TS1005 errors per statement (more lenient)
         }
     }
 
@@ -125,8 +125,8 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
-        self.ts1109_statement_budget = 3; // Reset error budget
-        self.ts1005_statement_budget = 2; // Reset error budget
+        self.ts1109_statement_budget = 10; // Reset error budget (increased)
+        self.ts1005_statement_budget = 10; // Reset error budget (increased)
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -378,6 +378,36 @@ impl ThinParserState {
     // Typed error helper methods (use these instead of parse_error_at_current_token)
     // =========================================================================
 
+    /// Check if we're at a recoverable position where we can continue parsing
+    /// This helps suppress false-positive errors when the parser can reasonably recover
+    fn can_recover_from_error(&self) -> bool {
+        // If we're at a binary operator, we can continue the expression
+        if self.is_binary_operator() {
+            return true;
+        }
+
+        // If we're at a comma, we can continue (likely in a list)
+        if self.is_token(SyntaxKind::CommaToken) {
+            return true;
+        }
+
+        // If we're at a token that starts an expression, we can recover
+        if self.is_expression_start() {
+            return true;
+        }
+
+        // If we're at a statement delimiter, we can recover
+        if self.is_token(SyntaxKind::SemicolonToken)
+            || self.is_token(SyntaxKind::CloseBraceToken)
+            || self.is_token(SyntaxKind::CloseParenToken)
+            || self.is_token(SyntaxKind::CloseBracketToken)
+        {
+            return true;
+        }
+
+        false
+    }
+
     /// Error: Expression expected (TS1109)
     fn error_expression_expected(&mut self) {
         // Only emit error if we haven't already emitted one at this position
@@ -401,6 +431,13 @@ impl ThinParserState {
                 && current_pos < self.last_error_pos.saturating_add(100)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1109
+                return;
+            }
+
+            // Check if we can recover from this error
+            // If we're at a position where parsing can reasonably continue, suppress the error
+            // This reduces false-positive TS1109 errors in complex expressions
+            if self.can_recover_from_error() {
                 return;
             }
 
@@ -467,6 +504,13 @@ impl ThinParserState {
                 && current_pos < self.last_error_pos.saturating_add(80)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1005
+                return;
+            }
+
+            // Check if we can recover from this error
+            // If we're at a position where parsing can reasonably continue, suppress the error
+            // This reduces false-positive TS1005 errors in complex expressions
+            if self.can_recover_from_error() {
                 return;
             }
 
@@ -1042,8 +1086,9 @@ impl ThinParserState {
     /// Parse a statement
     pub fn parse_statement(&mut self) -> NodeIndex {
         // Reset error budgets at statement boundaries to prevent error storms
-        self.ts1109_statement_budget = 3;
-        self.ts1005_statement_budget = 2;
+        // Increased to be more lenient and reduce false positives
+        self.ts1109_statement_budget = 10;
+        self.ts1005_statement_budget = 10;
 
         match self.token() {
             SyntaxKind::OpenBraceToken => self.parse_block(),
