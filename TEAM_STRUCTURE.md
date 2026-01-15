@@ -17,25 +17,29 @@ Project Zang has 2 Engineering Managers (EMs) and 8 Workers. **RESTRUCTURED 2026
 
 ---
 
-## Team Assignments (POST-RESTRUCTURE)
+## Team Assignments (UPDATED 2026-01-15 12:45)
 
-### EM-1: "Syntax Squad" ✅ NOW ACTIVE
+### EM-1: "Syntax Squad" ✅ ACTIVE - AT CAPACITY
 **Focus:** Tier 1 (Parser Accuracy) + Tier 3 (Symbol Resolution)
 
-| Worker | Branch | Squad | Current Focus | Status |
-|--------|--------|-------|---------------|--------|
-| Worker 1 | worker-1 | Syntax | TS2683 (implicit this) ✅ Complete | 🟢 Active |
-| Worker 2 | worker-2 | Syntax | super() handling ✅ Complete | 🟢 Active |
-| Worker 3 | worker-3 | Syntax | Not assigned | ⚪ Ready for assignment |
-| Worker 4 | worker-4 | Syntax | Not assigned | ⚪ Ready for assignment |
-| Worker 5 | worker-5 | Syntax | Parser noise (TS1005/TS1109) 🔄 In progress | 🟡 Transferring from EM-2 |
+| Worker | Branch | Squad | Current Focus | Status | Throughput |
+|--------|--------|-------|---------------|--------|------------|
+| Worker 1 | worker-1 | Syntax | TS2683 ✅ Complete | 🟢 Ready for reassignment | High |
+| Worker 2 | worker-2 | Syntax | super() ✅ Complete | 🟢 Ready for reassignment | High |
+| Worker 3 | worker-3 | Syntax | TS1109 parser noise | 🔵 Active (just activated) | TBD |
+| Worker 4 | worker-4 | Syntax | TS1005 parser noise | 🔵 Active (just activated) | TBD |
+| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Transferred from EM-2 | High |
 
 **EM Branch:** em-team-1
 
+**⚠️ TEAM SIZE ISSUE:** 5 workers (exceeds limit of 4)
+
+**Decision Required:** Create EM-3 or reassign Workers 1-2
+
 **Priority Issues:**
-- Activate Workers 3-4 with first assignments
-- Complete Worker 5 transfer from EM-2
-- Assign new tasks to Workers 1-2 after completed work review
+- ✅ Workers 3-4 activated with parser tasks
+- ✅ Worker 5 transferred from EM-2 (statement-level recovery complete)
+- 🔄 Workers 1-2 awaiting next assignments (may transfer to EM-2 or EM-3)
 
 ---
 
