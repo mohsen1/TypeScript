@@ -29,6 +29,7 @@ pub struct HoverProvider<'a> {
     interner: &'a TypeInterner,
     source_text: &'a str,
     file_name: String,
+    strict: bool,
 }
 
 impl<'a> HoverProvider<'a> {
@@ -48,6 +49,28 @@ impl<'a> HoverProvider<'a> {
             interner,
             source_text,
             file_name,
+            strict: false,
+        }
+    }
+
+    /// Create a new Hover provider with explicit strict mode setting.
+    pub fn with_strict(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        line_map: &'a LineMap,
+        interner: &'a TypeInterner,
+        source_text: &'a str,
+        file_name: String,
+        strict: bool,
+    ) -> Self {
+        Self {
+            arena,
+            binder,
+            line_map,
+            interner,
+            source_text,
+            file_name,
+            strict,
         }
     }
 
@@ -107,7 +130,7 @@ impl<'a> HoverProvider<'a> {
 
         // 3. Compute Type Information
         // Use persistent cache if available for O(1) lookups on repeated queries
-        let strict = false; // TODO: get from tsconfig
+        let strict = self.strict;
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,

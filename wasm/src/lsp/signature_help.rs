@@ -85,6 +85,7 @@ pub struct SignatureHelpProvider<'a> {
     interner: &'a TypeInterner,
     source_text: &'a str,
     file_name: String,
+    strict: bool,
 }
 
 impl<'a> SignatureHelpProvider<'a> {
@@ -103,6 +104,27 @@ impl<'a> SignatureHelpProvider<'a> {
             interner,
             source_text,
             file_name,
+            strict: false,
+        }
+    }
+
+    pub fn with_strict(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        line_map: &'a LineMap,
+        interner: &'a TypeInterner,
+        source_text: &'a str,
+        file_name: String,
+        strict: bool,
+    ) -> Self {
+        Self {
+            arena,
+            binder,
+            line_map,
+            interner,
+            source_text,
+            file_name,
+            strict,
         }
     }
 
@@ -167,7 +189,7 @@ impl<'a> SignatureHelpProvider<'a> {
         };
 
         // 5. Create checker with persistent cache if available
-        let strict = false; // TODO: get from tsconfig
+        let strict = self.strict;
         let mut checker = if let Some(cache) = type_cache.take() {
             ThinCheckerState::with_cache(
                 self.arena,

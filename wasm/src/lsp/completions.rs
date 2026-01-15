@@ -92,6 +92,7 @@ pub struct Completions<'a> {
     source_text: &'a str,
     interner: Option<&'a TypeInterner>,
     file_name: Option<String>,
+    strict: bool,
 }
 
 /// JavaScript/TypeScript keywords for completion.
@@ -163,6 +164,7 @@ impl<'a> Completions<'a> {
             source_text,
             interner: None,
             file_name: None,
+            strict: false,
         }
     }
 
@@ -182,6 +184,28 @@ impl<'a> Completions<'a> {
             source_text,
             interner: Some(interner),
             file_name: Some(file_name),
+            strict: false,
+        }
+    }
+
+    /// Create a completions provider with type-aware member completion support and explicit strict mode.
+    pub fn with_strict(
+        arena: &'a ThinNodeArena,
+        binder: &'a ThinBinderState,
+        line_map: &'a LineMap,
+        interner: &'a TypeInterner,
+        source_text: &'a str,
+        file_name: String,
+        strict: bool,
+    ) -> Self {
+        Self {
+            arena,
+            binder,
+            line_map,
+            source_text,
+            interner: Some(interner),
+            file_name: Some(file_name),
+            strict,
         }
     }
 
@@ -411,7 +435,7 @@ impl<'a> Completions<'a> {
         let file_name = self.file_name.as_ref()?;
 
         let mut cache_ref = type_cache;
-        let strict = false; // TODO: get from tsconfig
+        let strict = self.strict;
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
@@ -594,7 +618,7 @@ impl<'a> Completions<'a> {
 
         // 2. Determine the contextual type (expected type)
         let mut cache_ref = type_cache;
-        let strict = false; // TODO: get from tsconfig
+        let strict = self.strict;
         let mut checker = if let Some(cache) = cache_ref.as_deref_mut() {
             if let Some(cache_value) = cache.take() {
                 ThinCheckerState::with_cache(
