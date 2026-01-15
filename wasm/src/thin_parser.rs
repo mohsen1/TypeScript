@@ -743,6 +743,42 @@ impl ThinParserState {
         }
     }
 
+    /// Check if the current token could be the start of an array element expression
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Literals that can be array elements
+            SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NoSubstitutionTemplateLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Identifiers and keywords that can start expressions
+            SyntaxKind::Identifier => true,
+            // Prefix operators that can start expressions
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword => true,
+            // Structural tokens
+            SyntaxKind::OpenParenToken => true,  // parenthesized expression
+            SyntaxKind::OpenBracketToken => true,  // nested array
+            SyntaxKind::OpenBraceToken => true,  // object literal
+            SyntaxKind::LessThanToken => true,  // type argument or JSX
+            SyntaxKind::SlashToken => true,  // regex literal (might be division)
+            SyntaxKind::SlashEqualsToken => true,
+            _ => false,
+        }
+    }
+
     /// Resynchronize after a parse error by skipping to the next statement boundary
     /// This prevents cascading errors by finding a known good synchronization point
     fn resync_after_error(&mut self) {

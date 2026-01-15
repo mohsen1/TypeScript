@@ -109,6 +109,111 @@ This fix is **high leverage** because:
 
 ---
 
+## Phase 1 Investigation: Module Symbol Resolution (2026-01-14)
+
+### Architecture Understanding
+
+**Current Implementation:**
+
+1. **Binder (binder.rs, thin_binder.rs):**
+   - `bind_import_declaration()` (line 1636) creates local ALIAS symbols for imports
+   - `bind_export_declaration()` (line 1693) marks symbols as exported locally
+   - `resolve_identifier()` (thin_binder.rs:313) searches:
+     - Scope chain (local scopes)
+     - file_locals (file-level symbols)
+     - lib_binders (lib.d.ts globals)
+   - **NO cross-file module resolution**
+
+2. **Parallel Module (parallel.rs):**
+   - `parse_and_bind_parallel()` processes each file independently
+   - `merge_bind_results()` merges symbols across files for declaration merging
+   - `parse_and_bind_parallel_with_libs()` injects lib.d.ts symbols
+   - **No export/import table linking**
+
+### The Root Cause Gap
+
+**What happens when `import { foo } from './bar'` is bound:**
+
+1. Binder creates a local ALIAS symbol named "foo" in current scope
+2. Binder marks it as `is_type_only` if appropriate
+3. **But there's no step to:**
+   - Load './bar' file
+   - Find exported symbol "foo" from './bar'
+   - Link local "foo" to the exported symbol
+   - Track the module dependency
+
+**Why TS7005/TS7008 errors occur:**
+- TS7005: "Symbol 'X' cannot be referenced from a module"
+  - The imported symbol exists locally but is marked as ALIAS
+  - Checker doesn't know it's a valid import, so it treats it as module-scoped violation
+
+- TS7008: "Module 'X' has no exported member 'Y'"
+  - When checking `import { foo } from './bar'`, WASM doesn't verify 'foo' exists in './bar'
+  - Should resolve during binding, but currently doesn't
+
+### Cross-File Resolution Gap
+
+**Current flow:**
+```
+file1.ts: export const foo = 42;
+file2.ts: import { foo } from './file1';
+
+Binding file1:
+  - Creates symbol "foo" in file1.file_locals
+  - Marks foo.is_exported = true
+
+Binding file2 (independent):
+  - Creates ALIAS symbol "foo" in file2.current_scope
+  - NO lookup of file1 to verify foo exists
+  - NO linking of file2's "foo" to file1's "foo"
+
+Type checking:
+  - resolve_identifier("foo") finds local ALIAS
+  - Checker doesn't know this is a valid import
+  - TS7005 error or incorrect type
+```
+
+**Expected flow:**
+```
+1. Parse all files (parallel) ✓
+2. Bind all files (parallel) ✓
+3. Build export tables:
+   - For each file, collect exported symbols
+   - Create module_name -> { exports: Map<name, SymbolId> }
+4. Resolve imports:
+   - For each import, lookup module's export table
+   - Link local import symbol to remote export symbol
+5. Type check with resolved symbols
+```
+
+### Key Files to Modify
+
+**1. wasm/src/parallel.rs**
+- Add export table building phase
+- Add import resolution phase
+- Store module_exports: FxHashMap<String, SymbolTable>
+
+**2. wasm/src/thin_binder.rs**
+- Track exported symbols separately (already done in Symbol.exports)
+- Build export table during binding
+- Post-process imports to resolve them
+
+**3. wasm/src/checker/** (thin_checker.rs)
+- Update to use resolved import symbols
+- Check for TS7008 during import binding
+
+### Test Case Created
+
+File: `wasm/test_module_import.ts`
+
+Demonstrates the issue:
+- file1.ts exports foo, bar, Baz
+- file2.ts imports them
+- Expected: No errors
+- Current: TS7005 errors
+
+---
+
 ## Previous Task: Invert Solver Defaults ✅ COMPLETED
 
 **Priority:** 🔴 CRITICAL (Priority 2)
