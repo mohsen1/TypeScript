@@ -627,7 +627,35 @@ impl<'a> ThinCheckerState<'a> {
             // Identifiers
             k if k == SyntaxKind::Identifier as u16 => self.get_type_of_identifier(idx),
             k if k == SyntaxKind::ThisKeyword as u16 => {
-                self.current_this_type().unwrap_or(TypeId::UNKNOWN)
+                if let Some(this_type) = self.current_this_type() {
+                    this_type
+                } else if let Some(ref class_info) = self.ctx.enclosing_class.clone() {
+                    // Inside a class but no explicit this type on stack -
+                    // return the class instance type (e.g., for constructor default params)
+                    if let Some(class_node) = self.ctx.arena.get(class_info.class_idx) {
+                        if let Some(class_data) = self.ctx.arena.get_class(class_node) {
+                            return self.get_class_instance_type(class_info.class_idx, class_data);
+                        }
+                    }
+                    TypeId::ANY
+                } else {
+                    // Not in a class - check if we're in a function
+                    if self.find_enclosing_function(idx).is_some() {
+                        // TS2683: 'this' implicitly has type 'any'
+                        use crate::checker::types::diagnostics::{
+                            diagnostic_codes, diagnostic_messages,
+                        };
+                        self.error_at_node(
+                            idx,
+                            diagnostic_messages::THIS_IMPLICITLY_HAS_TYPE_ANY,
+                            diagnostic_codes::THIS_IMPLICITLY_HAS_TYPE_ANY,
+                        );
+                        TypeId::ANY
+                    } else {
+                        // Outside function - this is an error but use ANY for recovery
+                        TypeId::ANY
+                    }
+                }
             }
             k if k == SyntaxKind::SuperKeyword as u16 => self.get_type_of_super_keyword(idx),
 

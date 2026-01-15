@@ -136,6 +136,8 @@ pub mod diagnostic_messages {
         "Property '{0}' is {1} and only accessible within class '{2}'.";
     pub const PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT: &str =
         "Private identifiers are not allowed in ambient contexts.";
+    pub const THIS_IMPLICITLY_HAS_TYPE_ANY: &str =
+        "'this' implicitly has type 'any' because it does not have a type annotation.";
 
     // Interface errors
     pub const INTERFACE_INCORRECTLY_EXTENDS: &str =
@@ -301,6 +303,7 @@ pub mod diagnostic_codes {
     pub const PROPERTY_USED_BEFORE_INITIALIZATION: u32 = 2729; // Property '{0}' is used before its initialization.
     pub const SUPER_ONLY_IN_DERIVED_CLASS: u32 = 2335;
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
+    pub const THIS_IMPLICITLY_HAS_TYPE_ANY: u32 = 2683; // 'this' implicitly has type 'any' because it does not have a type annotation.
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515; // Same code for methods
