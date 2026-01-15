@@ -122,6 +122,32 @@ fn check_type_recursive(&mut self, type_id: TypeId) -> Type {
 ### Status
 - **Flow Recording:** ✅ Complete
 - **Application Expansion:** ✅ Complete
-- **Recursion Guards:** 🔴 NEW - Critical Priority
-- **Ready for Merge:** No
+- **Recursion Guards:** ⚠️ REASSIGNED - See RECURSION_GUARDS_FINDINGS.md
+  - **Note:** Worker-3 investigated and verified recursion guards are already implemented
+  - Zero crashes in all test scenarios
+- **Ready for Merge:** ✅ YES - Merged to em-team-1 (commit e3feed998c5)
 - **Last Updated:** 2026-01-15
+
+---
+
+## Worker-4 Merge Summary
+
+**Merge Commit:** `e3feed998c5` (pushed to origin/em-team-1)
+
+### Completed Tasks Merged:
+1. **Flow Recording** ✅
+   - Fixed flow recording for statements and identifiers
+   - All 54/54 control_flow tests passing
+   - Commits: a163cbed8c9, 4c2544eb316
+
+2. **Application Expansion Tests** ✅
+   - Fixed all 34/34 application expansion tests
+   - Added default type parameter support
+   - Fixed test setup with `insert_with_params()`
+
+### Code Changes:
+- `wasm/src/solver/evaluate_tests.rs` - Test improvements
+- `wasm/src/solver/instantiate.rs` - Default type parameter support
+
+### Reassigned:
+- **Recursion Guards** - Reassigned to worker-3 (investigation complete, already implemented)
