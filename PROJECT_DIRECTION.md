@@ -1,337 +1,200 @@
-
 # PROJECT Zang
 
-## Mission: TypeScript → Rust/WASM Migration
+## Mission
 
-Project Zang is a complete rewrite of the TypeScript compiler and type checker in Rust, compiled to WebAssembly for performance. The goal is to **beat TypeScript in performance** while maintaining 100% compatibility with the original TypeScript compiler.
+Project Zang is a complete rewrite of the TypeScript compiler and type checker in Rust, compiled to WebAssembly. The goal is to achieve performance improvements while maintaining compatibility with the original TypeScript compiler.
 
 ## Architecture Overview
 
 **Core Principle:** TypeScript source files (`src/`) remain **read-only** and identical to upstream Microsoft TypeScript. All custom implementation lives in the `wasm/` directory.
 
-See `wasm/specs/WASM_ARCHITECTURE.md` for a deep dive.
-See `wasm/specs/SOLVER.md` for type solver architecture.
-See `wasm/specs` files for other component designs and references.
+### Key Components
 
-### Key Components:
-- **WASM Parser** (`wasm/src/parser/`) - Rust implementation of TypeScript parser
-- **WASM Checker** (`wasm/src/checker/`) - Type checking and semantic analysis  
-- **WASM Solver** (`wasm/src/solver/`) - Type resolution and constraint solving
-- **WASM Binder** (`wasm/src/binder/`) - Symbol binding and scope management
-- **Integration Layer** (`wasm/src/integration/`) - TypeScript ↔ WASM bridge
+| Component | Location | Purpose |
+|-----------|----------|---------|
+| Parser | `wasm/src/thin_parser.rs` | Rust implementation of TypeScript parser |
+| Checker | `wasm/src/thin_checker.rs` | Type checking and semantic analysis |
+| Solver | `wasm/src/solver/` | Type resolution and constraint solving |
+| Binder | `wasm/src/binder/` | Symbol binding and scope management |
+| Diagnostics | `wasm/src/checker/types/diagnostics.rs` | Error codes and messages |
 
-### Quality Metrics:
-- **Conformance Tests:** 4,941 TypeScript test cases
-- **Current Performance:** 38.6% exact match (500 test sample, 2026-01-15)
-- **Target Performance:** 95%+ compatibility before production
+### Spec Documents
 
-## Current Priority Issues
-
-### 1. 🔴 CRITICAL: Fix The "Parser Noise" (TS1005 & TS1109)
-**Owner:** Syntax Squad
-**Data:** 701 combined extra errors (TS1005: 439, TS1109: 262).
-**Analysis:** These are false positives. Our `ThinParser` is bailing out or emitting error nodes on syntax that `tsc` accepts. This "noise" makes it impossible to trust downstream semantic errors because a broken AST results in broken symbols.
-**Action:**
-*   **Implement Error Resynchronization:** When the parser hits an unexpected token, it must not just emit an error; it must advance to the next synchronization point (e.g., next `;` or `}`) and *continue* parsing the rest of the file.
-*   **Audit Semicolon Insertion (ASI):** Verify our ASI logic matches TypeScript's exactly. Many TS1005 errors are likely missing semicolons we aren't inferring.
-
-### 2. 🔴 CRITICAL: The "Global Scope" Fix (TS2304)
-**Owner:** worker-3
-**Status:** 🟡 IN PROGRESS (Assigned 2026-01-15)
-**Data:** TS2304 appears in both Extra (343) and Missing (116) lists.
-**Analysis:** This is the root of the "Error Poisoning."
-*   **Extra TS2304:** We aren't loading `lib.d.ts` correctly in the test runner, so `console`, `Promise`, and `Array` are undefined.
-*   **Missing Errors:** When `Promise` is undefined, the Solver treats it as `Any`. This suppresses TS2322 (Type Mismatch) errors downstream.
-**Action:**
-*   **Fix Lib Injection:** Ensure `lib.d.ts` is correctly merged into the root `SymbolTable` for every test.
-*   **Fix Global Merging:** Ensure `interface Window` (and similar globals) merge correctly across files.
-
-### 3. 🟠 STRATEGIC: Invert Solver Defaults (Stop being "Nice")
-**Owner:** Semantics Squad
-**Data:** 2961 missing errors (60%).
-**Analysis:** We are missing 184 `TS2322` (Type Mismatch) and 357 `TS7006` (Implicit Any) errors. This proves our compiler is "optimistic"—when it encounters an unknown type or a resolution failure, it returns `TypeId::ANY`.
-**Action:**
-*   **Change Default to `UNKNOWN`:** Modify `wasm/src/solver/` to return `TypeId::UNKNOWN` or `TypeId::ERROR` instead of `TypeId::ANY` when a symbol cannot be resolved or a type operation fails.
-*   **Expect a Regression:** This will cause a massive spike in "Extra Errors." **This is good.** It exposes exactly where our logic is failing rather than hiding it behind `Any`.
-
-### 4. 🟡 TACTICAL: Fix Class Property Initialization (TS2564)
-**Owner:** CFA Squad
-**Data:** TS2564 is the #1 missing error (413 occurrences).
-**Analysis:** "Property 'x' has no initializer..." is missing. This means we are simply *not running* the check that verifies class properties are initialized in the constructor.
-**Action:**
-*   Implement the `strictPropertyInitialization` check in `wasm/src/checker/thin_checker.rs`. This is a high-ROI task that will knock out the top missing error category.
-
-### 5. 🟢 STABILITY: Recursion Guards
-**Data:** 2 Crashes (Stack Overflow).
-**Analysis:** `types/typeRelationships/recursiveTypes` caused a panic.
-**Action:**
-*   Add a `recursion_depth` counter to `solve_subtype` and `check_expression`. Return a "Type instantiation is excessively deep" error (TS2589) when hitting the limit (e.g., 100), rather than crashing the WASM process.
+- `wasm/specs/WASM_ARCHITECTURE.md` - Architecture deep dive
+- `wasm/specs/SOLVER.md` - Type solver design
+- `wasm/specs/` - Other component designs
 
 ---
 
-### Success Metrics for Next Report
-*   **TS1005/TS1109 (Parser):** Reduce from ~700 to <40. ✅ **EM-1/EM-2 ACHIEVED** (96% reduction: 701 → 29)
-*   **TS2304 (Binder):** Reduce Extra errors from 343 to <10. ✅ **ALREADY FIXED** (343 → ~0)
-*   **TS2564 (CFA):** Reduce Missing errors from 413 to <20. ✅ **EM-3/EM-1 ACHIEVED** (413 → ~0)
-*   **Exact Match:** Increase from 30.1% to **80%+**. 🟡 **IN PROGRESS** (currently ~44%)
+## Running Conformance Tests
 
-**Priority Order:** Parser (Noise) -> Binder (Poisoning) -> Solver (Strictness). Do not work on new features until Parser noise is cleared.
+To get current metrics, run the conformance test suite:
 
----
+```bash
+# Navigate to differential test directory
+cd wasm/differential-test
 
-## EM-3 Team Branch Integration (2026-01-15)
+# Quick test (200 files, ~1 min)
+bash run-conformance.sh --max=200 --workers=4
 
-### Merge Summary: em-team-3 → rust ✅
+# Standard test (500 files, ~3 min)
+bash run-conformance.sh --max=500 --workers=8
 
-**Validation Results:**
-- Tests Run: 487
-- Exact Match: 158 (32.4%)
-- Same Error Count: 184 (37.8%)
-- **Total Parity: 70.2%**
-- **WASM Crashed: 0** (down from 2) ✅
-
-**Key Achievements:**
-- TS2564 no longer in missing errors (was 413 missing)
-- TS2322 reduced to 13 missing (was 310+)
-- WASM compilation fixed
-- All workers (9-12) merged successfully
-
-**Files Modified:**
-- `wasm/src/checker/declarations.rs` - TS2564 implementation
-- `wasm/src/thin_checker.rs` - Super keyword type inference
-- `wasm/src/thin_parser.rs` - Parser improvements
-- `wasm/src/checker/types/diagnostics.rs` - Error diagnostics
-
-### Team Assessment - EM-3
-
-**Productivity Analysis:**
-| Worker | Status | Performance | Recommendation |
-|--------|--------|-------------|----------------|
-| worker-9 | ✅ Merged | **HIGH** - Completed 3+ tasks, TS2322 refinements | **KEEP** - Core contributor |
-| worker-10 | ✅ Merged | **MEDIUM** - Module resolution complete, needs validation | **REASSIGN** - Available for new work |
-| worker-11 | ✅ Merged | **HIGH** - TS2322 analysis ready, ERROR type diagnostics | **KEEP** - Has critical analysis |
-| worker-12 | ⚠️ Stalled | **LOW** - Task assigned but not started | **REASSIGN** - Redistribute work |
-
-**Decision:** **RESIZE EM-3** to 2 workers (9, 11). Redistribute workers 10 and 12 to high-priority tasks.
-
----
-
-## Updated Priority Tasks (Post-EM-3 Merge)
-
-### Completed ✅
-1. Parser Noise (TS1005/TS1109) - 96% reduction
-2. TS2304 Global Scope - Already fixed
-3. TS2564 Class Property Initialization - Phase 1 & 2 complete
-4. Recursion Guards - Already implemented (0 crashes)
-5. Solver Defaults Inversion - Complete
-
-### Remaining Critical Issues 🔴
-
-1. **TS2322 Type Accuracy** (~105 missing, ~548 extra)
-   - Primary: Abstract Constructor Assignability
-   - Owner: worker-11 has analysis ready
-   - Estimated: 3-5 days
-
-2. **TS7006 Implicit Any** (~357 missing)
-   - Parameter type inference failures
-   - Unassigned
-   - Estimated: 3-5 days
-
-3. **Conformance Validation** (BLOCKS ALL PLANNING)
-   - Owner: worker-2 (EM-1)
-   - Run full 4941 tests, generate report
-   - Estimated: 1-2 days
-
-4. **Literal Type Narrowing** (TS2322 subtask)
-   - Owner: worker-4 (EM-1)
-   - Fix narrowing in assignments/conditionals
-   - Estimated: 3-5 days
-
----
-
-## Director Decision: Team Restructuring
-
-### Current State Analysis
-
-**EM-1 (Syntax & Foundation):** ✅ STABLE
-- 4 workers at capacity
-- All assigned to critical path tasks
-- No changes needed
-
-**EM-2 (Semantics & Core):** ⚠️ NEEDS RESIZE
-- worker-5: Available (high performer)
-- worker-6: Off-track (wrong task)
-- worker-7: Available
-- worker-8: Available
-- **Decision:** RESIZE to 2-3 workers, redistribute excess
-
-**EM-3 (Advanced Features):** ✅ MERGED, NEEDS RESIZE
-- worker-9: High performer (keep)
-- worker-10: Available for reassignment
-- worker-11: High performer with critical analysis (keep)
-- worker-12: Task not started (reassign)
-- **Decision:** Resize to 2 workers (9, 11), redistribute 10 and 12
-
-### Worker Redistribution Plan
-
-**From EM-2:**
-- worker-5 → Assign to TS7006 or TS2322 support
-- worker-7 → Assign to validation or testing
-- worker-8 → Available for overflow work
-- worker-6 → Redirect to correct task or reassign
-
-**From EM-3:**
-- worker-9 → Keep for TS2322 work (has expertise)
-- worker-11 → Keep for TS2322 implementation (has analysis)
-- worker-10 → Reassign to validation or module testing
-- worker-12 → Reassign to any available task
-
-**New Team Sizes (Recommended):**
-- EM-1: 4 workers (unchanged)
-- EM-2: 2-3 workers (down from 4)
-- EM-3: 2 workers (down from 4)
-- **Total active workers:** 8-9 (down from 12)
-
-**Rationale:** EM-3's integration tasks are complete. Remaining work is type accuracy (TS2322, TS7006) which benefits from focused, smaller teams. Excess workers can form a "Float Pool" for overflow work, validation, and testing.
-
----
-
-## Conformance Test Analysis (2026-01-15)
-
-### Latest Test Results (500 tests)
-
-| Metric | Value |
-|--------|-------|
-| Tests Run | 487 |
-| Exact Match | 188 (38.6%) |
-| Same Error Count | 202 (41.5%) |
-| WASM Crashes | 0 |
-| Skipped | 13 |
-
-### Category Breakdown
-
-| Category | Exact Match |
-|----------|-------------|
-| Symbols | 75% (6/8) |
-| async | 44% (79/179) |
-| ambient | 44% (8/18) |
-| classes | 34% (94/277) |
-| asyncGenerators | 33% (1/3) |
-
-### Top Extra Errors (Over-reporting)
-
-| Error Code | Count | Description | Root Cause |
-|------------|-------|-------------|------------|
-| **TS2571** | 30 | Object is of type 'unknown' | `this` in regular functions typed as `unknown` instead of emitting TS2683 |
-| **TS7006** | 24 | Implicit any parameter | Over-reporting in some cases despite previous fixes |
-| **TS2348** | 23 | Cannot invoke expression | Non-callable type being called |
-| **TS2300** | 20 | Duplicate identifier | Symbol table merging issues |
-| **TS2322** | 17 | Type not assignable | Type compatibility false positives |
-| **TS1109** | 13 | Expression expected | Parser errors for `await` in parameter defaults |
-| **TS7005** | 12 | Implicit any variable | Variable type inference failures |
-
-### Top Missing Errors (Under-reporting)
-
-| Error Code | Count | Description | Root Cause |
-|------------|-------|-------------|------------|
-| **TS2705** | 34 | Async function return type | Remaining async cases not covered |
-| **TS2524** | 15 | Module resolution | Module member access failures |
-| **TS1005** | 11 | Token expected | Parser synchronization issues |
-| **TS1109** | 10 | Expression expected | Parser bailing on valid syntax |
-| **TS1359** | 10 | await reserved word | Async context detection |
-| **TS2304** | 10 | Cannot find name | Symbol resolution gaps |
-
----
-
-## Recent Fixes (2026-01-15)
-
-### 1. TS2507 - Extends Clause Literals ✅
-
-**Commit:** `95102f64c3`
-
-**Problem:** Parser emitted TS1109 for `class C extends undefined/true/42/"hello"` instead of semantic TS2507.
-
-**Solution:**
-- Parser now accepts literals in extends clauses (`thin_parser.rs`)
-- Checker emits TS2507 "Type 'X' is not a constructor function type" (`thin_checker.rs`)
-- Added diagnostic code and message template (`diagnostics.rs`)
-
-**Test Case:**
-```typescript
-class C1 extends undefined { }  // Now: TS2507, Before: TS1109
-class C2 extends 42 { }         // Now: TS2507, Before: TS1109
+# Full test (all files, ~15 min)
+bash run-conformance.sh --all --workers=14
 ```
 
-### 2. TS7006/TS7008 - Implicit Any Over-reporting ✅
+### Understanding Results
 
-**Commit:** `b186bc5df3`
+| Metric | Meaning |
+|--------|---------|
+| Exact Match | WASM and TSC emit identical error codes |
+| Same Error Count | Same number of errors (may differ in codes) |
+| Missing Errors | TSC emits but WASM doesn't (under-reporting) |
+| Extra Errors | WASM emits but TSC doesn't (over-reporting) |
+| Crashed | WASM panicked during test |
 
-**Problem:** Implicit any errors emitted for parameters/properties with initializers.
+**Target:** 95%+ exact match before production release.
 
-**Solution:**
-- Skip TS7006 when parameter has default value (`param.initializer.is_some()`)
-- Skip TS7008 when property has initializer (`prop.initializer.is_some()`)
+### Building WASM
 
-**Reduction:** 135 → 24 extra errors
-
-### 3. TS2705 - Async Generator Return Type ✅
-
-**Commit:** `b186bc5df3`
-
-**Problem:** Async generators emitting "must return Promise" error.
-
-**Solution:**
-- Added check for generator flag (`!func.asterisk_token`)
-- Async generators return `AsyncGenerator`, not `Promise`
-
-### 4. Docker Path Fix ✅
-
-**Commit:** `3eb0b9e0f5`
-
-**Problem:** Conformance tests failing with `ENOENT: /tests/cases/conformance`
-
-**Solution:**
-- Fixed path resolution from `../../tests` to `../tests`
-- Docker structure: `/app/differential-test` → `../tests` → `/app/tests`
+```bash
+cd wasm
+wasm-pack build --target web --out-dir pkg
+```
 
 ---
 
-## Next Priority Issues
+## Priority Issues
 
-### 1. 🔴 TS2571 "Object is of type 'unknown'" (30 extra)
+### Tier 1: Parser Accuracy
 
-**Root Cause:** `this` inside regular functions (not methods) returns `TypeId::UNKNOWN` when no type annotation exists. Property access on `unknown` triggers TS2571 instead of TS2683.
+**Goal:** Parser should accept all valid TypeScript syntax without emitting false errors.
 
-**TSC Behavior:** Emits TS2683 "'this' implicitly has type 'any' because it does not have a type annotation."
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| TS1109 extra | Parser emits "Expression expected" for valid syntax | Unassigned |
+| TS1005 extra | Parser emits "X expected" for valid constructs | Unassigned |
+| ASI handling | Automatic semicolon insertion edge cases | Unassigned |
 
-**Fix Location:** `thin_checker.rs:629-631` - `current_this_type()` handling
+**Key Files:** `wasm/src/thin_parser.rs`
 
-**Example:**
+**Validation:** Run conformance tests and check "Extra Errors" for TS1xxx codes.
+
+---
+
+### Tier 2: Type Checker Accuracy
+
+**Goal:** Checker should emit the same semantic errors as TSC.
+
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| TS2571 extra | "Object is of type 'unknown'" over-reported | Unassigned |
+| TS2683 missing | "'this' implicitly has type 'any'" not emitted | Unassigned |
+| TS2507 incomplete | Non-constructor extends not fully checked | Unassigned |
+| TS2348 extra | "Cannot invoke expression" over-reported | Unassigned |
+| TS2322 accuracy | Type assignability false positives | Unassigned |
+
+**Key Files:** `wasm/src/thin_checker.rs`, `wasm/src/solver/`
+
+**Root Cause - TS2571/TS2683:** When `this` is used inside a regular function (not a method), it should emit TS2683 but instead types as `unknown` and emits TS2571 on property access.
+
 ```typescript
 function foo() {
-    this.x = 1;  // WASM: TS2571, TSC: TS2683
+    this.x = 1;  // Should: TS2683, Currently: TS2571
 }
 ```
 
-### 2. 🔴 TS2507 for Non-Literal Extends (Missing)
+**Fix Location:** `thin_checker.rs` - `current_this_type()` handling around line 629
 
-**Problem:** `class C extends x { }` where `x: {}` - not emitting TS2507.
+---
 
-**Root Cause:** Only literals are checked; resolved identifiers with non-constructor types need validation.
+### Tier 3: Symbol Resolution
 
-**Fix:** Check `base_constructor_type_from_expression` return value and emit TS2507 if `None`.
+**Goal:** All symbols should resolve correctly, including globals and modules.
 
-### 3. 🟠 TS1109 Parser Cases (13 extra)
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| TS2304 gaps | "Cannot find name" for valid symbols | Unassigned |
+| TS2524 missing | Module member resolution failures | Unassigned |
+| Global merging | Interface/namespace merging across files | Unassigned |
 
-**Problem:** Extra parser errors for `await` in parameter defaults like `function f(await = await)`.
+**Key Files:** `wasm/src/binder/`, `wasm/src/thin_checker.rs`
 
-**Root Cause:** Parser doesn't handle `await` as identifier in non-async contexts correctly.
+---
 
-### 4. 🟠 TS2348 Non-Callable (23 extra)
+### Tier 4: Implicit Any Checks
 
-**Problem:** Over-reporting "Cannot invoke expression" errors.
+**Goal:** Emit TS7006/TS7008 only when type cannot be inferred.
 
-**Root Cause:** Call signature resolution may be too strict or missing overload handling.
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| TS7006 extra | Parameter implicit any over-reported | Unassigned |
+| TS7005 extra | Variable implicit any over-reported | Unassigned |
+
+**Key Files:** `wasm/src/thin_checker.rs` - implicit any checking functions
+
+**Rule:** Skip implicit any errors when:
+- Parameter has default value (`param.initializer.is_some()`)
+- Property has initializer (`prop.initializer.is_some()`)
+- Type can be inferred from usage
+
+---
+
+### Tier 5: Async/Await
+
+**Goal:** Correct handling of async functions, generators, and await expressions.
+
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| TS2705 gaps | Async function return type checking | Unassigned |
+| TS1359 missing | 'await' reserved word detection | Unassigned |
+| Async generators | `AsyncGenerator` vs `Promise` return types | Unassigned |
+
+**Key Files:** `wasm/src/thin_checker.rs` - async-related functions
+
+---
+
+## Team Assignment Guidelines
+
+### How to Assign Work
+
+1. **Run conformance tests** to get current error counts
+2. **Identify top errors** from "Extra Errors" (over-reporting) or "Missing Errors" (under-reporting)
+3. **Assign by tier** - Parser issues block checker accuracy
+4. **One issue per engineer** - Focused work prevents conflicts
+
+### Priority Order
+
+```
+Parser (Tier 1) → Symbol Resolution (Tier 3) → Type Checker (Tier 2) → Implicit Any (Tier 4) → Async (Tier 5)
+```
+
+**Rationale:** Parser errors create broken ASTs that poison downstream analysis. Fix syntax handling before semantic checking.
+
+### Debugging Workflow
+
+1. **Find failing test:**
+   ```bash
+   # Check conformance output for example files
+   # e.g., "classes/classDeclarations/classExtendingNonConstructor.ts"
+   ```
+
+2. **Create minimal repro:**
+   ```bash
+   # Create test file in /tmp/test.mjs
+   node /tmp/test.mjs
+   ```
+
+3. **Compare outputs:**
+   - TSC diagnostics (expected)
+   - WASM diagnostics (actual)
+   - Identify missing/extra error codes
+
+4. **Trace through code:**
+   - Parser: `thin_parser.rs`
+   - Checker: `thin_checker.rs`
+   - Add logging if needed
 
 ---
 
@@ -339,8 +202,39 @@ function foo() {
 
 | File | Purpose |
 |------|---------|
-| `wasm/src/thin_parser.rs` | Parser implementation |
-| `wasm/src/thin_checker.rs` | Type checker implementation |
-| `wasm/src/checker/types/diagnostics.rs` | Error codes and messages |
+| `wasm/src/thin_parser.rs` | Main parser implementation |
+| `wasm/src/thin_checker.rs` | Main type checker (~22k lines) |
+| `wasm/src/binder/` | Symbol table and scope management |
+| `wasm/src/solver/` | Type resolution engine |
+| `wasm/src/checker/types/diagnostics.rs` | Error codes and message templates |
 | `wasm/differential-test/` | Conformance test infrastructure |
-| `wasm/differential-test/run-conformance.sh` | Docker test runner |
+| `wasm/differential-test/run-conformance.sh` | Docker-based test runner |
+| `wasm/differential-test/conformance-child.mjs` | Per-test execution logic |
+
+---
+
+## Adding New Diagnostics
+
+1. Add code to `wasm/src/checker/types/diagnostics.rs`:
+   ```rust
+   pub const NEW_ERROR_CODE: u32 = XXXX;
+   ```
+
+2. Add message template:
+   ```rust
+   pub const NEW_ERROR_MESSAGE: &str = "Error message with {0} placeholder.";
+   ```
+
+3. Emit in checker:
+   ```rust
+   use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
+
+   let message = format_message(diagnostic_messages::NEW_ERROR_MESSAGE, &[arg]);
+   self.error_at_node(node_idx, &message, diagnostic_codes::NEW_ERROR_CODE);
+   ```
+
+4. Rebuild and test:
+   ```bash
+   wasm-pack build --target web --out-dir pkg
+   node /tmp/test.mjs
+   ```
