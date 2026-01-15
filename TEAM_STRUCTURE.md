@@ -17,29 +17,39 @@ Project Zang has 2 Engineering Managers (EMs) and 8 Workers. **RESTRUCTURED 2026
 
 ---
 
-## Team Assignments (UPDATED 2026-01-15 12:45)
+## Team Assignments (UPDATED 2026-01-15 12:57)
 
-### EM-1: "Syntax Squad" ✅ ACTIVE - AT CAPACITY
+### EM-1: "Syntax Squad" ⚠️ RESTRUCTURING REQUIRED
 **Focus:** Tier 1 (Parser Accuracy) + Tier 3 (Symbol Resolution)
 
-| Worker | Branch | Squad | Current Focus | Status | Throughput |
-|--------|--------|-------|---------------|--------|------------|
-| Worker 1 | worker-1 | Syntax | TS2683 ✅ Complete | 🟢 Ready for reassignment | High |
-| Worker 2 | worker-2 | Syntax | super() ✅ Complete | 🟢 Ready for reassignment | High |
-| Worker 3 | worker-3 | Syntax | TS1109 parser noise | 🔵 Active (just activated) | TBD |
-| Worker 4 | worker-4 | Syntax | TS1005 parser noise | 🔵 Active (just activated) | TBD |
-| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Transferred from EM-2 | High |
+| Worker | Branch | Squad | Assigned Focus | Status | Throughput |
+|--------|--------|-------|----------------|--------|------------|
+| Worker 1 | worker-1 | Syntax | TS2683 (implicit this) ✅ Complete | 🟢 Ready | High |
+| Worker 2 | worker-2 | Syntax | super() ✅ Complete | 🟢 Ready | High |
+| Worker 3 | worker-3 | Syntax | TS1109 suppression | ❌ **Not done** | None |
+| Worker 4 | worker-4 | Syntax | TS1005 suppression | ❌ **Wrong task** | Low |
+| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Complete | High |
 
 **EM Branch:** em-team-1
 
-**⚠️ TEAM SIZE ISSUE:** 5 workers (exceeds limit of 4)
+**⚠️ CRITICAL ISSUE:** Workers 3-4 did not complete their Syntax Squad tasks
 
-**Decision Required:** Create EM-3 or reassign Workers 1-2
+**Worker 3 Assessment:**
+- Assigned: TS1109 "Expression expected" suppression (reduce from 262 to <40 errors)
+- Actual: Documentation only (claimed it was "already implemented")
+- Reality: TS1109 suppression is NOT implemented
+- Throughput: None - needs reassignment or reset
+
+**Worker 4 Assessment:**
+- Assigned: TS1005 "X expected" suppression (extend Worker 5's work, reduce from 345 to <50)
+- Actual: Implemented "Invert Solver Defaults" (semantic task, not parser)
+- Issue: Did wrong task - this was Worker 7's assignment (solver defaults)
+- Throughput: Low - completed wrong task, needs redirection
 
 **Priority Issues:**
-- ✅ Workers 3-4 activated with parser tasks
-- ✅ Worker 5 transferred from EM-2 (statement-level recovery complete)
-- 🔄 Workers 1-2 awaiting next assignments (may transfer to EM-2 or EM-3)
+- ⚠️ **Reassign Workers 3-4** - Did not complete Syntax Squad tasks
+- ✅ Worker 5 complete - transfer to EM-1 (parser work aligns)
+- 🔄 Workers 1-2 ready for next assignments
 
 ---
 
