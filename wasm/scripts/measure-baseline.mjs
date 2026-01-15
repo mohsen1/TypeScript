@@ -165,7 +165,54 @@ async function main() {
         }
     }
 
-    console.log('=== Results ===\n');
+    // Show files with errors
+    console.log('\n=== Files with TS1005/TS1109 Errors (Top 20) ===\n');
+    const filesWithErrors = [];
+    for (const file of files) {
+        const source = readSourceFile(file);
+        if (source.length > 50000 || source.includes('@filename:')) continue;
+
+        const testName = basename(file, extname(file));
+        const parser = wasm.createThinParser(basename(file), source);
+
+        try {
+            parser.parseSourceFile();
+            const diagnostics = JSON.parse(parser.getDiagnosticsJson());
+
+            const actualErrors = {};
+            if (diagnostics) {
+                diagnostics.forEach(d => {
+                    if (d.code) actualErrors[d.code] = (actualErrors[d.code] || 0) + 1;
+                });
+            }
+
+            const ts1005 = actualErrors[1005] || 0;
+            const ts1109 = actualErrors[1109] || 0;
+
+            if (ts1005 > 0 || ts1109 > 0) {
+                filesWithErrors.push({ name: testName, ts1005, ts1109 });
+            }
+
+            parser.free();
+        } catch (e) {
+            try { parser.free(); } catch (e2) {}
+        }
+    }
+
+    filesWithErrors.sort((a, b) => (b.ts1005 + b.ts1109) - (a.ts1005 + a.ts1109));
+    filesWithErrors.slice(0, 20).forEach((f, i) => {
+        const parts = [];
+        parts.push((i + 1) + '. ' + f.name);
+        if (f.ts1005) parts.push('TS1005:' + f.ts1005);
+        if (f.ts1109) parts.push('TS1109:' + f.ts1109);
+        console.log(parts.join(' '));
+    });
+
+    if (filesWithErrors.length > 20) {
+        console.log(`\n... and ${filesWithErrors.length - 20} more files`);
+    }
+
+    console.log('\n=== Results ===\n');
     console.log(`Total tests: ${totalTests}`);
     console.log(`Skipped:    ${skipped} (large files)`);
     console.log(`\nExtra Errors (False Positives):`);
