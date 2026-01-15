@@ -639,8 +639,11 @@ impl<'a> ThinCheckerState<'a> {
                     }
                     TypeId::ANY
                 } else {
-                    // Not in a class - check if we're in a function
-                    if self.find_enclosing_function(idx).is_some() {
+                    // Not in a class - check if we're in a NON-ARROW function
+                    // Arrow functions capture `this` from their enclosing scope, so they
+                    // should NOT trigger TS2683. We need to skip past arrow functions
+                    // to find the actual enclosing function that defines the `this` context.
+                    if self.find_enclosing_non_arrow_function(idx).is_some() {
                         // TS2683: 'this' implicitly has type 'any'
                         use crate::checker::types::diagnostics::{
                             diagnostic_codes, diagnostic_messages,
@@ -652,7 +655,8 @@ impl<'a> ThinCheckerState<'a> {
                         );
                         TypeId::ANY
                     } else {
-                        // Outside function - this is an error but use ANY for recovery
+                        // Outside function or only inside arrow functions - use ANY for recovery
+                        // Arrow functions will capture this from outer scope, or it becomes any
                         TypeId::ANY
                     }
                 }
@@ -5700,6 +5704,38 @@ impl<'a> ThinCheckerState<'a> {
         while !current.is_none() {
             if let Some(node) = self.ctx.arena.get(current) {
                 if node.is_function_like() {
+                    return Some(current);
+                }
+            }
+            let ext = self.ctx.arena.get_extended(current)?;
+            if ext.parent.is_none() {
+                return None;
+            }
+            current = ext.parent;
+        }
+        None
+    }
+
+    /// Find the enclosing NON-ARROW function for a given node.
+    /// Returns Some(NodeIndex) if inside a non-arrow function (function declaration/expression),
+    /// None if at module/global scope or only inside arrow functions.
+    ///
+    /// This is used for `this` type checking: arrow functions capture `this` from their
+    /// enclosing scope, so we need to skip past them to find the actual function that
+    /// defines the `this` context.
+    fn find_enclosing_non_arrow_function(&self, idx: NodeIndex) -> Option<NodeIndex> {
+        use crate::parser::syntax_kind_ext::*;
+        let mut current = idx;
+        while !current.is_none() {
+            if let Some(node) = self.ctx.arena.get(current) {
+                // Check for non-arrow functions that define their own `this` context
+                if node.kind == FUNCTION_DECLARATION
+                    || node.kind == FUNCTION_EXPRESSION
+                    || node.kind == METHOD_DECLARATION
+                    || node.kind == CONSTRUCTOR
+                    || node.kind == GET_ACCESSOR
+                    || node.kind == SET_ACCESSOR
+                {
                     return Some(current);
                 }
             }
