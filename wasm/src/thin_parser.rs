@@ -397,26 +397,17 @@ impl ThinParserState {
             return true;
         }
 
-        // If we're at an open parenthesis/bracket/brace, we might be starting a new sub-expression
+        // If we're at an open parenthesis/bracket, we might be starting a new sub-expression
         // This handles cases like `a + (` where we're starting a parenthesized expression
-        if self.is_token(SyntaxKind::OpenParenToken)
-            || self.is_token(SyntaxKind::OpenBracketToken)
-            || self.is_token(SyntaxKind::OpenBraceToken)
-        {
-            return true;
-        }
-
-        // If we're at a token that clearly starts a new statement, we can recover
-        // This handles cases where the user has clearly moved on to the next statement
-        // But we need to be careful - only suppress for statement start, not expression start
-        if self.is_statement_start() {
+        // NOTE: Removed OpenBraceToken - it's ambiguous (could be object literal or block)
+        if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::OpenBracketToken) {
             return true;
         }
 
         // If we're at certain expression start tokens, we might be able to recover
-        // But be selective - only recover on tokens that clearly indicate a new expression
+        // But be VERY selective - only recover on tokens that unambiguously start a new expression
         match self.token() {
-            // Literals and keywords that clearly start a new expression
+            // Literals that clearly start a new expression (not keywords which could be ambiguous)
             SyntaxKind::NumericLiteral
             | SyntaxKind::BigIntLiteral
             | SyntaxKind::StringLiteral
@@ -424,11 +415,10 @@ impl ThinParserState {
             | SyntaxKind::TemplateHead
             | SyntaxKind::TrueKeyword
             | SyntaxKind::FalseKeyword
-            | SyntaxKind::NullKeyword
-            | SyntaxKind::ThisKeyword
-            | SyntaxKind::SuperKeyword
-            | SyntaxKind::AwaitKeyword
-            | SyntaxKind::YieldKeyword => true,
+            | SyntaxKind::NullKeyword => true,
+            // Special keywords that can ONLY start expressions (not statements)
+            SyntaxKind::ThisKeyword
+            | SyntaxKind::SuperKeyword => true,
             // Open angle bracket for type arguments or JSX
             SyntaxKind::LessThanToken => true,
             _ => false,
