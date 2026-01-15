@@ -5666,11 +5666,21 @@ impl ThinParserState {
 
         // For restricted productions (throw), ASI applies immediately after line break
         // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
-        // NOTE: The previous implementation incorrectly treated line break as a syntax error.
-        // According to JavaScript spec, ASI should apply: throw\nx parses as throw; x;
+        // NOTE: Unlike return/break/continue, throw REQUIRES an expression.
+        // When ASI is applied to throw, it's a semantic error (TS1109: Expression expected).
+        // Example: throw\nnew Error() should emit TS1109 at the line break.
+        let has_line_break = self.scanner.has_preceding_line_break();
         let expression = if !self.can_parse_semicolon_for_restricted_production() {
             self.parse_expression()
         } else {
+            // ASI applied - emit TS1109 because throw requires an expression
+            if has_line_break && self.token_pos() != self.last_error_pos {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Expression expected.",
+                    diagnostic_codes::EXPRESSION_EXPECTED,
+                );
+            }
             NodeIndex::NONE
         };
 
