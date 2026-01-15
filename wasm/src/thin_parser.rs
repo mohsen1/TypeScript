@@ -434,11 +434,10 @@ impl ThinParserState {
                 return;
             }
 
-            // Check multiple conditions to suppress false-positive TS1109 errors:
-            // 1. Can we recover from this error? (worker-1)
-            // 2. Are we at a natural expression end point? (worker-5)
-            // Both conditions help reduce false positives in different scenarios
-            if self.can_recover_from_error() || self.is_at_expression_end() {
+            // NEW: Suppress error if we're at a natural expression end point
+            // This handles cases like `let x =` where the user forgot the expression
+            // but it's clear they've moved on to the next statement/context
+            if self.is_at_expression_end() {
                 return;
             }
 
@@ -7652,45 +7651,6 @@ impl ThinParserState {
                 multi_line: false,
             },
         )
-    }
-
-    /// Check if current token can start an array element
-    /// Used for error recovery in array literals when commas are missing
-    fn is_array_element_start(&self) -> bool {
-        match self.token() {
-            // Spread operator
-            SyntaxKind::DotDotDotToken => true,
-            // Literals that can start array elements
-            SyntaxKind::StringLiteral
-            | SyntaxKind::NumericLiteral
-            | SyntaxKind::BigIntLiteral
-            | SyntaxKind::TrueKeyword
-            | SyntaxKind::FalseKeyword
-            | SyntaxKind::NullKeyword => true,
-            // Keywords/identifiers
-            SyntaxKind::Identifier => true,
-            // This keyword
-            SyntaxKind::ThisKeyword => true,
-            // Super keyword
-            SyntaxKind::SuperKeyword => true,
-            // Open bracket (nested array)
-            SyntaxKind::OpenBracketToken => true,
-            // Open brace (object literal)
-            SyntaxKind::OpenBraceToken => true,
-            // Open paren (parenthesized expression)
-            SyntaxKind::OpenParenToken => true,
-            // Prefix operators
-            SyntaxKind::ExclamationToken  // !
-            | SyntaxKind::TildeToken  // ~
-            | SyntaxKind::PlusToken  // + (unary)
-            | SyntaxKind::MinusToken  // - (unary)
-            | SyntaxKind::PlusPlusToken  // ++ (prefix)
-            | SyntaxKind::MinusMinusToken  // -- (prefix)
-            | SyntaxKind::TypeOfKeyword
-            | SyntaxKind::VoidKeyword
-            | SyntaxKind::DeleteKeyword => true,
-            _ => self.is_identifier_or_keyword(),
-        }
     }
 
     /// Check if current token can start an object property
