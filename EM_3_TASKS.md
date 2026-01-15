@@ -25,6 +25,7 @@ EM-3 is responsible for **type checker accuracy**. Your team ensures that:
 |--------|-------|------------|--------|------------|
 | worker-1 | Type Squad | Implicit `this` handling (TS2683) | ✅ Complete | High |
 | worker-2 | Type Squad | `super()` call handling (TS2322) | ✅ Complete | High |
+| worker-11 | Type Squad | TS2571 over-reporting fix | 🔄 Active | TBD |
 
 **EM Branch:** em-team-3
 
@@ -84,7 +85,7 @@ EM-3 is responsible for **type checker accuracy**. Your team ensures that:
 ---
 
 ### Priority 2: TS2571 Over-reporting
-**Owner:** worker-1 or worker-2 (new assignment)
+**Owner:** worker-11
 
 **Goal:** Eliminate TS2571 false positives (should be TS2683 instead)
 
@@ -157,12 +158,13 @@ Current baseline from rust branch (commit 05236939f):
 
 ---
 
-## Merge Readiness Status (2026-01-15 13:25)
+## Merge Readiness Status (2026-01-15 14:45)
 
 | Worker | Status | Notes |
 |--------|--------|-------|
 | worker-1 | 🔵 Active | TS2683 fix complete, assigned TS2322 categorization (Priority 1) |
 | worker-2 | 🔵 Active | super() fix complete, assigned TS2322 fixes (Priority 1) |
+| worker-11 | 🟡 Assigned | TS2571 over-reporting fix (Priority 2), investigating emissions |
 
 ---
 
@@ -201,8 +203,8 @@ Current baseline from rust branch (commit 05236939f):
 
 ## Team Size and Capacity
 
-**Current Workers:** 2 (worker-1, worker-2)
-**Capacity:** Can accept up to 2 more workers (limit is 4)
+**Current Workers:** 3 (worker-1, worker-2, worker-11)
+**Capacity:** Can accept up to 1 more worker (limit is 4)
 
 **Future Considerations:**
 - If worker-3 or worker-4 are reassigned from EM-1, they should be assigned:
