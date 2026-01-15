@@ -637,6 +637,14 @@ impl ThinBinderState {
                     root_scope.table.set(name.clone(), *sym_id);
                 }
             }
+
+            // Also merge lib symbols into current_scope for immediate availability
+            // This ensures symbols like console, Array, Promise are available during binding
+            for (name, sym_id) in &lib_symbols {
+                if !self.current_scope.has(name) {
+                    self.current_scope.set(name.clone(), *sym_id);
+                }
+            }
         }
 
         // Create START flow node for the file
