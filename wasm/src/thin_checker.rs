@@ -3938,11 +3938,12 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypePredicate;
 
         if type_annotation.is_none() {
-            return (TypeId::ANY, None);
+            // Return UNKNOWN instead of ANY to enforce strict type checking
+            return (TypeId::UNKNOWN, None);
         }
 
         let Some(node) = self.ctx.arena.get(type_annotation) else {
-            return (TypeId::ANY, None);
+            return (TypeId::UNKNOWN, None);
         };
 
         if node.kind != syntax_kind_ext::TYPE_PREDICATE {
@@ -4251,7 +4252,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -4922,7 +4923,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -6893,7 +6894,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(op) = op_str {
             return match evaluator.evaluate(left_type, right_type, op) {
                 BinaryOpResult::Success(result) => result,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
         }
 
@@ -7017,7 +7018,7 @@ impl<'a> ThinCheckerState<'a> {
                     continue;
                 }
                 _ => {
-                    type_stack.push(TypeId::ANY);
+                    type_stack.push(TypeId::UNKNOWN);
                     continue;
                 }
             };
@@ -7025,12 +7026,12 @@ impl<'a> ThinCheckerState<'a> {
             let result = evaluator.evaluate(left_type, right_type, op_str);
             let result_type = match result {
                 BinaryOpResult::Success(result_type) => result_type,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
             type_stack.push(result_type);
         }
 
-        type_stack.pop().unwrap_or(TypeId::ANY)
+        type_stack.pop().unwrap_or(TypeId::UNKNOWN)
     }
 
     /// Get type of variable declaration.
@@ -7058,8 +7059,9 @@ impl<'a> ThinCheckerState<'a> {
             return self.get_type_of_node(var_decl.initializer);
         }
 
-        // No initializer - implicit any
-        TypeId::ANY
+        // No initializer - use UNKNOWN to enforce strict checking
+        // This requires explicit type annotation or prevents unsafe usage
+        TypeId::UNKNOWN
     }
 
     fn apply_this_substitution_to_call_return(
@@ -9039,7 +9041,9 @@ impl<'a> ThinCheckerState<'a> {
                         }
                         PropertyAccessResult::PropertyNotFound { .. } => {
                             report_no_index = true;
-                            TypeId::ANY
+                            // Generate TS2339 for property not found during element access
+                            self.error_property_not_exist_at(&property_name.to_string(), object_type_for_access, access.name_or_argument);
+                            TypeId::ERROR  // Return ERROR instead of ANY to expose the error
                         }
                     });
                 }
@@ -9761,7 +9765,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_type_for_parameter_properties(type_annotation);
             self.return_type_and_predicate(type_annotation)
         } else {
-            (TypeId::ANY, None)
+            // Use UNKNOWN as default to enforce strict checking
+            // This ensures return statements are checked even without annotation
+            (TypeId::UNKNOWN, None)
         };
 
         // Evaluate Application types in return type to get their structural form
@@ -10058,6 +10064,21 @@ impl<'a> ThinCheckerState<'a> {
 
                     let value_type = self.get_type_of_node(prop.initializer);
 
+                    // TS7008: Member implicitly has an 'any' type
+                    // Report this error when noImplicitAny is enabled, the object literal has a contextual type,
+                    // and the property value type is 'any'
+                    if self.ctx.no_implicit_any && prev_context.is_some() && value_type == TypeId::ANY {
+                        let message = format_message(
+                            diagnostic_messages::MEMBER_IMPLICIT_ANY,
+                            &[&name, "any"],
+                        );
+                        self.error_at_node(
+                            prop.name,
+                            &message,
+                            diagnostic_codes::IMPLICIT_ANY_MEMBER,
+                        );
+                    }
+
                     // Restore context
                     self.ctx.contextual_type = prev_context;
 
@@ -10094,6 +10115,25 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
                     let name = ident.escaped_text.clone();
+
+                    // TS7008: Member implicitly has an 'any' type
+                    // Report this error when noImplicitAny is enabled, the object literal has a contextual type,
+                    // and the shorthand property value type is 'any'
+                    if self.ctx.no_implicit_any
+                        && self.ctx.contextual_type.is_some()
+                        && value_type == TypeId::ANY
+                    {
+                        let message = format_message(
+                            diagnostic_messages::MEMBER_IMPLICIT_ANY,
+                            &[&name, "any"],
+                        );
+                        self.error_at_node(
+                            elem_idx,
+                            &message,
+                            diagnostic_codes::IMPLICIT_ANY_MEMBER,
+                        );
+                    }
+
                     let name_atom = self.ctx.types.intern_string(&name);
 
                     // Check for duplicate property
@@ -14409,7 +14449,8 @@ impl<'a> ThinCheckerState<'a> {
                         let mut return_type = if has_type_annotation {
                             self.get_type_of_node(func.type_annotation)
                         } else {
-                            TypeId::ANY
+                            // Use UNKNOWN to enforce strict checking
+                            TypeId::UNKNOWN
                         };
 
                         self.cache_parameter_types(&func.parameters.nodes, None);
@@ -14799,6 +14840,29 @@ impl<'a> ThinCheckerState<'a> {
             self.push_symbol_dependency(sym_id, true);
             let final_type = compute_final_type(self);
             self.pop_symbol_dependency();
+
+            // TS7005: Variable implicitly has an 'any' type
+            // Report this error when noImplicitAny is enabled and the variable has no type annotation
+            // and the inferred type is 'any'
+            if self.ctx.no_implicit_any
+                && var_decl.type_annotation.is_none()
+                && final_type == TypeId::ANY
+            {
+                if let Some(ref name) = var_name {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages, format_message,
+                    };
+                    let message = format_message(
+                        diagnostic_messages::VARIABLE_IMPLICIT_ANY,
+                        &[name, "any"],
+                    );
+                    self.error_at_node(
+                        var_decl.name,
+                        &message,
+                        diagnostic_codes::IMPLICIT_ANY,
+                    );
+                }
+            }
 
             // Check for variable redeclaration in the current scope (TS2403).
             // Note: This applies specifically to 'var' merging where types must match.
@@ -20555,9 +20619,24 @@ impl<'a> ThinCheckerState<'a> {
             self.check_property_initialization_order(member_idx, prop.initializer);
         }
 
-        // Note: TS7008 (Member implicitly has an 'any' type) is now checked in
-        // check_property_initialization, where we can determine if the property
-        // is assigned in the constructor (type can be inferred from assignment).
+        // TS7008: Member implicitly has an 'any' type
+        // Report this error when noImplicitAny is enabled and the property has no type annotation
+        if self.ctx.no_implicit_any && prop.type_annotation.is_none() {
+            if let Some(member_name) = self.get_property_name(prop.name) {
+                use crate::checker::types::diagnostics::{
+                    diagnostic_codes, diagnostic_messages, format_message,
+                };
+                let message = format_message(
+                    diagnostic_messages::MEMBER_IMPLICIT_ANY,
+                    &[&member_name, "any"],
+                );
+                self.error_at_node(
+                    prop.name,
+                    &message,
+                    diagnostic_codes::IMPLICIT_ANY_MEMBER,
+                );
+            }
+        }
     }
 
     /// Check a method declaration.
