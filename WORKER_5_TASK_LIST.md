@@ -9,7 +9,7 @@
 ## ✅ TASK COMPLETE: Parser Noise Reduction (TS1005)
 
 **Completed:** 2026-01-14
-**Merged to:** em-team-2 (commit 9ae2568bd)
+**Merged to:** em-team-2 (commit 5f04a2bb1)
 
 ---
 
