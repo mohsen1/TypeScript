@@ -108,6 +108,33 @@ If worker-2's validation shows TS1005/TS1109 did not meet the <40 target:
 
 ## Completed Tasks
 
+### Task 1: Fix checker/expr.rs Optimistic Defaults (P0) ✅
+
+**Status:** @ COMPLETE (2026-01-15)
+**Priority:** 🔴 CRITICAL
+**Commits:**
+- b8697565779 Task 1: Fix checker/expr.rs optimistic defaults (P0)
+- e1ecaa8ecd2 docs: EM-1 task reassignment notification
+
+**Summary:**
+Fixed optimistic type defaults in expression type checker to return UNKNOWN instead of ANY for error cases, improving type error detection.
+
+**Changes:**
+- Updated `wasm/src/checker/expr.rs` to return TypeId::UNKNOWN for missing nodes
+- Updated `wasm/src/checker/expr.rs` to return TypeId::UNKNOWN for parsing failures
+- Added detailed comments explaining the stricter type checking approach
+
+**Impact:**
+- Exposes type errors that were previously hidden by permissive ANY defaults
+- Improves error reporting accuracy
+- Aligns with worker-9's solver defaults inversion work
+
+**Build Status:** ✅ Passed (cargo build --release: 2m 49s, 64 warnings)
+
+**Merge Status:** ✅ Merged to em-team-1 (commit: f0debb590c3)
+
+---
+
 ### TS1005/TS1109 Parser Noise Reduction ✅
 
 **Status:** @ COMPLETE (2026-01-15)
