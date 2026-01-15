@@ -668,11 +668,11 @@ impl ThinParserState {
             | SyntaxKind::VoidKeyword
             | SyntaxKind::DeleteKeyword => true,
             // Structural tokens that can start statements
-            SyntaxKind::OpenBraceToken => true,  // block
-            | SyntaxKind::SemicolonToken => true,  // empty statement
-            | SyntaxKind::OpenParenToken => true,  // parenthesized expression
-            | SyntaxKind::OpenBracketToken => true,  // array literal/destructuring
-            | SyntaxKind::LessThanToken => true,  // JSX/type argument
+            SyntaxKind::OpenBraceToken  // block
+            | SyntaxKind::SemicolonToken  // empty statement
+            | SyntaxKind::OpenParenToken  // parenthesized expression
+            | SyntaxKind::OpenBracketToken  // array literal/destructuring
+            | SyntaxKind::LessThanToken => true, // JSX/type argument
             _ => false,
         }
     }
@@ -1697,6 +1697,9 @@ impl ThinParserState {
             self.parse_identifier()
         };
 
+        // Parse definite assignment assertion (!)
+        let exclamation_token = self.parse_optional(SyntaxKind::ExclamationToken);
+
         // Parse optional type annotation
         let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
             self.parse_type()
@@ -1743,7 +1746,7 @@ impl ThinParserState {
             end_pos,
             VariableDeclarationData {
                 name,
-                exclamation_token: false,
+                exclamation_token,
                 type_annotation,
                 initializer,
             },
@@ -5384,6 +5387,9 @@ impl ThinParserState {
                 self.parse_identifier()
             };
 
+            // Parse definite assignment assertion (!)
+            let exclamation_token = self.parse_optional(SyntaxKind::ExclamationToken);
+
             // Optional type annotation
             let type_annotation = if self.parse_optional(SyntaxKind::ColonToken) {
                 self.parse_type()
@@ -5404,9 +5410,9 @@ impl ThinParserState {
                 self.token_end(),
                 VariableDeclarationData {
                     name,
+                    exclamation_token,
                     type_annotation,
                     initializer,
-                    exclamation_token: false,
                 },
             );
             declarations.push(decl);
