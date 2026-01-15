@@ -892,6 +892,16 @@ impl<'a> ThinCheckerState<'a> {
                     let type_param = self.lookup_type_parameter(name);
                     let sym_id = self.resolve_identifier_symbol(type_name_idx);
                     if !is_builtin_array && type_param.is_none() && sym_id.is_none() {
+                        // Try resolving from lib binders before falling back to UNKNOWN
+                        if let Some(type_id) = self.resolve_lib_type_by_name(name) {
+                            // Still process type arguments for validation
+                            if let Some(args) = &type_ref.type_arguments {
+                                for &arg_idx in &args.nodes {
+                                    let _ = self.get_type_from_type_node(arg_idx);
+                                }
+                            }
+                            return type_id;
+                        }
                         if self.is_known_global_type_name(name) {
                             if let Some(args) = &type_ref.type_arguments {
                                 for &arg_idx in &args.nodes {
@@ -987,12 +997,6 @@ impl<'a> ThinCheckerState<'a> {
                     "object" => return TypeId::OBJECT,
                     "bigint" => return TypeId::BIGINT,
                     "symbol" => return TypeId::SYMBOL,
-                    // Global interfaces from lib.es5.d.ts - these accept primitives via boxing
-                    // Object/String/Number/Boolean are wide types that accept their primitive counterparts
-                    // We use UNKNOWN as a permissive stand-in when lib.d.ts is not loaded
-                    "Object" | "String" | "Number" | "Boolean" | "Symbol" | "Function" => {
-                        return TypeId::UNKNOWN;
-                    }
                     _ => {}
                 }
 
