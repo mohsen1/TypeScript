@@ -232,3 +232,103 @@ Worker-6's lib symbol enhancement is already included in em-team-2. The merge co
 2. TS2454 lib.d.ts global values fix ✅
 3. Lib symbol injection enhancement ✅
 
+---
+
+## Next Task: Fix TS7006/TS7005 Implicit Any Over-Reporting
+
+**Priority:** 🔴 CRITICAL (Tier 4 - Implicit Any Checks)
+
+**Status:** 🟢 READY TO START
+
+**Assigned:** 2026-01-15
+
+### Problem
+
+The type checker emits **TS7006 "Parameter 'x' implicitly has an 'any' type"** and **TS7005 "Variable 'x' implicitly has an 'any' type"** errors even when the type can be inferred from:
+- Default parameter values
+- Initializers
+- Usage context
+
+**Current Impact:** ~200 extra TS7006 and ~150 extra TS7005 errors in conformance tests
+
+### Root Cause
+
+The implicit any check doesn't verify if the type can actually be inferred before emitting the error. This creates false positives for:
+
+```typescript
+// Should NOT error - type inferred from default value
+function foo(param = 5) {  // Currently emits TS7006, should not
+    return param;
+}
+
+// Should NOT error - type inferred from initializer
+const x = 5;  // Currently may emit TS7005, should not
+
+// SHOULD error - no type inference possible
+function bar(param) {  // Should emit TS7006
+    return param;
+}
+```
+
+### Action Items
+
+1. **Locate implicit any checking code** in `wasm/src/thin_checker.rs`
+   - Search for `TS7006` and `TS7005` error codes
+   - Find functions that check parameter and variable types
+   - Identify where the check happens (likely in variable/parameter declaration)
+
+2. **Add inference checks before emitting TS7006/TS7005:**
+   - **For parameters:** Check if `param.initializer.is_some()`
+   - **For properties:** Check if `prop.initializer.is_some()`
+   - **For variables:** Check if there's an initializer or if type can be inferred from usage
+
+3. **Implement suppression logic:**
+   ```rust
+   // Pseudo-code for the fix
+   if is_parameter && param.initializer.is_some() {
+       // Skip TS7006 - type can be inferred from default value
+       continue;
+   }
+
+   if is_property && prop.initializer.is_some() {
+       // Skip TS7006 - type can be inferred from initializer
+       continue;
+   }
+   ```
+
+4. **Test cases to verify:**
+   ```typescript
+   // Should NOT emit TS7006
+   function test1(x = 5) { return x; }
+   function test2({ a = 1 } = {}) { return a; }
+   const y = 10;
+
+   // Should emit TS7006
+   function test3(z) { return z; }
+   ```
+
+5. **Run conformance tests:**
+   ```bash
+   cd wasm/differential-test
+   bash run-conformance.sh --max=500 --workers=4
+   ```
+   - Track TS7006 count (target: reduce from ~200 to <100)
+   - Track TS7005 count (target: similar reduction)
+   - Ensure no regression - valid errors still emitted
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS7006 extra | ~200 | <100 |
+| TS7005 extra | ~150 | <75 |
+
+**Key Files:**
+- `wasm/src/thin_checker.rs` - implicit any checking functions
+- `wasm/src/checker/types/diagnostics.rs` - error code definitions
+
+**Reference:** See `PROJECT_DIRECTION.md` Tier 4 section for rules on when to skip implicit any errors.
+
+**Coordination:** Worker 3 (EM-1) is also working on TS7006. Coordinate with EM-1 to avoid duplicate work and share findings.
+
+
+
