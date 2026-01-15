@@ -5724,6 +5724,27 @@ impl ThinParserState {
     fn parse_expression_statement(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
         let expression = self.parse_expression();
+
+        // If expression parsing failed completely, resync to recover
+        if expression.is_none() {
+            // Emit error for unexpected token if we haven't already
+            if self.token_pos() != self.last_error_pos && !self.is_token(SyntaxKind::EndOfFileToken) {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "Expression expected.",
+                    diagnostic_codes::EXPRESSION_EXPECTED,
+                );
+            }
+            // Try to parse semicolon for partial recovery, then resync
+            let _ = self.can_parse_semicolon();
+            if !self.is_token(SyntaxKind::SemicolonToken) {
+                self.resync_after_error();
+            } else {
+                self.next_token();
+            }
+            return NodeIndex::NONE;
+        }
+
         self.parse_semicolon();
         let end_pos = self.token_end();
 
