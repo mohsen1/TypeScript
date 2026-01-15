@@ -21,7 +21,7 @@ use crate::checker::types::diagnostics::{
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
 use crate::parser::syntax_kind_ext;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ImportDeclData, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::solver::{ContextualTypeContext, TypeId, TypeInterner};
@@ -15793,8 +15793,9 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check an import declaration for unresolved modules.
+    /// Check an import declaration for unresolved modules and missing exports.
     /// Emits TS2792 when the module cannot be resolved.
+    /// Emits TS2305 when a module exists but doesn't export a specific member.
     fn check_import_declaration(&mut self, stmt_idx: NodeIndex) {
         use crate::checker::types::diagnostics::{
             diagnostic_codes, diagnostic_messages, format_message,
@@ -15826,6 +15827,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
+                // Module exists, check if individual imports are exported
+                self.check_imported_members(import, module_name);
                 return;
             }
         }
@@ -15833,6 +15836,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module exists in the module_exports map (cross-file module resolution)
         // This enables resolving imports from other files in the same compilation
         if self.ctx.binder.module_exports.contains_key(module_name) {
+            // Module exists, check if individual imports are exported
+            self.check_imported_members(import, module_name);
             return;
         }
 
@@ -15847,6 +15852,89 @@ impl<'a> ThinCheckerState<'a> {
         // without access to the module graph (aside from ambient module declarations).
         let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
         self.error_at_node(import.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
+    }
+
+    /// Check if individual imported members exist in the module's exports.
+    /// Emits TS2305 for each missing export.
+    fn check_imported_members(&mut self, import: &ImportDeclData, module_name: &str) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
+        };
+
+        // Get the import clause
+        let clause_node = match self.ctx.arena.get(import.import_clause) {
+            Some(node) => node,
+            None => return,
+        };
+
+        let clause = match self.ctx.arena.get_import_clause(clause_node) {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Get named_bindings (NamedImports or NamespaceImport)
+        let bindings_node = match self.ctx.arena.get(clause.named_bindings) {
+            Some(node) => node,
+            None => return,
+        };
+
+        // Check if this is NamedImports (import { a, b })
+        if bindings_node.kind == crate::parser::syntax_kind_ext::NAMED_IMPORTS {
+            let named_imports = match self.ctx.arena.get_named_imports(bindings_node) {
+                Some(ni) => ni,
+                None => return,
+            };
+
+            // Get the module's exports table
+            let exports_table = match self.ctx.binder.module_exports.get(module_name) {
+                Some(table) => table,
+                None => return,
+            };
+
+            // Check each import specifier
+            for element_idx in &named_imports.elements.nodes {
+                let element_node = match self.ctx.arena.get(*element_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let specifier = match self.ctx.arena.get_specifier(element_node) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                // Get the name being imported (property_name if present, otherwise name)
+                let name_idx = if specifier.property_name.is_none() {
+                    specifier.name
+                } else {
+                    specifier.property_name
+                };
+
+                let name_node = match self.ctx.arena.get(name_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let identifier = match self.ctx.arena.get_identifier(name_node) {
+                    Some(id) => id,
+                    None => continue,
+                };
+
+                let import_name = &identifier.escaped_text;
+
+                // Check if this import exists in the module's exports
+                if !exports_table.has(import_name) {
+                    // Emit TS2305: Module has no exported member
+                    let message = format_message(
+                        diagnostic_messages::MODULE_HAS_NO_EXPORTED_MEMBER,
+                        &[module_name, import_name]
+                    );
+                    self.error_at_node(specifier.name, &message, diagnostic_codes::MODULE_HAS_NO_EXPORTED_MEMBER);
+                }
+            }
+        }
+        // Note: Namespace imports (import * as ns) don't need individual checks
+        // Default imports don't need checks here (they're handled differently)
     }
 
     /// Check an export declaration's module specifier for unresolved modules.
