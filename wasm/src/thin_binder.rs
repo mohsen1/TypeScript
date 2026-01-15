@@ -1288,7 +1288,9 @@ impl ThinBinderState {
                         return;
                     }
                 }
+                // Record flow for binary expressions to support flow analysis in closures
                 self.bind_binary_expression_iterative(arena, idx);
+                self.record_flow(idx);
             }
 
             // Conditional expressions - traverse into branches
@@ -1465,6 +1467,18 @@ impl ThinBinderState {
             // Function expressions - bind body
             k if k == syntax_kind_ext::FUNCTION_EXPRESSION => {
                 self.bind_function_expression(arena, node, idx);
+            }
+
+            // Typeof, void, await, yield expressions - record flow and traverse into operand
+            k if k == syntax_kind_ext::TYPE_OF_EXPRESSION
+                || k == syntax_kind_ext::VOID_EXPRESSION
+                || k == syntax_kind_ext::AWAIT_EXPRESSION
+                || k == syntax_kind_ext::YIELD_EXPRESSION =>
+            {
+                self.record_flow(idx);
+                if let Some(unary) = arena.get_unary_expr(node) {
+                    self.bind_node(arena, unary.operand);
+                }
             }
 
             _ => {
