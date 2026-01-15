@@ -130,9 +130,14 @@ async function runTsc(code, fileName = 'test.ts', testOptions = {}) {
 async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
   let parser = null;
   try {
-    const wasm = await import(join(wasmPkgPath, 'wasm.js'));
+    const wasmModule = await import(join(wasmPkgPath, 'wasm.js'));
+    const fs = await import('fs');
 
-    parser = new wasm.ThinParser(fileName, code);
+    // Initialize WASM module synchronously with file system loading
+    const wasmBuffer = fs.readFileSync(join(wasmPkgPath, 'wasm_bg.wasm'));
+    wasmModule.initSync(wasmBuffer);
+
+    parser = new wasmModule.ThinParser(fileName, code);
     if (!testOptions.nolib) {
       parser.addLibFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
     }

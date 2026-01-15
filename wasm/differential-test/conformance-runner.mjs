@@ -283,9 +283,14 @@ async function runTscMultiFile(files, testOptions = {}) {
 
 async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
   try {
-    const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
+    const wasmModule = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
+    const fs = await import('fs');
 
-    const parser = new wasm.ThinParser(fileName, code);
+    // Initialize WASM module synchronously with file system loading
+    const wasmBuffer = fs.readFileSync(join(CONFIG.wasmPkgPath, 'wasm_bg.wasm'));
+    wasmModule.initSync(wasmBuffer);
+
+    const parser = new wasmModule.ThinParser(fileName, code);
     if (!testOptions.nolib) {
       parser.addLibFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);
     }
@@ -333,10 +338,15 @@ async function runWasm(code, fileName = 'test.ts', testOptions = {}) {
  */
 async function runWasmMultiFile(files, testOptions = {}) {
   try {
-    const wasm = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
+    const wasmModule = await import(join(CONFIG.wasmPkgPath, 'wasm.js'));
+    const fs = await import('fs');
+
+    // Initialize WASM module synchronously with file system loading
+    const wasmBuffer = fs.readFileSync(join(CONFIG.wasmPkgPath, 'wasm_bg.wasm'));
+    wasmModule.initSync(wasmBuffer);
 
     // Use the new WasmProgram API for multi-file support
-    const program = new wasm.WasmProgram();
+    const program = new wasmModule.WasmProgram();
 
     if (!testOptions.nolib) {
       program.addFile(DEFAULT_LIB_NAME, DEFAULT_LIB_SOURCE);

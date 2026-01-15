@@ -228,6 +228,24 @@ pub(crate) fn is_ts_file(path: &Path) -> bool {
     }
 }
 
+/// Check if a path is a valid module file for module resolution purposes.
+/// This includes TypeScript files AND .json files (which can be imported with resolveJsonModule).
+pub(crate) fn is_valid_module_file(path: &Path) -> bool {
+    let name = match path.file_name().and_then(|name| name.to_str()) {
+        Some(name) => name,
+        None => return false,
+    };
+
+    if name.ends_with(".d.ts") || name.ends_with(".d.mts") || name.ends_with(".d.cts") {
+        return true;
+    }
+
+    match path.extension().and_then(|ext| ext.to_str()) {
+        Some("ts") | Some("tsx") | Some("mts") | Some("cts") | Some("json") => true,
+        _ => false,
+    }
+}
+
 fn path_to_pattern(base_dir: &Path, path: &Path) -> Option<String> {
     let rel = if path.is_absolute() {
         path.strip_prefix(base_dir).ok()?.to_path_buf()
