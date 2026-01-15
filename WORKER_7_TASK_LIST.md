@@ -438,3 +438,53 @@ TS2589 guards added by Worker 8 did not fully resolve these - need deeper recurs
 
 Worker 7 is ready for new task assignment.
 
+
+---
+
+## Worker-7 Restart Alert (2026-01-15 12:35)
+
+### Status: 🔴 RESTART REQUIRED
+
+**Reason:** Worker-7 became unresponsive and is being restarted by orchestrator.
+
+### Current State
+**Worker-7 Branch:** `0434355dd` - "Complete: <task description>"
+**Status:** Behind current rust/em-team-2 by multiple commits
+
+### Partial Work Analysis
+Worker-7 had started implementing module import resolution:
+
+**File Changed:** `wasm/src/thin_binder.rs` (+50 lines, -3 lines)
+
+**Implementation:** `resolve_import_if_needed()` function
+- Attempts to resolve import aliases to actual exported symbols
+- Checks `import_module` and `import_name` on symbols
+- Looks up exports in `module_exports` table
+- Called from three locations in `resolve_identifier()`
+
+**Code Quality:**
+- ⚠️ Commit message is placeholder: "Complete: <task description>"
+- ⚠️ Implementation appears incomplete
+- ⚠️ Branch is significantly behind current rust
+
+### Recommendations for EM-2
+
+**Option 1: Salvage and Continue**
+- Merge worker-7 to assess the partial work
+- Determine if `resolve_import_if_needed()` is on the right track
+- Assign worker to complete the implementation
+
+**Option 2: Fresh Start**
+- Worker-7 will restart from their branch state
+- May need to rebase their work onto current rust
+- Consider reassigning if code is not salvageable
+
+**Option 3: Reassign Task**
+- Give module resolution to a different worker
+- Worker-7 takes on a different task after restart
+
+### Next Steps
+1. Awaiting worker-7 restart completion
+2. EM-2 to assess worker-7 capability and code quality
+3. Make decision on salvage vs reassign
+
