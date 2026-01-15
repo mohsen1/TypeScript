@@ -141,6 +141,12 @@ pub struct Symbol {
     /// This indicates which file's arena contains this symbol's declarations.
     /// Value of u32::MAX means single-file mode (use current arena).
     pub decl_file_idx: u32,
+    /// Import module specifier for ES6 imports (e.g., './file' for `import { X } from './file'`)
+    /// This enables resolving imported symbols to their actual exports from other files.
+    pub import_module: Option<String>,
+    /// Original export name for imports with renamed imports (e.g., 'foo' for `import { foo as bar }`)
+    /// If None, the import name matches the escaped_name.
+    pub import_name: Option<String>,
 }
 
 impl Symbol {
@@ -158,6 +164,8 @@ impl Symbol {
             is_exported: false,
             is_type_only: false,
             decl_file_idx: u32::MAX,
+            import_module: None,
+            import_name: None,
         }
     }
 

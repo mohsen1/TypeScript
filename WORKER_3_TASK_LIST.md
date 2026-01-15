@@ -1,7 +1,7 @@
 # Worker-3 Task List
 
-## 🔴 CURRENT TASK: Invert Solver Defaults (Stop being "Nice")
-**Priority:** 🔴 CRITICAL (Strategic)
+## 🔴 CURRENT TASK: Global Scope Fix (TS2304 - Error Poisoning)
+**Priority:** 🔴 CRITICAL
 **Owner:** worker-3
 **Branch:** worker-3
 **Status:** 🟡 IN PROGRESS
@@ -11,110 +11,162 @@
 
 ## Task Description
 
-**Problem:** Missing 2,961 errors (60% of all errors). We are missing 184 `TS2322` (Type Mismatch) and 357 `TS7006` (Implicit Any) errors.
+**Problem:** TS2304 appears in both Extra (343) and Missing (116) lists. This is the root of "Error Poisoning."
 
-**Root Cause:** The compiler is "optimistic"—when it encounters an unknown type or a resolution failure, it returns `TypeId::ANY`. This hides type errors instead of exposing them.
+### Why This Matters
 
-**Target:** Change default from `ANY` to `UNKNOWN` to expose hidden type errors
+**Extra TS2304:** We aren't loading `lib.d.ts` correctly in the test runner, so `console`, `Promise`, `Array`, and other global types are undefined. This causes false "Cannot find name" errors.
+
+**Missing Errors:** When `Promise` is undefined, the Solver treats it as `Any`. This suppresses TS2322 (Type Mismatch) errors downstream, hiding real bugs.
+
+**Impact:** This single issue is poisoning both our error counts AND hiding other type errors from being detected.
 
 ---
 
-## Analysis Required
+## Investigation Required
 
-### Phase 1: Investigation (DO THIS FIRST)
+### Phase 1: Understand Current Behavior (DO THIS FIRST)
 
 **Before making any changes:**
 
-1. **Understand the current behavior:**
-   - Search for all places where `TypeId::ANY` is returned as a default
-   - Understand the difference between `TypeId::ANY`, `TypeId::UNKNOWN`, and `TypeId::ERROR`
-   - Read `wasm/specs/SOLVER.md` for solver architecture
-
-2. **Find the return points:**
+1. **Find the test runner setup:**
    ```bash
-   cd /tmp/orchestrator-workspace/worktrees/worker-3/wasm/src
-   grep -rn "TypeId::UNKNOWN\|TypeId::ANY\|TypeId::ERROR" solver/
-   grep -rn "return.*ANY" solver/
+   cd /tmp/orchestrator-workspace/worktrees/worker-3/wasm
+   grep -rn "lib.d.ts" .
+   grep -rn "conformance-test" .
+   grep -rn "SymbolTable" .
    ```
+
+2. **Understand global symbol loading:**
+   - Read `wasm/specs/BINDER.md` for symbol binding architecture
+   - Find where `SymbolTable` is created for tests
+   - Find where `lib.d.ts` should be loaded
+   - Find how global declarations (like `console`, `Promise`) are registered
 
 3. **Run baseline conformance tests:**
    ```bash
    cd /tmp/orchestrator-workspace/worktrees/worker-3/wasm
    ./differential-test/run-conformance.sh --max=100
    ```
-   Record current TS2322 and TS7006 counts.
+   Record current TS2304 counts (both Extra and Missing).
 
-4. **Study TypeScript's error handling:**
-   - When does tsc report "Implicit Any" vs "Unknown" vs "Error"?
-   - What's the semantic difference?
+4. **Find examples of broken global resolution:**
+   ```bash
+   cd /tmp/orchestrator-workspace/worktrees/worker-3/wasm
+   ./differential-test/find-extra-ts2304.mjs  # if exists, or create it
+   ```
+
+5. **Study how tsc handles globals:**
+   - How does TypeScript merge `lib.d.ts` with user code?
+   - How do global interfaces (`Window`, `Array`) get merged?
+   - What's the difference between `declare var` and `interface` at global scope?
 
 ---
 
 ## Implementation Plan
 
-### Phase 2: Change Defaults to UNKNOWN
+### Phase 2: Fix Lib Injection
 
-**Goal:** Return `TypeId::UNKNOWN` or `TypeId::ERROR` instead of `TypeId::ANY` when a symbol cannot be resolved or a type operation fails.
+**Goal:** Ensure `lib.d.ts` is correctly merged into the root `SymbolTable` for every test.
 
-**Key Files to Modify:**
+**Key Files to Investigate:**
 
-1. **wasm/src/solver/operations.rs**
-   - Search for `resolve_named_type` failing returns
-   - Property access resolution failures
-   - Method call resolution failures
+1. **Test Setup** (likely in `wasm/differential-test/` or `wasm/tests/`)
+   - Find the conformance test runner
+   - Find where the `SymbolTable` is created
+   - Find where TypeScript source files are loaded
 
-2. **wasm/src/solver/constraints.rs** (if it exists)
-   - Constraint solving failures
-   - Type inference failures
+2. **Symbol Binding** (`wasm/src/binder/`)
+   - `mod.rs` or `symbol_table.rs` - main symbol table implementation
+   - Look for global scope handling
+   - Look for "ambient" or "declare" handling
 
-3. **wasm/src/checker/thin_checker.rs**
-   - Expression type checking failures
-   - Variable declaration type inference failures
+3. **Integration Layer** (`wasm/src/integration/`)
+   - May handle lib.d.ts loading
+   - May handle symbol table initialization
 
 **Pattern to Find and Fix:**
-```rust
-// BEFORE (optimistic - hides errors):
-fn some_resolution(&mut self) -> TypeId {
-    match self.try_resolve() {
-        Some(t) => t,
-        None => TypeId::ANY,  // ❌ Too permissive
-    }
+
+```typescript
+// BEFORE (broken - no lib.d.ts):
+function run_test(test_file: string) {
+    let symbol_table = new SymbolTable();
+    load_file(test_file, symbol_table);  // Missing globals!
 }
 
-// AFTER (strict - exposes errors):
-fn some_resolution(&mut self) -> TypeId {
-    match self.try_resolve() {
-        Some(t) => t,
-        None => TypeId::UNKNOWN,  // ✅ Exposes the problem
+// AFTER (fixed - lib.d.ts loaded):
+function run_test(test_file: string) {
+    let symbol_table = new SymbolTable();
+    load_lib_dts(symbol_table);  // Load console, Promise, Array, etc.
+    load_file(test_file, symbol_table);  // Now has access to globals
+}
+```
+
+### Phase 3: Fix Global Merging
+
+**Goal:** Ensure `interface Window` (and similar globals) merge correctly across files.
+
+**Key Concepts:**
+
+1. **Declaration Merging:** TypeScript allows multiple `interface Window` declarations to merge into one
+2. **Global Scope:** All `lib.d.ts` declarations are at global scope
+3. **Augmentation:** User code can augment global types (e.g., `interface Window { myCustomProp: string; }`)
+
+**Implementation:**
+
+```rust
+// In binder/symbol_table.rs or similar:
+
+// Handle declaration merging for global interfaces
+fn merge_global_interface(&mut self, name: &str, new_interface: &Interface) {
+    if let Some(existing) = self.global_symbols.get(name) {
+        // Merge the new interface members into the existing one
+        existing.members.extend(new_interface.members);
+    } else {
+        // First time seeing this interface - add it
+        self.global_symbols.insert(name.to_string(), new_interface);
     }
 }
 ```
 
-### Phase 3: Handle the Error Spike
+### Phase 4: Validate the Fix
 
-**Expected Result:** Massive spike in "Extra Errors" after the change.
+**Expected Result:**
 
-**This is GOOD because:**
-- It exposes exactly where our logic is failing
-- It replaces hidden errors with visible diagnostics
-- It shows us what we need to fix next
+1. **TS2304 Extra errors should drop dramatically:**
+   - From 343 to <10 (per success metrics)
+   - `console`, `Promise`, `Array` should be found
+   - False "Cannot find name" errors eliminated
+
+2. **TS2322 Missing errors should increase:**
+   - We should see MORE type mismatch errors (good!)
+   - These were previously hidden by "undefined = Any" logic
+   - This means our type checker is now working correctly
+
+3. **Overall Exact Match should increase:**
+   - From current 44.2% toward 80% target
+   - More accurate error detection
 
 **Validation Steps:**
+
 1. Run conformance tests after each major change
-2. Check that the "Extra Errors" increase is in TS2322/TS7006 (expected)
-3. Check for regressions in previously passing tests
-4. Document which errors are "expected" vs "real bugs"
+2. Check TS2304 counts (Extra should drop, Missing should stabilize)
+3. Check TS2322 counts (Missing should drop as we fix poisoning)
+4. Verify no regressions in previously passing tests
+5. Document which errors are "expected" vs "real bugs"
 
 ---
 
 ## Success Criteria
 
-- [ ] All `TypeId::ANY` defaults changed to `TypeId::UNKNOWN` or `TypeId::ERROR`
-- [ ] TS2322 (Type Mismatch) errors increase from 184 missing to >100 extra
-- [ ] TS7006 (Implicit Any) errors increase from 357 missing to >200 extra
+- [ ] `lib.d.ts` is loaded into root `SymbolTable` for all tests
+- [ ] Global types (`console`, `Promise`, `Array`, etc.) resolve correctly
+- [ ] TS2304 Extra errors reduced from 343 to <10
+- [ ] TS2322 Missing errors decrease (previously hidden by poisoning)
+- [ ] Global interface merging works correctly (e.g., `interface Window`)
 - [ ] No regressions in tests that were previously passing
-- [ ] Baseline established for next round of fixes
-- [ ] Code comments added explaining when to return UNKNOWN vs ERROR vs ANY
+- [ ] Conformance test exact match increases significantly
+- [ ] Code comments added explaining global symbol loading
 
 ---
 
@@ -127,27 +179,30 @@ fn some_resolution(&mut self) -> TypeId {
    ```
 
 2. **Investigation Phase:**
-   - Find all locations returning `TypeId::ANY` as default
-   - Understand semantic differences between ANY/UNKNOWN/ERROR
+   - Find the test runner and symbol table initialization
+   - Understand current lib.d.ts loading (or lack thereof)
    - Run baseline conformance tests
+   - Find examples of broken global resolution
    - Document current behavior
 
 3. **Implementation Phase:**
-   - Change defaults from ANY to UNKNOWN/ERROR
+   - Implement lib.d.ts loading in test setup
+   - Fix global scope merging
+   - Fix interface declaration merging
    - Run tests after each change
-   - Document error increases
-   - Fix any obvious regressions
+   - Document error count changes
 
 4. **Validation:**
    - Run full conformance test suite
-   - Verify TS2322/TS7006 errors increased as expected
+   - Verify TS2304 Extra errors dropped to <10
+   - Verify TS2322 Missing errors decreased
    - Check for unexpected regressions
    - Document findings
 
 5. **Commit and Push:**
    ```bash
    git add -A
-   git commit -m "feat(solver): invert defaults from ANY to UNKNOWN"
+   git commit -m "feat(binder): fix global scope and lib.d.ts loading"
    git push origin worker-3 --force
    ```
 
@@ -157,32 +212,49 @@ fn some_resolution(&mut self) -> TypeId {
 
 ## Deliverables
 
-1. All solver/checker locations returning ANY as default changed to UNKNOWN/ERROR
-2. Baseline test results showing error increases
-3. Documentation of expected vs unexpected errors
-4. Updated task list with "Complete" status
-5. Conformance test report showing the change
+1. lib.d.ts correctly loaded in all tests
+2. TS2304 Extra errors reduced from 343 to <10
+3. Global interface merging working correctly
+4. Baseline test results showing error reductions
+5. Documentation of global symbol loading
+6. Updated task list with "Complete" status
+7. Conformance test report showing the improvement
 
 ---
 
 ## Known Risks
 
-1. **Error Spike:** Expect 500+ new extra errors
-   - **Mitigation:** Document which are expected (TS2322/TS7006 increases)
-   
-2. **Test Failures:** Some tests may fail due to exposed errors
-   - **Mitigation:** Distinguish between "test was wrong" vs "real bug exposed"
+1. **Test Runner Changes:** May require significant refactoring of test setup
+   - **Mitigation:** Start with minimal changes, add lib.d.ts loading first
 
-3. **Performance:** More errors = slower type checking
-   - **Mitigation:** Profile before/after if performance degrades
+2. **Declaration Merging Complexity:** Global interface merging can be tricky
+   - **Mitigation:** Study TypeScript's behavior carefully, test edge cases
+
+3. **Performance Impact:** Loading lib.d.ts for every test may slow things down
+   - **Mitigation:** Cache the parsed lib.d.ts symbols, reuse across tests
+
+4. **Unexpected Regressions:** Fixing poisoning may expose other bugs
+   - **Mitigation:** Run tests incrementally, document each change
 
 ---
 
 ## Previous Tasks: ✅ COMPLETE
 
+### Recursion Guards (Stack Overflow Prevention) ✅
+**Status:** ✅ Complete
+**Results:** Verified working, zero crashes in all test scenarios
+
+### Invert Solver Defaults (Stop being "Nice") ✅
+**Status:** ✅ Complete
+**Results:**
+- Changed TypeId::ANY defaults to TypeId::UNKNOWN
+- TS7006 (Implicit Any): 11 extra errors - catching previously hidden
+- TS2322 (Type Mismatch): 4 extra errors - catching previously hidden
+- Exact Match: 44.2% (up from ~30% baseline)
+
 ### Parser Noise Fix (TS1005 & TS1109) ✅
 **Status:** ✅ Complete
-**Results:** 
+**Results:**
 - TS1005: 24 extra errors (down from 439) - 95% reduction
 - TS1109: 0 extra errors (down from 262) - 100% reduction
 - Combined: 24 extra errors (down from 701) - 97% reduction
@@ -196,7 +268,7 @@ fn some_resolution(&mut self) -> TypeId {
 
 ## Status
 
-- **Current Task:** Invert Solver Defaults (Stop being "Nice")
+- **Current Task:** Global Scope Fix (TS2304 - Error Poisoning)
 - **Phase:** Investigation (Phase 1)
 - **Last Updated:** 2026-01-15
 - **Ready to Start:** ✅ YES

@@ -6523,10 +6523,24 @@ impl<'a> ThinCheckerState<'a> {
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
                         }
                     }
-                    // Handle ES6 named imports - these are already handled by IMPORT_DECLARATION
-                    // but fall through to ANY for now as they need module resolution
+                    // Handle ES6 named imports (import { X } from './module')
+                    // Use the import_module field to resolve to the actual export
+                    // Check if this symbol has import tracking metadata
                 }
             }
+
+            // For ES6 imports with import_module set, resolve using module_exports
+            if let Some(ref module_name) = symbol.import_module {
+                // Use import_name if set (for renamed imports), otherwise use escaped_name
+                let export_name = symbol.import_name.as_ref().unwrap_or(&symbol.escaped_name);
+                if let Some(exports_table) = self.ctx.binder.module_exports.get(module_name) {
+                    if let Some(export_sym_id) = exports_table.get(export_name) {
+                        return (self.get_type_of_symbol(export_sym_id), Vec::new());
+                    }
+                }
+                // Module not found in exports - fall through to ANY
+            }
+
             return (TypeId::ANY, Vec::new());
         }
 
@@ -10770,16 +10784,20 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         env: Option<&crate::solver::TypeEnvironment>,
     ) -> Option<bool> {
-        if !self.is_abstract_constructor_type(source, env) {
+        let source_is_abstract = self.is_abstract_constructor_type(source, env);
+        let target_is_abstract = self.is_abstract_constructor_type(target, env);
+        let target_is_concrete = self.is_concrete_constructor_target(target, env);
+
+        if !source_is_abstract {
             return None;
         }
-        if self.is_abstract_constructor_type(target, env) {
+        if target_is_abstract {
             return None;
         }
         if target == TypeId::ANY || target == TypeId::UNKNOWN || target == TypeId::ERROR {
             return None;
         }
-        if self.is_concrete_constructor_target(target, env) {
+        if target_is_concrete {
             return Some(false);
         }
         None
@@ -14238,23 +14256,29 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             }
 
+            // Check if we have any non-block-scoped declarations (var, function, etc.)
+            // Imports (ALIAS) and let/const (BLOCK_SCOPED_VARIABLE) are block-scoped
             let has_non_block_scoped = declarations.iter().any(|(decl_idx, flags)| {
-                conflicts.contains(decl_idx) && (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0
+                conflicts.contains(decl_idx) && {
+                    (flags & (symbol_flags::BLOCK_SCOPED_VARIABLE | symbol_flags::ALIAS)) == 0
+                }
             });
-            if !has_non_block_scoped {
-                // Skip pure block-scoped duplicates (TS2451), handled elsewhere.
-                continue;
-            }
 
             let name = symbol.escaped_name.clone();
-            let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+            let (message, code) = if !has_non_block_scoped {
+                // Pure block-scoped duplicates (let/const/import conflicts) emit TS2451
+                (format_message(diagnostic_messages::CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE, &[&name]), diagnostic_codes::CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE)
+            } else {
+                // Mixed or non-block-scoped duplicates emit TS2300
+                (format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]), diagnostic_codes::DUPLICATE_IDENTIFIER)
+            };
             for (decl_idx, _) in declarations {
                 if conflicts.contains(&decl_idx) {
                     let error_node = self.get_declaration_name_node(decl_idx).unwrap_or(decl_idx);
                     self.error_at_node(
                         error_node,
                         &message,
-                        diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        code,
                     );
                 }
             }
@@ -14711,6 +14735,11 @@ impl<'a> ThinCheckerState<'a> {
             // Export declarations - descend into the wrapped declaration
             syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = self.ctx.arena.get_export_decl(node) {
+                    // Check module specifier for unresolved modules (TS2792)
+                    // This handles cases like: export * as ns from './nonexistent';
+                    if !export_decl.module_specifier.is_none() {
+                        self.check_export_module_specifier(stmt_idx);
+                    }
                     // Check the wrapped declaration (function, class, variable, etc.)
                     if !export_decl.export_clause.is_none() {
                         self.check_statement(export_decl.export_clause);
@@ -15790,6 +15819,12 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
+        // Check if the module exists in the module_exports map (cross-file module resolution)
+        // This enables resolving imports from other files in the same compilation
+        if self.ctx.binder.module_exports.contains_key(module_name) {
+            return;
+        }
+
         // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
         // Imports from ambient modules should emit TS2792 because ambient modules
         // don't provide runtime values - they only provide type information.
@@ -15800,12 +15835,50 @@ impl<'a> ThinCheckerState<'a> {
         // This is correct because WASM checker operates on individual files
         // without access to the module graph (aside from ambient module declarations).
         let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
-        let code = if module_name.starts_with('.') || module_name.starts_with('/') {
-            diagnostic_codes::MODULE_NOT_FOUND
-        } else {
-            diagnostic_codes::CANNOT_FIND_MODULE
+        self.error_at_node(import.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
+    }
+
+    /// Check an export declaration's module specifier for unresolved modules.
+    /// Emits TS2792 when the module cannot be resolved.
+    /// Handles cases like: export * as ns from './nonexistent';
+    fn check_export_module_specifier(&mut self, stmt_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
         };
-        self.error_at_node(import.module_specifier, &message, code);
+
+        if !self.ctx.report_unresolved_imports {
+            return;
+        }
+
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(export_decl) = self.ctx.arena.get_export_decl(node) else {
+            return;
+        };
+
+        // Get module specifier string
+        let Some(spec_node) = self.ctx.arena.get(export_decl.module_specifier) else {
+            return;
+        };
+
+        let Some(literal) = self.ctx.arena.get_literal(spec_node) else {
+            return;
+        };
+
+        let module_name = &literal.text;
+
+        // Check if the module was resolved by the CLI driver (multi-file mode)
+        if let Some(ref resolved) = self.ctx.resolved_modules {
+            if resolved.contains(module_name) {
+                return;
+            }
+        }
+
+        // Emit TS2792 for unresolved export module specifiers
+        let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
+        self.error_at_node(export_decl.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
     }
 
     /// Check heritage clauses (extends/implements) for unresolved names.
@@ -20743,6 +20816,28 @@ impl<'a> ThinCheckerState<'a> {
         // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
         let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
 
+        // Extract parameter types from contextual type (for object literal methods)
+        // This enables shorthand method parameter type inference
+        let mut param_types: Vec<Option<TypeId>> = Vec::new();
+        if let Some(ctx_type) = self.ctx.contextual_type {
+            let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, ctx_type);
+
+            for (i, &param_idx) in method.parameters.nodes.iter().enumerate() {
+                if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                    if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                        let type_id = if !param.type_annotation.is_none() {
+                            // Use explicit type annotation if present
+                            Some(self.get_type_from_type_node(param.type_annotation))
+                        } else {
+                            // Infer from contextual type
+                            ctx_helper.get_parameter_type(i)
+                        };
+                        param_types.push(type_id);
+                    }
+                }
+            }
+        }
+
         let has_type_annotation = !method.type_annotation.is_none();
         let mut return_type = if has_type_annotation {
             self.get_type_from_type_node(method.type_annotation)
@@ -20750,7 +20845,13 @@ impl<'a> ThinCheckerState<'a> {
             TypeId::ANY
         };
 
-        self.cache_parameter_types(&method.parameters.nodes, None);
+        // Cache parameter types for use in method body
+        // If we have contextual types, use them; otherwise fall back to type annotations or UNKNOWN
+        if param_types.is_empty() {
+            self.cache_parameter_types(&method.parameters.nodes, None);
+        } else {
+            self.cache_parameter_types(&method.parameters.nodes, Some(&param_types));
+        }
 
         // Check for duplicate parameter names (TS2300)
         self.check_duplicate_parameters(&method.parameters);
