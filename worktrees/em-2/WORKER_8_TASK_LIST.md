@@ -1,55 +1,109 @@
 # WORKER-8 TASK LIST
 
-## Squad: CFA Squad
+## Squad: LSP Squad
 ## EM: EM-2
 ## Branch: worker-8
 
 ---
 
-## Primary Task: Fix Class Property Initialization (TS2564)
+## ✅ APPROVED: LSP TypeScript Config Integration (2026-01-14 23:25)
 
-**Priority:** 🟡 TACTICAL (Priority 4 for EM-2)
+**Status:** 🟢 APPROVED BY EM-2
+**Priority:** 🟢 ENHANCEMENT (Quality of Life)
+**Assigned:** 2026-01-14 23:25
+
+---
+
+## Primary Task: LSP TypeScript Config Integration
+
+**Priority:** 🟢 ENHANCEMENT (Quality of Life)
 
 ### Problem
-- TS2564 is the #1 missing error: 413 occurrences
-- "Property 'x' has no initializer and is not definitely assigned in the constructor"
-- We are simply NOT running this check
 
-### Action Items
-1. **Implement `strictPropertyInitialization` Check**
-   - Add control flow analysis to verify class properties are initialized
-   - Check constructor body and property declarations
-   - Account for definite assignment assertions (`!`)
+Currently, LSP features (hover, completions, signature help, diagnostics) hardcode `strict = false` instead of reading the project's actual TypeScript configuration:
 
-2. **Integration Point**
-   - Add check to `wasm/src/checker/thin_checker.rs`
-   - Run after class declaration is analyzed
+```rust
+// wasm/src/lsp/hover.rs:110
+let strict = false; // TODO: get from tsconfig
 
-### Files to Work On
-- `wasm/src/checker/thin_checker.rs`
-- `wasm/src/checker/class_checker.rs` (if exists, or create)
+// wasm/src/lsp/project.rs:416
+let strict = false; // TODO: get from tsconfig
+
+// wasm/src/lsp/signature_help.rs
+let strict = false; // TODO: get from tsconfig
+
+// wasm/src/lsp/completions.rs (2 occurrences)
+let strict = false; // TODO: get from tsconfig
+```
+
+This means LSP features don't respect user's `tsconfig.json` settings, leading to:
+- Inaccurate type information in strict mode projects
+- Mismatched behavior between CLI and LSP
+- Poor developer experience
+
+### Solution
+
+**Infrastructure Already Exists:**
+- ✅ `wasm/src/cli/config.rs` has `TsConfig` parsing
+- ✅ `load_tsconfig(path: &Path)` function available
+- ✅ `resolve_compiler_options()` handles `strict` flag
+- ✅ `CheckerOptions` struct has `strict` field
+
+**Implementation Required:**
+
+1. **Add tsconfig discovery to Project**
+   - Find tsconfig.json in workspace root
+   - Parse and resolve compiler options
+   - Store in `ProjectFile` struct
+
+2. **Update LSP features to use resolved strict setting**
+   - `hover.rs`: Use `project.get_strict()` instead of `false`
+   - `project.rs`: Use `project.get_strict()` instead of `false`
+   - `signature_help.rs`: Use `project.get_strict()` instead of `false`
+   - `completions.rs`: Use `project.get_strict()` instead of `false`
+
+3. **Handle tsconfig changes**
+   - Watch for tsconfig.json modifications
+   - Reinitialize project when config changes
+
+### Files to Modify
+- `wasm/src/lsp/project.rs` - Add tsconfig loading
+- `wasm/src/lsp/hover.rs` - Use resolved strict flag
+- `wasm/src/lsp/signature_help.rs` - Use resolved strict flag
+- `wasm/src/lsp/completions.rs` - Use resolved strict flag (2 locations)
 
 ### Success Criteria
-- Reduce TS2564 Missing errors from 413 to <20
-- Emit TS2564 when property lacks initializer and isn't set in constructor
-- Respect definite assignment assertion operator
+- LSP respects project's `strict: true` setting
+- LSP respects project's `strict: false` setting
+- tsconfig.json changes trigger project reinitialization
+- No breaking changes to existing behavior
 
 ### Testing
-- Create test cases for class property initialization
-- Verify check fires on unassigned properties
-- Verify check respects `!` operator
+- Create test with `strict: true` tsconfig
+- Create test with `strict: false` tsconfig
+- Verify LSP returns appropriate type information
+- Test tsconfig change detection
+
+### Estimated Effort
+- **Low complexity** - Infrastructure exists, just need wiring
+- **1-2 hours** implementation
+- **1 hour** testing
+
+### Risk Assessment
+- **Low risk** - Changes are localized to LSP module
+- **No breaking changes** - Default behavior (strict=false) preserved if no tsconfig found
 
 ---
 
 ## Instructions
 1. Create branch from `em-team-2`
-2. Implement the `strictPropertyInitialization` check
+2. Implement LSP TypeScript config integration
 3. Push to `worker-8` branch when ready for review
 4. EM-2 will merge and validate before escalating
 
 ---
 
-## Task Completion Report
+## ✅ COMPLETED: TS2564 Verification
 
 ### Worker 8 Investigation (2026-01-14)
 
