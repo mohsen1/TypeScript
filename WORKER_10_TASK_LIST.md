@@ -6,7 +6,96 @@
 
 ---
 
-## Primary Task: Global Scope & Lib Injection (TS2304)
+## Primary Task: Module Resolution (TS2524, TS2664, TS2705, TS2307)
+
+**Assigned:** 2024-01-14
+**Priority:** 🔴 HIGH (21 combined errors: 7 TS2524 + 7 TS2664 + 7 TS2705)
+
+### Problem
+Module resolution is incomplete, causing errors when importing/exporting:
+- **TS2524:** "Module has no exported member 'X'" (7 occurrences)
+- **TS2664:** "Type requires a type reference directive" (7 occurrences)
+- **TS2705:** "Required type information is not available" (7 occurrences)
+- **TS2307:** "Cannot find module" (2 occurrences)
+
+### Context
+These errors occur when:
+1. Exported members are not found in module exports
+2. Type references don't properly load dependency type information
+3. Module resolution fails to locate dependency files
+4. Type-only imports don't resolve correctly
+
+### Action Items
+
+#### 1. Investigate Module Loading
+- **File:** `wasm/src/binder/thin_binder.rs`
+- Check how module files are loaded and processed
+- Verify export declarations are properly tracked
+- Compare with how TypeScript resolves module exports
+
+#### 2. Fix Export Member Resolution
+- **File:** `wasm/src/binder/thin_binder.rs`
+- When a module exports a member (function, class, type, etc.), track it in the symbol graph
+- Ensure `import { X } from 'module'` can find `export { X }`
+- Handle re-exports: `export { X } from 'other-module'`
+
+#### 3. Implement Type Reference Directives (TS2664)
+- **File:** `wasm/src/binder/thin_binder.rs`
+- Parse and process `/// <reference types="..." />` directives
+- Load dependency type information when referenced
+- Ensure circular dependencies are handled correctly
+
+#### 4. Fix Type Information Availability (TS2705)
+- **File:** `wasm/src/binder/thin_binder.rs` or `wasm/src/checker/`
+- Ensure type-only imports (`import type { X }`) resolve correctly
+- Verify type information is available during type checking
+- Handle forward references and deferred type loading
+
+#### 5. Module Resolution (TS2307)
+- **File:** `wasm/src/binder/thin_binder.rs`
+- Implement module resolution algorithm (node, classic, etc.)
+- Handle `node_modules` lookup
+- Support `.d.ts`, `.ts`, `.tsx` file extensions
+
+### Files to Work On
+- `wasm/src/binder/thin_binder.rs` (Primary)
+- `wasm/src/checker/thin_checker.rs` (if type info issues)
+- `wasm/src/module_resolution.rs` (if it exists, or create it)
+
+### Success Criteria
+- Reduce TS2524 from 7 to <2
+- Reduce TS2664 from 7 to <2
+- Reduce TS2705 from 7 to <2
+- Reduce TS2307 from 2 to 0
+- Combined: 21 → <6 errors (-71%)
+- Exact match improvement: 44.2% → 47%+
+
+### Testing
+- Run: `./wasm/differential-test/run-conformance.sh --all`
+- Analyze report, focus on module-related tests
+- Compare with tsc output to verify module resolution
+- Test cases with:
+  - Named exports/imports
+  - Default exports/imports
+  - Re-exports
+  - Type-only imports
+  - `/// <reference types="..."/>` directives
+  - `node_modules` resolution
+
+---
+
+## Instructions
+
+1. Create branch from `rust` branch
+2. Focus ONLY on module resolution errors (TS2524, TS2664, TS2705, TS2307)
+3. Run conformance tests frequently to track progress
+4. Push to `worker-10` branch when ready for review
+5. Mark "Ready for Merge: Yes" in your plan when done
+6. EM-3 will merge and validate before escalating
+
+---
+
+## Completed Task: Global Scope & TS2304 ✅
 
 **Priority:** @ CRITICAL (Phase 2 for em-team-3)
 
