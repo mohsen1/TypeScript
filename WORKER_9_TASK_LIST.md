@@ -129,6 +129,39 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ## Active Task
 
+### Task 8: Fix TS2322 Type Compatibility Errors 🔄 IN PROGRESS
+
+**Started:** 2025-01-15
+**Priority:** HIGH (103 missing + 593 extra = 696 total TS2322 errors)
+
+**Pattern 1: Fix Type 'error' Assignability ✅ COMPLETED**
+**Commit:** 35949f55eda (2025-01-15)
+
+**Changes Applied:**
+- Added selective diagnostic suppression in `error_type_not_assignable_at()`
+- Added selective diagnostic suppression in `error_type_not_assignable_with_reason_at()`
+- Suppress TS2322 emission when source or target type IS `TypeId::ERROR`
+- Fixes "Type 'error' is not assignable to type 'X'" errors
+- Should fix 7 out of 10 false positive test files
+
+**Rationale:**
+- When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+- Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+- TypeScript doesn't emit these errors - it only reports the resolution failure
+- The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors, but that was too broad
+- We now suppress only when source/target IS ERROR (not when it CONTAINS ERROR)
+
+**Estimated Impact:**
+- Reduce Extra TS2322 from 593 to ~300 (49% improvement)
+- Combined improvement: 696 → ~400 errors (43% improvement)
+
+**Remaining Patterns:**
+- Pattern 2: Await type inference returns `unknown` (3 test files)
+- Pattern 3: Super call type inference (4 test files)
+- Missing TS2322 error: Abstract constructor assignability (1 test file)
+
+---
+
 ### Task 7: Refine TS1005 and TS1109 Parser Error Recovery ✅ COMPLETED
 
 **Started:** 2024-01-14
@@ -241,6 +274,7 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ---
 
+<<<<<<< HEAD
 ## Completed Tasks
 
 ### Task 8: TS2322 Type Compatibility & Shorthand Method Fixes ✅ COMPLETED
@@ -497,3 +531,7 @@ Based on validation results, fix issues:
 - Target: 65 → <10 module resolution errors
 
 ---
+=======
+## Pending Tasks
+_Awaiting continuation of Task 8 (Patterns 2-3 and missing TS2322 error)_
+>>>>>>> 96b22ab8864 (docs: Update WORKER_9_TASK_LIST.md with Task 8 Pattern 1 completion)
