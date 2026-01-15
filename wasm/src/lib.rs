@@ -1444,6 +1444,8 @@ pub struct WasmProgram {
     merged: Option<MergedProgram>,
     /// Bind results (kept for diagnostics access)
     bind_results: Option<Vec<BindResult>>,
+    /// Lib files (lib.d.ts, lib.dom.d.ts, etc.) for global symbol resolution
+    lib_files: Vec<(String, String)>,
 }
 
 #[wasm_bindgen]
@@ -1453,6 +1455,7 @@ impl WasmProgram {
     pub fn new() -> WasmProgram {
         WasmProgram {
             files: Vec::new(),
+            lib_files: Vec::new(),
             merged: None,
             bind_results: None,
         }
@@ -1462,12 +1465,27 @@ impl WasmProgram {
     ///
     /// Files are accumulated and compiled together when `checkAll` is called.
     /// The file_name should be a relative path like "src/a.ts".
+    ///
+    /// Lib files (detected by name patterns like "lib.d.ts", "lib.dom.d.ts", etc.)
+    /// are automatically tracked separately and used for global symbol resolution.
     #[wasm_bindgen(js_name = addFile)]
     pub fn add_file(&mut self, file_name: String, source_text: String) {
         // Invalidate any previous compilation
         self.merged = None;
         self.bind_results = None;
-        self.files.push((file_name, source_text));
+
+        // Detect lib files by name pattern
+        let is_lib_file = file_name.contains("lib.d.ts")
+            || file_name.contains("lib.es")
+            || file_name.contains("lib.dom")
+            || file_name.contains("lib.webworker")
+            || file_name.contains("lib.scripthost");
+
+        if is_lib_file {
+            self.lib_files.push((file_name, source_text));
+        } else {
+            self.files.push((file_name, source_text));
+        }
     }
 
     /// Get the number of files in the program.
@@ -1480,6 +1498,7 @@ impl WasmProgram {
     #[wasm_bindgen]
     pub fn clear(&mut self) {
         self.files.clear();
+        self.lib_files.clear();
         self.merged = None;
         self.bind_results = None;
     }
@@ -1487,20 +1506,56 @@ impl WasmProgram {
     /// Compile all files and return diagnostics as JSON.
     ///
     /// This performs:
-    /// 1. Parallel parsing of all files
-    /// 2. Parallel binding of all files
-    /// 3. Symbol merging (sequential)
-    /// 4. Parallel type checking
+    /// 1. Load lib files for global symbol resolution
+    /// 2. Parallel parsing of all files
+    /// 3. Parallel binding of all files with lib symbols merged
+    /// 4. Symbol merging (sequential)
+    /// 5. Parallel type checking
     ///
     /// Returns a JSON object with diagnostics per file.
     #[wasm_bindgen(js_name = checkAll)]
     pub fn check_all(&mut self) -> String {
-        if self.files.is_empty() {
+        if self.files.is_empty() && self.lib_files.is_empty() {
             return r#"{"files":[],"stats":{"totalFiles":0,"totalDiagnostics":0}}"#.to_string();
         }
 
-        // Parse and bind all files in parallel
-        let bind_results = parse_and_bind_parallel(self.files.clone());
+        // Load lib files for binding
+        let lib_file_objects: Vec<Arc<lib_loader::LibFile>> = self
+            .lib_files
+            .iter()
+            .filter_map(|(file_name, source_text)| {
+                // Parse lib file
+                let mut lib_parser = ThinParserState::new(file_name.clone(), source_text.clone());
+                let source_file_idx = lib_parser.parse_source_file();
+
+                if !lib_parser.get_diagnostics().is_empty() {
+                    // Parse errors in lib file - skip it
+                    return None;
+                }
+
+                let mut lib_binder = ThinBinderState::new();
+                lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+                let arena = Arc::new(lib_parser.into_arena());
+                let binder = Arc::new(lib_binder);
+
+                Some(Arc::new(lib_loader::LibFile::new(
+                    file_name.clone(),
+                    arena,
+                    binder,
+                )))
+            })
+            .collect();
+
+        // Parse and bind all files in parallel with lib symbols
+        let bind_results = if !lib_file_objects.is_empty() {
+            // Use lib-aware binding
+            use crate::parallel;
+            parallel::parse_and_bind_parallel_with_libs(self.files.clone(), &lib_file_objects)
+        } else {
+            // No lib files - use regular binding
+            parse_and_bind_parallel(self.files.clone())
+        };
 
         // Collect parse diagnostics before merging
         let parse_diags: Vec<Vec<_>> = bind_results

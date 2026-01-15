@@ -333,7 +333,7 @@ pub fn parse_and_bind_parallel_with_lib_files(
 ///
 /// # Returns
 /// Vector of BindResult for each file
-fn parse_and_bind_parallel_with_libs(
+pub fn parse_and_bind_parallel_with_libs(
     files: Vec<(String, String)>,
     lib_files: &[Arc<lib_loader::LibFile>],
 ) -> Vec<BindResult> {
