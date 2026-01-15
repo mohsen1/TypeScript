@@ -737,9 +737,9 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
                     let expr_type = self.get_type_of_node(unary.expression);
                     // If the awaited type is Promise-like, extract the type argument
-                    // Otherwise, just return the type as-is
+                    // Otherwise, return UNKNOWN as a fallback (consistent with Task 4-6 changes)
                     self.promise_like_return_type_argument(expr_type)
-                        .unwrap_or(expr_type)
+                        .unwrap_or(TypeId::UNKNOWN)
                 } else {
                     // Return UNKNOWN instead of ANY when await expression cannot be resolved
                     TypeId::UNKNOWN
@@ -21448,10 +21448,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        if self.type_ref_is_promise_like(return_type) {
-            return Some(TypeId::ANY);
-        }
-
+        // If we can't extract the type argument from a Promise-like type,
+        // return None instead of ANY/UNKNOWN (consistent with Task 4-6 changes)
+        // This allows the caller (await expressions) to use UNKNOWN as fallback
         None
     }
 
@@ -21505,14 +21504,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(&first_arg) = args.first() {
                 return Some(first_arg);
             }
-            return Some(TypeId::ANY);
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(TypeId::UNKNOWN);
         }
 
         let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(args.first().copied().unwrap_or(TypeId::UNKNOWN));
         }
 
         if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {
