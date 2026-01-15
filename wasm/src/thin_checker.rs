@@ -16000,6 +16000,14 @@ impl<'a> ThinCheckerState<'a> {
         // Check if this class is abstract
         let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
 
+        // Push type parameters BEFORE checking heritage clauses and abstract members
+        // This allows heritage clauses and member checks to reference the class's type parameters
+        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
+
+        // Check heritage clauses for unresolved names (TS2304)
+        // Must be checked AFTER type parameters are pushed so heritage can reference type params
+        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
+
         // Check for abstract members in non-abstract class (error 1253)
         // and private identifiers in ambient classes (error 2819)
         for &member_idx in &class.members.nodes {
@@ -16077,11 +16085,6 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
         }
-
-        // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
-
-        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
 
         // Collect class name and static members for error 2662 suggestions
         let class_name = if !class.name.is_none() {
