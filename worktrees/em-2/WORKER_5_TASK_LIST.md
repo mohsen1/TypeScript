@@ -39,48 +39,6 @@
 
 ---
 
-## Current Task: Implement ASI (Automatic Semicolon Insertion)
-
-**Priority:** 🟡 HIGH (Priority 2 for EM-2)
-**Assigned:** 2026-01-14
-
-### Problem
-- TypeScript infers semicolons in many contexts where we currently emit TS1005 errors
-- Missing ASI causes false-positive "';' expected" errors on valid JavaScript/TypeScript
-- ASI rules are complex and not fully implemented in ThinParser
-
-### Action Items
-1. **Implement ASI Rules from TypeScript Spec**
-   - **Restricted productions**: `return`, `throw`, `yield`, `break`, `continue` must be followed by line terminator
-   - **Empty statements**: Handle standalone semicolons correctly
-   - **For statements**: ASI works differently in for-loop headers
-
-2. **Line Terminator Tracking**
-   - Track line breaks between tokens in scanner
-   - Pass line terminator info to parser
-   - Apply ASI only when line break exists (for restricted productions)
-
-3. **Edge Cases**
-   - `++`/`--` postfix operators must not have line break
-   - `return\nvalue` should parse as `return; value;` NOT `return value;`
-   - Arrow functions: `() \n => {}` should NOT trigger ASI
-
-### Files to Work On
-- `wasm/src/thin_parser.rs` - Add ASI logic in appropriate places
-- `wasm/src/parser/scanner.rs` - Track line terminators between tokens
-
-### Success Criteria
-- ASI works correctly for all restricted productions
-- TS1005 errors reduced further by handling inferred semicolons
-- Conformance tests pass
-
-### Testing
-- Test `return\nvalue` parses correctly
-- Test empty statements work
-- Test for-loop headers work correctly
-
----
-
 ## Task Completion Report
 
 ### ASI Implementation - Completed ✅
