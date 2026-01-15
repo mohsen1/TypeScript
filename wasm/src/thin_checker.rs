@@ -16036,10 +16036,10 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
 
-        // Skip TS2564 for declared classes (ambient) and abstract classes
-        // Abstract classes can't be instantiated, so property initialization
-        // is the responsibility of the concrete derived class
-        if is_declared || is_abstract {
+        // Skip TS2564 for declared classes (ambient declarations)
+        // Note: Abstract classes DO get TS2564 errors - they can have constructors
+        // and properties must be initialized either with defaults or in the constructor
+        if is_declared {
             return;
         }
 
