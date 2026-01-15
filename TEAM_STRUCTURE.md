@@ -1,14 +1,19 @@
 # Team Structure - Project Zang Orchestrator
 
-**Last Updated:** 2026-01-14
-**Director:** Managing 3 Engineering Managers, 12 Workers
+**Last Updated:** 2026-01-15
+**Director:** Managing 3 Engineering Managers, 12 Workers (restructuring to 8-9)
 **Branch:** rust
 
 ---
 
 ## Executive Summary
 
-Project Zang is migrating the TypeScript compiler to Rust/WASM. Current performance is **60.8%** conformance with TypeScript. Our mission is to reach **95%+ compatibility** by fixing critical error discrepancies.
+Project Zang is migrating the TypeScript compiler to Rust/WASM. Current performance is **44.2%** conformance with TypeScript. Our mission is to reach **95%+ compatibility** by fixing critical error discrepancies.
+
+**Recent Merges:**
+- EM-3: ✅ Merged to rust (2026-01-15) - TS2564, TS2322 improvements
+- EM-1: 🔄 Escalated for review
+- EM-2: 🔄 Escalated for review
 
 This document defines the team structure and focus areas for each Engineering Manager (EM) and their assigned workers.
 
@@ -148,6 +153,74 @@ This document defines the team structure and focus areas for each Engineering Ma
    - EM unresponsive for >24 hours
    - Consistent test failures with no resolution plan
 4. **Reassign workers** dynamically based on priority shifts
+
+---
+
+## 🔄 TEAM RESTRUCTURING (2026-01-15)
+
+### Decision Summary
+
+**Status:** EXECUTING - EM-3 merged, EM-1 and EM-2 pending merge
+
+**Rationale:** Phase 1 (parser, binder, CFA) complete. Remaining work is type accuracy (TS2322, TS7006) which benefits from smaller, focused teams.
+
+### New Team Structure
+
+| Team | Previous Size | New Size | Change | Status |
+|------|--------------|----------|--------|--------|
+| EM-1 (Syntax & Foundation) | 4 workers | 4 workers | No change | ✅ Stable |
+| EM-2 (Semantics & Core) | 4 workers | 2-3 workers | -1 to -2 | ⚠️ Resize pending |
+| EM-3 (Advanced Features) | 4 workers | 2 workers | -2 | ✅ Approved |
+| **Total** | **12 workers** | **8-9 workers** | **-3 to -4** | **In progress** |
+
+### Worker Redistribution
+
+#### Retaining Core Contributors (Keep)
+| Worker | Team | Reason | New Focus |
+|--------|------|--------|-----------|
+| worker-9 | EM-3 | High performer, TS2322 expertise | Type accuracy |
+| worker-11 | EM-3 | Has critical TS2322 analysis | Type accuracy |
+| worker-1 | EM-1 | Parser fixes complete | Validation/support |
+| worker-2 | EM-1 | Conformance validation (critical) | Testing |
+| worker-3 | EM-1 | TS2564 Phase 2 complete | Available |
+| worker-4 | EM-1 | TS2322 literal narrowing | Type accuracy |
+
+#### Reassigning Available Workers
+| Worker | From | Reason | New Assignment |
+|--------|------|--------|----------------|
+| worker-5 | EM-2 | High performer, available | TS7006 or validation |
+| worker-6 | EM-2 | Off-track (wrong task) | Redirect or reassign |
+| worker-7 | EM-2 | Solver defaults complete | Validation or testing |
+| worker-8 | EM-2 | Recursion guards done | Overflow work |
+| worker-10 | EM-3 | Module resolution complete | Validation or module testing |
+| worker-12 | EM-3 | Task not started | Available for reassignment |
+
+### Float Pool (Overflow Workers)
+
+Workers not actively assigned to core teams form a "Float Pool" for:
+- Validation and testing overflow
+- Quick bug fixes
+- Documentation and tooling
+- Backup for critical workers
+
+**Current Float Pool:** worker-5, worker-7, worker-8, worker-10, worker-12
+
+### Updated Focus Areas
+
+#### EM-1 (Syntax & Foundation) - UNCHANGED
+- Focus: Parser validation, conformance testing, type accuracy
+- Workers: worker-1, worker-2, worker-3, worker-4
+- Status: All assigned to critical path
+
+#### EM-2 (Semantics & Core) - RESIZING
+- Focus: Type accuracy, validation, testing
+- Workers: 2-3 workers (from 4)
+- Status: Awaiting merge, then redistribute
+
+#### EM-3 (Advanced Features) - RESIZED
+- Focus: Type accuracy (TS2322, TS7006)
+- Workers: worker-9, worker-11 (from 4)
+- Status: Merged to rust, active on type accuracy
 
 ---
 

@@ -784,7 +784,7 @@ impl ThinParserState {
             | SyntaxKind::SemicolonToken  // empty statement
             | SyntaxKind::OpenParenToken  // parenthesized expression
             | SyntaxKind::OpenBracketToken  // array literal/destructuring
-            | SyntaxKind::LessThanToken => true, // JSX/type argument
+            | SyntaxKind::LessThanToken => true,  // JSX/type argument
             _ => false,
         }
     }
@@ -6641,33 +6641,66 @@ impl ThinParserState {
             }
             SyntaxKind::AwaitKeyword => {
                 // Only parse as await expression if we're in an async context
-                // Otherwise, parse as an identifier (await can be used as a variable name)
-                if self.in_async_context() {
-                    let start_pos = self.token_pos();
-                    self.next_token();
+                if !self.in_async_context() {
+                    // Outside async context, check if await is used as a bare expression
+                    // If followed by tokens that can't start an expression, report "Expression expected"
+                    // Examples where await is a reserved identifier but invalid as expression:
+                    //   await;  // Error: Expression expected (in static blocks)
+                    //   await (1);  // Error: Expression expected (in static blocks)
+                    //   async (a = await) => {}  // Error: Expression expected (parameter default)
+                    //   async (a = await => x) => {}  // Error: Expression expected (before arrow)
+                    // But allow: let await = 1;  (declaration)
 
-                    // Check for missing operand (e.g., just "await" with nothing after it)
-                    if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+                    // Look ahead to see what token comes after 'await'
+                    let snapshot = self.scanner.save_state();
+                    let current_token = self.current_token;
+                    self.next_token(); // consume 'await'
+                    let next_token = self.token();
+                    self.scanner.restore_state(snapshot);
+                    self.current_token = current_token;
+
+                    let has_following_expression = !matches!(
+                        next_token,
+                        SyntaxKind::SemicolonToken
+                            | SyntaxKind::CloseParenToken
+                            | SyntaxKind::CloseBracketToken
+                            | SyntaxKind::CommaToken
+                            | SyntaxKind::ColonToken
+                            | SyntaxKind::EqualsGreaterThanToken
+                            | SyntaxKind::EndOfFileToken
+                    );
+
+                    if !has_following_expression {
                         use crate::checker::types::diagnostics::diagnostic_codes;
                         self.error_expression_expected();
                     }
 
-                    let expression = self.parse_unary_expression();
-                    let end_pos = self.token_end();
-
-                    self.arena.add_unary_expr_ex(
-                        syntax_kind_ext::AWAIT_EXPRESSION,
-                        start_pos,
-                        end_pos,
-                        UnaryExprDataEx {
-                            expression,
-                            asterisk_token: false,
-                        },
-                    )
-                } else {
-                    // In non-async contexts, await is just an identifier
-                    self.parse_primary_expression()
+                    // Fall through to parse as identifier/postfix expression
+                    return self.parse_postfix_expression();
                 }
+
+                // In async context, parse as await expression
+                let start_pos = self.token_pos();
+                self.next_token();
+
+                // Check for missing operand (e.g., just "await" with nothing after it)
+                if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_expression_expected();
+                }
+
+                let expression = self.parse_unary_expression();
+                let end_pos = self.token_end();
+
+                self.arena.add_unary_expr_ex(
+                    syntax_kind_ext::AWAIT_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    UnaryExprDataEx {
+                        expression,
+                        asterisk_token: false,
+                    },
+                )
             }
             SyntaxKind::YieldKeyword => {
                 let start_pos = self.token_pos();
@@ -7862,6 +7895,31 @@ impl ThinParserState {
         }
     }
 
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals
+            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword | SyntaxKind::NullKeyword => true,
+            // Identifier
+            SyntaxKind::Identifier => true,
+            // This and super
+            SyntaxKind::ThisKeyword | SyntaxKind::SuperKeyword => true,
+            // Nested structures
+            SyntaxKind::OpenBracketToken => true,  // nested array
+            SyntaxKind::OpenBraceToken => true,     // object literal
+            SyntaxKind::OpenParenToken => true,     // parenthesized expression
+            // Unary operators
+            SyntaxKind::ExclamationToken | SyntaxKind::TildeToken | SyntaxKind::PlusToken
+            | SyntaxKind::MinusToken | SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken
+            | SyntaxKind::TypeOfKeyword | SyntaxKind::VoidKeyword | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Parse object literal
     fn parse_object_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -8298,6 +8356,14 @@ impl ThinParserState {
                 // Computed property name: { [expr]: value }
                 let start_pos = self.token_pos();
                 self.next_token();
+
+                // TS1109: await in computed property name is invalid when in async context
+                // { [await]: foo } should report "Expression expected"
+                if self.in_async_context() && self.is_token(SyntaxKind::AwaitKeyword) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_expression_expected();
+                }
+
                 let expression = self.parse_expression();
                 self.parse_expected(SyntaxKind::CloseBracketToken);
                 let end_pos = self.token_end();

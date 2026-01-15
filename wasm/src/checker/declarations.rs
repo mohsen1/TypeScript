@@ -8,6 +8,7 @@ use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
 use crate::scanner::SyntaxKind;
+use std::collections::HashSet;
 
 /// Declaration type checker that operates on the shared context.
 ///
@@ -15,6 +16,32 @@ use crate::scanner::SyntaxKind;
 /// All declaration type checking goes through this checker.
 pub struct DeclarationChecker<'a, 'ctx> {
     pub ctx: &'a mut CheckerContext<'ctx>,
+}
+
+/// Property key for tracking property assignments in control flow analysis.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+enum PropertyKey {
+    Ident(String),
+    Private(String),
+    Computed(ComputedKey),
+}
+
+/// Computed property key.
+#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+enum ComputedKey {
+    Ident(String),
+    String(String),
+    Number(String),
+    Qualified(String),
+    /// Symbol call like Symbol("key") or Symbol() - stores optional description
+    Symbol(Option<String>),
+}
+
+/// Result of control flow analysis for property assignments.
+#[derive(Clone, Debug)]
+struct FlowResult {
+    normal: Option<HashSet<PropertyKey>>,
+    exits: Option<HashSet<PropertyKey>>,
 }
 
 impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
@@ -144,10 +171,13 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
     /// - Are not assigned in all constructor code paths
     fn check_property_initialization(
         &mut self,
-        _class_idx: NodeIndex,
+        class_idx: NodeIndex,
         class_decl: &crate::parser::thin_node::ClassData,
     ) {
-        // Iterate over class members
+        // Collect properties that need to be checked and create a set of tracked properties
+        let mut tracked: HashSet<PropertyKey> = HashSet::new();
+        let mut properties: Vec<(PropertyKey, String, NodeIndex)> = Vec::new();
+
         for &member_idx in &class_decl.members.nodes {
             let Some(member_node) = self.ctx.arena.get(member_idx) else {
                 continue;
@@ -196,17 +226,34 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
                 continue;
             }
 
-            // Get property name for error message
+            // Get property name for error message and tracking
             let prop_name = self.get_property_name(prop.name);
+            let key = self.property_to_key(prop.name, &prop_name);
 
-            // Report TS2564 error
-            // TODO: Add control flow analysis to check if property is initialized in constructor
-            // For now, we report on all properties without initializers
+            if let Some(k) = key {
+                tracked.insert(k.clone());
+                properties.push((k, prop_name, prop.name));
+            }
+        }
+
+        if properties.is_empty() {
+            return;
+        }
+
+        // Analyze constructor to find assigned properties
+        let assigned = self.is_property_initialized_in_constructor(class_idx, &tracked);
+
+        // Report errors for properties that are not initialized
+        for (key, name, name_node) in properties {
+            if assigned.contains(&key) {
+                continue;
+            }
+
             let message =
-                diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER.replace("{0}", &prop_name);
+                diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER.replace("{0}", &name);
 
             // Get the span for the property name
-            if let Some((pos, end)) = self.ctx.get_node_span(prop.name) {
+            if let Some((pos, end)) = self.ctx.get_node_span(name_node) {
                 self.ctx.error(
                     pos,
                     end - pos,
@@ -227,6 +274,475 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
             "[computed]".to_string()
         } else {
             "[unknown]".to_string()
+        }
+    }
+
+    /// Convert a property name node to a PropertyKey for tracking.
+    fn property_to_key(&self, name_idx: NodeIndex, name_str: &str) -> Option<PropertyKey> {
+        if let Some(name_node) = self.ctx.arena.get(name_idx) {
+            match name_node.kind {
+                SyntaxKind::Identifier as u16 => {
+                    Some(PropertyKey::Ident(name_str.clone()))
+                }
+                SyntaxKind::PrivateIdentifier as u16 => {
+                    Some(PropertyKey::Private(name_str.clone()))
+                }
+                SyntaxKind::StringLiteral as u16 => {
+                    Some(PropertyKey::Computed(ComputedKey::String(name_str.clone())))
+                }
+                SyntaxKind::NumericLiteral as u16 => {
+                    Some(PropertyKey::Computed(ComputedKey::Number(name_str.clone())))
+                }
+                k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
+                    // For computed properties, try to get the identifier
+                    if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                        Some(PropertyKey::Computed(ComputedKey::Ident(ident.escaped_text.clone())))
+                    } else {
+                        None
+                    }
+                }
+                _ => None,
+            }
+        } else {
+            None
+        }
+    }
+
+    /// Check if properties are initialized in constructor using control flow analysis.
+    ///
+    /// Returns the set of properties that are definitely assigned in all code paths.
+    fn is_property_initialized_in_constructor(
+        &self,
+        class_idx: NodeIndex,
+        tracked: &HashSet<PropertyKey>,
+    ) -> HashSet<PropertyKey> {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return HashSet::new();
+        };
+
+        let Some(class_decl) = self.ctx.arena.get_class(node) else {
+            return HashSet::new();
+        };
+
+        // Find the constructor body
+        let constructor_body = self.find_constructor_body(&class_decl.members);
+
+        if let Some(body_idx) = constructor_body {
+            self.analyze_constructor_assignments(body_idx, tracked)
+        } else {
+            HashSet::new()
+        }
+    }
+
+    /// Find the constructor body in class members.
+    fn find_constructor_body(&self, members: &crate::parser::NodeList) -> Option<NodeIndex> {
+        for &member_idx in &members.nodes {
+            let Some(node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+            if node.kind != syntax_kind_ext::CONSTRUCTOR {
+                continue;
+            }
+            let Some(ctor) = self.ctx.arena.get_constructor(node) else {
+                continue;
+            };
+            if !ctor.body.is_none() {
+                return Some(ctor.body);
+            }
+        }
+        None
+    }
+
+    /// Analyze constructor to find which properties are assigned.
+    fn analyze_constructor_assignments(
+        &self,
+        body_idx: NodeIndex,
+        tracked: &HashSet<PropertyKey>,
+    ) -> HashSet<PropertyKey> {
+        let result = self.analyze_statement(body_idx, &HashSet::default(), tracked);
+        self.flow_result_to_assigned(result)
+    }
+
+    /// Convert flow result to a set of definitely assigned properties.
+    fn flow_result_to_assigned(&self, result: FlowResult) -> HashSet<PropertyKey> {
+        let mut assigned = None;
+        if let Some(normal) = result.normal {
+            assigned = Some(normal);
+        }
+        if let Some(exits) = result.exits {
+            assigned = Some(match assigned {
+                Some(current) => self.intersect_sets(&current, &exits),
+                None => exits,
+            });
+        }
+
+        assigned.unwrap_or_default()
+    }
+
+    /// Intersect two sets of property keys.
+    fn intersect_sets(
+        &self,
+        set1: &HashSet<PropertyKey>,
+        set2: &HashSet<PropertyKey>,
+    ) -> HashSet<PropertyKey> {
+        set1.intersection(set2).cloned().collect()
+    }
+
+    /// Analyze a statement for property assignments.
+    fn analyze_statement(
+        &self,
+        stmt_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> FlowResult {
+        if stmt_idx.is_none() {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        }
+
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        match node.kind {
+            k if k == syntax_kind_ext::BLOCK => self.analyze_block(stmt_idx, assigned_in, tracked),
+            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
+                self.analyze_expression_statement(stmt_idx, assigned_in, tracked)
+            }
+            k if k == syntax_kind_ext::IF_STATEMENT => {
+                self.analyze_if_statement(stmt_idx, assigned_in, tracked)
+            }
+            k if k == syntax_kind_ext::RETURN_STATEMENT => {
+                self.analyze_return_statement(assigned_in)
+            }
+            k if k == syntax_kind_ext::THROW_STATEMENT => {
+                self.analyze_throw_statement(assigned_in)
+            }
+            k if k == syntax_kind_ext::WHILE_STATEMENT || k == syntax_kind_ext::FOR_STATEMENT => {
+                // For loops, we conservatively assume the property might not be assigned
+                FlowResult {
+                    normal: Some(assigned_in.clone()),
+                    exits: None,
+                }
+            }
+            k if k == syntax_kind_ext::TRY_STATEMENT => {
+                // For try statements, analyze both try and catch blocks
+                self.analyze_try_statement(stmt_idx, assigned_in, tracked)
+            }
+            _ => FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            },
+        }
+    }
+
+    /// Analyze a block of statements.
+    fn analyze_block(
+        &self,
+        block_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(node) = self.ctx.arena.get(block_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        if node.kind != syntax_kind_ext::BLOCK {
+            return self.analyze_statement(block_idx, assigned_in, tracked);
+        }
+
+        let Some(block) = self.ctx.arena.get_block(node) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let Some(ref statements) = block.statements else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let mut current = assigned_in.clone();
+        let mut exits: Option<HashSet<PropertyKey>> = None;
+
+        for &stmt_idx in &statements.nodes {
+            let result = self.analyze_statement(stmt_idx, &current, tracked);
+
+            // If we hit a return or throw, track it as an exit
+            if result.normal.is_none() {
+                if let Some(exit_set) = result.exits {
+                    exits = Some(match exits {
+                        Some(current_exits) => self.intersect_sets(&current_exits, &exit_set),
+                        None => exit_set,
+                    });
+                }
+                // Don't update current after a return/throw
+            } else if let Some(normal_set) = result.normal {
+                current = normal_set;
+            }
+        }
+
+        FlowResult {
+            normal: Some(current),
+            exits,
+        }
+    }
+
+    /// Analyze an expression statement for property assignments.
+    fn analyze_expression_statement(
+        &self,
+        stmt_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let assigned = self.analyze_expression_for_assignment(expr_stmt.expression, assigned_in, tracked);
+
+        FlowResult {
+            normal: Some(assigned),
+            exits: None,
+        }
+    }
+
+    /// Analyze an expression for property assignments.
+    fn analyze_expression_for_assignment(
+        &self,
+        expr_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> HashSet<PropertyKey> {
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return assigned_in.clone();
+        };
+
+        // Check for binary expression assignment (this.prop = value)
+        if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
+            if let Some(bin_expr) = self.ctx.arena.get_binary_expr(node) {
+                if bin_expr.operator_token.kind == SyntaxKind::EqualsToken as u16 {
+                    // Check if left side is a property access (this.prop)
+                    if self.is_this_property_access(bin_expr.left) {
+                        if let Some(prop_key) = self.extract_property_key(bin_expr.left) {
+                            // Only track if this property is in our tracked set
+                            if tracked.contains(&prop_key) {
+                                let mut assigned = assigned_in.clone();
+                                assigned.insert(prop_key);
+                                return assigned;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        assigned_in.clone()
+    }
+
+    /// Check if an expression is a `this.property` access.
+    fn is_this_property_access(&self, expr_idx: NodeIndex) -> bool {
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return false;
+        };
+
+        if node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return false;
+        }
+
+        let Some(prop_access) = self.ctx.arena.get_property_access_expr(node) else {
+            return false;
+        };
+
+        // Check if the expression is `this`
+        let Some(expr_node) = self.ctx.arena.get(prop_access.expression) else {
+            return false;
+        };
+
+        expr_node.kind == SyntaxKind::ThisKeyword as u16
+    }
+
+    /// Extract the property key from a property access expression.
+    fn extract_property_key(&self, expr_idx: NodeIndex) -> Option<PropertyKey> {
+        let Some(node) = self.ctx.arena.get(expr_idx) else {
+            return None;
+        };
+
+        if node.kind != syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION {
+            return None;
+        }
+
+        let Some(prop_access) = self.ctx.arena.get_property_access_expr(node) else {
+            return None;
+        };
+
+        let Some(name_node) = self.ctx.arena.get(prop_access.name) else {
+            return None;
+        };
+
+        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+            Some(PropertyKey::Ident(ident.escaped_text.clone()))
+        } else {
+            None
+        }
+    }
+
+    /// Analyze an if statement.
+    fn analyze_if_statement(
+        &self,
+        stmt_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let Some(if_stmt) = self.ctx.arena.get_if_statement(node) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        // Analyze then branch
+        let then_result = self.analyze_statement(if_stmt.then_statement, assigned_in, tracked);
+
+        // Analyze else branch if present
+        let else_result = if !if_stmt.else_statement.is_none() {
+            Some(self.analyze_statement(if_stmt.else_statement, assigned_in, tracked))
+        } else {
+            None
+        };
+
+        // For if-else, we need the intersection of both branches
+        // For if-only, we need to intersect with the input (property might not be assigned if condition is false)
+        let normal = if let Some(else_res) = else_result {
+            // Both branches exist - intersect them
+            let then_set = then_result.normal.unwrap_or_default();
+            let else_set = else_res.normal.unwrap_or_default();
+            Some(self.intersect_sets(&then_set, &else_set))
+        } else {
+            // Only then branch - intersect with input
+            let then_set = then_result.normal.unwrap_or_else(|| assigned_in.clone());
+            Some(self.intersect_sets(&then_set, assigned_in))
+        };
+
+        // Handle exits from both branches
+        let mut exits: Option<HashSet<PropertyKey>> = None;
+        if let Some(then_exits) = then_result.exits {
+            exits = Some(match else_result {
+                Some(ref else_res) => {
+                    if let Some(else_exits) = &else_res.exits {
+                        self.intersect_sets(&then_exits, else_exits)
+                    } else {
+                        then_exits
+                    }
+                }
+                None => then_exits,
+            });
+        }
+
+        FlowResult { normal, exits }
+    }
+
+    /// Analyze a try statement.
+    fn analyze_try_statement(
+        &self,
+        stmt_idx: NodeIndex,
+        assigned_in: &HashSet<PropertyKey>,
+        tracked: &HashSet<PropertyKey>,
+    ) -> FlowResult {
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        let Some(try_stmt) = self.ctx.arena.get_try_statement(node) else {
+            return FlowResult {
+                normal: Some(assigned_in.clone()),
+                exits: None,
+            };
+        };
+
+        // Analyze try block
+        let try_result = self.analyze_statement(try_stmt.try_block, assigned_in, tracked);
+
+        // Analyze catch block if present
+        let catch_result = if !try_stmt.catch_clause.is_none() {
+            Some(self.analyze_statement(try_stmt.catch_clause, assigned_in, tracked))
+        } else {
+            None
+        };
+
+        // Analyze finally block if present
+        let finally_result = if !try_stmt.finally_block.is_none() {
+            Some(self.analyze_statement(try_stmt.finally_block, assigned_in, tracked))
+        } else {
+            None
+        };
+
+        // Conservative approach: only count assignments that are in all paths
+        // For try-catch, we need the intersection
+        let mut current = try_result.normal.unwrap_or_else(|| assigned_in.clone());
+
+        if let Some(catch_res) = catch_result {
+            let catch_set = catch_res.normal.unwrap_or_else(|| assigned_in.clone());
+            current = self.intersect_sets(&current, &catch_set);
+        }
+
+        // Finally block always runs, so we can just update current
+        if let Some(finally_res) = finally_result {
+            if let Some(finally_set) = finally_res.normal {
+                current = finally_set;
+            }
+        }
+
+        FlowResult {
+            normal: Some(current),
+            exits: None,
+        }
+    }
+
+    /// Analyze a return statement.
+    fn analyze_return_statement(&self, assigned_in: &HashSet<PropertyKey>) -> FlowResult {
+        FlowResult {
+            normal: None,
+            exits: Some(assigned_in.clone()),
+        }
+    }
+
+    /// Analyze a throw statement.
+    fn analyze_throw_statement(&self, assigned_in: &HashSet<PropertyKey>) -> FlowResult {
+        FlowResult {
+            normal: None,
+            exits: Some(assigned_in.clone()),
         }
     }
 
@@ -627,6 +1143,278 @@ class Foo {
                         "Expected 0 TS2564 errors when strict mode disabled, got {}",
                         ts2564_errors.len()
                     );
+                }
+            }
+        }
+    }
+
+    // ========== Phase 2 Tests: Control Flow Analysis ==========
+
+    #[test]
+    fn test_ts2564_phase2_simple_constructor_initialization() {
+        // Test that TS2564 is NOT reported for properties initialized in simple constructor
+        let source = r#"
+class Foo {
+    x: number;  // Should NOT report (initialized in constructor)
+    constructor() {
+        this.x = 1;
+    }
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have NO TS2564 errors (property initialized in constructor)
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        0,
+                        "Expected 0 TS2564 errors for constructor-initialized property, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_phase2_conditional_all_paths_assigned() {
+        // Test that TS2564 is NOT reported when property is initialized on all code paths
+        let source = r#"
+class Foo {
+    x: number;  // Should NOT report (initialized on all paths)
+    constructor(flag: boolean) {
+        if (flag) {
+            this.x = 1;
+        } else {
+            this.x = 2;
+        }
+    }
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have NO TS2564 errors (property initialized on all paths)
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        0,
+                        "Expected 0 TS2564 errors for property initialized on all paths, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_phase2_conditional_not_all_paths_assigned() {
+        // Test that TS2564 IS reported when property is not initialized on all code paths
+        let source = r#"
+class Foo {
+    x: number;  // Should report TS2564 (not initialized on all paths)
+    constructor(flag: boolean) {
+        if (flag) {
+            this.x = 1;
+        }
+        // else branch doesn't assign this.x
+    }
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have 1 TS2564 error (property not initialized on all paths)
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        1,
+                        "Expected 1 TS2564 error for property not initialized on all paths, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_phase2_return_statement_exits() {
+        // Test that TS2564 IS reported when property is not initialized before early return
+        let source = r#"
+class Foo {
+    x: number;  // Should report TS2564 (not initialized before early return)
+    constructor(flag: boolean) {
+        if (flag) {
+            return;
+        }
+        this.x = 1;
+    }
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have 1 TS2564 error (property not initialized on all exit paths)
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        1,
+                        "Expected 1 TS2564 error for property not initialized before early return, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_phase2_multiple_properties() {
+        // Test mixed scenario: some properties initialized, some not
+        let source = r#"
+class Foo {
+    x: number;  // Should NOT report (initialized in constructor)
+    y: string;  // Should report TS2564 (not initialized)
+    z: boolean = true;  // Should NOT report (has initializer)
+    constructor() {
+        this.x = 1;
+    }
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have 1 TS2564 error for 'y'
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        1,
+                        "Expected 1 TS2564 error for property 'y', got {}",
+                        ts2564_errors.len()
+                    );
+
+                    if let Some(err) = ts2564_errors.first() {
+                        assert!(
+                            err.message_text.contains("y"),
+                            "Error message should contain 'y', got: {}",
+                            err.message_text
+                        );
+                    }
                 }
             }
         }
