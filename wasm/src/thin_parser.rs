@@ -277,21 +277,10 @@ impl ThinParserState {
     fn check_illegal_binding_identifier(&mut self) -> bool {
         use crate::checker::types::diagnostics::diagnostic_codes;
 
-        // In static blocks, 'await' cannot be used as a binding identifier
-        if self.in_static_block_context() {
-            // Check if current token is 'await' (either as keyword or identifier)
-            let is_await = self.is_token(SyntaxKind::AwaitKeyword)
-                || (self.is_token(SyntaxKind::Identifier)
-                    && self.scanner.get_token_value_ref() == "await");
-
-            if is_await {
-                self.parse_error_at_current_token(
-                    "Identifier expected. 'await' is a reserved word that cannot be used here.",
-                    diagnostic_codes::AWAIT_IDENTIFIER_ILLEGAL,
-                );
-                return true;
-            }
-        }
+        // Note: 'await' IS allowed as a binding identifier in static blocks
+        // It's only illegal in async functions, which is handled elsewhere
+        // TypeScript permits: static { let await = 1; }
+        // This matches the spec - static blocks are not async contexts
 
         false
     }
