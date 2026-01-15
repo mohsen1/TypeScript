@@ -238,3 +238,39 @@
 ✅ **Statement-Level Error Recovery - COMPLETE:** Successfully merged into em-team-2
 **Worker 5 Status:** Ready for new task assignment
 
+
+---
+
+## EM-2 Merge Results (2026-01-15 12:55)
+
+### Merge Status: ✅ ALREADY INCLUDED
+
+**Analysis:** Worker-5's statement-level error recovery work is already in em-team-2
+
+**How it got there:**
+- Worker-5's commit `2173a3318` was merged into rust
+- em-team-2 was rebased onto latest rust
+- The work is now part of em-team-2's history
+
+### Commit Chain
+```
+rust: 9cb1ddc65 "Merge branch 'em-team-1' into rust"
+  ├─ em-team-1 merge
+  └─ Includes: 2173a3318 "feat: enhance statement-level error recovery" (worker-5)
+```
+
+### Verification
+- em-team-2 HEAD: `4361478b2`
+- worker-5 HEAD: `2173a3318`
+- Merge-base: `2173a3318` (worker-5 is ancestor of em-team-2)
+
+### Previous Work Completed
+The statement-level error recovery enhancements from worker-5 include:
+- `is_resync_sync_point()` helper function
+- Enhanced `resync_after_error()` with better sync points
+- Improved `parse_variable_declaration_list()` with error recovery
+
+### Task Status
+✅ **Statement-Level Error Recovery:** Already in em-team-2
+**Worker 5 Status:** Ready for new task assignment
+
