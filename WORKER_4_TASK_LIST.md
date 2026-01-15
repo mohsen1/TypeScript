@@ -1,69 +1,127 @@
 # Worker-4 Task List
 
-## Previous Assignment: Flow Analysis Tests ✅ PARTIALLY COMPLETED
-- **Status:** Partially completed and merged
-- **Summary:** Fixed flow recording for unary/binary expressions in closures. Fixed AST navigation in test_closure_capture_with_array_map. 44/54 control_flow tests now passing.
-- **Remaining:** Type narrowing issues, AST navigation in other tests, flow graph construction
+## ✅ COMPLETED: Flow Recording (2026-01-15)
+- **Status:** Complete and merged to em-team-1
+- **Summary:** Fixed flow recording for statements and identifiers
+- **Test Results:** All 54/54 control_flow tests passing 🎉
+- **Commits:**
+  - a163cbed8c9 [wasm] binder: add flow recording for statements and identifiers
+  - 4c2544eb316 [wasm] flow: fix literal type narrowing in assignments
 
 ---
 
-## Assignment: Type Narrowing Investigation ✅ COMPLETED
-- **Status:** Complete and ready for merge
-- **Summary:** Root cause identified - tests were passing wrong target to get_flow_type(). Fixed test_closure_capture_with_array_filter and test_closure_capture_with_array_map to pass the identifier x instead of the binary expression. 46/54 control_flow tests now passing.
+## ✅ COMPLETED: Application Expansion Tests (2026-01-15)
+- **Status:** Complete and pushed (commit b2b7678f5bf)
+- **Summary:** Fixed all failing application expansion tests in the type solver
+- **Test Results:** All 34/34 application expansion tests passing 🎉
 
 ## Changes Made:
-1. **Fixed flow recording** (`thin_binder.rs`):
-   - Added `record_flow` for TYPE_OF_EXPRESSION, VOID_EXPRESSION, AWAIT_EXPRESSION, YIELD_EXPRESSION
-   - Added `record_flow` for BINARY_EXPRESSION to support flow analysis in closures
+1. **Fixed test setup** (`evaluate_tests.rs`):
+   - Changed `env.insert()` to `env.insert_with_params()` to register type parameters
+   - Added `.clone()` when creating TypeParameter types to allow reuse
 
-2. **Fixed AST navigation** (`control_flow_tests.rs`):
-   - Fixed `test_closure_capture_with_array_map` to navigate VariableStatement → VariableDeclaration → initializer
-   - Fixed `test_closure_capture_with_array_filter` to extract identifier x from typeof expression
-   - Fixed both tests to pass correct target (identifier x) to `get_flow_type()`
+2. **Added default type parameter support** (`instantiate.rs`):
+   - Modified `TypeSubstitution::from_args()` to handle default type parameters
+   - When fewer type arguments than parameters, defaults are now used
 
-## Test Results:
-- **Before:** 44/54 control_flow tests passing
-- **After:** 46/54 control_flow tests passing 🎉
-
-## Remaining Work (8 tests):
-The remaining 8 tests have similar AST navigation issues. They need to navigate:
-```
-VariableStatement → declarations → VariableDeclarationList
-  → declarations → VariableDeclaration → initializer
-```
-
-Pattern documented in commit message for future fixes.
+## Tests Fixed:
+- test_application_ref_expansion_with_constraints
+- test_application_ref_expansion_with_defaults
+- test_application_ref_expansion_with_never_arg
+- test_application_ref_expansion_with_unknown_arg
+- test_application_ref_expansion_with_any_arg
+- test_application_ref_expansion_with_union_arg
+- test_application_ref_expansion_nested
+- test_application_ref_expansion_reducer_function
 
 ---
 
-## Assignment: Flow Recording for Statement Nodes ✅ COMPLETED
-- **Status:** Complete and pushed (commit 4bf82227386)
-- **Summary:** Added flow recording for statement nodes and identifier references to fix flow_graph_captures tests.
+## 🎯 CRITICAL: Recursion Guards (Stack Overflow) 🔴
+**Priority:** CRITICAL (STABILITY)
+**Assigned:** 2026-01-15
+**Owner:** worker-4
+**Branch:** worker-4
 
-## Changes Made:
-1. **Added flow recording for statements** (`thin_binder.rs`):
-   - Added `record_flow(idx)` for IF_STATEMENT
-   - Added `record_flow(idx)` for SWITCH_STATEMENT
-   - Added `record_flow(idx)` for TRY_STATEMENT
-   - Added `record_flow(idx)` for FOR_STATEMENT
-   - Added `record_flow(idx)` for FOR_IN_STATEMENT and FOR_OF_STATEMENT
-   - Added `record_flow(idx)` for CLASS_DECLARATION
+### Task Description
+Fix stack overflow crashes in the type checker by adding recursion depth counters. The recursiveTypes test currently causes 2 stack overflow crashes, blocking all validation work.
 
-2. **Added flow recording for identifier references** (`thin_binder.rs`):
-   - Added `record_flow(idx)` for IDENTIFIER syntax kind
-   - This enables `get_node_flow()` to work for identifier references
+### Problem Analysis
+- **Crashes:** 2 (stack overflow in type checker)
+- **Test:** `recursiveTypes` test file triggers crashes
+- **Impact:** HIGH - crashes block all conformance testing
+- **Root Cause:** Type checker doesn't limit recursion depth when checking recursive type definitions
 
-## Test Results:
-- **Before:** 46/54 control_flow tests passing
-- **After:** 53/54 control_flow tests passing 🎉
+### Action Items
 
-## Remaining Work (1 test):
-**test_multiple_closures_capture_same_variable** - Complex literal narrowing issue:
-- The test expects that after `x = 42`, the second arrow function should see `x` narrowed to literal `42.0`
-- Currently it's getting generic `NUMBER` (TypeId 9) instead of literal (TypeId 111)
-- This appears to be a type checker issue: the type checker is not inferring literal types for numeric literals in assignment context
-- May require changes to how the type checker handles literal type inference in assignments
+#### Phase 1: Investigation
+- [ ] Read `wasm/specs/WASM_ARCHITECTURE.md` type checker section
+- [ ] Locate crash trigger: Run recursiveTypes test to reproduce stack overflow
+- [ ] Identify recursive code paths in type checker:
+  - Likely in `wasm/src/checker/thin_checker.rs` (type checking)
+  - Or `wasm/src/checker/solver.rs` (type solving)
+- [ ] Study how TypeScript handles recursion guards
 
-## Status
-- **Ready for Merge:** Yes ✅
-- **Last Updated:** 2026-01-14
+#### Phase 2: Implementation
+- [ ] Add recursion depth counter to relevant type checking functions
+- [ ] Implement depth limit (start with 100, adjust if needed)
+- [ ] Add graceful fallback when limit reached:
+  - Return `Any` type or `Unknown` type
+  - Or skip checking deeply nested types
+- [ ] Add diagnostic/warning when recursion limit hit (optional)
+
+#### Phase 3: Validation
+- [ ] Run recursiveTypes test - should complete without crash
+- [ ] Run `./wasm/test.sh` (Docker-only!)
+- [ ] Run conformance tests: `./wasm/differential-test/run-conformance.sh --all`
+- [ ] Verify zero crashes on all tests
+- [ ] Check that recursion guards don't break valid recursive types
+
+### Success Metrics
+- **Crashes:** Reduce from 2 to 0
+- **recursiveTypes test:** Completes without stack overflow
+- **Regressions:** No new errors introduced by depth limiting
+
+### Implementation Guidance
+
+**Where to Add Recursion Guards:**
+
+Look for recursive functions in type checker:
+
+```rust
+// Example pattern (actual code may vary)
+fn check_type_recursive(&mut self, type_id: TypeId) -> Type {
+    // Add depth check at start
+    if self.recursion_depth > MAX_RECURSION_DEPTH {
+        return self.any_type(); // Graceful fallback
+    }
+
+    self.recursion_depth += 1;
+    let result = self.check_type_recursive_impl(type_id);
+    self.recursion_depth -= 1;
+    result
+}
+```
+
+**Possible Locations:**
+- `wasm/src/solver/subtype.rs` - Subtype checking (already has depth counter!)
+- `wasm/src/solver/evaluate.rs` - Type evaluation
+- `wasm/src/checker/thin_checker.rs` - Type declaration checking
+
+**Depth Limit:**
+- Start with 100 (TypeScript uses similar values)
+- Adjust based on test results
+- Too low: Breaks valid deep types
+- Too high: Doesn't prevent crashes
+
+### Deliverables
+1. Code changes adding recursion depth counters
+2. Test showing recursiveTypes test passes without crash
+3. Conformance test report showing zero crashes
+4. Set `Ready for Merge: Yes` when complete
+
+### Status
+- **Flow Recording:** ✅ Complete
+- **Application Expansion:** ✅ Complete
+- **Recursion Guards:** 🔴 NEW - Critical Priority
+- **Ready for Merge:** No
+- **Last Updated:** 2026-01-15
