@@ -1,69 +1,46 @@
 # Worker-4 Task List
 
-## Previous Assignment: Flow Analysis Tests ✅ PARTIALLY COMPLETED
-- **Status:** Partially completed and merged
-- **Summary:** Fixed flow recording for unary/binary expressions in closures. Fixed AST navigation in test_closure_capture_with_array_map. 44/54 control_flow tests now passing.
-- **Remaining:** Type narrowing issues, AST navigation in other tests, flow graph construction
+## Previous Assignment: Flow Analysis Tests ✅ COMPLETED
+- **Status:** Complete and merged
+- **Summary:** Fixed flow recording and literal type narrowing for control flow analysis
+- **Test Results:** All 54/54 control_flow tests passing 🎉
 
 ---
 
-## Assignment: Type Narrowing Investigation ✅ COMPLETED
-- **Status:** Complete and ready for merge
-- **Summary:** Root cause identified - tests were passing wrong target to get_flow_type(). Fixed test_closure_capture_with_array_filter and test_closure_capture_with_array_map to pass the identifier x instead of the binary expression. 46/54 control_flow tests now passing.
+## Assignment: Application Expansion Tests ✅ IN PROGRESS
+- **Status:** In Progress (29/34 tests passing)
+- **Objective:** Fix remaining failing application expansion tests in the type solver
 
-## Changes Made:
-1. **Fixed flow recording** (`thin_binder.rs`):
-   - Added `record_flow` for TYPE_OF_EXPRESSION, VOID_EXPRESSION, AWAIT_EXPRESSION, YIELD_EXPRESSION
-   - Added `record_flow` for BINARY_EXPRESSION to support flow analysis in closures
+## Changes Made So Far:
+1. **Fixed test setup** (`evaluate_tests.rs`):
+   - Changed `env.insert()` to `env.insert_with_params()` to register type parameters
+   - Added `.clone()` when creating TypeParameter types to allow reuse
 
-2. **Fixed AST navigation** (`control_flow_tests.rs`):
-   - Fixed `test_closure_capture_with_array_map` to navigate VariableStatement → VariableDeclaration → initializer
-   - Fixed `test_closure_capture_with_array_filter` to extract identifier x from typeof expression
-   - Fixed both tests to pass correct target (identifier x) to `get_flow_type()`
-
-## Test Results:
-- **Before:** 44/54 control_flow tests passing
-- **After:** 46/54 control_flow tests passing 🎉
-
-## Remaining Work (8 tests):
-The remaining 8 tests have similar AST navigation issues. They need to navigate:
-```
-VariableStatement → declarations → VariableDeclarationList
-  → declarations → VariableDeclaration → initializer
-```
-
-Pattern documented in commit message for future fixes.
-
----
-
-## Assignment: Flow Recording for Statement Nodes ✅ COMPLETED
-- **Status:** Complete and pushed (commit 4bf82227386)
-- **Summary:** Added flow recording for statement nodes and identifier references to fix flow_graph_captures tests.
-
-## Changes Made:
-1. **Added flow recording for statements** (`thin_binder.rs`):
-   - Added `record_flow(idx)` for IF_STATEMENT
-   - Added `record_flow(idx)` for SWITCH_STATEMENT
-   - Added `record_flow(idx)` for TRY_STATEMENT
-   - Added `record_flow(idx)` for FOR_STATEMENT
-   - Added `record_flow(idx)` for FOR_IN_STATEMENT and FOR_OF_STATEMENT
-   - Added `record_flow(idx)` for CLASS_DECLARATION
-
-2. **Added flow recording for identifier references** (`thin_binder.rs`):
-   - Added `record_flow(idx)` for IDENTIFIER syntax kind
-   - This enables `get_node_flow()` to work for identifier references
+2. **Added default type parameter support** (`instantiate.rs`):
+   - Modified `TypeSubstitution::from_args()` to handle default type parameters
+   - When fewer type arguments than parameters, defaults are now used
 
 ## Test Results:
-- **Before:** 46/54 control_flow tests passing
-- **After:** 53/54 control_flow tests passing 🎉
+- **Before:** 20/34 application expansion tests passing
+- **After:** 29/34 application expansion tests passing 🎉
 
-## Remaining Work (1 test):
-**test_multiple_closures_capture_same_variable** - Complex literal narrowing issue:
-- The test expects that after `x = 42`, the second arrow function should see `x` narrowed to literal `42.0`
-- Currently it's getting generic `NUMBER` (TypeId 9) instead of literal (TypeId 111)
-- This appears to be a type checker issue: the type checker is not inferring literal types for numeric literals in assignment context
-- May require changes to how the type checker handles literal type inference in assignments
+## Remaining Work (5 tests):
+The following tests still fail and likely need the same fixes:
+1. `test_application_ref_expansion_with_any_arg`
+2. `test_application_ref_expansion_with_unknown_arg`
+3. `test_application_ref_expansion_with_union_arg`
+4. `test_application_ref_expansion_nested`
+5. `test_application_ref_expansion_reducer_function`
+
+## Pattern to Apply:
+For each failing test:
+1. Add `.clone()` to type parameters when creating TypeParameter types
+2. Change `env.insert(SymbolRef(N), body)` to `env.insert_with_params(SymbolRef(N), body, vec![param.clone()])`
+3. Update assertions to expect expanded types instead of passing through unchanged
+
+## Files to Modify:
+- `wasm/src/solver/evaluate_tests.rs`
 
 ## Status
-- **Ready for Merge:** Yes ✅
-- **Last Updated:** 2026-01-14
+- **Assigned:** 2026-01-15
+- **In Progress:** Yes

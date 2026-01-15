@@ -15636,7 +15636,7 @@ fn test_application_ref_expansion_with_unknown_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15655,9 +15655,9 @@ fn test_application_ref_expansion_with_unknown_arg() {
     // Create Application: Box<unknown>
     let box_unknown = interner.application(box_ref, vec![TypeId::UNKNOWN]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_unknown);
@@ -15672,15 +15672,10 @@ fn test_application_ref_expansion_with_unknown_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_unknown,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<unknown> should be {{ value: unknown }}"
+        result, expected,
+        "Box<unknown> should expand to {{ value: unknown }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application with any as type argument.
