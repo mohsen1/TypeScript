@@ -7625,7 +7625,7 @@ impl ThinParserState {
             if !self.parse_optional(SyntaxKind::CommaToken) {
                 // Missing comma - check if next token looks like another array element
                 // If so, suppress the error and continue parsing (better recovery)
-                if self.is_array_element_start()
+                if self.is_expression_start()
                     && !self.is_token(SyntaxKind::CloseBracketToken)
                     && !self.is_token(SyntaxKind::EndOfFileToken)
                 {
