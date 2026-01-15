@@ -33,6 +33,12 @@ Instead of the assigned TS2564 (Class Property Initialization) task, Worker 3 im
 - `wasm/typescript-bridge.ts`: +11 lines (TypeScript wrapper)
 - **Total:** 89 insertions
 
+### Test Results
+```bash
+cargo test to_file_name_lower_case
+```
+**Result:** ✅ PASSED - `test lib_tests::test_to_file_name_lower_case ... ok`
+
 ### Assessment
 **Quality:** High - Well-tested, properly documented, follows Rust patterns
 **Relevance:** ⚠️ **OFF-TASK** - This is string utility work, not the assigned TS2564 checker work
@@ -61,6 +67,7 @@ The TS2564 task still requires:
 ## Status
 - **Merged to em-team-1:** Yes (ff506c83f)
 - **Original Task (TS2564) Completed:** ❌ NO - Different work was done
+- **Tests Passed:** ✅ Yes
 - **Last Updated:** 2026-01-14 (EM-1 review)
 - **Next Action:** Director review - accept off-task work and reassign TS2564
 
