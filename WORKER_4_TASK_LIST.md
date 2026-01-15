@@ -1,64 +1,65 @@
 # Worker-4 Task List
 
-## Previous Assignment: Recursion Guards ✅ COMPLETED
-- **Status:** Complete and merged
-- **Summary:** Recursion guards were already implemented in SubtypeChecker and TypeInstantiator. Fixed syntax error in thin_parser.rs and updated test expectation in subtype_tests.rs. All 15 recursion tests pass, no stack overflow panics.
+## Previous Assignment: Flow Analysis Tests ✅ PARTIALLY COMPLETED
+- **Status:** Partially completed and merged
+- **Summary:** Fixed flow recording for unary/binary expressions in closures. Fixed AST navigation in test_closure_capture_with_array_map. 44/54 control_flow tests now passing.
+- **Remaining:** Type narrowing issues, AST navigation in other tests, flow graph construction
 
 ---
 
-## Assignment: Fix Flow Analysis Tests
+## Assignment: Investigate and Fix Type Narrowing
 **Priority:** 🟡 STABILITY
 **Owner:** worker-4
 **Branch:** worker-4
 
 ## Task Description
-Multiple flow analysis tests are failing with panics. These tests are related to closure capture and flow graph analysis. The failures appear to be pre-existing issues, not related to recent changes.
+The flow analysis tests are failing at the type narrowing stage. The `FlowAnalyzer::get_flow_type` method is not correctly narrowing types based on flow nodes. This prevents proper type narrowing in closures even when flow is correctly recorded.
 
 ## Problem Analysis
 From test failures:
-- test_closure_capture_with_array_filter - panics at line 1827
-- test_closure_capture_with_array_map - panics at line 1410
-- test_closure_with_conditional_capture - panics at line 1703
-- test_multiple_closures_capture_same_variable - panics at line 1631
-- test_flow_graph_captures_* - multiple flow graph capture tests failing
+- `test_closure_capture_with_array_filter` - fails at type narrowing (line 1830)
+- `test_closure_capture_with_array_map` - fails at type narrowing (line 1450)
+- The flow is recorded correctly, but `FlowAnalyzer::get_flow_type` returns wrong type
+- Expected: `TypeId::STRING` (narrowed from `string | number`)
+- Actual: `TypeId(130)` (some other type, possibly the union itself)
 
 ## Action Items
 
 ### Phase 1: Investigation
-- [ ] Run the failing tests and capture full panic messages
-- [ ] Read wasm/src/checker/flow_analyzer.rs to understand flow analysis
-- [ ] Read wasm/src/checker/control_flow_tests.rs to understand test expectations
-- [ ] Identify the root cause of the panics
+- [ ] Read `wasm/src/checker/flow_analyzer.rs` to understand `get_flow_type` logic
+- [ ] Add debug output to understand what `TypeId(130)` represents
+- [ ] Check if flow nodes are correctly connected to type narrowing logic
+- [ ] Compare with working tests to understand expected flow graph structure
 
 ### Phase 2: Fix Implementation
-- [ ] Fix the flow analysis logic to handle closure captures correctly
-- [ ] Ensure flow graph properly captures variable access in closures
-- [ ] Fix any assertion failures in the tests
+- [ ] Fix `FlowAnalyzer::get_flow_type` to correctly narrow types
+- [ ] Ensure flow conditions properly narrow union types
+- [ ] Fix any flow graph construction issues
 
 ### Phase 3: Validation
-- [ ] Run all flow analysis tests: cargo test control_flow
-- [ ] Run full test suite: ./wasm/test.sh
-- [ ] Verify no regressions in other tests
+- [ ] Run all flow analysis tests: `cargo test control_flow`
+- [ ] Verify type narrowing works correctly in closures
+- [ ] Fix remaining AST navigation issues in other tests
 
 ## Success Metrics
-- Zero panics in flow analysis tests
 - All control_flow tests passing
-- No regressions in other test suites
+- Type narrowing works correctly in closures
+- No regressions in other tests
 
 ## Deliverables
-1. Code changes in wasm/src/checker/flow_analyzer.rs or related files
-2. All flow analysis tests passing
+1. Code changes in `wasm/src/checker/flow_analyzer.rs` or related files
+2. All control_flow tests passing
 3. Test report showing all tests green
 
 ## Workflow
-1. Sync: git fetch origin && git merge origin/rust --no-edit
-2. Investigate the failing tests
-3. Fix the implementation
-4. Test: cargo test control_flow
-5. Commit: [wasm] checker: fix flow analysis closure capture tests
+1. Sync: `git fetch origin && git merge origin/rust --no-edit`
+2. Investigate FlowAnalyzer logic
+3. Fix type narrowing implementation
+4. Test: `cargo test control_flow`
+5. Commit: `[wasm] checker: fix type narrowing in flow analysis`
 6. Push to worker-4 branch
-7. Mark Ready for Merge: Yes in your plan
+7. Mark `Ready for Merge: Yes` in your plan
 
 ## Status
-- Ready for Merge: No
-- Last Updated: 2026-01-14
+- **Ready for Merge:** No
+- **Last Updated:** 2026-01-14
