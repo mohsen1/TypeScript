@@ -78,20 +78,26 @@ Successfully implemented parser error recovery improvements to reduce TS1005 and
 
 ## Worker-1 Merge Summary (2026-01-15)
 
-**Merge Commit:** `7c7df3b2acc` (pushed to origin/em-team-1)
+**Latest Merge Commit:** `a2fd647c520` (pushed to origin/em-team-1)
+**Previous Merge Commit:** `7c7df3b2acc`
 
 ### Latest Changes Merged:
-**[wasm] parser: allow keywords as labels in labeled statements**
-- Fixed parsing of labeled statements where label is a reserved keyword
-- Example: `await: if (true) { ... }`
-- Addresses TS1109 "Expression expected" errors in valid code
-- Particularly affects static blocks using keyword labels
+**[wasm] parser: support optional chaining in heritage clauses** (2f011a64e49)
+- Fixed parsing of class extends/implements clauses with optional chaining
+- TypeScript allows: `class C extends A?.B {}` and `class C implements A?.B {}`
+- Added support for QuestionDotToken case in property access chain loop
+- Sets question_dot_token to true when ?. is encountered in heritage clauses
 
 ### Code Changes:
-- `wasm/src/thin_parser.rs` - Extended parse_statement() to handle keywords as labels
-- Check if token is identifier/keyword AND followed by colon (labeled statement)
+- `wasm/src/thin_parser.rs` - Added QuestionDotToken handling in parse_heritage_left_hand_expression
+- 21 insertions to support optional chaining syntax
+
+### Previous Merged Work:
+**[wasm] parser: allow keywords as labels in labeled statements** (7c7df3b2acc)
+- Fixed parsing of labeled statements where label is a reserved keyword
+- Example: `await: if (true) { ... }`
 
 ### Overall Progress:
-- **Phase 1:** ✅ Complete (4 parser improvements total)
+- **Phase 1:** ✅ Complete (5 parser improvements total)
 - **Validation:** ⏳ Pending conformance test results
 - **Status:** Awaiting validation to determine if Phase 2 needed
