@@ -1913,6 +1913,45 @@ pub fn file_extension_is(path: &str, extension: &str) -> bool {
     path.len() > extension.len() && path.ends_with(extension)
 }
 
+/// Convert file name to lowercase for case-insensitive file systems.
+///
+/// This function handles special Unicode characters that need to remain
+/// case-sensitive for proper cross-platform file name handling:
+/// - \u{0130} (İ - Latin capital I with dot above)
+/// - \u{0131} (ı - Latin small letter dotless i)
+/// - \u{00DF} (ß - Latin small letter sharp s)
+///
+/// These characters are excluded from lowercase conversion to maintain
+/// compatibility with case-insensitive file systems that have special
+/// handling for these characters (notably Turkish locale on Windows).
+///
+/// Matches TypeScript's `toFileNameLowerCase` in src/compiler/core.ts
+#[wasm_bindgen(js_name = toFileNameLowerCase)]
+pub fn to_file_name_lower_case(x: &str) -> String {
+    // First, check if we need to do any work (optimization - avoid allocation)
+    // The "safe" set of characters that don't need lowercasing:
+    // - \u{0130} (İ), \u{0131} (ı), \u{00DF} (ß) - special Turkish chars
+    // - a-z (lowercase ASCII letters)
+    // - 0-9 (digits)
+    // - \ / : - _ . (path separators and common filename chars)
+    // - space
+
+    let needs_conversion = x.chars().any(|c| {
+        !matches!(c,
+            '\u{0130}' | '\u{0131}' | '\u{00DF}' |  // Special Unicode chars
+            'a'..='z' | '0'..='9' |  // ASCII lowercase and digits
+            '\\' | '/' | ':' | '-' | '_' | '.' | ' '  // Path chars and space
+        )
+    });
+
+    if !needs_conversion {
+        return x.to_string();
+    }
+
+    // Convert to lowercase, preserving the special characters
+    x.to_lowercase()
+}
+
 // =============================================================================
 // Character Classification (Phase 1.3 - Scanner Prep)
 // =============================================================================

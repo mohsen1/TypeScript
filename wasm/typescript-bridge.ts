@@ -33,6 +33,7 @@ export interface WasmModule {
     hasExtension(fileName: string): boolean;
     getBaseFileName(path: string): string;
     fileExtensionIs(path: string, extension: string): boolean;
+    toFileNameLowerCase(fileName: string): string;
 
     // Character classification (Phase 1.3 - Scanner prep)
     isLineBreak(ch: number): boolean;
@@ -299,6 +300,16 @@ export function wasmGetBaseFileName(pathStr: string): string | undefined {
 export function wasmFileExtensionIs(pathStr: string, extension: string): boolean | undefined {
     const wasm = getWasm();
     return wasm?.fileExtensionIs(pathStr, extension);
+}
+
+/**
+ * Convert file name to lowercase for case-insensitive file systems (Rust implementation).
+ * Handles special Unicode characters (Turkish I with dot, etc.) correctly.
+ * @internal
+ */
+export function wasmToFileNameLowerCase(fileName: string): string | undefined {
+    const wasm = getWasm();
+    return wasm?.toFileNameLowerCase(fileName);
 }
 
 // =============================================================================

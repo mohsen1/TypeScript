@@ -169,6 +169,45 @@ fn test_file_extension_is() {
     assert!(!file_extension_is(".ts", ".ts")); // path must be longer than extension
 }
 
+#[test]
+fn test_to_file_name_lower_case() {
+    // Already lowercase - should return unchanged (optimization)
+    assert_eq!(to_file_name_lower_case("file.ts"), "file.ts");
+    assert_eq!(to_file_name_lower_case("path/to/file"), "path/to/file");
+
+    // Uppercase letters should be lowercased
+    assert_eq!(to_file_name_lower_case("FILE.TS"), "file.ts");
+    assert_eq!(to_file_name_lower_case("Path/To/File"), "path/to/file");
+
+    // Mixed case
+    assert_eq!(to_file_name_lower_case("MyFile.ts"), "myfile.ts");
+    assert_eq!(to_file_name_lower_case("PaTh/To/FiLe"), "path/to/file");
+
+    // Special Unicode characters - should remain unchanged (Turkish locale handling)
+    // \u{0130} (İ - Latin capital I with dot above)
+    assert_eq!(to_file_name_lower_case("\u{0130}file.ts"), "\u{0130}file.ts");
+    // \u{0131} (ı - Latin small letter dotless i)
+    assert_eq!(to_file_name_lower_case("file\u{0131}.ts"), "file\u{0131}.ts");
+    // \u{00DF} (ß - Latin small letter sharp s)
+    assert_eq!(to_file_name_lower_case("file\u{00DF}.ts"), "file\u{00DF}.ts");
+
+    // Safe characters - should remain unchanged
+    assert_eq!(to_file_name_lower_case("file-0123456789.ts"), "file-0123456789.ts");
+    assert_eq!(to_file_name_lower_case("path_to_file.ts"), "path_to_file.ts");
+    assert_eq!(to_file_name_lower_case("path:to:file"), "path:to:file");
+    assert_eq!(to_file_name_lower_case("path.to.file"), "path.to.file");
+    assert_eq!(to_file_name_lower_case("path to file"), "path to file");
+
+    // Mixed: safe chars + uppercase letters
+    assert_eq!(to_file_name_lower_case("MY-File_01.TS"), "my-file_01.ts");
+    assert_eq!(to_file_name_lower_case("/PATH/TO/FILE.TS"), "/path/to/file.ts");
+
+    // Edge cases
+    assert_eq!(to_file_name_lower_case(""), "");
+    assert_eq!(to_file_name_lower_case("A"), "a");
+    assert_eq!(to_file_name_lower_case("a"), "a");
+}
+
 // Character classification tests
 
 #[test]
