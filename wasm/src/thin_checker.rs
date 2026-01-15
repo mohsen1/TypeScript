@@ -16010,6 +16010,14 @@ impl<'a> ThinCheckerState<'a> {
         // Check if this class is abstract
         let is_abstract_class = self.has_abstract_modifier(&class.modifiers);
 
+        // Push type parameters BEFORE checking heritage clauses and abstract members
+        // This allows heritage clauses and member checks to reference the class's type parameters
+        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
+
+        // Check heritage clauses for unresolved names (TS2304)
+        // Must be checked AFTER type parameters are pushed so heritage can reference type params
+        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
+
         // Check for abstract members in non-abstract class (error 1253)
         // and private identifiers in ambient classes (error 2819)
         for &member_idx in &class.members.nodes {
@@ -16088,11 +16096,6 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        // Check heritage clauses for unresolved names (TS2304)
-        self.check_heritage_clauses_for_unresolved_names(&class.heritage_clauses);
-
-        let (_type_params, type_param_updates) = self.push_type_parameters(&class.type_parameters);
-
         // Collect class name and static members for error 2662 suggestions
         let class_name = if !class.name.is_none() {
             if let Some(name_node) = self.ctx.arena.get(class.name) {
@@ -16148,6 +16151,9 @@ impl<'a> ThinCheckerState<'a> {
 
         // Check that non-abstract class implements all abstract members from base class (error 2654)
         self.check_abstract_member_implementations(stmt_idx, &class);
+
+        // Check that class properly implements all interfaces from implements clauses (error 2420)
+        self.check_implements_clauses(stmt_idx, &class);
 
         // Restore previous enclosing class
         self.ctx.enclosing_class = prev_enclosing_class;
@@ -19802,6 +19808,132 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
         None
+    }
+
+    /// Check that a class properly implements all interfaces from its implements clauses.
+    /// Emits TS2420 when a class incorrectly implements an interface.
+    fn check_implements_clauses(
+        &mut self,
+        class_idx: NodeIndex,
+        class_data: &crate::parser::thin_node::ClassData,
+    ) {
+        use crate::checker::types::diagnostics::diagnostic_codes;
+        use crate::scanner::SyntaxKind;
+
+        let Some(ref heritage_clauses) = class_data.heritage_clauses else {
+            return;
+        };
+
+        // Collect implemented members from the class
+        let mut class_members: std::collections::HashMap<String, NodeIndex> =
+            std::collections::HashMap::new();
+        for &member_idx in &class_data.members.nodes {
+            if let Some(name) = self.get_member_name(member_idx) {
+                class_members.insert(name, member_idx);
+            }
+        }
+
+        for &clause_idx in &heritage_clauses.nodes {
+            let Some(clause_node) = self.ctx.arena.get(clause_idx) else {
+                continue;
+            };
+
+            let Some(heritage) = self.ctx.arena.get_heritage_clause(clause_node) else {
+                continue;
+            };
+
+            // Only check implements clauses
+            if heritage.token != SyntaxKind::ImplementsKeyword as u16 {
+                continue;
+            };
+
+            // Check each interface in the implements clause
+            for &type_idx in &heritage.types.nodes {
+                let Some(type_node) = self.ctx.arena.get(type_idx) else {
+                    continue;
+                };
+
+                // Get the expression (identifier or property access) from ExpressionWithTypeArguments
+                let expr_idx =
+                    if let Some(expr_type_args) = self.ctx.arena.get_expr_type_args(type_node) {
+                        expr_type_args.expression
+                    } else {
+                        type_idx
+                    };
+
+                // Get the interface symbol
+                if let Some(name) = self.heritage_name_text(expr_idx) {
+                    if let Some(sym_id) = self.ctx.binder.file_locals.get(&name) {
+                        if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                            let interface_idx = if !symbol.value_declaration.is_none() {
+                                symbol.value_declaration
+                            } else if let Some(&decl_idx) = symbol.declarations.first() {
+                                decl_idx
+                            } else {
+                                continue;
+                            };
+
+                            let Some(interface_node) = self.ctx.arena.get(interface_idx) else {
+                                continue;
+                            };
+
+                            // Check if it's actually an interface declaration
+                            if interface_node.kind != syntax_kind_ext::INTERFACE_DECLARATION {
+                                continue;
+                            }
+
+                            let Some(interface_decl) = self.ctx.arena.get_interface(interface_node) else {
+                                continue;
+                            };
+
+                            // Check that all interface members are implemented
+                            let mut missing_members: Vec<String> = Vec::new();
+
+                            for &member_idx in &interface_decl.members.nodes {
+                                if let Some(member_name) = self.get_member_name(member_idx) {
+                                    // Check if class has this member
+                                    if !class_members.contains_key(&member_name) {
+                                        missing_members.push(member_name);
+                                    }
+                                }
+                            }
+
+                            // Report error if there are missing implementations
+                            if !missing_members.is_empty() {
+                                let class_name = if !class_data.name.is_none() {
+                                    if let Some(name_node) = self.ctx.arena.get(class_data.name) {
+                                        if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                                            ident.escaped_text.clone()
+                                        } else {
+                                            String::from("<anonymous>")
+                                        }
+                                    } else {
+                                        String::from("<anonymous>")
+                                    }
+                                } else {
+                                    String::from("<anonymous>")
+                                };
+
+                                let missing_list = missing_members
+                                    .iter()
+                                    .map(|s| format!("'{}", s))
+                                    .collect::<Vec<_>>()
+                                    .join(", ");
+
+                                self.error_at_node(
+                                    clause_idx,
+                                    &format!(
+                                        "Class '{}' incorrectly implements interface '{}'. Missing members: {}.",
+                                        class_name, name, missing_list
+                                    ),
+                                    diagnostic_codes::CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE,
+                                );
+                            }
+                        }
+                    }
+                }
+            }
+        }
     }
 
     /// Check that all top-level function overload signatures have implementations.
