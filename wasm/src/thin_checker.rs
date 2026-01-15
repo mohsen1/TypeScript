@@ -10875,9 +10875,11 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(env) = env {
                     let mut checker =
                         crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    checker.set_strict_null_checks(self.ctx.strict_null_checks);
                     return Some(checker.is_assignable(TypeId::NUMBER, target));
                 }
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                checker.set_strict_null_checks(self.ctx.strict_null_checks);
                 return Some(checker.is_assignable(TypeId::NUMBER, target));
             }
         }
@@ -10887,9 +10889,11 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(env) = env {
                     let mut checker =
                         crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    checker.set_strict_null_checks(self.ctx.strict_null_checks);
                     return Some(checker.is_assignable(source, TypeId::NUMBER));
                 }
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                checker.set_strict_null_checks(self.ctx.strict_null_checks);
                 return Some(checker.is_assignable(source, TypeId::NUMBER));
             }
         }
@@ -11654,7 +11658,8 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let env = self.ctx.type_env.borrow();
-        let checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        checker.set_strict_null_checks(self.ctx.strict_null_checks);
         checker.is_weak_union_violation(source, target)
     }
 
