@@ -7,95 +7,142 @@
 
 ---
 
+## Mission Statement
+
+EM-1 is responsible for **parser accuracy**. Your team ensures that:
+1. Syntax errors are properly suppressed when TypeScript suppresses them (TS1109, TS1005)
+2. Error recovery allows parsing to continue after syntax errors
+3. ASI (Automatic Semicolon Insertion) works correctly
+4. Parser doesn't emit false syntax errors
+
+**Why this matters:** Parser accuracy is the foundation. If the parser emits false syntax errors, the binder and type checker never run. Users trust TypeScript to parse valid JavaScript.
+
+---
+
 ## Team Composition
 
-| Worker | Squad | Focus Area | Status |
-|--------|-------|------------|--------|
-| worker-1 | Type Squad | Implicit `this` handling (TS2683) | Active |
-| worker-2 | Type Squad | `super()` call handling | Active |
-| worker-3 | AnyCheck Squad | Implicit any detection (TS7006/TS7005) | Active |
-| worker-4 | Async Squad | Async/await type checking (TS2705) | Active |
+| Worker | Squad | Focus Area | Status | Throughput |
+|--------|-------|------------|--------|------------|
+| Worker 3 | Syntax | TS1109 suppression | ❌ **Needs restart** | None |
+| Worker 4 | Syntax | TS1005 suppression | ❌ **Did wrong task** | Low |
+| Worker 5 | Syntax | Parser error recovery | ✅ Complete | High |
+
+**Leadership:** Worker 5 (exceptional throughput, mentor for Workers 3-4)
+
+**EM Branch:** em-team-1
 
 ---
 
-## Team Priorities (Updated 2026-01-15)
+## Completed Work
 
-### Priority 1: Type Checker Accuracy - `this` and `super` (Tier 2)
-**Owner:** worker-1, worker-2
+### Worker 5: Parser Error Recovery ✅
+**Commits:**
+- 2fac75924a - Statement-level error recovery
+- 29ec0035e8 - Control statement error recovery (switch, try-catch, for, while)
 
-**Goal:** Fix object-oriented type checking edge cases
+**Problem:** Parser would crash or emit cascading errors after encountering syntax errors.
 
-| Issue | Description | Owner |
-|-------|-------------|-------|
-| TS2683 missing | "'this' implicitly has type 'any'" not emitted | worker-1 |
-| TS2571 extra | "Object is of type 'unknown'" over-reported | worker-1 |
-| super() handling | Special handling for super() calls in constructors | worker-2 (completed) |
+**Fix:** Enhanced error recovery for:
+- Switch statements: "case or default expected" error
+- Try-catch-finally: Missing catch/finally error
+- For/while loops: Error recovery for failed parsing
+- Control statements: Comprehensive error recovery
 
-**Root Cause:** When `this` is used inside a regular function (not a method), it should emit TS2683 but instead types as `unknown` and emits TS2571 on property access.
-
-**Fix Location:** `thin_checker.rs` - `current_this_type()` handling around line 629
-
-### Priority 2: Implicit Any Checks (Tier 4)
-**Owner:** worker-3 (AnyCheck Squad)
-
-**Goal:** Emit TS7006/TS7008 only when type cannot be inferred
-
-| Error Code | Current | Target | Owner |
-|------------|---------|--------|-------|
-| TS7006 extra | ~200 (estimate) | <50 | worker-3 |
-| TS7005 extra | ~150 (estimate) | <30 | worker-3 |
-
-**Key Files:** `wasm/src/thin_checker.rs` - implicit any checking functions
-
-**Rules to Implement:**
-- Skip implicit any errors when parameter has default value (`param.initializer.is_some()`)
-- Skip implicit any errors when property has initializer (`prop.initializer.is_some()`)
-- Skip implicit any errors when type can be inferred from usage
-
-### Priority 3: Async/Await Type Checking (Tier 5)
-**Owner:** worker-4 (Async Squad)
-
-**Goal:** Correct handling of async functions, generators, and await expressions
-
-| Error Code | Description | Owner |
-|------------|-------------|-------|
-| TS2705 gaps | Async function return type checking | worker-4 |
-| TS1359 missing | 'await' reserved word detection | worker-4 |
-| Async generators | `AsyncGenerator` vs `Promise` return types | worker-4 |
-
-**Key Files:** `wasm/src/thin_checker.rs` - async-related functions
+**Impact:** 48 lines of production-quality parser code. Parser now continues after syntax errors instead of crashing.
 
 ---
 
-## Recent Activity Log
+## Team Priorities (Updated 2026-01-15 13:20)
 
-### 2026-01-15
-- EM-1 initialized
-- Created em-team-1 branch from rust
-- Merged worker-1 (template only)
-- Merged worker-2 (super() handling fix - dc7519914)
-- Created EM_1_TASKS.md
+### Priority 1: Restart Workers 3-4 Under Worker 5's Mentorship
+**Owner:** EM-1 (with Worker 5 as mentor)
 
-### Completed Work
-- worker-2: fix: add special handling for super() calls in ThinCheckerState (dc7519914)
-- worker-1: fix: implement TS2683 for implicit this in functions (c958fc9cb)
+**Problem:** Workers 3-4 did not complete their assigned tasks:
+- Worker 3: Only documentation, no TS1109 implementation
+- Worker 4: Did wrong task (solver defaults instead of TS1005)
+
+**Action Items:**
+1. EM-1 assigns new tasks to Workers 3-4
+2. Worker 5 provides close mentorship
+3. Regular progress checkpoints (daily commits required)
+4. If no progress after 2 days, reassign to different squad
+
+### Priority 2: TS1109 Suppression (Parser Expression Expected)
+**Owner:** Worker 3 (restarted) or Worker 5
+
+**Goal:** Reduce TS1109 extra errors from 262 to <40
+
+**Current State:**
+- TS1109: "Expression expected"
+- 262 extra errors (we emit, tsc doesn't)
+- TypeScript often suppresses this error in recovery contexts
+
+**Action Items:**
+1. Identify when TypeScript suppresses TS1109
+2. Implement suppression logic in parser
+3. Add error recovery for expression contexts
+4. Test with conformance suite
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS1109 extra | ~262 | <40 |
+
+**Key Files:**
+- `wasm/src/thin_parser.rs` - expression parsing functions
+- `wasm/src/parser_recovery.rs` - error recovery logic
+
+### Priority 3: TS1005 Suppression (Parser Token Expected)
+**Owner:** Worker 4 (restarted) or Worker 5
+
+**Goal:** Reduce TS1005 extra errors from 345 to <50
+
+**Current State:**
+- TS1005: "X expected" (e.g., "; expected", "} expected")
+- 345 extra errors (we emit, tsc doesn't)
+- Worker 5 already implemented partial suppression for some tokens
+- Need to extend to remaining cases
+
+**Action Items:**
+1. Extend Worker 5's work to cover more token types
+2. Identify when TypeScript suppresses TS1005
+3. Implement suppression logic in parser
+4. Add error recovery for token contexts
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS1005 extra | ~345 | <50 |
+
+**Key Files:**
+- `wasm/src/thin_parser.rs` - token parsing functions
+- `wasm/src/parser_recovery.rs` - error recovery logic
+
+### Priority 4: ASI Handling Edge Cases
+**Owner:** Worker 3 or Worker 4 (after completing priorities 2-3)
+
+**Goal:** Correct automatic semicolon insertion in edge cases
+
+**Current State:**
+- Most ASI cases work correctly
+- Edge cases: return statements, postfix ++/--, template literals
+
+**Action Items:**
+1. Identify ASI edge cases in conformance tests
+2. Implement ASI logic in parser
+3. Test with conformance suite
 
 ---
 
 ## Conformance Test Baseline (2026-01-15)
 
-Current baseline from rust branch (commit 978ce6786):
+Current baseline from rust branch (commit 74df9fd30d):
 
-| Metric | Result | Goal |
-|--------|--------|------|
-| Exact Match | TBD | 95%+ |
-| Same Error Count | TBD | - |
-| Missing Errors | TBD | <5% |
-| Extra Errors | TBD | <5% |
+**Top Parser Errors:**
+- TS1005: ~345 extra (Parser token expected errors)
+- TS1109: ~262 extra (Parser expression expected errors)
 
-**Action Items:**
-- Run conformance tests to establish EM-1 baseline
-- Track TS2683, TS2571, TS7006, TS7005, TS2705 specific counts
+**Target:** Reduce parser noise by 80% while maintaining accuracy
 
 ---
 
@@ -105,27 +152,26 @@ Current baseline from rust branch (commit 978ce6786):
 1. **Daily sync**: `git pull origin rust` → merge to em-team-1
 2. **Review worker branches**: Check commits, test results
 3. **Merge locally**: `git merge worker-X` into em-team-1
-4. **Run validation**: `cd wasm/differential-test && bash run-conformance.sh --max=500 --workers=4`
+4. **Run validation**: `./wasm/differential-test/run-conformance.sh --max=500 --workers=4`
 5. **Push to director**: Only when stable and validated
 
 ### For Workers:
 1. Create branch from em-team-1
 2. Work on assigned task ONLY
-3. Commit frequently with `[wasm] <component>: <description>`
+3. Commit frequently with `[wasm] parser: <description>`
 4. Push to worker-X branch
 5. Update task list with status
 6. Notify EM-1 when ready for merge
 
 ---
 
-## Merge Readiness Status (2026-01-15)
+## Merge Readiness Status (2026-01-15 13:20)
 
 | Worker | Status | Notes |
 |--------|--------|-------|
-| worker-1 | 🟡 Active | TS2683 fix complete (c958fc9cb), needs validation |
-| worker-2 | 🟢 Merged | super() handling fix complete (dc7519914) |
-| worker-3 | 🟡 Pending | TS7006/TS7005 task assignment pending |
-| worker-4 | 🟡 Pending | TS2705 async/await task assignment pending |
+| Worker 3 | 🔴 Needs restart | Did not complete TS1109 task |
+| Worker 4 | 🔴 Needs restart | Did wrong task (solver defaults) |
+| Worker 5 | 🟢 Complete | Parser error recovery complete |
 
 ---
 
@@ -142,13 +188,13 @@ Current baseline from rust branch (commit 978ce6786):
 
 ## Next Actions for EM-1
 
-1. ✅ Sync em-team-1 with rust
-2. ✅ Merge worker-1 into em-team-1
-3. ✅ Merge worker-2 into em-team-1
-4. 🔄 Create WORKER_3_TASK_LIST.md with TS7006/TS7005 assignment
-5. 🔄 Create WORKER_4_TASK_LIST.md with TS2705 async/await assignment
-6. 📅 Run conformance tests to establish baseline
-7. 📋 Push em-team-1 to origin for director review
+1. ✅ Create em-team-1 branch
+2. ✅ Create EM_1_TASKS.md
+3. ✅ Worker 5 complete - transfer from EM-2
+4. 🔄 **Restart Workers 3-4** under Worker 5's mentorship
+5. 📅 Assign TS1109 to Worker 3 (or Worker 5 if Worker 3 doesn't progress)
+6. 📅 Assign TS1005 to Worker 4 (or Worker 5 if Worker 4 doesn't progress)
+7. 📋 Track parser error counts
 
 ---
 
@@ -159,4 +205,28 @@ Current baseline from rust branch (commit 978ce6786):
 - Run `./wasm/test.sh` for Rust tests (Docker-only)
 - Use `./scripts/ask-gemini.mjs` before coding (if applicable)
 - Target: 95%+ exact match before production
-- Worktree location: `/tmp/orchestrator-workspace/worktrees/em-1`
+- **Focus:** Parser accuracy, not binder or type checker work
+
+---
+
+## Team Size and Capacity
+
+**Current Workers:** 3 (Worker 3, Worker 4, Worker 5)
+**Capacity:** At maximum (limit is 4)
+
+**Future Considerations:**
+- If Worker 3-4 don't progress, may reassign to EM-3 (type checking)
+- EM-1 needs strong mentorship from Worker 5
+- Focus on parser accuracy tasks only
+
+---
+
+## Success Metrics
+
+| Metric | Current | Target (EM-1) |
+|--------|---------|---------------|
+| TS1005 extra errors | ~345 | <50 |
+| TS1109 extra errors | ~262 | <40 |
+| Exact Match Rate | ~30% | 35%+ |
+
+**Overall EM-1 Goal:** Reduce parser noise by 80%, increase exact match rate by 5%
