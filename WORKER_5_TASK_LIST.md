@@ -274,3 +274,49 @@ The statement-level error recovery enhancements from worker-5 include:
 ✅ **Statement-Level Error Recovery:** Already in em-team-2
 **Worker 5 Status:** Ready for new task assignment
 
+
+---
+
+## EM-2 Merge Results (2026-01-15 13:06)
+
+### Merge Status: ✅ SUCCESS - NEW WORK
+
+**Merge Commit:** `02b1af695`
+**Worker Commit:** `a8cacd954` - "feat: enhance control statement error recovery"
+
+### Changes from Worker 5
+**Control Statement Error Recovery Enhancement:**
+- Enhanced error recovery for control statements
+- Improved parser resynchronization in if/else, switch, while, do-while, for, for-in, for-of
+- Better handling of malformed statement bodies
+
+### File Changed
+- `wasm/src/thin_parser.rs`: +48 lines, -1 line
+
+### Implementation Details
+Added new logic for:
+- Control flow statement boundary detection
+- Error recovery in nested control structures
+- Proper resynchronization after malformed statements
+
+### Merge Strategy
+- Clean merge using 'ort' strategy
+- No conflicts
+
+### Previous Work Already Included
+- Statement-level error recovery (from earlier merge)
+- ASI (Automatic Semicolon Insertion)
+- Object/array literal error recovery
+
+### Task Status
+✅ **Control Statement Error Recovery:** NEW work successfully merged
+✅ **Previous Statement-Level Recovery:** Already included
+**Worker 5 Status:** Ready for new task assignment
+
+### Total Contributions from Worker-5
+1. ASI implementation ✅
+2. Statement-level error recovery ✅
+3. Object literal error recovery ✅
+4. Array literal error recovery ✅
+5. Control statement error recovery ✅
+
