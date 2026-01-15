@@ -110,8 +110,8 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
-            ts1109_statement_budget: 10, // Increased: Allow 10 TS1109 errors per statement (more lenient)
-            ts1005_statement_budget: 10, // Increased: Allow 10 TS1005 errors per statement (more lenient)
+            ts1109_statement_budget: 3, // Allow 3 TS1109 errors per statement (reduced for noise suppression)
+            ts1005_statement_budget: 2, // Allow 2 TS1005 errors per statement (reduced for noise suppression)
         }
     }
 
@@ -125,8 +125,8 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
-        self.ts1109_statement_budget = 10; // Reset error budget (increased)
-        self.ts1005_statement_budget = 10; // Reset error budget (increased)
+        self.ts1109_statement_budget = 3; // Reset error budget (reduced for noise suppression)
+        self.ts1005_statement_budget = 2; // Reset error budget (reduced for noise suppression)
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -1208,8 +1208,8 @@ impl ThinParserState {
     pub fn parse_statement(&mut self) -> NodeIndex {
         // Reset error budgets at statement boundaries to prevent error storms
         // Increased to be more lenient and reduce false positives
-        self.ts1109_statement_budget = 10;
-        self.ts1005_statement_budget = 10;
+        self.ts1109_statement_budget = 3;
+        self.ts1005_statement_budget = 2;
 
         match self.token() {
             SyntaxKind::OpenBraceToken => self.parse_block(),
@@ -7714,45 +7714,6 @@ impl ThinParserState {
         )
     }
 
-    /// Check if current token can start an array element
-    /// Used for error recovery in array literals when commas are missing
-    fn is_array_element_start(&self) -> bool {
-        match self.token() {
-            // Spread operator
-            SyntaxKind::DotDotDotToken => true,
-            // Literals that can start array elements
-            SyntaxKind::StringLiteral
-            | SyntaxKind::NumericLiteral
-            | SyntaxKind::BigIntLiteral
-            | SyntaxKind::TrueKeyword
-            | SyntaxKind::FalseKeyword
-            | SyntaxKind::NullKeyword => true,
-            // Keywords/identifiers
-            SyntaxKind::Identifier => true,
-            // This keyword
-            SyntaxKind::ThisKeyword => true,
-            // Super keyword
-            SyntaxKind::SuperKeyword => true,
-            // Open bracket (nested array)
-            SyntaxKind::OpenBracketToken => true,
-            // Open brace (object literal)
-            SyntaxKind::OpenBraceToken => true,
-            // Open paren (parenthesized expression)
-            SyntaxKind::OpenParenToken => true,
-            // Prefix operators
-            SyntaxKind::ExclamationToken  // !
-            | SyntaxKind::TildeToken  // ~
-            | SyntaxKind::PlusToken  // + (unary)
-            | SyntaxKind::MinusToken  // - (unary)
-            | SyntaxKind::PlusPlusToken  // ++ (prefix)
-            | SyntaxKind::MinusMinusToken  // -- (prefix)
-            | SyntaxKind::TypeOfKeyword
-            | SyntaxKind::VoidKeyword
-            | SyntaxKind::DeleteKeyword => true,
-            _ => self.is_identifier_or_keyword(),
-        }
-    }
-
     /// Check if current token can start an object property
     /// Used for error recovery in object literals when commas are missing
     fn is_property_start(&self) -> bool {
@@ -7771,31 +7732,6 @@ impl ThinParserState {
             SyntaxKind::Identifier => true,
             // Bracket (computed property)
             SyntaxKind::OpenBracketToken => true,
-            _ => self.is_identifier_or_keyword(),
-        }
-    }
-
-    /// Check if current token can start an array element
-    /// Used for error recovery in array literals when commas are missing
-    fn is_array_element_start(&self) -> bool {
-        match self.token() {
-            // Spread operator
-            SyntaxKind::DotDotDotToken => true,
-            // Literals
-            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
-            | SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword | SyntaxKind::NullKeyword => true,
-            // Identifier
-            SyntaxKind::Identifier => true,
-            // This and super
-            SyntaxKind::ThisKeyword | SyntaxKind::SuperKeyword => true,
-            // Nested structures
-            SyntaxKind::OpenBracketToken => true,  // nested array
-            SyntaxKind::OpenBraceToken => true,     // object literal
-            SyntaxKind::OpenParenToken => true,     // parenthesized expression
-            // Unary operators
-            SyntaxKind::ExclamationToken | SyntaxKind::TildeToken | SyntaxKind::PlusToken
-            | SyntaxKind::MinusToken | SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken
-            | SyntaxKind::TypeOfKeyword | SyntaxKind::VoidKeyword | SyntaxKind::DeleteKeyword => true,
             _ => self.is_identifier_or_keyword(),
         }
     }
