@@ -272,12 +272,23 @@ fn merge_global_interface(&mut self, name: &str, new_interface: &Interface) {
 - **Phase:** Investigation (Phase 1)
 - **Last Updated:** 2026-01-15
 - **Ready to Start:** ✅ YES
-- **MERGED TO em-team-1:** 2026-01-15 (commit 5441ae2127d)
-- **Pushed to Origin:** ✅ YES
+- **MERGED TO em-team-1:** 2026-01-15 02:22 CST (commit ce37a772d82)
+- **Pushed to Origin:** ✅ YES (commit 7256d7ed06a..ce37a772d82)
 
 ---
 
-## Worker-3 Merge Summary
+## Worker-3 Merge Summary (January 15, 2026)
+
+### EM-1 Merge Details:
+**Merge Commit:** `ce37a772d82`
+**Branch:** worker-3 → em-team-1
+**Status:** ✅ Successfully merged and pushed to origin
+
+### Files Changed in Merge:
+- `wasm/src/thin_parser.rs` - Parser error recovery improvements
+- `wasm/differential-test/conformance-child.mjs` - Test runner improvements
+- `wasm/differential-test/process-pool-conformance.mjs` - Process pool enhancements
+- `wasm/differential-test/run-conformance.sh` - Test script updates
 
 ### Completed Tasks Merged:
 1. **Invert Solver Defaults** ✅
