@@ -27,22 +27,61 @@
 **Root Cause Found:**
 The Rust implementation had an "enhanced" ASI that checked `is_statement_start()` when there was a line break, but TypeScript's `canParseSemicolon()` does NOT have this extra check.
 
-TypeScript simply returns `true` if there's a preceding line break, period. This extra check was causing false-positive TS1005 errors on valid TypeScript code.
-
 **Changes Made:**
 - Simplified `can_parse_semicolon()` to match TypeScript exactly
-- Removed `is_statement_start()` check
-- Removed `CloseParenToken`/`CloseBracketToken` special cases
+- Removed `is_statement_start()` check and special cases
 - ASI now applies whenever `scanner.has_preceding_line_break()` is `true`
 - Fixed syntax error in `is_statement_start()` (malformed comment on `LessThanToken`)
 
 **Files Modified:**
 - `wasm/src/thin_parser.rs`: Simplified ASI logic (lines 538-568)
 
+---
+
+### Task 3: Fix Global Scope - Resolve TS2304 "Error Poisoning" ✅ COMPLETED
+**Completed:** 2025-01-14
+**Commit:** 284b8b10d
+
+**Root Cause Found:**
+In `bind_source_file_with_libs`, lib symbols were being merged AFTER binding the source file. This meant when the binder encountered global symbols like `console`, `Promise`, `Array`, etc., they didn't exist yet, causing TS2304 errors.
+
+**Fix Applied:**
+Swapped the order in `bind_source_file_with_libs`:
+1. Merge lib symbols FIRST (via `merge_lib_symbols`)
+2. THEN bind the source file
+
+This ensures global symbols from lib.d.ts are available during binding, preventing the "error poisoning" cascade where undefined globals cause downstream type errors to be suppressed.
+
+**Files Modified:**
+- `wasm/src/thin_binder.rs`: Fixed order in `bind_source_file_with_libs` (lines 698-702)
+
+---
+
+### Task 4: Invert Solver Defaults - Change TypeId::ANY to TypeId::UNKNOWN ✅ COMPLETED
+**Completed:** 2025-01-14
+**Commit:** 0fed63f73
+
+**Root Cause:**
+The solver was "optimistic" - when it encountered an unknown type or a resolution failure, it returned `TypeId::ANY`. This suppressed type errors downstream because:
+- `any` is compatible with everything
+- Invalid operations on `any` don't emit errors
+
+**P0 (Critical) Changes Applied:**
+1. Call signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3276-3277)
+2. Construct signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3312-3313)
+3. Type predicate missing annotation: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 3996-3997)
+4. Type predicate missing node: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 4001-4002)
+
+**Files Modified:**
+- `wasm/src/thin_checker.rs`: P0 function return defaults
+
 **Expected Impact:**
-- Significant reduction in TS1005 "semicolon expected" errors
-- Better compatibility with TypeScript's ASI behavior
-- Matches `src/compiler/parser.ts:canParseSemicolon()` implementation
+- Missing errors will decrease significantly
+- Extra errors will increase initially (this is correct behavior!)
+- Conformance may decrease temporarily, but correctness increases
+- Type errors are properly reported instead of being hidden behind `any`
+
+**Note:** This is a strategic change. Expect a regression in "exact match" percentage, but this is the correct path to correctness.
 
 ---
 
