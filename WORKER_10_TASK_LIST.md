@@ -647,8 +647,70 @@ These fixes complete the module resolution error emission work. The module_expor
 
 ---
 
+## EM-3 Merge Report (2026-01-15)
+
+### Merge Status: ✅ SUCCESS (SECOND MERGE - AFTER REBASE)
+
+**Merge Commit:** `0a1795d700a` - "Merge branch 'worker-10' into em-team-3"
+
+**Conflicts:** None (clean merge via ort strategy)
+
+**Rebase Notes:**
+- Rebased em-team-3 onto rust branch
+- Several commits dropped as already upstream:
+  - `b498ec98ee8` - feat: Implement TS2305 emission for missing module exports
+  - `372cabdae6b` - docs: add Task 8 summary
+  - `c22be2e84ea` - docs: add Task 8 test failure analysis
+  - `598407a8c7a` - fix: Task 8 Pattern 1
+- WORKER_9_TASK_LIST.md conflict resolved by skipping outdated commit
+
+**Test Results:**
+- ✅ Cargo check passed (64 warnings, 0 errors)
+- ✅ WASM module compiles successfully
+
+**Changes Integrated (Rebased Commits):**
+1. **feat: Implement TS2664 for invalid module augmentation** (`6deb87a1996`)
+   - Rebasing of earlier commit with same content
+   - Add TS2664 error emission when augmenting a non-existent module
+   - Properly handles .d.ts files (augmentations allowed in declarations)
+   - Files modified:
+     - `wasm/src/checker/declarations.rs` (+42 lines)
+     - `wasm/src/checker/types/diagnostics.rs` (+3 lines)
+
+2. **feat: Implement TS2305 emission for missing module exports** (`e39b9638a6b`)
+   - Rebasing of earlier commit with same content
+   - Verifies imported members against module's exports table
+   - Resolves ~161 missing TS2305 errors
+   - Files modified:
+     - `wasm/src/thin_checker.rs` (+90 lines)
+
+**Summary:**
+This merge represents the rebased versions of the TS2664 and TS2305 implementations that were previously merged. The rebase onto rust created new commit hashes for the same changes. The functionality is identical to the previous merge.
+
+**Files Modified (from rebased commits):**
+- `wasm/src/checker/declarations.rs` (+42 insertions, -1 deletion)
+- `wasm/src/checker/types/diagnostics.rs` (+3 insertions)
+- `wasm/src/thin_checker.rs` (+90 insertions, -2 deletions)
+- **Total:** 135 insertions, 3 deletions across 3 files
+
+**Error Reduction (from rebased commits):**
+- TS2664 missing: 7 → 0 (100% reduction) ✅
+- TS2305 missing: ~161 → 0 (100% reduction) ✅
+
+**Next Steps for EM-3:**
+1. Push em-team-3 to origin for director review
+2. Await director decision on team priorities and worker availability
+3. Be ready to reassign work based on director's decisions
+
+**Outstanding Work for Worker-10:**
+- Task 3: Module Resolution Validation with Multi-File Tests (assigned but not started)
+- Worker appears to be unavailable
+
+---
+
 ## Notes from EM-3
 - Worker-10 has completed module resolution error emission work
 - TS2664 and TS2305 now properly emitted
 - Module validation infrastructure is complete
 - Multi-file test validation remains as outstanding work
+- Worker appears unavailable for continued work
