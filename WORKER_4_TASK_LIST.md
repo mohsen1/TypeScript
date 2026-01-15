@@ -1,6 +1,145 @@
-# Worker-4 Task List
+# Worker 4 Task List
 
-## ✅ COMPLETED: Flow Recording (2026-01-15)
+Maintained by EM-1
+
+## 🔴 CURRENT TASK: TS2322 Literal Type Narrowing & Type Accuracy
+
+**Last Updated:** 2026-01-15
+**Status:** 🔄 ASSIGNED
+**Priority:** 🔴 CRITICAL
+**Impact:** HIGH - Core type accuracy improvements
+
+### Task Description
+
+Fix type mismatch (TS2322) and implicit any (TS7006) error accuracy by improving literal type narrowing, union type handling, and contextual typing. This is critical for achieving 80%+ exact match conformance.
+
+### Context
+
+From worker-11's Task 6 analysis:
+- **Missing TS2322:** 105 errors (primary issue: Abstract Constructor Assignability)
+- **Extra TS2322:** 548 errors (~0.5% false positive rate - acceptable)
+
+Key issue categories identified:
+1. **Await type resolution** - `unknown` vs `boolean` type mismatches
+2. **Literal type narrowing** - Fails in assignments and conditionals
+3. **Union type handling** - Incorrectly narrows or fails to narrow
+4. **Contextual typing** - Object literal property types not inferred correctly
+
+### Focus Areas
+
+#### 1. Literal Type Narrowing in Assignments
+**Problem:**
+```typescript
+let x: "hello" | "world" = "hello";
+if (Math.random() > 0.5) {
+    x = "world";
+}
+// x should be narrowed to "hello" | "world", not string
+```
+
+**Files:** `wasm/src/checker/control_flow.rs`, `wasm/src/checker/thin_checker.rs`
+
+#### 2. Union Type Handling with Literals
+**Problem:**
+```typescript
+function f(x: "a" | "b"): void {
+    if (x === "a") {
+        // x should be narrowed to "a" here
+    }
+}
+```
+
+**Files:** `wasm/src/checker/thin_checker.rs`, `wasm/src/solver/subtype.rs`
+
+#### 3. Contextual Typing for Object Literals
+**Problem:**
+```typescript
+type Foo = { method(x: string): void };
+const foo: Foo = {
+    method(x) { }  // x should be inferred as string
+};
+```
+
+**Files:** `wasm/src/checker/thin_checker.rs`
+
+#### 4. Shorthand Method Parameter Types
+**Related to worker-12's task:**
+```typescript
+type Method = {
+    method(...args: [type: string, cb: (e: string) => void]): void;
+};
+const obj: Method = {
+    method(type, cb) { }  // Error: Cannot find name 'type', 'cb'
+};
+```
+
+**Note:** This is primarily worker-12's task, but related work may help here.
+
+### Implementation Steps
+
+1. **Investigation Phase**
+   - Run 100-200 sample conformance tests focusing on TS2322 errors
+   - Categorize missing vs extra TS2322 by root cause
+   - Identify 3-5 high-frequency patterns to fix
+   - Document findings in `TS2322_LITERAL_NARROWING_ANALYSIS.md`
+
+2. **Implementation Phase**
+   - Fix literal type narrowing in control flow
+   - Improve union type handling in subtype checker
+   - Enhance contextual typing for object literals
+   - Add tests for each fix
+
+3. **Validation Phase**
+   - Run conformance tests after each fix
+   - Track TS2322 missing/extra counts
+   - Ensure no regressions in valid error detection
+
+### Success Criteria
+
+- [ ] Investigation complete with 3-5 patterns identified
+- [ ] At least 2 patterns fixed with code changes
+- [ ] Missing TS2322 reduced from 105 to <50
+- [ ] Extra TS2322 not increased significantly (<600)
+- [ ] Conformance tests show improvement
+- [ ] No regressions in valid error detection
+
+### Files to Modify
+
+- **Primary:** `wasm/src/checker/control_flow.rs`
+- **Primary:** `wasm/src/checker/thin_checker.rs`
+- **Maybe:** `wasm/src/solver/subtype.rs` (if union type issues)
+- **Tests:** `wasm/src/checker/control_flow_tests.rs` (add new tests)
+
+### Timeline
+
+- **Investigation:** 1 day
+- **Implementation:** 2-3 days
+- **Validation:** 1 day
+- **Total:** 3-5 days
+
+### Dependencies
+
+- None (can start immediately)
+- Coordinate with worker-3 on TS2564 Phase 2 (both use control_flow.rs)
+- Coordinate with worker-12 on shorthand method typing (related issues)
+
+### Expected Impact
+
+**Baseline:**
+- Missing TS2322: 105
+- Extra TS2322: 548
+- Exact match: ~44%
+
+**Target:**
+- Missing TS2322: <50 (52% reduction)
+- Extra TS2322: <600 (acceptable)
+- Exact match: ~50% (+6pp improvement)
+
+---
+
+## Completed Tasks
+
+### Flow Recording (2026-01-15) ✅
 - **Status:** Complete and merged to em-team-1
 - **Summary:** Fixed flow recording for statements and identifiers
 - **Test Results:** All 54/54 control_flow tests passing 🎉
@@ -8,295 +147,25 @@
   - a163cbed8c9 [wasm] binder: add flow recording for statements and identifiers
   - 4c2544eb316 [wasm] flow: fix literal type narrowing in assignments
 
----
-
-## ✅ COMPLETED: Application Expansion Tests (2026-01-15)
-- **Status:** ✅ MERGED into em-team-1 (commit f54e163d33f)
+### Application Expansion Tests (2026-01-15) ✅
+- **Status:** Complete and merged to em-team-1
 - **Summary:** Fixed all failing application expansion tests in the type solver
 - **Test Results:** All 34/34 application expansion tests passing 🎉
-- **Merge Details:**
-  - Merge commit: f54e163d33f "Merge worker-4 branch into em-team-1"
-  - Pushed to origin: em-team-1 branch
-  - Rebased successfully with remote changes
-  - No conflicts during merge
-
-## Changes Made:
-1. **Fixed test setup** (`evaluate_tests.rs`):
-   - Changed `env.insert()` to `env.insert_with_params()` to register type parameters
-   - Added `.clone()` when creating TypeParameter types to allow reuse
-
-2. **Added default type parameter support** (`instantiate.rs`):
-   - Modified `TypeSubstitution::from_args()` to handle default type parameters
-   - When fewer type arguments than parameters, defaults are now used
-
-## Tests Fixed:
-- test_application_ref_expansion_with_constraints
-- test_application_ref_expansion_with_defaults
-- test_application_ref_expansion_with_never_arg
-- test_application_ref_expansion_with_unknown_arg
-- test_application_ref_expansion_with_any_arg
-- test_application_ref_expansion_with_union_arg
-- test_application_ref_expansion_nested
-- test_application_ref_expansion_reducer_function
+- **Changes:**
+  - Fixed test setup in `evaluate_tests.rs`
+  - Added default type parameter support in `instantiate.rs`
 
 ---
 
-## 🎯 CRITICAL: Recursion Guards (Stack Overflow) 🔴
-**Priority:** CRITICAL (STABILITY)
-**Assigned:** 2026-01-15
-**Owner:** worker-4
-**Branch:** worker-4
+## Notes
 
-### Task Description
-Fix stack overflow crashes in the type checker by adding recursion depth counters. The recursiveTypes test currently causes 2 stack overflow crashes, blocking all validation work.
-
-### Problem Analysis
-- **Crashes:** 2 (stack overflow in type checker)
-- **Test:** `recursiveTypes` test file triggers crashes
-- **Impact:** HIGH - crashes block all conformance testing
-- **Root Cause:** Type checker doesn't limit recursion depth when checking recursive type definitions
-
-### Action Items
-
-#### Phase 1: Investigation
-- [ ] Read `wasm/specs/WASM_ARCHITECTURE.md` type checker section
-- [ ] Locate crash trigger: Run recursiveTypes test to reproduce stack overflow
-- [ ] Identify recursive code paths in type checker:
-  - Likely in `wasm/src/checker/thin_checker.rs` (type checking)
-  - Or `wasm/src/checker/solver.rs` (type solving)
-- [ ] Study how TypeScript handles recursion guards
-
-#### Phase 2: Implementation
-- [ ] Add recursion depth counter to relevant type checking functions
-- [ ] Implement depth limit (start with 100, adjust if needed)
-- [ ] Add graceful fallback when limit reached:
-  - Return `Any` type or `Unknown` type
-  - Or skip checking deeply nested types
-- [ ] Add diagnostic/warning when recursion limit hit (optional)
-
-#### Phase 3: Validation
-- [ ] Run recursiveTypes test - should complete without crash
-- [ ] Run `./wasm/test.sh` (Docker-only!)
-- [ ] Run conformance tests: `./wasm/differential-test/run-conformance.sh --all`
-- [ ] Verify zero crashes on all tests
-- [ ] Check that recursion guards don't break valid recursive types
-
-### Success Metrics
-- **Crashes:** Reduce from 2 to 0
-- **recursiveTypes test:** Completes without stack overflow
-- **Regressions:** No new errors introduced by depth limiting
-
-### Implementation Guidance
-
-**Where to Add Recursion Guards:**
-
-Look for recursive functions in type checker:
-
-```rust
-// Example pattern (actual code may vary)
-fn check_type_recursive(&mut self, type_id: TypeId) -> Type {
-    // Add depth check at start
-    if self.recursion_depth > MAX_RECURSION_DEPTH {
-        return self.any_type(); // Graceful fallback
-    }
-
-    self.recursion_depth += 1;
-    let result = self.check_type_recursive_impl(type_id);
-    self.recursion_depth -= 1;
-    result
-}
-```
-
-**Possible Locations:**
-- `wasm/src/solver/subtype.rs` - Subtype checking (already has depth counter!)
-- `wasm/src/solver/evaluate.rs` - Type evaluation
-- `wasm/src/checker/thin_checker.rs` - Type declaration checking
-
-**Depth Limit:**
-- Start with 100 (TypeScript uses similar values)
-- Adjust based on test results
-- Too low: Breaks valid deep types
-- Too high: Doesn't prevent crashes
-
-### Deliverables
-1. Code changes adding recursion depth counters
-2. Test showing recursiveTypes test passes without crash
-3. Conformance test report showing zero crashes
-4. Set `Ready for Merge: Yes` when complete
-
-### Status
-- **Flow Recording:** ✅ Complete
-- **Application Expansion:** ✅ Complete
-- **Recursion Guards:** ⚠️ REASSIGNED - See RECURSION_GUARDS_FINDINGS.md
-  - **Note:** Worker-3 investigated and verified recursion guards are already implemented
-  - Zero crashes in all test scenarios
-- **Ready for Merge:** ✅ YES - Merged to em-team-1 (commit e3feed998c5)
-- **Last Updated:** 2026-01-15
+- Work in: /tmp/orchestrator-workspace/worktrees/worker-4
+- Push to worker-4 branch when complete
+- Coordinate with worker-3 (both working on control flow)
+- Coordinate with worker-12 (shorthand method typing)
 
 ---
 
-## Worker-4 Merge Summary
+## Previous Task Note
 
-**Merge Commit:** `e3feed998c5` (pushed to origin/em-team-1)
-
-### Completed Tasks Merged:
-1. **Flow Recording** ✅
-   - Fixed flow recording for statements and identifiers
-   - All 54/54 control_flow tests passing
-   - Commits: a163cbed8c9, 4c2544eb316
-
-2. **Application Expansion Tests** ✅
-   - Fixed all 34/34 application expansion tests
-   - Added default type parameter support
-   - Fixed test setup with `insert_with_params()`
-
-### Code Changes:
-- `wasm/src/solver/evaluate_tests.rs` - Test improvements
-- `wasm/src/solver/instantiate.rs` - Default type parameter support
-
-### Reassigned:
-- **Recursion Guards** - Reassigned to worker-3 (investigation complete, already implemented)
-
----
-
-## 🎯 NEW ASSIGNMENT: Fix Class Property Initialization (TS2564) 🟠
-**Priority:** HIGH (Strategic - #1 missing error category)
-**Assigned:** 2026-01-15
-**Owner:** worker-4
-**Branch:** worker-4
-**Status:** 🔄 READY TO START
-
-### Task Description
-Implement the `strictPropertyInitialization` check in `wasm/src/checker/thin_checker.rs`. TS2564 ("Property 'x' has no initializer and is not definitely assigned in the constructor") is the #1 missing error category with 413 occurrences.
-
-### Problem Analysis
-From PROJECT_DIRECTION.md:
-- **Missing Errors:** 413 TS2564 errors
-- **Root Cause:** We are simply *not running* the check that verifies class properties are initialized in the constructor
-- **Impact:** HIGH - This is the single biggest missing error category
-
-### Action Items
-
-#### Phase 1: Investigation
-- [ ] Search for existing TS2564 implementation in `wasm/src/checker/thin_checker.rs`
-- [ ] Check if `strictPropertyInitialization` compiler option is respected
-- [ ] Find class declaration checking logic
-- [ ] Run conformance tests to get baseline:
-  ```bash
-  cd /tmp/orchestrator-workspace/worktrees/worker-4/wasm
-  ./differential-test/run-conformance.sh --all | grep TS2564
-  ```
-
-#### Phase 2: Implementation
-- [ ] Implement property initialization checking
-- [ ] Track definite assignment analysis in constructor
-- [ ] Emit TS2564 when property not initialized:
-  - No initializer in declaration
-  - Not definitely assigned in constructor
-  - No definite assignment assertion (!)
-- [ ] Handle edge cases:
-  - Property declarations with type annotations
-  - Properties initialized in constructor
-  - Properties declared with definite assignment assertion (!)
-  - Optional properties (?)
-
-#### Phase 3: Validation
-- [ ] Run `./wasm/test.sh` (Docker-only!)
-- [ ] Run conformance tests: `./wasm/differential-test/run-conformance.sh --all`
-- [ ] Verify TS2564 missing errors reduced from 413 to <20
-- [ ] Check for regressions in previously passing tests
-- [ ] Verify no false positives (errors that TypeScript doesn't report)
-
-### Success Metrics
-- **TS2564 Missing:** Reduce from 413 to <20 (95% reduction)
-- **Exact Match:** Increase conformance score
-- **No Regressions:** Don't break existing working tests
-
-### Implementation Guidance
-
-**Pattern to Implement:**
-
-```rust
-// In thin_checker.rs, class declaration checking:
-
-fn check_class_property(&mut self, property: &ClassElementDeclaration) {
-    // Check if strictPropertyInitialization is enabled
-    if !self.strict_property_initialization {
-        return;
-    }
-
-    // Check if property has initializer
-    if property.initializer.is_some() {
-        return; // Has initializer, OK
-    }
-
-    // Check if property is optional
-    if property.is_optional {
-        return; // Optional properties don't need initialization
-    }
-
-    // Check if property has definite assignment assertion
-    if property.has_definite_assignment_assertion {
-        return; // Property explicitly marked as definitely assigned
-    }
-
-    // Check if property is definitely assigned in constructor
-    if self.is_definitely_assigned_in_constructor(property.name) {
-        return; // Definitely assigned, OK
-    }
-
-    // Emit TS2564 error
-    self.error(Diagnostic {
-        code: TS2564,
-        message: format!("Property '{}' has no initializer and is not definitely assigned in the constructor", property.name),
-        span: property.span,
-    });
-}
-```
-
-**Key Files:**
-- `wasm/src/checker/thin_checker.rs` - Class declaration checking
-- Look for `check_class_declaration` function
-- Look for existing property checking logic
-
-**Definite Assignment Analysis:**
-- Track which properties are assigned in constructor body
-- Handle property assignments via `this.property = value`
-- Handle assignments in all constructor branches
-- Handle assignments in super() calls
-
-### Deliverables
-1. Implementation of `strictPropertyInitialization` check
-2. Conformance test report showing TS2564 reduction from 413 to <20
-3. Updated task list with "Complete" status
-4. Set `Ready for Merge: Yes` when complete
-
-### Status
-- **Previous Tasks:** ✅ Flow Recording, ✅ Application Expansion
-- **Current Task:** 🟠 TS2564 Class Property Initialization
-- **Ready to Start:** ✅ YES
-- **Last Updated:** 2026-01-15
-
----
-
-## Worker-4 Merge Summary (2026-01-15)
-
-**Merge Commit:** `083abfaff14` (pushed to origin/em-team-1)
-
-### Completed Tasks Previously Merged:
-1. **Flow Recording** ✅
-   - Fixed flow recording for statements and identifiers
-   - All 54/54 control_flow tests passing
-
-2. **Application Expansion Tests** ✅
-   - Fixed all 34/34 application expansion tests
-   - Added default type parameter support
-
-### This Merge:
-- Documentation update only
-- Updated task list with previous merge details
-- No code changes in this merge
-
-### Current Assignment:
-- **TS2564 Class Property Initialization** - READY TO START
-- Target: 413 missing errors → <20 (95% reduction)
+**Recursion Guards** - This task was previously assigned but investigation revealed it's already fully implemented in `wasm/src/solver/subtype.rs` with depth counter (MAX_DEPTH = 100) and TS2589 error emission. No crashes found in testing.
