@@ -7178,6 +7178,9 @@ impl<'a> ThinCheckerState<'a> {
         // Get the type of the callee
         let mut callee_type = self.get_type_of_node(call.expression);
 
+        // Special handling for super() calls - treat as construct call
+        let is_super_call = self.is_super_expression(call.expression);
+
         // Get arguments list (may be None for calls without arguments)
         // IMPORTANT: We must check arguments even if callee is ANY/ERROR to catch definite assignment errors
         let args = call
@@ -7293,6 +7296,10 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             CallResult::NotCallable { .. } => {
+                // Special case: super() calls are valid in constructors and return void
+                if is_super_call {
+                    return TypeId::VOID;
+                }
                 // Check if it's a class constructor called without 'new' (TS2348)
                 if self.is_class_constructor_type(callee_type) {
                     self.error_class_constructor_without_new_at(callee_type, call.expression);
