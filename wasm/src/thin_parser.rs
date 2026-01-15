@@ -415,33 +415,60 @@ impl ThinParserState {
     // =========================================================================
 
     /// Check if we're at a recoverable position where we can continue parsing
-    /// This helps suppress false-positive errors when the parser can reasonably recover
+    /// This helps suppress false-positive TS1005 errors when the parser can reasonably recover
+    ///
+    /// For TS1005 (token expected), we need to balance between:
+    /// 1. Suppressing errors when the parser can clearly continue (reduces extra errors)
+    /// 2. Emitting errors when the missing token is genuine (reduces missing errors)
     fn can_recover_from_error(&self) -> bool {
         // If we're at a binary operator, we can continue the expression
+        // This handles cases like `a +` where the next operand is missing but we're continuing
         if self.is_binary_operator() {
             return true;
         }
 
         // If we're at a comma, we can continue (likely in a list)
+        // This handles cases like `[1,` where the next element is missing but list continues
         if self.is_token(SyntaxKind::CommaToken) {
             return true;
         }
 
-        // If we're at a token that starts an expression, we can recover
-        if self.is_expression_start() {
-            return true;
-        }
-
-        // If we're at a statement delimiter, we can recover
-        if self.is_token(SyntaxKind::SemicolonToken)
-            || self.is_token(SyntaxKind::CloseBraceToken)
-            || self.is_token(SyntaxKind::CloseParenToken)
-            || self.is_token(SyntaxKind::CloseBracketToken)
+        // If we're at an open parenthesis/bracket/brace, we might be starting a new sub-expression
+        // This handles cases like `a + (` where we're starting a parenthesized expression
+        if self.is_token(SyntaxKind::OpenParenToken)
+            || self.is_token(SyntaxKind::OpenBracketToken)
+            || self.is_token(SyntaxKind::OpenBraceToken)
         {
             return true;
         }
 
-        false
+        // If we're at a token that clearly starts a new statement, we can recover
+        // This handles cases where the user has clearly moved on to the next statement
+        // But we need to be careful - only suppress for statement start, not expression start
+        if self.is_statement_start() {
+            return true;
+        }
+
+        // If we're at certain expression start tokens, we might be able to recover
+        // But be selective - only recover on tokens that clearly indicate a new expression
+        match self.token() {
+            // Literals and keywords that clearly start a new expression
+            SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::StringLiteral
+            | SyntaxKind::NoSubstitutionTemplateLiteral
+            | SyntaxKind::TemplateHead
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword
+            | SyntaxKind::ThisKeyword
+            | SyntaxKind::SuperKeyword
+            | SyntaxKind::AwaitKeyword
+            | SyntaxKind::YieldKeyword => true,
+            // Open angle bracket for type arguments or JSX
+            SyntaxKind::LessThanToken => true,
+            _ => false,
+        }
     }
 
     /// Error: Expression expected (TS1109)
@@ -687,32 +714,24 @@ impl ThinParserState {
     // =========================================================================
 
     /// Check if we're at a position where an expression can reasonably end
-    /// This is used to suppress spurious "expression expected" errors when
+    /// This is used to suppress spurious TS1109 "expression expected" errors when
     /// the user has clearly moved on to the next statement/context.
+    ///
+    /// For TS1109 (expression expected), we should only suppress if we've reached a closing
+    /// delimiter or EOF. We should NOT suppress on statement start keywords because if we're
+    /// expecting an expression and see `var`, `let`, `function`, etc., that's likely an error.
     fn is_at_expression_end(&self) -> bool {
         match self.token() {
-            // Tokens that naturally end expressions
+            // Only tokens that naturally end expressions and indicate we've moved on
             SyntaxKind::SemicolonToken
             | SyntaxKind::CloseBraceToken
             | SyntaxKind::CloseParenToken
             | SyntaxKind::CloseBracketToken
             | SyntaxKind::EndOfFileToken => true,
-            // Keywords that start a new statement (expression is clearly missing)
-            SyntaxKind::VarKeyword
-            | SyntaxKind::LetKeyword
-            | SyntaxKind::ConstKeyword
-            | SyntaxKind::FunctionKeyword
-            | SyntaxKind::ClassKeyword
-            | SyntaxKind::IfKeyword
-            | SyntaxKind::ForKeyword
-            | SyntaxKind::WhileKeyword
-            | SyntaxKind::DoKeyword
-            | SyntaxKind::SwitchKeyword
-            | SyntaxKind::TryKeyword
-            | SyntaxKind::WithKeyword
-            | SyntaxKind::ReturnKeyword
-            | SyntaxKind::BreakKeyword
-            | SyntaxKind::ContinueKeyword => true,
+            // NOTE: We do NOT suppress on statement start keywords
+            // If we're expecting an expression and see `var`, `let`, `function`, etc.,
+            // that's likely a genuine error where the user forgot the expression.
+            // This fixes the "missing TS1109" issue where errors were being suppressed too aggressively.
             _ => false,
         }
     }
@@ -828,7 +847,9 @@ impl ThinParserState {
         }
 
         // Skip tokens until we find a synchronization point
-        let mut depth = 0u32;
+        let mut brace_depth = 0u32;
+        let mut paren_depth = 0u32;
+        let mut bracket_depth = 0u32;
         let max_iterations = 1000; // Prevent infinite loops
 
         for _ in 0..max_iterations {
@@ -837,16 +858,16 @@ impl ThinParserState {
                 break;
             }
 
-            // Track brace depth to handle nested blocks
+            // Track nesting depth to handle nested structures
             match self.token() {
                 SyntaxKind::OpenBraceToken => {
-                    depth += 1;
+                    brace_depth += 1;
                     self.next_token();
                     continue;
                 }
                 SyntaxKind::CloseBraceToken => {
-                    if depth > 0 {
-                        depth -= 1;
+                    if brace_depth > 0 {
+                        brace_depth -= 1;
                         self.next_token();
                         continue;
                     }
@@ -854,8 +875,42 @@ impl ThinParserState {
                     self.next_token();
                     break;
                 }
+                SyntaxKind::OpenParenToken => {
+                    paren_depth += 1;
+                    self.next_token();
+                    continue;
+                }
+                SyntaxKind::CloseParenToken => {
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                        self.next_token();
+                        continue;
+                    }
+                    // Found closing paren at same level - could be end of expression
+                    // Skip it and check if next token is a statement start
+                    self.next_token();
+                    if self.is_statement_start() {
+                        break;
+                    }
+                    continue;
+                }
+                SyntaxKind::OpenBracketToken => {
+                    bracket_depth += 1;
+                    self.next_token();
+                    continue;
+                }
+                SyntaxKind::CloseBracketToken => {
+                    if bracket_depth > 0 {
+                        bracket_depth -= 1;
+                        self.next_token();
+                        continue;
+                    }
+                    // Found closing bracket at same level - skip it
+                    self.next_token();
+                    continue;
+                }
                 SyntaxKind::SemicolonToken => {
-                    // Semicolon is always a sync point
+                    // Semicolon is always a sync point (even in nested contexts)
                     self.next_token();
                     break;
                 }
@@ -863,11 +918,11 @@ impl ThinParserState {
             }
 
             // If we're at depth 0 and found a statement start, we've resync'd
-            if depth == 0 && self.is_statement_start() {
+            if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 && self.is_statement_start() {
                 break;
             }
 
-            // Otherwise, keep skipping tokens
+            // Keep skipping tokens
             self.next_token();
         }
     }
@@ -1384,7 +1439,16 @@ impl ThinParserState {
                     self.parse_expression_statement()
                 }
             }
-            _ => self.parse_expression_statement(),
+            _ => {
+                // Check for labeled statement with keyword as label (e.g., await: if (...))
+                // TypeScript/JavaScript allow reserved keywords as labels
+                // This enables: await: ..., arguments: ..., eval: ..., etc.
+                if self.is_identifier_or_keyword() && self.look_ahead_is_labeled_statement() {
+                    self.parse_labeled_statement()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
         }
     }
 
@@ -2829,6 +2893,27 @@ impl ThinParserState {
                         expression: expr,
                         name_or_argument: name,
                         question_dot_token: false,
+                    },
+                );
+            } else if self.is_token(SyntaxKind::QuestionDotToken) {
+                // Optional chaining in heritage clause: A?.B
+                // TypeScript allows optional chaining in extends/implements clauses
+                self.next_token();
+                let name = if self.is_identifier_or_keyword() {
+                    self.parse_identifier_name()
+                } else {
+                    self.parse_identifier()
+                };
+
+                let end_pos = self.token_end();
+                expr = self.arena.add_access_expr(
+                    syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::AccessExprData {
+                        expression: expr,
+                        name_or_argument: name,
+                        question_dot_token: true,
                     },
                 );
             } else if self.is_token(SyntaxKind::LessThanToken) {
