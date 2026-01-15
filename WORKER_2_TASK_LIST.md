@@ -109,11 +109,40 @@ This task should be marked as complete. No further action needed for TS2304 glob
 
 **Status:** AWAITING ASSIGNMENT
 
-The following high-priority tasks are available in the project:
+### Investigation Notes:
 
-1. **Parser Noise (TS1005 & TS1109)** - P1 - 701 combined extra errors
-2. **Class Property Initialization (TS2564)** - P4 - 413 missing errors
-3. **Solver Strictness Improvements** - P3 - 2961 missing errors
+**Parser Noise (TS1005 & TS1109) Task Status:**
+
+**Status:** ✅ ALREADY COMPLETED by Worker-5
+
+Investigation (2026-01-15) revealed that the Parser Noise task has been **fully completed** by Worker-5 (EM-2 team). The improvements have been merged to the rust branch.
+
+**Worker-5 Results:**
+- **Goal:** Reduce 701 combined extra errors to <40 (94% reduction)
+- **Achieved:** ~29 errors (96% reduction) ✅ GOAL EXCEEDED
+- **TS1005:** 97% reduction (439 → ~13 errors)
+- **TS1109:** 94% reduction (262 → ~16 errors)
+
+**Merged Commits:**
+- `b690646d692 Merge worker-5: Parser noise reduction - Goal achieved`
+- `76aaec21bdc feat(parser): advanced error suppression mechanisms`
+- `8db5e2f82ff docs: mark Parser Noise Fix task as complete`
+
+**Improvements Implemented:**
+1. ASI (Automatic Semicolon Insertion) for restricted productions
+2. Error budget system (reduced from 10 to 2/3 errors per statement)
+3. Expression boundary detection (`is_at_expression_end()`)
+4. Object/array literal recovery
+5. Enhanced statement-level error recovery
+
+**Documentation:** See `WORKER_5_PARSER_IMPROVEMENTS.md` for full details.
+
+---
+
+### Remaining High-Priority Tasks:
+
+1. **Class Property Initialization (TS2564)** - P4 - 413 missing errors
+2. **Solver Strictness Improvements** - P3 - 2961 missing errors
 
 Awaiting EM-1 direction on which task to assign next.
 
