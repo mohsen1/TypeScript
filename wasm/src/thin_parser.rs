@@ -8323,6 +8323,14 @@ impl ThinParserState {
                 // Computed property name: { [expr]: value }
                 let start_pos = self.token_pos();
                 self.next_token();
+
+                // TS1109: await in computed property name is invalid when in async context
+                // { [await]: foo } should report "Expression expected"
+                if self.in_async_context() && self.is_token(SyntaxKind::AwaitKeyword) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_expression_expected();
+                }
+
                 let expression = self.parse_expression();
                 self.parse_expected(SyntaxKind::CloseBracketToken);
                 let end_pos = self.token_end();
