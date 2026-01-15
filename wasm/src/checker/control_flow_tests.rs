@@ -704,7 +704,7 @@ x;
 
     let flow_after = binder.get_node_flow(ident_after).expect("flow after");
     let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
-    assert_eq!(narrowed_after, TypeId::STRING);
+    assert_eq!(narrowed_after, types.literal_string("hi"));
 }
 
 #[test]
@@ -754,7 +754,7 @@ class Foo {
 
     let flow_after = binder.get_node_flow(ident_after).expect("flow after");
     let narrowed_after = analyzer.get_flow_type(ident_after, union, flow_after);
-    assert_eq!(narrowed_after, TypeId::STRING);
+    assert_eq!(narrowed_after, types.literal_string("s"));
 }
 
 #[test]
@@ -1263,7 +1263,7 @@ const callback = () => {
 
     // Verify the type narrowing works correctly
     let narrowed_in_closure = analyzer.get_flow_type(ident_in_closure, union, flow_in_closure.unwrap());
-    assert_eq!(narrowed_in_closure, TypeId::STRING);
+    assert_eq!(narrowed_in_closure, types.literal_string("assigned"));
 }
 
 /// Test definite assignment analysis with callbacks that are immediately invoked.
@@ -1373,7 +1373,7 @@ arr.forEach((item) => {
     assert!(flow_in_callback.is_some(), "Flow should be recorded for variable inside forEach callback");
 
     let narrowed_in_callback = analyzer.get_flow_type(x_ref_in_closure, union, flow_in_callback.unwrap());
-    assert_eq!(narrowed_in_callback, TypeId::STRING);
+    assert_eq!(narrowed_in_callback, types.literal_string("hello"));
 }
 
 /// Test variable capture with map callback.
@@ -1452,7 +1452,7 @@ const mapped = arr.map((item) => {
     assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside map callback");
 
     let narrowed_in_callback = analyzer.get_flow_type(x_identifier, union, flow_in_callback.unwrap());
-    assert_eq!(narrowed_in_callback, TypeId::STRING);
+    assert_eq!(narrowed_in_callback, types.literal_string("world"));
 }
 
 /// Test nested closure capture (closure inside a closure).
@@ -1542,7 +1542,7 @@ const outer = () => {
     assert!(flow_in_nested.is_some(), "Flow should be recorded for variable inside nested closure");
 
     let narrowed_in_nested = analyzer.get_flow_type(x_ref_in_inner, union, flow_in_nested.unwrap());
-    assert_eq!(narrowed_in_nested, TypeId::STRING);
+    assert_eq!(narrowed_in_nested, types.literal_string("nested"));
 }
 
 /// Test callback used with setTimeout (common async pattern).
@@ -1611,7 +1611,7 @@ setTimeout(() => {
     assert!(flow_in_callback.is_some(), "Flow should be recorded for variable inside setTimeout callback");
 
     let narrowed_in_callback = analyzer.get_flow_type(x_ref, union, flow_in_callback.unwrap());
-    assert_eq!(narrowed_in_callback, TypeId::STRING);
+    assert_eq!(narrowed_in_callback, types.literal_string("timeout"));
 }
 
 /// Test that flow analysis correctly handles multiple closures capturing
@@ -1700,12 +1700,12 @@ const callback2 = () => {
 
     let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
-    // First callback should see x as string
+    // First callback should see x as literal "first"
     let flow1 = binder.get_node_flow(x_ref1).expect("flow for callback1");
     let narrowed1 = analyzer.get_flow_type(x_ref1, union, flow1);
-    assert_eq!(narrowed1, TypeId::STRING);
+    assert_eq!(narrowed1, types.literal_string("first"));
 
-    // Second callback should see x as number
+    // Second callback should see x as literal 42
     let flow2 = binder.get_node_flow(x_ref2).expect("flow for callback2");
     let narrowed2 = analyzer.get_flow_type(x_ref2, union, flow2);
     assert_eq!(narrowed2, types.literal_number(42.0));
@@ -1908,7 +1908,7 @@ const filtered = arr.filter((item) => {
     assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside filter callback");
 
     let narrowed_in_callback = analyzer.get_flow_type(x_identifier, union, flow_in_callback.unwrap());
-    assert_eq!(narrowed_in_callback, TypeId::STRING);
+    assert_eq!(narrowed_in_callback, types.literal_string("filter"));
 }
 
 // ============================================================================
