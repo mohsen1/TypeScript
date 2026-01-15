@@ -4,8 +4,10 @@
 //! This module separates declaration checking logic from the monolithic ThinCheckerState.
 
 use super::context::CheckerContext;
+use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
 use crate::parser::NodeIndex;
 use crate::parser::syntax_kind_ext;
+use crate::scanner::SyntaxKind;
 
 /// Declaration type checker that operates on the shared context.
 ///
@@ -104,14 +106,128 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
     }
 
     /// Check a class declaration.
-    pub fn check_class_declaration(&mut self, _class_idx: NodeIndex) {
-        // Class declaration checking is handled by ThinCheckerState for now
-        // Will be migrated incrementally
-        // Key checks:
+    pub fn check_class_declaration(&mut self, class_idx: NodeIndex) {
+        let Some(node) = self.ctx.arena.get(class_idx) else {
+            return;
+        };
+
+        // Get the class data
+        let Some(class_decl) = self.ctx.arena.get_class(node) else {
+            return;
+        };
+
+        // Skip ambient classes (declare keyword)
+        if self
+            .ctx
+            .has_modifier(&class_decl.modifiers, SyntaxKind::DeclareKeyword as u16)
+        {
+            return;
+        }
+
+        // Check property initialization if strictPropertyInitialization is enabled
+        if self.ctx.strict_property_initialization {
+            self.check_property_initialization(class_idx, class_decl);
+        }
+
+        // Additional class checks will be added here:
         // - Heritage clauses (extends/implements)
         // - Member types and modifiers
         // - Abstract implementation requirements
         // - Constructor parameter properties
+    }
+
+    /// Check property initialization for TS2564.
+    ///
+    /// Reports errors for class properties that:
+    /// - Don't have initializers
+    /// - Don't have definite assignment assertions (!)
+    /// - Are not assigned in all constructor code paths
+    fn check_property_initialization(
+        &mut self,
+        _class_idx: NodeIndex,
+        class_decl: &crate::parser::thin_node::ClassData,
+    ) {
+        // Iterate over class members
+        for &member_idx in &class_decl.members.nodes {
+            let Some(member_node) = self.ctx.arena.get(member_idx) else {
+                continue;
+            };
+
+            // Only check PropertyDeclaration nodes
+            if member_node.kind != syntax_kind_ext::PROPERTY_DECLARATION {
+                continue;
+            }
+
+            let Some(prop) = self.ctx.arena.get_property_decl(member_node) else {
+                continue;
+            };
+
+            // Skip if property has definite assignment assertion (!)
+            if prop.exclamation_token {
+                continue;
+            }
+
+            // Skip if property has an initializer
+            if !prop.initializer.is_none() {
+                continue;
+            }
+
+            // Skip static properties
+            if self
+                .ctx
+                .has_modifier(&prop.modifiers, SyntaxKind::StaticKeyword as u16)
+            {
+                continue;
+            }
+
+            // Skip abstract properties
+            if self
+                .ctx
+                .has_modifier(&prop.modifiers, SyntaxKind::AbstractKeyword as u16)
+            {
+                continue;
+            }
+
+            // Skip ambient properties (declare keyword)
+            if self
+                .ctx
+                .has_modifier(&prop.modifiers, SyntaxKind::DeclareKeyword as u16)
+            {
+                continue;
+            }
+
+            // Get property name for error message
+            let prop_name = self.get_property_name(prop.name);
+
+            // Report TS2564 error
+            // TODO: Add control flow analysis to check if property is initialized in constructor
+            // For now, we report on all properties without initializers
+            let message =
+                diagnostic_messages::PROPERTY_HAS_NO_INITIALIZER.replace("{0}", &prop_name);
+
+            // Get the span for the property name
+            if let Some((pos, end)) = self.ctx.get_node_span(prop.name) {
+                self.ctx.error(
+                    pos,
+                    end - pos,
+                    message,
+                    diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER,
+                );
+            }
+        }
+    }
+
+    /// Get the name of a property as a string.
+    fn get_property_name(&self, name_idx: NodeIndex) -> String {
+        if let Some(name_node) = self.ctx.arena.get(name_idx) {
+            if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                return ident.escaped_text.clone();
+            }
+            // Handle computed properties and private identifiers
+            "[computed]".to_string()
+        } else {
+            "[unknown]".to_string()
+        }
     }
 
     /// Check an interface declaration.
@@ -244,6 +360,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::checker::types::diagnostics::diagnostic_codes;
     use crate::solver::TypeInterner;
     use crate::thin_binder::ThinBinderState;
     use crate::thin_parser::ThinParserState;
@@ -268,6 +385,208 @@ mod tests {
                     let mut checker = DeclarationChecker::new(&mut ctx);
                     checker.check(stmt_idx);
                     // Test passes if no panic
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_property_without_initializer() {
+        // Test that TS2564 is reported for properties without initializers
+        let source = r#"
+class Foo {
+    x: number;  // Should report TS2564
+    y: string = "hello";  // Should NOT report (has initializer)
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        // Get the class declaration
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have one TS2564 error for property 'x'
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        1,
+                        "Expected 1 TS2564 error, got {}",
+                        ts2564_errors.len()
+                    );
+
+                    // Verify the error message contains 'x'
+                    if let Some(err) = ts2564_errors.first() {
+                        assert!(
+                            err.message_text.contains("x"),
+                            "Error message should contain 'x', got: {}",
+                            err.message_text
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_with_definite_assignment_assertion() {
+        // Test that TS2564 is NOT reported for properties with definite assignment assertion (!)
+        let source = r#"
+class Foo {
+    x!: number;  // Should NOT report (has definite assignment assertion)
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        // Get the class declaration
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have NO TS2564 errors
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        0,
+                        "Expected 0 TS2564 errors, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_skips_static_properties() {
+        // Test that TS2564 is NOT reported for static properties
+        let source = r#"
+class Foo {
+    static x: number;  // Should NOT report (static property)
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            true, // strict = true
+        );
+
+        // Get the class declaration
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have NO TS2564 errors
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        0,
+                        "Expected 0 TS2564 errors, got {}",
+                        ts2564_errors.len()
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_ts2564_disabled_when_strict_false() {
+        // Test that TS2564 is NOT reported when strict mode is disabled
+        let source = r#"
+class Foo {
+    x: number;  // Should NOT report (strict mode disabled)
+}
+"#;
+        let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+        let root = parser.parse_source_file();
+
+        let mut binder = ThinBinderState::new();
+        binder.bind_source_file(parser.get_arena(), root);
+
+        let types = TypeInterner::new();
+        let mut ctx = CheckerContext::new(
+            parser.get_arena(),
+            &binder,
+            &types,
+            "test.ts".to_string(),
+            false, // strict = false
+        );
+
+        // Get the class declaration
+        if let Some(root_node) = parser.get_arena().get(root) {
+            if let Some(sf_data) = parser.get_arena().get_source_file(root_node) {
+                if let Some(&stmt_idx) = sf_data.statements.nodes.first() {
+                    let mut checker = DeclarationChecker::new(&mut ctx);
+                    checker.check(stmt_idx);
+
+                    // Should have NO TS2564 errors (strict mode disabled)
+                    let ts2564_errors: Vec<_> = ctx
+                        .diagnostics
+                        .iter()
+                        .filter(|d| d.code == diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER)
+                        .collect();
+
+                    assert_eq!(
+                        ts2564_errors.len(),
+                        0,
+                        "Expected 0 TS2564 errors when strict mode disabled, got {}",
+                        ts2564_errors.len()
+                    );
                 }
             }
         }
