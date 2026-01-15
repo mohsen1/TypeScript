@@ -3277,7 +3277,8 @@ impl<'a> ThinCheckerState<'a> {
                             (self.get_type_of_node(sig.type_annotation), None)
                         }
                     } else {
-                        (TypeId::ANY, None)
+                        // Return UNKNOWN instead of ANY for missing return type annotation
+                        (TypeId::UNKNOWN, None)
                     };
 
                     call_signatures.push(SolverCallSignature {
@@ -3308,7 +3309,8 @@ impl<'a> ThinCheckerState<'a> {
                             (self.get_type_of_node(sig.type_annotation), None)
                         }
                     } else {
-                        (TypeId::ANY, None)
+                        // Return UNKNOWN instead of ANY for missing return type annotation
+                        (TypeId::UNKNOWN, None)
                     };
 
                     construct_signatures.push(SolverCallSignature {
@@ -3991,11 +3993,13 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypePredicate;
 
         if type_annotation.is_none() {
-            return (TypeId::ANY, None);
+            // Return UNKNOWN instead of ANY for missing type annotation
+            return (TypeId::UNKNOWN, None);
         }
 
         let Some(node) = self.ctx.arena.get(type_annotation) else {
-            return (TypeId::ANY, None);
+            // Return UNKNOWN instead of ANY for missing node
+            return (TypeId::UNKNOWN, None);
         };
 
         if node.kind != syntax_kind_ext::TYPE_PREDICATE {
