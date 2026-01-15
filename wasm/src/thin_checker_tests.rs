@@ -15073,6 +15073,14 @@ var CC: typeof C = B;
     let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
     let not_assignable_count = codes.iter().filter(|&&code| code == 2322).count();
 
+    // Debug: print all diagnostics
+    eprintln!("=== Abstract to Concrete Constructor Diagnostics ===");
+    eprintln!("Total diagnostics: {}", checker.ctx.diagnostics.len());
+    for diag in &checker.ctx.diagnostics {
+        eprintln!("[{}] Code {}: {}", diag.start, diag.code, diag.message_text);
+    }
+    eprintln!("Abstract constructor types in context: {:?}", checker.ctx.abstract_constructor_types);
+
     // Should have 2 TS2322 errors:
     // - Line 8: typeof B (abstract) to typeof A (concrete)
     // - Line 14: typeof B (abstract) to typeof C (concrete)
