@@ -67,7 +67,7 @@ function chunkArray(array, chunks) {
   return result;
 }
 
-async function runChildProcess(testFiles, workerId, wasmPkgPath, conformanceDir) {
+async function runChildProcess(testFiles, workerId, wasmPkgPath, conformanceDir, onProgress) {
   return new Promise((resolve, reject) => {
     // Write test files to a temp file for the child process
     const tempFile = `/tmp/conformance-tests-${workerId}-${Date.now()}.json`;
@@ -81,7 +81,7 @@ async function runChildProcess(testFiles, workerId, wasmPkgPath, conformanceDir)
     let stderr = '';
 
     child.stdout.on('data', (data) => {
-      // Progress updates come via stdout
+      // Ignore stdout (children use IPC for progress)
     });
 
     child.stderr.on('data', (data) => {
@@ -93,6 +93,8 @@ async function runChildProcess(testFiles, workerId, wasmPkgPath, conformanceDir)
         results = msg.results;
       } else if (msg.type === 'error') {
         reject(new Error(msg.error));
+      } else if (msg.type === 'progress' && onProgress) {
+        onProgress(msg.completed, msg.total);
       }
     });
 
@@ -141,8 +143,16 @@ async function main() {
   log(`\nRunning tests in parallel (child processes)...`, colors.cyan);
   const startTime = Date.now();
 
-  // Start progress tracking
+  // Track progress from all workers
+  const workerProgress = new Array(chunks.length).fill(0);
   let completedCount = 0;
+
+  const updateProgress = (workerId, workerCompleted, workerTotal) => {
+    const oldWorkerProgress = workerProgress[workerId];
+    workerProgress[workerId] = workerCompleted;
+    completedCount += (workerCompleted - oldWorkerProgress);
+  };
+
   const progressInterval = setInterval(() => {
     process.stdout.write(`\r  Progress: ${completedCount}/${testFiles.length} (${((completedCount / testFiles.length) * 100).toFixed(1)}%)`);
   }, 500);
@@ -150,7 +160,9 @@ async function main() {
   try {
     // Run all child processes in parallel
     const childPromises = chunks.map((chunk, i) =>
-      runChildProcess(chunk, i, CONFIG.wasmPkgPath, CONFIG.conformanceDir)
+      runChildProcess(chunk, i, CONFIG.wasmPkgPath, CONFIG.conformanceDir, (completed, total) => {
+        updateProgress(i, completed, total);
+      })
     );
     const childResults = await Promise.all(childPromises);
 
