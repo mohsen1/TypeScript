@@ -908,10 +908,13 @@ fn test_recursion_depth_limit_provisional_subtyping() {
 
     let deep_string = nest_array(&interner, TypeId::STRING, 120);
     let deep_number = nest_array(&interner, TypeId::NUMBER, 120);
+    // Deep recursion returns False (not assignable) for type safety
+    // depth_exceeded flag is set for TS2589 diagnostic emission
     assert!(matches!(
         checker.check_subtype(deep_string, deep_number),
-        SubtypeResult::Provisional
+        SubtypeResult::False
     ));
+    assert!(checker.depth_exceeded);
 }
 
 #[test]
