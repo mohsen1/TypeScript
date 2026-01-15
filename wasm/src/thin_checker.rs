@@ -6922,7 +6922,8 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::NUMBER;
         }
 
-        TypeId::ANY
+        // Return UNKNOWN instead of ANY for unknown binary operand types
+        TypeId::UNKNOWN
     }
 
     /// Get type of binary expression.
@@ -6935,7 +6936,8 @@ impl<'a> ThinCheckerState<'a> {
 
         while let Some((node_idx, visited)) = stack.pop() {
             let Some(node) = self.ctx.arena.get(node_idx) else {
-                type_stack.push(TypeId::ANY);
+                // Return UNKNOWN instead of ANY when node cannot be found
+                type_stack.push(TypeId::UNKNOWN);
                 continue;
             };
 
@@ -6945,7 +6947,8 @@ impl<'a> ThinCheckerState<'a> {
             }
 
             let Some(binary) = self.ctx.arena.get_binary_expr(node) else {
-                type_stack.push(TypeId::ANY);
+                // Return UNKNOWN instead of ANY when binary expression cannot be extracted
+                type_stack.push(TypeId::UNKNOWN);
                 continue;
             };
 
@@ -6972,8 +6975,9 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             }
 
-            let right_type = type_stack.pop().unwrap_or(TypeId::ANY);
-            let left_type = type_stack.pop().unwrap_or(TypeId::ANY);
+            // Return UNKNOWN instead of ANY when type_stack is empty
+            let right_type = type_stack.pop().unwrap_or(TypeId::UNKNOWN);
+            let left_type = type_stack.pop().unwrap_or(TypeId::UNKNOWN);
             if op_kind == SyntaxKind::CommaToken as u16 {
                 if self.is_side_effect_free(left_idx)
                     && !self.is_indirect_call(node_idx, left_idx, right_idx)
