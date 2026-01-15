@@ -33,7 +33,7 @@ echo "======================================"
 if [ "$REBUILD" = true ] || ! docker image inspect "$IMAGE_NAME" &>/dev/null; then
     echo "Building Docker image..."
     docker build -t "$IMAGE_NAME" -f - "$SCRIPT_DIR" << 'EOF'
-FROM node:20-alpine
+FROM node:22
 RUN npm install -g typescript
 WORKDIR /app
 EOF

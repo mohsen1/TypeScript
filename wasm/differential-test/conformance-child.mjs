@@ -232,11 +232,14 @@ async function main() {
   for (let i = 0; i < testFiles.length; i++) {
     const result = await processTest(testFiles[i]);
     results.push(result);
-    // Report progress via stdout
-    if (i % 50 === 0) {
-      console.log(`Progress: ${i + 1}/${testFiles.length}`);
+    // Report progress via IPC every 10 tests
+    if ((i + 1) % 10 === 0) {
+      process.send({ type: 'progress', completed: i + 1, total: testFiles.length });
     }
   }
+
+  // Send final progress update
+  process.send({ type: 'progress', completed: testFiles.length, total: testFiles.length });
 
   // Send results back to parent
   process.send({ type: 'done', results });
