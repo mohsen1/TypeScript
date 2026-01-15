@@ -4,30 +4,99 @@ Maintained by EM-3
 
 ## Active Task
 
-### Task 5: Investigate remaining 94 TS2322 missing errors (post-fix)
-- [ ] Extract specific test cases with missing TS2322 errors from conformance results
-- [ ] Categorize the 94 cases by root cause (solver strictness, CFA, symbol resolution, etc.)
-- [ ] Identify patterns in the remaining missing errors
-- [ ] Check if any are caused by solver bailouts in complex scenarios (Task 2 finding #2)
-- [ ] Verify if any are related to Control Flow Analysis gaps (TS2454/TS2564)
-- [ ] Create detailed analysis of each category with code locations
-- [ ] Develop targeted fix strategies for each category
+### Task 6: Fix TS2322 Type Accuracy - Balance Missing (105) and Extra (548)
 
-**Goal:** Understand why 94 TS2322 errors are still missing after diagnostic suppression fix
+**Priority:** 🔴 CRITICAL (653 total errors: 105 missing + 548 extra)
 
-**Context:**
-- Task 4 reduced TS2322 missing from ~310 to 94 (70% improvement)
-- Remaining 94 cases are NOT related to ERROR type suppression
-- Need to identify what other factors are causing these gaps
+**Problem:**
+TS2322 type errors have significant accuracy issues:
+- **105 missing:** Type incompatibilities not detected
+- **548 extra:** False positives on valid code
+- This indicates type checking is both too permissive and too strict in different areas
 
-**Expected Impact:**
-- Further reduce missing TS2322 errors
-- Improve exact match conformance toward 45% target
-- Address solver strictness and CFA gaps
+**Root Causes (from Task 2 & 3 analysis):**
 
-**Priority:** 1 (High - continues conformance improvement work)
+1. **Missing Errors (105):**
+   - Solver bails out on complex types (generics, conditional types, mapped types)
+   - Control Flow Analysis gaps (not tracking definite assignments)
+   - Type parameter defaults (still using ANY in some places)
+   - Intersection type handling
+   - Union type compatibility checks
+
+2. **Extra Errors (548):**
+   - Over-strict type narrowing
+   - Incorrect generic constraint checking
+   - Discriminated union type failures
+   - Type predicate issues
+   - Literal type widening
+
+**Action Items:**
+
+1. **Analyze the 105 Missing TS2322 Errors**
+   - Extract failing test cases from conformance results
+   - Categorize by root cause:
+     - Generic type resolution failures
+     - Conditional type evaluation
+     - Mapped type handling
+     - Union/intersection compatibility
+     - CFA-related (properties not known to be assigned)
+   - Use `wasm/differential-test/find-missing-ts2322.mjs` to get samples
+
+2. **Analyze the 548 Extra TS2322 Errors**
+   - Extract false positive test cases
+   - Categorize by pattern:
+     - Type narrowing too aggressive
+     - Generic constraints over-checked
+     - Literal types not widening when they should
+     - Discriminant property checks failing
+     - Method signature compatibility
+
+3. **Fix Missing Errors (Priority P0)**
+   - Fix solver bailouts on complex types
+   - Add CFA tracking for:
+     - Property assignments in all code paths
+     - Variable declarations in closures
+     - Array/object destructuring
+   - Remove remaining ANY defaults
+   - Improve intersection/union type checking
+
+4. **Fix Extra Errors (Priority P1)**
+   - Refine type narrowing logic
+   - Fix generic constraint checking
+   - Properly handle literal type widening
+   - Fix discriminant union type checking
+   - Improve method signature compatibility
+
+5. **Testing**
+   - Run `wasm/differential-test/find-extra-ts2322.mjs`
+   - Run `wasm/differential-test/find-missing-ts2322.mjs`
+   - Target: Reduce both to <100 each
+   - Verify no regressions in passing tests
+
+**Success Criteria:**
+- Reduce Missing TS2322 from 105 to <30
+- Reduce Extra TS2322 from 548 to <100
+- Net improvement: 653 → 130 errors (80% reduction)
+- Overall type parity: 28% → 45%+
+
+**Files to Work On:**
+- `wasm/src/solver/` - Type resolution and subtyping
+- `wasm/src/checker/control_flow.rs` - Definite assignment analysis
+- `wasm/src/thin_checker.rs` - Type checking logic
+- `wasm/src/checker/narrowing.rs` - Type narrowing (if exists)
+
+**Related Work:**
+- Builds on Tasks 2 (solver investigation)
+- Builds on Tasks 3 (diagnostic audit)
+- Builds on Tasks 4 (ERROR type fix)
+- Coordinates with Worker 9 (solver defaults changes)
 
 **Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --all` after changes
+- Focus on `types/*` test category
+- Use TS2322 finder scripts to measure improvement
 
 ## Merged to rust
 ✅ **All completed tasks have been merged to origin/rust branch** (2024-01-14)
