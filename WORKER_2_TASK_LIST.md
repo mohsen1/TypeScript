@@ -232,12 +232,50 @@ Investigation (2026-01-15) revealed that the Parser Noise task has been **fully 
 
 ---
 
-### Remaining High-Priority Tasks:
+### Available Tasks Identified:
 
-1. **Class Property Initialization (TS2564)** - P4 - 413 missing errors
-2. **Solver Strictness Improvements** - P3 - 2961 missing errors
+Based on investigation of other workers' task lists, the following tasks are **AVAILABLE FOR REASSIGNMENT**:
+
+#### 🔴 HIGH PRIORITY: Class Property Type Inference & Validation
+**Status:** ⚠️ ASSIGNED TO WORKER-12 BUT NOT STARTED
+**Worker-12 Status:** Synchronized but appears unavailable (no implementation commits)
+**Priority:** 🟡 MEDIUM
+**Problem:**
+- Shorthand methods with tuple parameter types produce TS2304 errors (16 occurrences)
+- Type checker fails to infer types for shorthand method parameters
+- Object literal property type inference gaps
+**Success Criteria:**
+- Fix shorthand method type inference (16 TS2304 errors)
+- Improve object literal type inference
+- Reduce class-related errors by 50%
+**Files:** `wasm/src/checker/thin_checker.rs`
+**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_12_TASK_LIST.md`
+
+#### 🔴 CRITICAL: Fix TS2322 Type Accuracy Balance
+**Status:** 🔄 ASSIGNED TO WORKER-11 (IN PROGRESS)
+**Priority:** 🔴 CRITICAL (167 total errors: 48 missing + 119 extra)
+**Current Baseline:**
+- Missing TS2322: 48 occurrences
+- Extra TS2322: 119 occurrences
+**Note:** This task is active with worker-11, may need coordination
+**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_11_TASK_LIST.md`
+
+#### 🟡 MEDIUM: Module Resolution Validation (Task 3)
+**Status:** ⚠️ ASSIGNED TO WORKER-10 BUT NOT STARTED
+**Worker-10 Status:** Appears unavailable
+**Priority:** 🔴 HIGH
+**Context:** Worker-10 completed Module Resolution (Tasks 1-2) but Task 3 validation not started
+**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_10_TASK_LIST.md`
+
+---
 
 Awaiting EM-1 direction on which task to assign next.
+
+**Recommendation:** Consider assigning **Class Property Type Inference & Validation** as it's:
+1. Clearly defined scope
+2. Medium priority (good balance of impact/complexity)
+3. Worker-12 appears unavailable
+4. Has clear success criteria and file locations
 
 ---
 
