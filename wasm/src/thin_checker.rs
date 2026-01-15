@@ -10154,14 +10154,25 @@ impl<'a> ThinCheckerState<'a> {
             // Shorthand property: { x } - identifier is both name and value
             else if elem_node.kind == syntax_kind_ext::SHORTHAND_PROPERTY_ASSIGNMENT {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
-                    let value_type = self.get_type_of_node(elem_idx);
                     let name = ident.escaped_text.clone();
+
+                    // Set contextual type for shorthand property value
+                    let prev_context = self.ctx.contextual_type;
+                    if let Some(ctx_type) = prev_context {
+                        self.ctx.contextual_type =
+                            self.ctx.types.contextual_property_type(ctx_type, &name);
+                    }
+
+                    let value_type = self.get_type_of_node(elem_idx);
+
+                    // Restore context
+                    self.ctx.contextual_type = prev_context;
 
                     // TS7008: Member implicitly has an 'any' type
                     // Report this error when noImplicitAny is enabled, the object literal has a contextual type,
                     // and the shorthand property value type is 'any'
                     if self.ctx.no_implicit_any
-                        && self.ctx.contextual_type.is_some()
+                        && prev_context.is_some()
                         && value_type == TypeId::ANY
                     {
                         let message = format_message(
