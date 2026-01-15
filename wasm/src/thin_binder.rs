@@ -681,6 +681,10 @@ impl ThinBinderState {
     ///
     /// This is a convenience method that combines `bind_source_file` and `merge_lib_symbols`.
     ///
+    /// CRITICAL: Lib symbols MUST be merged BEFORE binding the source file so that
+    /// global symbols like `console`, `Array`, `Promise` are available during binding.
+    /// If we bind first, the binder will emit TS2304 errors for these symbols.
+    ///
     /// # Parameters
     /// - `arena`: The ThinNodeArena containing the AST
     /// - `root`: The root node index of the source file
@@ -691,10 +695,11 @@ impl ThinBinderState {
         root: NodeIndex,
         lib_files: &[Arc<lib_loader::LibFile>],
     ) {
-        self.bind_source_file(arena, root);
+        // IMPORTANT: Merge lib symbols FIRST so they're available during binding
         if !lib_files.is_empty() {
             self.merge_lib_symbols(lib_files);
         }
+        self.bind_source_file(arena, root);
     }
 
     /// Incrementally bind new statements after a prefix without rebinding the entire file.
