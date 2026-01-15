@@ -32,24 +32,18 @@
 
 ## Task Assignments
 
-### worker-12: Parser Accuracy (Tier 1)
-**Focus:** Fix TS1109 and TS1005 extra errors - parser false positives
+### worker-12: Type Checking (Tier 2) - *Previous Assignment*
+**Note:** Worker-12 was assigned TS2571/TS2683 (this type checking) under EM-3 before EM-4 activation.
+**Status:** Merged task list only - needs reassignment to current EM-4 priorities.
 
-**Issues:**
-- TS1109 "Expression expected" - appears as both missing (7) and extra (7)
-- TS1005 "X expected" - 5 extra occurrences
+**Previous Focus (from worker-12 branch):**
+- TS2571 - "Object is of type 'unknown'" over-reporting
+- TS2683 - "'this' implicitly has type 'any'" missing errors
+- Error reclassification for non-method function `this` handling
 
-**Key Files:**
-- `wasm/src/thin_parser.rs`
-- `wasm/src/scanner.rs`
-
-**Approach:**
-1. Find failing test examples from conformance output
-2. Create minimal repro files
-3. Compare TSC vs WASM parse trees
-4. Fix parser edge cases (ASI, expression statement detection, etc.)
-
-**Success Criteria:** TS1109/TS1005 extra errors reduced by 70%
+**Current EM-4 Assignment (Parser Tier 1):**
+- TS1109 - 7 missing, 7 extra (parser accuracy)
+- TS1005 - 5 extra (parser "X expected")
 
 ---
 
@@ -137,7 +131,7 @@ cd wasm/differential-test && bash run-conformance.sh --max=500 --workers=8
 
 | Worker | Task | Status | Notes |
 |--------|------|--------|-------|
-| worker-12 | Parser (TS1109/TS1005) | Pending | - |
+| worker-12 | Parser (TS1109/TS1005) | Merged | Previous assignment (TS2571/TS2683) merged - needs reassignment |
 | worker-13 | Async (TS2705/TS1359) | Pending | - |
 | worker-14 | Symbols (TS2304/TS2524) | Merged | Previous assignment (TS2322) merged - needs reassignment |
 
@@ -153,4 +147,7 @@ cd wasm/differential-test && bash run-conformance.sh --max=500 --workers=8
 - Created baseline: 28.9% exact match (55/190 tests)
 - Assigned tasks to workers 12, 13, 14
 - Merged worker-14 branch (previous assignment: TS2322 union types)
+- Merged worker-12 branch (previous assignment: TS2571/TS2683 under EM-3)
 - Pushed em-team-4 to origin for Director review
+
+**Status:** All workers merged with previous assignments - awaiting reassignment to EM-4 priorities.
