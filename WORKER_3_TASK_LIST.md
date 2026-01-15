@@ -1,5 +1,97 @@
 # Worker-3 Task List
 
+## 🔴 CURRENT TASK: TS2524 Duplicate Identifier Detection
+
+**Last Updated:** 2026-01-15
+**Status:** 🔄 ASSIGNED
+**Priority:** 🟡 MEDIUM (HIGH IMPACT)
+**Estimated Effort:** 1-2 days
+
+### Task Description
+
+Fix missing TS2524 errors by implementing duplicate identifier detection in block scopes, function parameters, and class declarations.
+
+### Background from Investigation Report
+
+**Current State (from 487 test sample):**
+- **Missing TS2524 errors:** 15 occurrences (3.1% of all missing errors) - **#3 missing error category**
+- **Error Message:** "Duplicate identifier [name]"
+- **Severity:** 🟡 MEDIUM complexity, HIGH impact
+
+**Root Cause:**
+The binder/symbol table is not detecting duplicate declarations in the same scope. TypeScript tracks all declarations and reports errors when identifiers are reused.
+
+**Example Cases:**
+- Function parameters with same name: `function f(x, x) {}`
+- Block scope duplicates: `{ let x; let x; }`
+- Class property/method duplicates: `class C { x; x() {} }`
+
+### Implementation Steps
+
+1. **Investigation Phase**
+   - Locate symbol table/binder code in `wasm/src/binder/`
+   - Understand current scope tracking mechanism
+   - Find where declarations are added to symbol table
+   - Test with affected test files to confirm missing errors
+   - Check if duplicate detection exists but is broken
+
+2. **Implementation Phase**
+   - Add duplicate check when inserting symbols into scope
+   - Track symbols by name within each scope level
+   - Report TS2524 error with proper diagnostic code
+   - Handle different scope types (block, function, class, global)
+   - Special cases: function overloading, declaration merging
+
+3. **Testing Phase**
+   - Test with sample files that should trigger TS2524
+   - Ensure no false positives on valid shadowing
+   - Verify error messages match TypeScript's format
+   - Run cargo check to ensure code correctness
+
+### Success Criteria
+
+- [ ] TS2524 errors properly emitted for duplicate identifiers
+- [ ] At least 10/15 missing errors fixed (67% reduction target)
+- [ ] No false positives on valid identifier shadowing
+- [ ] Code passes `cargo check`
+- [ ] Test coverage added for key patterns
+
+### Files to Modify
+
+- **Primary:** `wasm/src/binder/mod.rs` or `wasm/src/binder/symbol_table.rs`
+- **Maybe:** `wasm/src/binder/scope.rs` (if separate scope tracking)
+- **Tests:** Add test cases for duplicate detection
+
+### Timeline
+
+- **Investigation:** 0.5 day
+- **Implementation:** 1 day
+- **Testing:** 0.5 day
+- **Total:** 1-2 days
+
+### Dependencies
+
+- None (can start immediately)
+- Builds on symbol table knowledge from TS2564 work
+- May require understanding of scope hierarchy
+
+### Expected Impact
+
+**Baseline:**
+- Missing TS2524: 15 errors (3.1% of all missing errors)
+
+**Target:**
+- Missing TS2524: <5 errors (67%+ reduction)
+- Overall missing errors: Reduce by ~10 errors
+
+**Strategic Value:**
+- #3 missing error category by frequency
+- MEDIUM complexity matches worker-3's capabilities
+- Builds on existing symbol table knowledge from TS2564 Phase 2
+- Complements worker-1's TS2705 work (both improve module/type correctness)
+
+---
+
 ## ✅ MERGED - Latest Merge (January 15, 2026)
 
 **Status:** ✅ MERGED into em-team-1
