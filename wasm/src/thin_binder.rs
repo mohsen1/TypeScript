@@ -346,6 +346,10 @@ impl ThinBinderState {
                             eprintln!("[RESOLVE] '{}' FOUND in scope at depth {} (id={})",
                                 name, scope_depth, sym_id.0);
                         }
+                        // Resolve import if this symbol is imported from another module
+                        if let Some(resolved) = self.resolve_import_if_needed(sym_id) {
+                            return Some(resolved);
+                        }
                         return Some(sym_id);
                     }
                     scope_id = scope.parent;
@@ -362,6 +366,10 @@ impl ThinBinderState {
                 eprintln!("[RESOLVE] '{}' FOUND via parameter fallback (id={})",
                     name, sym_id.0);
             }
+            // Resolve import if this symbol is imported from another module
+            if let Some(resolved) = self.resolve_import_if_needed(sym_id) {
+                return Some(resolved);
+            }
             return Some(sym_id);
         }
 
@@ -370,6 +378,10 @@ impl ThinBinderState {
             if debug_enabled {
                 eprintln!("[RESOLVE] '{}' FOUND in file_locals (id={})",
                     name, sym_id.0);
+            }
+            // Resolve import if this symbol is imported from another module
+            if let Some(resolved) = self.resolve_import_if_needed(sym_id) {
+                return Some(resolved);
             }
             return Some(sym_id);
         }
@@ -382,6 +394,7 @@ impl ThinBinderState {
                     eprintln!("[RESOLVE] '{}' FOUND in lib_binder[{}] (id={}) - LIB SYMBOL",
                         name, i, sym_id.0);
                 }
+                // Note: lib symbols are not imports, so no need to resolve
                 return Some(sym_id);
             }
         }
@@ -421,6 +434,40 @@ impl ThinBinderState {
             }
         }
         None
+    }
+
+    /// Resolve an imported symbol to its actual export from the source module.
+    ///
+    /// When a symbol is imported (e.g., `import { foo } from './file'`), the binder creates
+    /// a local ALIAS symbol with `import_module` set to './file'. This method resolves that
+    /// alias to the actual exported symbol from the source module by looking up `module_exports`.
+    ///
+    /// Returns the resolved SymbolId, or the original sym_id if it's not an import or resolution fails.
+    fn resolve_import_if_needed(&self, sym_id: SymbolId) -> Option<SymbolId> {
+        // Get the symbol to check if it's an import
+        let sym = self.symbols.get(sym_id)?;
+        let module_specifier = sym.import_module.as_ref()?;
+
+        // Determine the export name:
+        // - If import_name is set, use it (for renamed imports like `import { foo as bar }`)
+        // - Otherwise use the symbol's escaped_name
+        let export_name = sym.import_name.as_ref().unwrap_or(&sym.escaped_name);
+
+        // Look up the module's exports in module_exports
+        let module_table = self.module_exports.get(module_specifier)?;
+
+        // Find the exported symbol with the matching name
+        let exported_sym_id = module_table.get(export_name)?;
+
+        let debug_enabled = crate::module_resolution_debug::is_debug_enabled();
+        if debug_enabled {
+            eprintln!(
+                "[RESOLVE_IMPORT] '{}' from module '{}' -> exported symbol id={}",
+                export_name, module_specifier, exported_sym_id.0
+            );
+        }
+
+        Some(exported_sym_id)
     }
 
     /// Find the enclosing scope for a given node by walking up the AST.
@@ -588,6 +635,14 @@ impl ThinBinderState {
             if let Some(root_scope) = self.scopes.first_mut() {
                 for (name, sym_id) in &lib_symbols {
                     root_scope.table.set(name.clone(), *sym_id);
+                }
+            }
+
+            // Also merge lib symbols into current_scope for immediate availability
+            // This ensures symbols like console, Array, Promise are available during binding
+            for (name, sym_id) in &lib_symbols {
+                if !self.current_scope.has(name) {
+                    self.current_scope.set(name.clone(), *sym_id);
                 }
             }
         }

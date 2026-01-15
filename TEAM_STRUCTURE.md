@@ -1,0 +1,211 @@
+# Team Structure - Project Zang Orchestrator
+
+**Last Updated:** 2026-01-15 13:20
+**Director:** Claude Code Orchestrator
+**Target Branch:** rust
+
+---
+
+## ✅ FINAL TEAM STRUCTURE: THREE EMs ESTABLISHED
+
+Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
+
+### Team Size Policy
+- **Maximum team size: 4 workers per EM**
+- Teams are resized dynamically after every merge
+- If team size exceeds 4, spin up new EM and reassign workers
+
+---
+
+## Team Assignments (FINAL - 2026-01-15 13:20)
+
+### EM-1: "Syntax Squad" 🟢 ACTIVE
+**Focus:** Tier 1 (Parser Accuracy)
+
+| Worker | Branch | Squad | Assigned Focus | Status | Throughput |
+|--------|--------|-------|----------------|--------|------------|
+| Worker 3 | worker-3 | Syntax | TS1109 suppression | ❌ **Not done** | None |
+| Worker 4 | worker-4 | Syntax | TS1005 suppression | ❌ **Wrong task** | Low |
+| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Complete | High |
+
+**EM Branch:** em-team-1
+
+**Leadership:** Worker 5 (exceptional throughput, mentor for Workers 3-4)
+
+**Status:**
+- ⚠️ **Workers 3-4 did not complete tasks** - Need reassignment under Worker 5's mentorship
+- ✅ Worker 5 complete - leading Syntax Squad
+
+**Worker 3 Assessment:**
+- Assigned: TS1109 "Expression expected" suppression (reduce from 262 to <40 errors)
+- Actual: Documentation only (claimed it was "already implemented")
+- Reality: TS1109 suppression is NOT implemented
+- Throughput: None - needs reassignment or reset
+
+**Worker 4 Assessment:**
+- Assigned: TS1005 "X expected" suppression (extend Worker 5's work, reduce from 345 to <50)
+- Actual: Implemented "Invert Solver Defaults" (semantic task, not parser)
+- Issue: Did wrong task - this was Worker 7's assignment (solver defaults)
+- Throughput: Low - completed wrong task, needs redirection
+
+---
+
+### EM-2: "Semantics Squad" ✅ HEALTHY
+**Focus:** Tier 2 (Type Checker) + Tier 3 (Symbol Resolution) + Tier 5 (Async)
+
+| Worker | Branch | Squad | Current Focus | Status | Throughput |
+|--------|--------|-------|---------------|--------|------------|
+| Worker 6 | worker-6 | Binder | Global scope / lib injection ✅ Complete | 🟢 Ready | Medium |
+| Worker 7 | worker-7 | Semantics | Module symbol resolution (partial) | 🔵 Active | Medium |
+| Worker 8 | worker-8 | LSP | TypeScript config integration | 🟢 Approved | TBD |
+
+**EM Branch:** em-team-2
+
+**Status:**
+- ✅ Worker 6 complete - awaiting new task
+- 🔄 Worker 7 active - partial implementation (named imports work, namespace/defaults/re-exports/T2792 pending)
+- 🟢 Worker 8 approved - ready to start LSP config integration
+
+**Priority Issues:**
+- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors (Worker 7 - partial implementation)
+- LSP TypeScript config integration (Worker 8 - approved, ready to start)
+- Remaining type checker accuracy issues
+
+---
+
+### EM-3: "Type Checking Squad" 🟢 NEW
+**Focus:** Tier 2 (Type Checker Accuracy)
+
+| Worker | Branch | Squad | Focus Area | Status | Throughput |
+|--------|--------|-------|------------|--------|------------|
+| Worker 1 | worker-1 | Type | TS2683 (implicit this) ✅ Complete | 🟢 Ready | High |
+| Worker 2 | worker-2 | Type | super() handling ✅ Complete | 🟢 Ready | High |
+
+**EM Branch:** em-team-3
+
+**Leadership:** Workers 1-2 (both high-throughput, type checking expertise)
+
+**Completed Work:**
+- ✅ Worker 1: TS2683 (implicit this in functions) - commit c958fc9cb
+- ✅ Worker 2: super() call handling - commit dc7519914
+
+**Status:**
+- Both workers ready for new assignments
+- See EM_3_TASKS.md for full mission statement and priorities
+
+---
+
+## Restructuring History (2026-01-15)
+
+### Initial State ❌
+- **EM-1:** 4 workers (inactive)
+- **EM-2:** 8 workers (active, over capacity)
+
+### First Restructure ❌
+- **EM-1:** 5 workers (Workers 1, 2, 3, 4, 5)
+- **EM-2:** 3 workers (Workers 6, 7, 8)
+- **Problem:** EM-1 still over capacity (5 workers)
+
+### Final Restructure ✅
+- **EM-1:** 3 workers (Workers 3, 4, 5) - Syntax Squad
+- **EM-2:** 3 workers (Workers 6, 7, 8) - Semantics Squad
+- **EM-3:** 2 workers (Workers 1, 2) - Type Checking Squad (NEW)
+
+### Rationale for EM-3 Creation
+1. **Workers 1-2 completed type checking work** (TS2683, super()) - distinct from parser work
+2. **Type checker accuracy** is critical priority (548 TS2322 errors)
+3. **Workers 1-2 have high throughput** - can lead new EM
+4. **EM-1 needs to focus on syntax** - Workers 3-4 need parser-focused mentorship from Worker 5
+5. **Balances workload** - 3 teams, each with 2-3 workers
+
+---
+
+## Priority Order by Team
+
+### EM-1 (Syntax Squad) Priority Queue
+1. **Restart Workers 3-4** - Under Worker 5's mentorship
+2. **TS1109 suppression** - Reduce from 262 to <40 errors (Worker 3 or 5)
+3. **TS1005 suppression** - Reduce from 345 to <50 errors (Worker 4 or 5)
+4. **ASI handling** - Edge cases in automatic semicolon insertion
+
+### EM-2 (Semantics Squad) Priority Queue
+1. **Module Symbol Resolution** - 800+ errors (Worker 7)
+   - TS7005: "Symbol cannot be referenced from module" (489 extra)
+   - TS7008: "Module has no exported member" (336 extra)
+   - TS2792: `import()` type resolution (161 missing)
+
+2. **LSP Config Integration** (Worker 8) - Approved, ready to start
+
+3. **Type Checker Accuracy** (Worker 6 after current task)
+   - Remaining TS2304 issues
+   - Other semantic errors
+
+### EM-3 (Type Checking Squad) Priority Queue
+1. **TS2322 Type Assignability** - 548 extra errors (Worker 1 or 2)
+   - Categorize: legitimate vs false positive
+   - Fix assignability logic for false positives
+   - Handle union/intersection type edge cases
+
+2. **TS2571 Over-reporting** (Worker 1 or 2)
+   - Should be TS2683 in many cases
+   - Fix `this` type inference in non-class methods
+
+3. **Generic Type Constraints** (Future)
+   - Type parameter enforcement
+   - Variance and covariance
+
+---
+
+## Merge Workflow
+
+1. **Workers** commit to their worker branches (worker-1 through worker-8)
+2. **EMs** merge from worker branches to EM branches (em-team-1, em-team-2, em-team-3)
+3. **Director** merges from EM branches to `rust` branch
+4. **After merge:** Director evaluates team sizes and reassigns if needed
+
+---
+
+## Current Blocking Issues
+
+| Issue | Workers Blocked | Resolution Path |
+|-------|-----------------|-----------------|
+| Workers 3-4 restart | Workers 3-4 | EM-1 must assign tasks under Worker 5's mentorship |
+| Module resolution | Workers 6-7 (EM-2) | Worker 7 actively working |
+| EM-3 activation | Workers 1-2 | EM-3 must assign TS2322 categorization task |
+
+---
+
+## Documentation
+
+- **Director Planning:** `.orchestrator/` directory
+- **EM-1 Tasks:** `EM_1_TASKS.md`
+- **EM-2 Tasks:** `EM_2_TASKS.md`
+- **EM-3 Tasks:** `EM_3_TASKS.md`
+- **Project Direction:** `PROJECT_DIRECTION.md` (root)
+- **Workflow:** `AGENTS.md` (root)
+
+---
+
+## Success Metrics
+
+| Team | Exact Match Target | Current | Priority |
+|------|-------------------|---------|----------|
+| **EM-1** | Reduce parser noise by 80% | TS1109: ~262, TS1005: ~439 | 🔴 High |
+| **EM-2** | Fix 800+ module errors | TS7005: 489, TS7008: 336 | 🔴 Critical |
+| **EM-3** | Reduce type checker noise by 70% | TS2322: ~548 | 🟡 High |
+
+**Overall Project Goal:** 95%+ exact match rate before production
+
+---
+
+## Capacity Planning
+
+**Current State:** ✅ BALANCED
+- EM-1: 3 workers (at capacity)
+- EM-2: 3 workers (at capacity)
+- EM-3: 2 workers (room for 2 more)
+
+**Future Considerations:**
+- EM-3 can accept up to 2 more workers if needed
+- Focus on type checker accuracy tasks
+- Workers 3-4 may transfer to EM-3 if they succeed in type checking tasks

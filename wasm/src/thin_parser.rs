@@ -829,11 +829,31 @@ impl ThinParserState {
         }
     }
 
+    /// Check if current token is a synchronization point for error recovery
+    /// This includes statement starts plus additional keywords that indicate
+    /// boundaries in control structures (else, case, default, catch, finally, etc.)
+    fn is_resync_sync_point(&self) -> bool {
+        if self.is_statement_start() {
+            return true;
+        }
+
+        // Additional sync points that indicate statement boundaries in control structures
+        match self.token() {
+            // Control structure boundaries
+            SyntaxKind::ElseKeyword => true,  // if statement alternative
+            SyntaxKind::CaseKeyword | SyntaxKind::DefaultKeyword => true,  // switch cases
+            SyntaxKind::CatchKeyword | SyntaxKind::FinallyKeyword => true,  // try-catch-finally
+            // Comma can be a sync point in declaration lists and object/array literals
+            SyntaxKind::CommaToken => true,
+            _ => false,
+        }
+    }
+
     /// Resynchronize after a parse error by skipping to the next statement boundary
     /// This prevents cascading errors by finding a known good synchronization point
     fn resync_after_error(&mut self) {
-        // If we're already at a statement start or EOF, no need to resync
-        if self.is_statement_start() || self.is_token(SyntaxKind::EndOfFileToken) {
+        // If we're already at a sync point or EOF, no need to resync
+        if self.is_resync_sync_point() || self.is_token(SyntaxKind::EndOfFileToken) {
             return;
         }
 
@@ -878,9 +898,9 @@ impl ThinParserState {
                         continue;
                     }
                     // Found closing paren at same level - could be end of expression
-                    // Skip it and check if next token is a statement start
+                    // Skip it and check if next token is a sync point
                     self.next_token();
-                    if self.is_statement_start() {
+                    if self.is_resync_sync_point() {
                         break;
                     }
                     continue;
@@ -908,8 +928,8 @@ impl ThinParserState {
                 _ => {}
             }
 
-            // If we're at depth 0 and found a statement start, we've resync'd
-            if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 && self.is_statement_start() {
+            // If we're at depth 0 and found a sync point, we've resync'd
+            if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 && self.is_resync_sync_point() {
                 break;
             }
 
@@ -1852,13 +1872,56 @@ impl ThinParserState {
             } // var
         };
 
-        // Parse declarations
+        // Parse declarations with enhanced error recovery
         let mut declarations = Vec::new();
         loop {
+            // Check if we can start a variable declaration
+            // Can be: identifier, keyword as identifier, or binding pattern (object/array)
+            let can_start_decl = self.is_identifier_or_keyword()
+                || self.is_token(SyntaxKind::OpenBraceToken)
+                || self.is_token(SyntaxKind::OpenBracketToken);
+
+            if !can_start_decl {
+                // Invalid token for variable declaration - emit error and recover
+                if !self.is_token(SyntaxKind::SemicolonToken)
+                    && !self.is_token(SyntaxKind::CloseBraceToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "Variable declaration expected.",
+                        diagnostic_codes::VARIABLE_DECLARATION_EXPECTED,
+                    );
+                }
+                break;
+            }
+
             let decl = self.parse_variable_declaration();
             declarations.push(decl);
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
+                break;
+            }
+
+            // After comma, check if next token can start another declaration
+            // Handle cases like: let x, , y (missing declaration between commas)
+            let can_start_next = self.is_identifier_or_keyword()
+                || self.is_token(SyntaxKind::OpenBraceToken)
+                || self.is_token(SyntaxKind::OpenBracketToken);
+
+            if !can_start_next {
+                // Next token cannot start a declaration - emit error for missing declaration
+                // and break to avoid consuming tokens that belong to the next statement
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                if !self.is_token(SyntaxKind::SemicolonToken)
+                    && !self.is_token(SyntaxKind::CloseBraceToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    self.parse_error_at_current_token(
+                        "Variable declaration expected.",
+                        diagnostic_codes::VARIABLE_DECLARATION_EXPECTED,
+                    );
+                }
                 break;
             }
         }
@@ -5481,6 +5544,11 @@ impl ThinParserState {
 
         let condition = self.parse_expression();
 
+        // Error recovery: if condition parsing failed badly, resync to close paren
+        if condition.is_none() && !self.is_token(SyntaxKind::CloseParenToken) {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let statement = self.parse_statement();
@@ -5523,6 +5591,14 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
+        // Error recovery: if initializer parsing failed badly, resync to semicolon
+        if initializer.is_none() && !self.is_token(SyntaxKind::SemicolonToken)
+            && !self.is_token(SyntaxKind::InKeyword)
+            && !self.is_token(SyntaxKind::OfKeyword)
+        {
+            self.resync_after_error();
+        }
+
         // Check for for-in or for-of
         if self.is_token(SyntaxKind::InKeyword) {
             return self.parse_for_in_statement_rest(start_pos, initializer);
@@ -5540,6 +5616,14 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: if condition parsing failed badly, resync to semicolon
+        if condition.is_none() && !self.is_token(SyntaxKind::SemicolonToken)
+            && !self.is_token(SyntaxKind::CloseParenToken)
+        {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::SemicolonToken);
 
         // Incrementor
@@ -5548,6 +5632,12 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: if incrementor parsing failed badly, resync to close paren
+        if incrementor.is_none() && !self.is_token(SyntaxKind::CloseParenToken) {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let statement = self.parse_statement();
@@ -5868,7 +5958,16 @@ impl ThinParserState {
                     },
                 ));
             } else {
-                self.next_token(); // Skip unexpected token
+                // Unexpected token in switch body - emit error and recover
+                if self.token_pos() != self.last_error_pos {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "case or default expected.",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                }
+                // Skip unexpected token and continue
+                self.next_token();
             }
         }
 
@@ -5947,6 +6046,17 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: try without catch or finally is invalid
+        if catch_clause.is_none() && finally_block.is_none() {
+            if self.token_pos() != self.last_error_pos {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "catch or finally expected.",
+                    diagnostic_codes::CATCH_OR_FINALLY_EXPECTED,
+                );
+            }
+        }
 
         let end_pos = self.token_end();
         self.arena.add_try(

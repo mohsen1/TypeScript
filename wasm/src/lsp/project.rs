@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::binder::SymbolId;
+use crate::cli::config::{load_tsconfig, resolve_compiler_options};
 use crate::checker::TypeCache;
 use crate::lsp::code_actions::{
     CodeAction, CodeActionContext, CodeActionKind, CodeActionProvider, ImportCandidate,
@@ -78,11 +79,17 @@ pub struct ProjectFile {
     type_interner: TypeInterner,
     type_cache: Option<TypeCache>,
     scope_cache: ScopeCache,
+    strict: bool,
 }
 
 impl ProjectFile {
     /// Parse and bind a single source file for LSP queries.
     pub fn new(file_name: String, source_text: String) -> Self {
+        Self::with_strict(file_name, source_text, false)
+    }
+
+    /// Parse and bind a single source file with explicit strict mode setting.
+    pub fn with_strict(file_name: String, source_text: String, strict: bool) -> Self {
         let mut parser = ThinParserState::new(file_name.clone(), source_text);
         let root = parser.parse_source_file();
         let arena = parser.get_arena();
@@ -101,6 +108,7 @@ impl ProjectFile {
             type_interner: TypeInterner::new(),
             type_cache: None,
             scope_cache: ScopeCache::default(),
+            strict,
         }
     }
 
@@ -132,6 +140,16 @@ impl ProjectFile {
     /// Original source text for this file.
     pub fn source_text(&self) -> &str {
         self.parser.get_source_text()
+    }
+
+    /// Get the strict mode setting for type checking.
+    pub fn strict(&self) -> bool {
+        self.strict
+    }
+
+    /// Set the strict mode for type checking.
+    pub fn set_strict(&mut self, strict: bool) {
+        self.strict = strict;
     }
 
     pub fn update_source(&mut self, source_text: String) {
@@ -338,13 +356,14 @@ impl ProjectFile {
         position: Position,
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<HoverInfo> {
-        let provider = HoverProvider::new(
+        let provider = HoverProvider::with_strict(
             self.parser.get_arena(),
             &self.binder,
             &self.line_map,
             &self.type_interner,
             self.parser.get_source_text(),
             self.file_name.clone(),
+            self.strict,
         );
 
         provider.get_hover_with_scope_cache(
@@ -365,13 +384,14 @@ impl ProjectFile {
         position: Position,
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<SignatureHelp> {
-        let provider = SignatureHelpProvider::new(
+        let provider = SignatureHelpProvider::with_strict(
             self.parser.get_arena(),
             &self.binder,
             &self.line_map,
             &self.type_interner,
             self.parser.get_source_text(),
             self.file_name.clone(),
+            self.strict,
         );
 
         provider.get_signature_help_with_scope_cache(
@@ -392,13 +412,14 @@ impl ProjectFile {
         position: Position,
         scope_stats: Option<&mut ScopeCacheStats>,
     ) -> Option<Vec<CompletionItem>> {
-        let provider = Completions::new_with_types(
+        let provider = Completions::with_strict(
             self.parser.get_arena(),
             &self.binder,
             &self.line_map,
             &self.type_interner,
             self.parser.get_source_text(),
             self.file_name.clone(),
+            self.strict,
         );
 
         provider.get_completions_with_caches(
@@ -413,7 +434,7 @@ impl ProjectFile {
     pub fn get_diagnostics(&mut self) -> Vec<LspDiagnostic> {
         let file_name = self.file_name.clone();
         let source_text = self.parser.get_source_text();
-        let strict = false; // TODO: get from tsconfig
+        let strict = self.strict;
 
         let mut checker = if let Some(cache) = self.type_cache.take() {
             ThinCheckerState::with_cache(
@@ -962,6 +983,7 @@ fn apply_text_edits(source: &str, line_map: &LineMap, edits: &[TextEdit]) -> Opt
 pub struct Project {
     files: FxHashMap<String, ProjectFile>,
     performance: ProjectPerformance,
+    strict: bool,
 }
 
 impl Project {
@@ -970,6 +992,43 @@ impl Project {
         Self {
             files: FxHashMap::default(),
             performance: ProjectPerformance::default(),
+            strict: false,
+        }
+    }
+
+    /// Get the strict mode setting for type checking.
+    pub fn strict(&self) -> bool {
+        self.strict
+    }
+
+    /// Load TypeScript configuration from a tsconfig.json file.
+    /// This updates the project's strict mode based on the compiler options.
+    pub fn load_tsconfig(&mut self, workspace_root: &Path) -> Result<(), String> {
+        let tsconfig_path = workspace_root.join("tsconfig.json");
+        match load_tsconfig(&tsconfig_path) {
+            Ok(config) => {
+                let resolved = resolve_compiler_options(config.compiler_options.as_ref())
+                    .map_err(|e| format!("failed to resolve compiler options: {}", e))?;
+                self.strict = resolved.checker.strict;
+                // Update strict mode on all existing files
+                for file in self.files.values_mut() {
+                    file.set_strict(self.strict);
+                }
+                Ok(())
+            }
+            Err(_) => {
+                // If tsconfig is not found or fails to parse, keep default (false)
+                Ok(())
+            }
+        }
+    }
+
+    /// Set the strict mode directly.
+    pub fn set_strict(&mut self, strict: bool) {
+        self.strict = strict;
+        // Update strict mode on all existing files
+        for file in self.files.values_mut() {
+            file.set_strict(strict);
         }
     }
 
@@ -985,7 +1044,7 @@ impl Project {
 
     /// Add or replace a file, re-parsing and re-binding its contents.
     pub fn set_file(&mut self, file_name: String, source_text: String) {
-        let file = ProjectFile::new(file_name.clone(), source_text);
+        let file = ProjectFile::with_strict(file_name.clone(), source_text, self.strict);
         self.files.insert(file_name, file);
     }
 
