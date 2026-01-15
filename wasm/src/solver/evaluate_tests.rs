@@ -15420,8 +15420,8 @@ fn test_application_ref_expansion_with_defaults() {
         constraint: None,
         default: Some(TypeId::UNDEFINED), // D = undefined
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
-    let d_type = interner.intern(TypeKey::TypeParameter(d_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+    let d_type = interner.intern(TypeKey::TypeParameter(d_param.clone()));
 
     // Define: type Optional<T, D = undefined> = T | D
     let optional_body = interner.union(vec![t_type, d_type]);
@@ -15436,9 +15436,13 @@ fn test_application_ref_expansion_with_defaults() {
     let optional_string_null =
         interner.application(optional_ref, vec![TypeId::STRING, TypeId::NULL]);
 
-    // Set up resolver
+    // Set up resolver with type parameters (including defaults)
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), optional_body);
+    env.insert_with_params(
+        SymbolRef(1),
+        optional_body,
+        vec![t_param.clone(), d_param.clone()],
+    );
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
 
@@ -15454,20 +15458,15 @@ fn test_application_ref_expansion_with_defaults() {
     // Expected for Case 2: string | null
     let expected2 = interner.union(vec![TypeId::STRING, TypeId::NULL]);
 
-    // TODO: When Application expansion is implemented with default handling,
-    // update assertions to: assert_eq!(result1, expected1); assert_eq!(result2, expected2);
+    // Application expansion with defaults now works
     assert_eq!(
-        result1, optional_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix with defaults, Optional<string> should be string | undefined"
+        result1, expected1,
+        "Optional<string> should expand to string | undefined (using default)"
     );
     assert_eq!(
-        result2, optional_string_null,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Optional<string, null> should be string | null"
+        result2, expected2,
+        "Optional<string, null> should expand to string | null"
     );
-
-    let _ = (expected1, expected2);
 }
 
 /// Test Application with constrained type parameters.
@@ -15577,7 +15576,7 @@ fn test_application_ref_expansion_with_never_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15596,9 +15595,9 @@ fn test_application_ref_expansion_with_never_arg() {
     // Create Application: Box<never>
     let box_never = interner.application(box_ref, vec![TypeId::NEVER]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_never);
@@ -15613,15 +15612,10 @@ fn test_application_ref_expansion_with_never_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_never,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<never> should be {{ value: never }}"
+        result, expected,
+        "Box<never> should expand to {{ value: never }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application with unknown as type argument.
