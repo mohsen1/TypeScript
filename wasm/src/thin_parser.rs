@@ -4693,12 +4693,14 @@ impl ThinParserState {
     }
 
     /// Parse module name (can be dotted: A.B.C)
+    /// Use parse_identifier_name to allow reserved keywords as identifiers
+    /// e.g., "namespace test.class {}" is valid TypeScript
     fn parse_module_name(&mut self) -> NodeIndex {
-        let mut left = self.parse_identifier();
+        let mut left = self.parse_identifier_name();
 
         while self.is_token(SyntaxKind::DotToken) {
             self.next_token();
-            let right = self.parse_identifier();
+            let right = self.parse_identifier_name();
             let start = if let Some(n) = self.arena.get(left) {
                 n.pos
             } else {
