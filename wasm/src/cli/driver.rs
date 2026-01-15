@@ -15,7 +15,7 @@ use crate::cli::config::{
     JsxEmit, ModuleResolutionKind, PathMapping, ResolvedCompilerOptions, TsConfig, load_tsconfig,
     resolve_compiler_options,
 };
-use crate::cli::fs::{FileDiscoveryOptions, discover_ts_files, is_ts_file};
+use crate::cli::fs::{FileDiscoveryOptions, discover_ts_files, is_ts_file, is_valid_module_file};
 use crate::checker::context::LibContext;
 use crate::declaration_emitter::DeclarationEmitter;
 use crate::lib_loader;
@@ -1304,7 +1304,7 @@ fn resolve_module_specifier(
     }
 
     for candidate in candidates {
-        if candidate.is_file() && is_ts_file(&candidate) {
+        if candidate.is_file() && is_valid_module_file(&candidate) {
             return Some(canonicalize_or_owned(&candidate));
         }
     }
@@ -1782,7 +1782,7 @@ fn resolve_package_entry(
     };
 
     for candidate in expand_module_path_candidates(&path, options, package_type) {
-        if candidate.is_file() && is_ts_file(&candidate) {
+        if candidate.is_file() && is_valid_module_file(&candidate) {
             return Some(canonicalize_or_owned(&candidate));
         }
     }
