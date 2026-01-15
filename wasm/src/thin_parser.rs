@@ -567,6 +567,41 @@ impl ThinParserState {
         self.scanner.has_preceding_line_break()
     }
 
+    /// Check if ASI applies for restricted productions (return, throw, yield, break, continue)
+    ///
+    /// Restricted productions have special ASI rules:
+    /// ASI applies immediately after a line break, WITHOUT checking if the next token starts a statement.
+    ///
+    /// Examples:
+    /// - `return\nx` parses as `return; x;` (ASI applies due to line break)
+    /// - `return x` parses as `return x;` (no ASI, x is the return value)
+    /// - `throw\nx` parses as `throw; x;` (ASI applies due to line break)
+    /// - `throw x` parses as `throw x;` (no ASI, x is the thrown value)
+    fn can_parse_semicolon_for_restricted_production(&self) -> bool {
+        // Explicit semicolon
+        if self.is_token(SyntaxKind::SemicolonToken) {
+            return true;
+        }
+
+        // ASI applies before closing brace
+        if self.is_token(SyntaxKind::CloseBraceToken) {
+            return true;
+        }
+
+        // ASI applies at EOF
+        if self.is_token(SyntaxKind::EndOfFileToken) {
+            return true;
+        }
+
+        // ASI applies after line break (without checking statement start)
+        // This is the key difference from can_parse_semicolon()
+        if self.scanner.has_preceding_line_break() {
+            return true;
+        }
+
+        false
+    }
+
     // =========================================================================
     // Error Resynchronization
     // =========================================================================
@@ -5198,7 +5233,9 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ReturnKeyword);
 
-        let expression = if !self.can_parse_semicolon() {
+        // For restricted productions (return), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
+        let expression = if !self.can_parse_semicolon_for_restricted_production() {
             self.parse_expression()
         } else {
             NodeIndex::NONE
@@ -5441,8 +5478,10 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::BreakKeyword);
 
+        // For restricted productions (break), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
         // Optional label
-        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        let label = if !self.can_parse_semicolon_for_restricted_production() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5464,8 +5503,10 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ContinueKeyword);
 
+        // For restricted productions (continue), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
         // Optional label
-        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        let label = if !self.can_parse_semicolon_for_restricted_production() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5487,17 +5528,15 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ThrowKeyword);
 
-        // CRITICAL: throw expression must be on same line (no ASI allowed)
-        // JavaScript spec: Line break between throw and expression is a syntax error
-        if self.scanner.has_preceding_line_break() {
-            use crate::checker::types::diagnostics::diagnostic_codes;
-            self.parse_error_at_current_token(
-                "Line break not allowed here",
-                diagnostic_codes::EXPRESSION_EXPECTED,
-            );
-        }
-
-        let expression = self.parse_expression();
+        // For restricted productions (throw), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
+        // NOTE: The previous implementation incorrectly treated line break as a syntax error.
+        // According to JavaScript spec, ASI should apply: throw\nx parses as throw; x;
+        let expression = if !self.can_parse_semicolon_for_restricted_production() {
+            self.parse_expression()
+        } else {
+            NodeIndex::NONE
+        };
 
         self.parse_semicolon();
         let end_pos = self.token_end();
