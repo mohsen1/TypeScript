@@ -212,6 +212,103 @@ No additional work required. The TS2564 strictPropertyInitialization check is fu
 
 ---
 
+## Proposed Task: LSP TypeScript Config Integration
+
+### Overview
+**Self-Proposed Task** (awaiting EM-2 approval)
+
+**Priority:** 🟢 ENHANCEMENT (Quality of Life)
+**Impact:** Improves LSP accuracy by respecting project tsconfig settings
+
+### Problem
+
+Currently, LSP features (hover, completions, signature help, diagnostics) hardcode `strict = false` instead of reading the project's actual TypeScript configuration:
+
+```rust
+// wasm/src/lsp/hover.rs:110
+let strict = false; // TODO: get from tsconfig
+
+// wasm/src/lsp/project.rs:416
+let strict = false; // TODO: get from tsconfig
+
+// wasm/src/lsp/signature_help.rs
+let strict = false; // TODO: get from tsconfig
+
+// wasm/src/lsp/completions.rs (2 occurrences)
+let strict = false; // TODO: get from tsconfig
+```
+
+This means LSP features don't respect user's `tsconfig.json` settings, leading to:
+- Inaccurate type information in strict mode projects
+- Mismatched behavior between CLI and LSP
+- Poor developer experience
+
+### Solution
+
+**Infrastructure Already Exists:**
+- ✅ `wasm/src/cli/config.rs` has `TsConfig` parsing
+- ✅ `load_tsconfig(path: &Path)` function available
+- ✅ `resolve_compiler_options()` handles `strict` flag
+- ✅ `CheckerOptions` struct has `strict` field
+
+**Implementation Required:**
+
+1. **Add tsconfig discovery to Project**
+   - Find tsconfig.json in workspace root
+   - Parse and resolve compiler options
+   - Store in `ProjectFile` struct
+
+2. **Update LSP features to use resolved strict setting**
+   - `hover.rs`: Use `project.get_strict()` instead of `false`
+   - `project.rs`: Use `project.get_strict()` instead of `false`
+   - `signature_help.rs`: Use `project.get_strict()` instead of `false`
+   - `completions.rs`: Use `project.get_strict()` instead of `false`
+
+3. **Handle tsconfig changes**
+   - Watch for tsconfig.json modifications
+   - Reinitialize project when config changes
+
+### Files to Modify
+- `wasm/src/lsp/project.rs` - Add tsconfig loading
+- `wasm/src/lsp/hover.rs` - Use resolved strict flag
+- `wasm/src/lsp/signature_help.rs` - Use resolved strict flag
+- `wasm/src/lsp/completions.rs` - Use resolved strict flag (2 locations)
+
+### Success Criteria
+- LSP respects project's `strict: true` setting
+- LSP respects project's `strict: false` setting
+- tsconfig.json changes trigger project reinitialization
+- No breaking changes to existing behavior
+
+### Testing
+- Create test with `strict: true` tsconfig
+- Create test with `strict: false` tsconfig
+- Verify LSP returns appropriate type information
+- Test tsconfig change detection
+
+### Estimated Effort
+- **Low complexity** - Infrastructure exists, just need wiring
+- **1-2 hours** implementation
+- **1 hour** testing
+
+### Risk Assessment
+- **Low risk** - Changes are localized to LSP module
+- **No breaking changes** - Default behavior (strict=false) preserved if no tsconfig found
+
+### Request to EM-2
+
+**Please approve this task for worker-8.**
+
+This is a straightforward enhancement that:
+1. Improves LSP accuracy
+2. Leverages existing infrastructure
+3. Has clear success criteria
+4. Low risk, well-scoped
+
+If approved, I will begin implementation immediately.
+
+---
+
 ## Request for New Task Assignment (2026-01-14)
 
 ### Summary of Completed Work
