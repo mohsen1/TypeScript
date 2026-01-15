@@ -246,6 +246,35 @@ The TS2564 strictPropertyInitialization check was already fully implemented in t
 
 ---
 
+---
+
+## EM-3 Merge Report (2025-01-15)
+
+### Merge Status: ✅ SUCCESS
+
+**Merge Commit:** `8736617b034` - "Merge branch 'worker-12' into em-team-3"
+
+**Conflicts Resolved:**
+- `wasm/src/thin_parser.rs` - WASM compilation syntax error (already fixed by Worker-12)
+
+**Test Results:**
+- ✅ Cargo check passed (63 warnings, 0 errors)
+- ✅ WASM module compiles successfully
+- ✅ WASM crashes reduced from 487 → 2 (99.6% reduction)
+
+**Changes Integrated:**
+1. Fixed WASM compilation bug in `thin_parser.rs` (line 648)
+2. Added typescript dependency for conformance testing
+3. Verified TS2564 implementation matches TypeScript behavior
+
+**Summary:**
+Worker-12's TS2564 task has been successfully merged into em-team-3. The critical WASM compilation bug has been fixed, enabling conformance testing to proceed. The strictPropertyInitialization check is confirmed to be fully implemented and working correctly.
+
+**Primary Task Status:**
+The NEW primary task (Class Property Type Inference & Validation) was assigned but NOT STARTED. This task remains available for reassignment.
+
+---
+
 ## Notes from EM-3
 - This is Phase 4 of the EM-3 strategy
 - High-ROI task: 413 errors with one check
