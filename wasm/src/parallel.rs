@@ -414,6 +414,9 @@ pub struct MergedProgram {
     pub file_locals: Vec<SymbolTable>,
     /// Ambient module declarations across all files
     pub declared_modules: FxHashSet<String>,
+    /// Module exports: maps file name (or module specifier) to its exported symbols
+    /// This enables cross-file module resolution: import { X } from './file' can find X's symbol
+    pub module_exports: FxHashMap<String, SymbolTable>,
     /// Global type interner - shared across all threads for type deduplication
     pub type_interner: TypeInterner,
 }
@@ -504,6 +507,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
     let mut files = Vec::with_capacity(results.len());
     let mut file_locals_list = Vec::with_capacity(results.len());
     let mut declared_modules = FxHashSet::default();
+    let mut module_exports: FxHashMap<String, SymbolTable> = FxHashMap::default();
 
     // Track which symbols have been merged to avoid duplicate processing
     let mut merged_symbols: FxHashMap<String, SymbolId> = FxHashMap::default();
@@ -546,6 +550,24 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
                 };
                 id_remap.insert(old_id, new_id);
             }
+        }
+
+        // Collect exported symbols for this file (for module_exports map)
+        let is_external_module = result.file_locals.iter().any(|(_, &sym_id)| {
+            result.symbols.get(sym_id).map_or(false, |sym| sym.is_exported)
+        });
+        if is_external_module {
+            let mut exports = SymbolTable::new();
+            for (name, &sym_id) in result.file_locals.iter() {
+                if let Some(sym) = result.symbols.get(sym_id) {
+                    if sym.is_exported {
+                        if let Some(&remapped_id) = id_remap.get(&sym_id) {
+                            exports.set(name.clone(), remapped_id);
+                        }
+                    }
+                }
+            }
+            module_exports.insert(result.file_name.clone(), exports);
         }
 
         let remap_symbol_table =
@@ -692,6 +714,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
         globals,
         file_locals: file_locals_list,
         declared_modules,
+        module_exports,
         type_interner: TypeInterner::new(),
     }
 }
@@ -968,6 +991,7 @@ fn create_binder_from_bound_file(
         file.scopes.clone(),
         file.node_scope_ids.clone(),
         file.global_augmentations.clone(),
+        program.module_exports.clone(),
     );
 
     binder.declared_modules = program.declared_modules.clone();

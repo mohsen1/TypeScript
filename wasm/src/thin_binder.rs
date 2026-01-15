@@ -92,6 +92,10 @@ pub struct ThinBinderState {
     /// Lib binders for automatic lib symbol resolution.
     /// When get_symbol() doesn't find a symbol locally, it checks these lib binders.
     lib_binders: Vec<Arc<ThinBinderState>>,
+
+    /// Module exports: maps file names to their exported symbols for cross-file module resolution
+    /// This enables resolving imports like `import { X } from './file'` where './file' is another file
+    pub module_exports: FxHashMap<String, SymbolTable>,
 }
 
 /// Validation result describing issues found in the symbol table
@@ -151,6 +155,7 @@ impl ThinBinderState {
             global_augmentations: FxHashMap::default(),
             in_global_augmentation: false,
             lib_binders: Vec::new(),
+            module_exports: FxHashMap::default(),
         }
     }
 
@@ -180,6 +185,7 @@ impl ThinBinderState {
         self.global_augmentations.clear();
         self.in_global_augmentation = false;
         self.lib_binders.clear();
+        self.module_exports.clear();
     }
 
     /// Set the current file name for debugging purposes.
@@ -232,6 +238,7 @@ impl ThinBinderState {
             global_augmentations: FxHashMap::default(),
             in_global_augmentation: false,
             lib_binders: Vec::new(),
+            module_exports: FxHashMap::default(),
         }
     }
 
@@ -250,6 +257,7 @@ impl ThinBinderState {
             scopes,
             node_scope_ids,
             FxHashMap::default(),
+            FxHashMap::default(),
         )
     }
 
@@ -265,6 +273,7 @@ impl ThinBinderState {
         scopes: Vec<Scope>,
         node_scope_ids: FxHashMap<u32, ScopeId>,
         global_augmentations: FxHashMap<String, Vec<crate::parser::NodeIndex>>,
+        module_exports: FxHashMap<String, SymbolTable>,
     ) -> Self {
         let mut flow_nodes = FlowNodeArena::new();
         let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
@@ -295,6 +304,7 @@ impl ThinBinderState {
             global_augmentations,
             in_global_augmentation: false,
             lib_binders: Vec::new(),
+            module_exports,
         }
     }
 
@@ -2888,6 +2898,15 @@ impl ThinBinderState {
 
     fn bind_import_declaration(&mut self, arena: &ThinNodeArena, node: &ThinNode, _idx: NodeIndex) {
         if let Some(import) = arena.get_import_decl(node) {
+            // Get module specifier for cross-file module resolution
+            let module_specifier = if !import.module_specifier.is_none() {
+                arena.get(import.module_specifier)
+                    .and_then(|spec_node| arena.get_literal(spec_node))
+                    .map(|lit| lit.text.clone())
+            } else {
+                None
+            };
+
             if let Some(clause_node) = arena.get(import.import_clause) {
                 if let Some(clause) = arena.get_import_clause(clause_node) {
                     let clause_type_only = clause.is_type_only;
@@ -2898,6 +2917,10 @@ impl ThinBinderState {
                             if let Some(sym) = self.symbols.get_mut(sym_id) {
                                 sym.declarations.push(clause.name);
                                 sym.is_type_only = clause_type_only;
+                                // Track module for cross-file resolution
+                                if let Some(ref specifier) = module_specifier {
+                                    sym.import_module = Some(specifier.clone());
+                                }
                             }
                             self.current_scope.set(name.to_string(), sym_id);
                             self.node_symbols.insert(clause.name.0, sym_id);
@@ -2916,6 +2939,10 @@ impl ThinBinderState {
                                     if let Some(sym) = self.symbols.get_mut(sym_id) {
                                         sym.declarations.push(clause.named_bindings);
                                         sym.is_type_only = clause_type_only;
+                                        // Track module for cross-file resolution
+                                        if let Some(ref specifier) = module_specifier {
+                                            sym.import_module = Some(specifier.clone());
+                                        }
                                     }
                                     self.current_scope.set(name.to_string(), sym_id);
                                     self.node_symbols.insert(clause.named_bindings.0, sym_id);
@@ -2932,6 +2959,10 @@ impl ThinBinderState {
                                         if let Some(sym) = self.symbols.get_mut(sym_id) {
                                             sym.declarations.push(named.name);
                                             sym.is_type_only = clause_type_only;
+                                            // Track module for cross-file resolution
+                                            if let Some(ref specifier) = module_specifier {
+                                                sym.import_module = Some(specifier.clone());
+                                            }
                                         }
                                         self.current_scope.set(name.to_string(), sym_id);
                                         self.node_symbols.insert(named.name.0, sym_id);
@@ -2957,9 +2988,25 @@ impl ThinBinderState {
                                                 let sym_id = self
                                                     .symbols
                                                     .alloc(symbol_flags::ALIAS, name.to_string());
+
+                                                // Get property name before mutable borrow to avoid borrow checker error
+                                                let prop_name = if !spec.name.is_none() && !spec.property_name.is_none() {
+                                                    self.get_identifier_name(arena, spec.property_name)
+                                                } else {
+                                                    None
+                                                };
+
                                                 if let Some(sym) = self.symbols.get_mut(sym_id) {
                                                     sym.declarations.push(local_ident);
                                                     sym.is_type_only = spec_type_only;
+                                                    // Track module and original name for cross-file resolution
+                                                    if let Some(ref specifier) = module_specifier {
+                                                        sym.import_module = Some(specifier.clone());
+                                                        // For renamed imports (import { foo as bar }), track original name
+                                                        if let Some(prop_name) = prop_name {
+                                                            sym.import_name = Some(prop_name.to_string());
+                                                        }
+                                                    }
                                                 }
                                                 self.current_scope.set(name.to_string(), sym_id);
                                                 self.node_symbols.insert(spec_idx.0, sym_id);
