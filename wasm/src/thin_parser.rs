@@ -2816,6 +2816,27 @@ impl ThinParserState {
                         question_dot_token: false,
                     },
                 );
+            } else if self.is_token(SyntaxKind::QuestionDotToken) {
+                // Optional chaining in heritage clause: A?.B
+                // TypeScript allows optional chaining in extends/implements clauses
+                self.next_token();
+                let name = if self.is_identifier_or_keyword() {
+                    self.parse_identifier_name()
+                } else {
+                    self.parse_identifier()
+                };
+
+                let end_pos = self.token_end();
+                expr = self.arena.add_access_expr(
+                    syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    crate::parser::thin_node::AccessExprData {
+                        expression: expr,
+                        name_or_argument: name,
+                        question_dot_token: true,
+                    },
+                );
             } else if self.is_token(SyntaxKind::LessThanToken) {
                 // Generic call expression: base<T>() or base<T, U>()
                 // Parse type arguments then check for call
