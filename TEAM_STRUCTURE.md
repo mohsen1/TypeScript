@@ -184,6 +184,7 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 - **EM-1 Tasks:** `EM_1_TASKS.md`
 - **EM-2 Tasks:** `EM_2_TASKS.md`
 - **EM-3 Tasks:** `EM_3_TASKS.md`
+- **EM-4 Tasks:** `EM_4_TASKS.md` ✅ Created (2025-01-15)
 - **Project Direction:** `PROJECT_DIRECTION.md` (root)
 - **Workflow:** `AGENTS.md` (root)
 
@@ -193,9 +194,10 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 | Team | Exact Match Target | Current | Priority |
 |------|-------------------|---------|----------|
-| **EM-1** | Reduce parser noise by 80% | TS1109: ~262, TS1005: ~439 | 🔴 High |
+| **EM-1** | Reduce parser noise by 80% | TS1109: ~262, TS1005: ~345 | 🔴 High |
 | **EM-2** | Fix 800+ module errors | TS7005: 489, TS7008: 336 | 🔴 Critical |
 | **EM-3** | Reduce type checker noise by 70% | TS2322: ~548 | 🟡 High |
+| **EM-4** | Fix Tier 0 cross-cutting gaps | Not measured | 🟡 High |
 
 **Overall Project Goal:** 95%+ exact match rate before production
 
@@ -203,12 +205,18 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 ## Capacity Planning
 
-**Current State:** ✅ BALANCED
+**Current State (Post-Rebalancing):** ✅ BALANCED
 - EM-1: 3 workers (at capacity)
-- EM-2: 3 workers (at capacity)
-- EM-3: 2 workers (room for 2 more)
+- EM-2: 3 workers (at capacity, 🔴 at risk)
+- EM-3: 4 workers (at capacity, Workers 1-2, 11-12)
+- EM-4: 4 workers (at capacity, Workers 9-10, 13-14)
+
+**Rebalancing Actions (2025-01-15):**
+- ✅ Workers 9-10 moved from EM-3 to EM-4 (Tier 0 quality)
+- ✅ EM-3 now has 4 workers (within capacity)
+- ✅ EM-4 established with 4 workers (Tier 0 focus)
 
 **Future Considerations:**
-- EM-3 can accept up to 2 more workers if needed
-- Focus on type checker accuracy tasks
-- Workers 3-4 may transfer to EM-3 if they succeed in type checking tasks
+- EM-2 needs intervention: Workers 6-7 have zero commits on module resolution
+- EM-4 needs EM assignment (currently TBD)
+- Monitor EM-1 mentorship progress (checkpoint: 2025-01-22)
