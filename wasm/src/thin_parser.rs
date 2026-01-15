@@ -434,10 +434,11 @@ impl ThinParserState {
                 return;
             }
 
-            // Check if we can recover from this error
-            // If we're at a position where parsing can reasonably continue, suppress the error
-            // This reduces false-positive TS1109 errors in complex expressions
-            if self.can_recover_from_error() {
+            // Check multiple conditions to suppress false-positive TS1109 errors:
+            // 1. Can we recover from this error? (worker-1)
+            // 2. Are we at a natural expression end point? (worker-5)
+            // Both conditions help reduce false positives in different scenarios
+            if self.can_recover_from_error() || self.is_at_expression_end() {
                 return;
             }
 
@@ -611,9 +612,75 @@ impl ThinParserState {
         self.scanner.has_preceding_line_break()
     }
 
+    /// Check if ASI applies for restricted productions (return, throw, yield, break, continue)
+    ///
+    /// Restricted productions have special ASI rules:
+    /// ASI applies immediately after a line break, WITHOUT checking if the next token starts a statement.
+    ///
+    /// Examples:
+    /// - `return\nx` parses as `return; x;` (ASI applies due to line break)
+    /// - `return x` parses as `return x;` (no ASI, x is the return value)
+    /// - `throw\nx` parses as `throw; x;` (ASI applies due to line break)
+    /// - `throw x` parses as `throw x;` (no ASI, x is the thrown value)
+    fn can_parse_semicolon_for_restricted_production(&self) -> bool {
+        // Explicit semicolon
+        if self.is_token(SyntaxKind::SemicolonToken) {
+            return true;
+        }
+
+        // ASI applies before closing brace
+        if self.is_token(SyntaxKind::CloseBraceToken) {
+            return true;
+        }
+
+        // ASI applies at EOF
+        if self.is_token(SyntaxKind::EndOfFileToken) {
+            return true;
+        }
+
+        // ASI applies after line break (without checking statement start)
+        // This is the key difference from can_parse_semicolon()
+        if self.scanner.has_preceding_line_break() {
+            return true;
+        }
+
+        false
+    }
+
     // =========================================================================
     // Error Resynchronization
     // =========================================================================
+
+    /// Check if we're at a position where an expression can reasonably end
+    /// This is used to suppress spurious "expression expected" errors when
+    /// the user has clearly moved on to the next statement/context.
+    fn is_at_expression_end(&self) -> bool {
+        match self.token() {
+            // Tokens that naturally end expressions
+            SyntaxKind::SemicolonToken
+            | SyntaxKind::CloseBraceToken
+            | SyntaxKind::CloseParenToken
+            | SyntaxKind::CloseBracketToken
+            | SyntaxKind::EndOfFileToken => true,
+            // Keywords that start a new statement (expression is clearly missing)
+            SyntaxKind::VarKeyword
+            | SyntaxKind::LetKeyword
+            | SyntaxKind::ConstKeyword
+            | SyntaxKind::FunctionKeyword
+            | SyntaxKind::ClassKeyword
+            | SyntaxKind::IfKeyword
+            | SyntaxKind::ForKeyword
+            | SyntaxKind::WhileKeyword
+            | SyntaxKind::DoKeyword
+            | SyntaxKind::SwitchKeyword
+            | SyntaxKind::TryKeyword
+            | SyntaxKind::WithKeyword
+            | SyntaxKind::ReturnKeyword
+            | SyntaxKind::BreakKeyword
+            | SyntaxKind::ContinueKeyword => true,
+            _ => false,
+        }
+    }
 
     /// Check if current token can start a statement (synchronization point)
     fn is_statement_start(&self) -> bool {
@@ -5243,7 +5310,9 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ReturnKeyword);
 
-        let expression = if !self.can_parse_semicolon() {
+        // For restricted productions (return), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
+        let expression = if !self.can_parse_semicolon_for_restricted_production() {
             self.parse_expression()
         } else {
             NodeIndex::NONE
@@ -5486,8 +5555,10 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::BreakKeyword);
 
+        // For restricted productions (break), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
         // Optional label
-        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        let label = if !self.can_parse_semicolon_for_restricted_production() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5509,8 +5580,10 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ContinueKeyword);
 
+        // For restricted productions (continue), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
         // Optional label
-        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        let label = if !self.can_parse_semicolon_for_restricted_production() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5532,17 +5605,15 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::ThrowKeyword);
 
-        // CRITICAL: throw expression must be on same line (no ASI allowed)
-        // JavaScript spec: Line break between throw and expression is a syntax error
-        if self.scanner.has_preceding_line_break() {
-            use crate::checker::types::diagnostics::diagnostic_codes;
-            self.parse_error_at_current_token(
-                "Line break not allowed here",
-                diagnostic_codes::EXPRESSION_EXPECTED,
-            );
-        }
-
-        let expression = self.parse_expression();
+        // For restricted productions (throw), ASI applies immediately after line break
+        // Use can_parse_semicolon_for_restricted_production() instead of can_parse_semicolon()
+        // NOTE: The previous implementation incorrectly treated line break as a syntax error.
+        // According to JavaScript spec, ASI should apply: throw\nx parses as throw; x;
+        let expression = if !self.can_parse_semicolon_for_restricted_production() {
+            self.parse_expression()
+        } else {
+            NodeIndex::NONE
+        };
 
         self.parse_semicolon();
         let end_pos = self.token_end();
@@ -7553,7 +7624,19 @@ impl ThinParserState {
             }
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
-                break;
+                // Missing comma - check if next token looks like another array element
+                // If so, suppress the error and continue parsing (better recovery)
+                if self.is_array_element_start()
+                    && !self.is_token(SyntaxKind::CloseBracketToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    // We have an element-like token but no comma - likely missing comma
+                    // Suppress the comma error and continue parsing for better recovery
+                    // This handles cases like: [1 2 3] instead of [1, 2, 3]
+                } else {
+                    // Not followed by an element, so we're really done
+                    break;
+                }
             }
         }
 
@@ -7571,6 +7654,67 @@ impl ThinParserState {
         )
     }
 
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals that can start array elements
+            SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Keywords/identifiers
+            SyntaxKind::Identifier => true,
+            // This keyword
+            SyntaxKind::ThisKeyword => true,
+            // Super keyword
+            SyntaxKind::SuperKeyword => true,
+            // Open bracket (nested array)
+            SyntaxKind::OpenBracketToken => true,
+            // Open brace (object literal)
+            SyntaxKind::OpenBraceToken => true,
+            // Open paren (parenthesized expression)
+            SyntaxKind::OpenParenToken => true,
+            // Prefix operators
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
+    /// Check if current token can start an object property
+    /// Used for error recovery in object literals when commas are missing
+    fn is_property_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Get/Set accessors
+            SyntaxKind::GetKeyword | SyntaxKind::SetKeyword => true,
+            // Async keyword (for async methods)
+            SyntaxKind::AsyncKeyword => true,
+            // Asterisk (for generator methods)
+            SyntaxKind::AsteriskToken => true,
+            // String/number literals (computed properties or shorthand)
+            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral => true,
+            // Identifier or keyword (property names)
+            SyntaxKind::Identifier => true,
+            // Bracket (computed property)
+            SyntaxKind::OpenBracketToken => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Parse object literal
     fn parse_object_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -7583,8 +7727,18 @@ impl ThinParserState {
                 properties.push(prop);
             }
 
+            // Try to parse comma separator
             if !self.parse_optional(SyntaxKind::CommaToken) {
-                break;
+                // Missing comma - check if next token looks like another property
+                // If so, suppress the error and continue parsing (better recovery)
+                if self.is_property_start() && !self.is_token(SyntaxKind::CloseBraceToken) {
+                    // We have a property-like token but no comma - likely missing comma
+                    // Suppress the comma error and continue parsing for better recovery
+                    // This handles cases like: {a: 1 b: 2} instead of {a: 1, b: 2}
+                } else {
+                    // Not followed by a property, so we're really done
+                    break;
+                }
             }
         }
 
