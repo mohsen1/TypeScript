@@ -106,10 +106,10 @@ Fix parser edge cases to support TS1005/TS1109 reduction efforts. **Target: Redu
 ---
 
 ## Status
-**Status:** ✅ ALL TASKS COMPLETE
+**Status:** 🔄 TASK 4 IN PROGRESS (Tasks 1-3 Complete)
 
 **Assigned:** 2026-01-14
-**Completed:** 2026-01-14
+**Task 4 Started:** 2026-01-14
 
 ### Key Achievements
 1. ✅ Fixed critical `throw` statement ASI bug (TS1109)
@@ -137,4 +137,55 @@ Fix parser edge cases to support TS1005/TS1109 reduction efforts. **Target: Redu
 
 ---
 
-**Worker-10: All assigned tasks complete. Ready for next assignment from EM-3.**
+---
+
+## Task 4: Deep Dive TS1005/TS1109 Remaining Patterns
+**Priority:** P0 - High
+**File:** `wasm/src/parser/`
+**Assigned:** 2026-01-14
+**Status:** 🔄 IN PROGRESS
+
+### Context
+With initial ASI and synchronization fixes complete (Tasks 1-3), we need to identify and fix remaining TS1005/TS1109 patterns that contribute to the ~700 parser noise errors.
+
+### Analysis Tasks
+1. **Categorize remaining TS1005 patterns** by syntactic context:
+   - Statement-level: if/for/while statements
+   - Declaration-level: class/interface/type declarations
+   - Expression-level: ternary operators, logical expressions
+   - Destructuring: array/object patterns
+   - Type annotations: generics, conditional types
+
+2. **Categorize remaining TS1109 patterns** by syntactic context:
+   - Missing expressions in statements
+   - Empty type positions
+   - Invalid object literal syntax
+   - Array literal edge cases
+
+3. **Identify top 10 error-producing patterns** from conformance test data
+
+### Implementation Strategy
+For each identified pattern:
+1. Create minimal reproduction test case
+2. Locate parser code handling that syntax
+3. Implement fix or improved error recovery
+4. Add regression test
+5. Verify with conformance tests
+
+### Success Criteria
+- [x] ASI edge cases identified and documented
+- [x] Parser recovery improved in complex contexts
+- [x] Support EM-1/EM-2 with categorized error patterns
+- [x] Edge case failure rate reduced by 50%
+- [ ] Additional 5-10 TS1005/TS1109 patterns fixed
+- [ ] Parser noise reduced to <200 total errors
+
+### Deliverables
+- TS1005_PATTERNS_ANALYSIS.md - Categorized TS1005 error patterns
+- TS1109_PATTERNS_ANALYSIS.md - Categorized TS1109 error patterns
+- Test suite for identified patterns
+- Code fixes for top remaining patterns
+
+---
+
+**Worker-10: Working on Task 4 - Deep Dive TS1005/TS1109 Remaining Patterns.**
