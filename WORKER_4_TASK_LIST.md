@@ -276,3 +276,27 @@ fn check_class_property(&mut self, property: &ClassElementDeclaration) {
 - **Current Task:** 🟠 TS2564 Class Property Initialization
 - **Ready to Start:** ✅ YES
 - **Last Updated:** 2026-01-15
+
+---
+
+## Worker-4 Merge Summary (2026-01-15)
+
+**Merge Commit:** `083abfaff14` (pushed to origin/em-team-1)
+
+### Completed Tasks Previously Merged:
+1. **Flow Recording** ✅
+   - Fixed flow recording for statements and identifiers
+   - All 54/54 control_flow tests passing
+
+2. **Application Expansion Tests** ✅
+   - Fixed all 34/34 application expansion tests
+   - Added default type parameter support
+
+### This Merge:
+- Documentation update only
+- Updated task list with previous merge details
+- No code changes in this merge
+
+### Current Assignment:
+- **TS2564 Class Property Initialization** - READY TO START
+- Target: 413 missing errors → <20 (95% reduction)
