@@ -9811,7 +9811,7 @@ impl<'a> ThinCheckerState<'a> {
                         self.get_type_from_type_node(param.type_annotation)
                     } else if is_this_param {
                         if let Some(ref helper) = ctx_helper {
-                            helper.get_this_type().unwrap_or(TypeId::UNKNOWN)
+                            helper.get_this_type().unwrap_or(TypeId::ANY)
                         } else {
                             TypeId::ANY
                         }
