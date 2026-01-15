@@ -15210,8 +15210,8 @@ fn test_application_ref_expansion_reducer_function() {
         constraint: None,
         default: None,
     };
-    let s_type = interner.intern(TypeKey::TypeParameter(s_param));
-    let a_type = interner.intern(TypeKey::TypeParameter(a_param));
+    let s_type = interner.intern(TypeKey::TypeParameter(s_param.clone()));
+    let a_type = interner.intern(TypeKey::TypeParameter(a_param.clone()));
 
     // Define: type Reducer<S, A> = (state: S | undefined, action: A) => S
     let state_name = interner.intern_string("state");
@@ -15258,9 +15258,9 @@ fn test_application_ref_expansion_reducer_function() {
     // Create Application: Reducer<number, AnyAction> = Application(Ref(1), [number, AnyAction])
     let reducer_number_action = interner.application(reducer_ref, vec![TypeId::NUMBER, any_action]);
 
-    // Set up a resolver that maps Ref(1) -> reducer_body
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), reducer_body);
+    env.insert_with_params(SymbolRef(1), reducer_body, vec![s_param, a_param]);
 
     // Evaluate the Application type
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
@@ -15291,17 +15291,10 @@ fn test_application_ref_expansion_reducer_function() {
         is_method: false,
     });
 
-    // TODO: When Application expansion is implemented (Worker 2/3 fix),
-    // change this assertion to: assert_eq!(result, expected);
-    // Currently, Application types pass through unchanged.
     assert_eq!(
-        result, reducer_number_action,
-        "Current behavior: Application passes through unchanged. \
-         After fix, should equal expected function type"
+        result, expected,
+        "Reducer<number, AnyAction> should expand to (state: number | undefined, action: AnyAction) => number"
     );
-
-    // Store expected for reference when implementing the fix
-    let _ = expected;
 }
 
 /// Test that nested Application types should expand recursively.
@@ -15322,7 +15315,7 @@ fn test_application_ref_expansion_nested() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15357,10 +15350,10 @@ fn test_application_ref_expansion_nested() {
     // Create: Promise<Box<string>> = Application(Ref(2), [Application(Ref(1), [string])])
     let promise_box_string = interner.application(promise_ref, vec![box_string]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
-    env.insert(SymbolRef(2), promise_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param.clone()]);
+    env.insert_with_params(SymbolRef(2), promise_body, vec![t_param]);
 
     // Evaluate
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
@@ -15384,15 +15377,10 @@ fn test_application_ref_expansion_nested() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented (Worker 2/3 fix),
-    // change this assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, promise_box_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix, should expand nested Applications recursively"
+        result, expected,
+        "Promise<Box<string>> should expand to {{ result: {{ value: string }} }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application with default type parameters.
@@ -15696,7 +15684,7 @@ fn test_application_ref_expansion_with_any_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15715,9 +15703,9 @@ fn test_application_ref_expansion_with_any_arg() {
     // Create Application: Box<any>
     let box_any = interner.application(box_ref, vec![TypeId::ANY]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_any);
@@ -15732,15 +15720,10 @@ fn test_application_ref_expansion_with_any_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_any,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<any> should be {{ value: any }}"
+        result, expected,
+        "Box<any> should expand to {{ value: any }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application with union type argument.
@@ -15761,7 +15744,7 @@ fn test_application_ref_expansion_with_union_arg() {
         constraint: None,
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type Box<T> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15781,9 +15764,9 @@ fn test_application_ref_expansion_with_union_arg() {
     let string_or_number = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
     let box_union = interner.application(box_ref, vec![string_or_number]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), box_body);
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
     let result = evaluator.evaluate(box_union);
@@ -15798,15 +15781,10 @@ fn test_application_ref_expansion_with_union_arg() {
         is_method: false,
     }]);
 
-    // TODO: When Application expansion is implemented,
-    // update assertion to: assert_eq!(result, expected);
     assert_eq!(
-        result, box_union,
-        "Current behavior: Application passes through unchanged. \
-         After fix, Box<string | number> should be {{ value: string | number }}"
+        result, expected,
+        "Box<string | number> should expand to {{ value: string | number }}"
     );
-
-    let _ = expected;
 }
 
 /// Test Application where the base is not a Ref (should pass through).
