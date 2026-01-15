@@ -43,21 +43,26 @@ Project Zang has 2 Engineering Managers (EMs) and 8 Workers. **RESTRUCTURED 2026
 
 ---
 
-### EM-2: "Semantics Squad" ✅ STREAMLINED
-**Focus:** Tier 2 (Type Checker) + Tier 4 (Implicit Any) + Tier 5 (Async)
+### EM-2: "Semantics Squad" ✅ HEALTHY
+**Focus:** Tier 2 (Type Checker) + Tier 3 (Symbol Resolution) + Tier 5 (Async)
 
-| Worker | Branch | Squad | Current Focus | Status |
-|--------|--------|-------|---------------|--------|
-| Worker 6 | worker-6 | Binder | Global scope / lib injection | 🟢 Ready |
-| Worker 7 | worker-7 | Semantics | Module symbol resolution | 🔵 High priority (800+ errors) |
-| Worker 8 | worker-8 | LSP | TypeScript config integration | 🟢 Approved |
+| Worker | Branch | Squad | Current Focus | Status | Throughput |
+|--------|--------|-------|---------------|--------|------------|
+| Worker 6 | worker-6 | Binder | Global scope / lib injection | 🟢 Ready | Medium |
+| Worker 7 | worker-7 | Semantics | Module symbol resolution (partial) | 🔵 Active | Medium |
+| Worker 8 | worker-8 | LSP | TypeScript config integration | 🟢 Approved | TBD |
 
 **EM Branch:** em-team-2
 
 **Priority Issues:**
-- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors
-- LSP TypeScript config integration
+- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors (Worker 7 - partial implementation)
+- LSP TypeScript config integration (Worker 8 - ready to start)
 - Remaining type checker accuracy issues
+
+**Worker 7 Status:**
+- ✅ Partial implementation merged (named imports work)
+- ⚠️ Incomplete: namespace, default, re-exports, TS2792
+- 🔄 Continue task to completion
 
 ---
 
