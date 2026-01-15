@@ -147,6 +147,8 @@ pub mod diagnostic_messages {
         "In 'const' enum declarations member initializer must be constant expression.";
 
     // Variable errors
+    pub const CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE: &str =
+        "Cannot redeclare block-scoped variable '{0}'.";
     pub const VARIABLE_USED_BEFORE_ASSIGNED: &str = "Variable '{0}' is used before being assigned.";
 
     // Switch exhaustiveness / control flow
@@ -277,6 +279,7 @@ pub mod diagnostic_codes {
 
     // Variable declaration errors
     pub const SUBSEQUENT_VARIABLE_DECLARATIONS_MUST_HAVE_SAME_TYPE: u32 = 2403; // Subsequent variable declarations must have the same type
+    pub const CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE: u32 = 2451; // Cannot redeclare block-scoped variable '{0}'.
     pub const VARIABLE_USED_BEFORE_ASSIGNED: u32 = 2454; // Variable '{0}' is used before being assigned.
 
     // Null/undefined errors

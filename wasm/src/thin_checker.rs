@@ -14238,23 +14238,29 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             }
 
+            // Check if we have any non-block-scoped declarations (var, function, etc.)
+            // Imports (ALIAS) and let/const (BLOCK_SCOPED_VARIABLE) are block-scoped
             let has_non_block_scoped = declarations.iter().any(|(decl_idx, flags)| {
-                conflicts.contains(decl_idx) && (flags & symbol_flags::BLOCK_SCOPED_VARIABLE) == 0
+                conflicts.contains(decl_idx) && {
+                    (flags & (symbol_flags::BLOCK_SCOPED_VARIABLE | symbol_flags::ALIAS)) == 0
+                }
             });
-            if !has_non_block_scoped {
-                // Skip pure block-scoped duplicates (TS2451), handled elsewhere.
-                continue;
-            }
 
             let name = symbol.escaped_name.clone();
-            let message = format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]);
+            let (message, code) = if !has_non_block_scoped {
+                // Pure block-scoped duplicates (let/const/import conflicts) emit TS2451
+                (format_message(diagnostic_messages::CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE, &[&name]), diagnostic_codes::CANNOT_REDECLARE_BLOCK_SCOPED_VARIABLE)
+            } else {
+                // Mixed or non-block-scoped duplicates emit TS2300
+                (format_message(diagnostic_messages::DUPLICATE_IDENTIFIER, &[&name]), diagnostic_codes::DUPLICATE_IDENTIFIER)
+            };
             for (decl_idx, _) in declarations {
                 if conflicts.contains(&decl_idx) {
                     let error_node = self.get_declaration_name_node(decl_idx).unwrap_or(decl_idx);
                     self.error_at_node(
                         error_node,
                         &message,
-                        diagnostic_codes::DUPLICATE_IDENTIFIER,
+                        code,
                     );
                 }
             }
