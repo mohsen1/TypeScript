@@ -44,7 +44,7 @@ impl<'a, 'ctx> ExpressionChecker<'a, 'ctx> {
         use crate::scanner::SyntaxKind;
 
         let Some(node) = self.ctx.arena.get(idx) else {
-            return TypeId::ANY;
+            return TypeId::UNKNOWN;
         };
 
         match node.kind {
@@ -69,12 +69,12 @@ impl<'a, 'ctx> ExpressionChecker<'a, 'ctx> {
                 if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
                     self.check(paren.expression)
                 } else {
-                    TypeId::ANY
+                    TypeId::UNKNOWN
                 }
             }
 
-            // Default case - return ANY for unhandled expressions
-            _ => TypeId::ANY,
+            // Default case - return UNKNOWN for unhandled expressions (stricter type checking)
+            _ => TypeId::UNKNOWN,
         }
     }
 
