@@ -113,17 +113,18 @@ function getWasmDiagnostics(code, fileNames) {
   const diagnostics = [];
 
   for (const fileName of fileNames) {
-    const result = wasm.parse(fileName, code);
-    if (result.diagnostics) {
-      for (const diag of result.diagnostics) {
-        diagnostics.push({
-          code: diag.code,
-          message: diag.message,
-          start: diag.span?.start,
-          length: diag.span?.length,
-        });
-      }
+    const parser = new wasm.ThinParser(fileName, code);
+    parser.parseSourceFile();
+    const parseDiags = JSON.parse(parser.getDiagnosticsJson());
+    for (const diag of parseDiags) {
+      diagnostics.push({
+        code: diag.code,
+        message: diag.message,
+        start: diag.span?.start,
+        length: diag.span?.length,
+      });
     }
+    parser.free();
   }
 
   return diagnostics;
