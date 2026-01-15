@@ -7585,7 +7585,19 @@ impl ThinParserState {
             }
 
             if !self.parse_optional(SyntaxKind::CommaToken) {
-                break;
+                // Missing comma - check if next token looks like another array element
+                // If so, suppress the error and continue parsing (better recovery)
+                if self.is_array_element_start()
+                    && !self.is_token(SyntaxKind::CloseBracketToken)
+                    && !self.is_token(SyntaxKind::EndOfFileToken)
+                {
+                    // We have an element-like token but no comma - likely missing comma
+                    // Suppress the comma error and continue parsing for better recovery
+                    // This handles cases like: [1 2 3] instead of [1, 2, 3]
+                } else {
+                    // Not followed by an element, so we're really done
+                    break;
+                }
             }
         }
 
@@ -7601,6 +7613,45 @@ impl ThinParserState {
                 multi_line: false,
             },
         )
+    }
+
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals that can start array elements
+            SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Keywords/identifiers
+            SyntaxKind::Identifier => true,
+            // This keyword
+            SyntaxKind::ThisKeyword => true,
+            // Super keyword
+            SyntaxKind::SuperKeyword => true,
+            // Open bracket (nested array)
+            SyntaxKind::OpenBracketToken => true,
+            // Open brace (object literal)
+            SyntaxKind::OpenBraceToken => true,
+            // Open paren (parenthesized expression)
+            SyntaxKind::OpenParenToken => true,
+            // Prefix operators
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
     }
 
     /// Check if current token can start an object property
