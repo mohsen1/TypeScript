@@ -113,9 +113,36 @@ Fix: Modified `wasm/src/thin_parser.rs`:
 - Changed `exclamation_token: false` to `exclamation_token` (parsed value)
 
 ### Remaining Work
-- Keywords as identifiers (354 errors) - parameter name resolution issue
+- **Keywords as identifiers (354 errors)** - Type checker issue with tuple type inference
+  - Root cause: When a shorthand method like `method(type, cb) { ... }` is assigned to a type with a tuple parameter signature like `method(...args: [type: string, cb: ...]): void`, the type checker incorrectly infers the parameter types
+  - The tuple type `[type: string, cb: (e: string) => void]` is being misinterpreted as an object type with properties instead of a tuple
+  - Error message shows: `Property 'void' is missing... but required in type '{ void: any; type: string; ... }'` - indicating the tuple is treated as an object type
+  - This is a **type checker issue**, not a binder issue
+  - The binder correctly binds parameters, and the parser correctly parses tuple types
+  - Fix required in type inference for shorthand methods with tuple type annotations
 - builtin_type (27 errors) - IterableIterator and similar symbols
 - type_parameter (12 errors) - generic parameter resolution
+
+### Investigation Details
+**Issue:** Shorthand methods with tuple parameter types produce TS2304 errors
+```typescript
+type FooMethod = {
+  method(...args: [type: string, cb: (e: string) => void]): void;
+}
+let fooM: FooMethod = {
+  method(type, cb) {  // Error: Cannot find name 'type', 'cb'
+    return type;
+  }
+};
+```
+
+**Analysis:**
+- Parser correctly parses both tuple types and shorthand method parameters
+- Binder correctly binds parameters to function scope
+- Type checker fails to infer types for shorthand method parameters when signature has tuple type
+- Error message shows tuple being interpreted as object type instead of tuple
+
+**Status:** This requires deep type checker work - beyond current scope of binder/lib.d.ts injection task
 
 ### Notes
 - The fix successfully resolves the definite assignment assertion parsing bug
