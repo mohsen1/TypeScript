@@ -36,6 +36,8 @@ export default tseslint.config(
             "wasm/pkg/**",
             "wasm/built/**",
             "wasm-demo/dist/**",
+            // Wasm test library files (TypeScript definition files)
+            "wasm/tests/lib/**/*.d.ts",
         ],
     },
     eslint.configs.recommended,
