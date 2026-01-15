@@ -624,10 +624,10 @@ impl ThinParserState {
             | SyntaxKind::VoidKeyword
             | SyntaxKind::DeleteKeyword => true,
             // Structural tokens that can start statements
-            SyntaxKind::OpenBraceToken  // block
-            | SyntaxKind::SemicolonToken  // empty statement
-            | SyntaxKind::OpenParenToken  // parenthesized expression
-            | SyntaxKind::OpenBracketToken  // array literal/destructuring
+            SyntaxKind::OpenBraceToken => true,  // block
+            | SyntaxKind::SemicolonToken => true,  // empty statement
+            | SyntaxKind::OpenParenToken => true,  // parenthesized expression
+            | SyntaxKind::OpenBracketToken => true,  // array literal/destructuring
             | SyntaxKind::LessThanToken => true,  // JSX/type argument
             _ => false,
         }
