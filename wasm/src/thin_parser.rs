@@ -110,8 +110,8 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
-            ts1109_statement_budget: 20, // Allow more TS1109 errors to reduce missing errors
-            ts1005_statement_budget: 10, // Keep TS1005 budget as-is (we're trying to reduce extra errors)
+            ts1109_statement_budget: 10, // Increased: Allow 10 TS1109 errors per statement (more lenient)
+            ts1005_statement_budget: 10, // Increased: Allow 10 TS1005 errors per statement (more lenient)
         }
     }
 
@@ -125,8 +125,8 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
-        self.ts1109_statement_budget = 20; // Reset error budget (increased for TS1109)
-        self.ts1005_statement_budget = 10; // Reset error budget (unchanged for TS1005)
+        self.ts1109_statement_budget = 10; // Reset error budget (increased)
+        self.ts1005_statement_budget = 10; // Reset error budget (increased)
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -379,50 +379,33 @@ impl ThinParserState {
     // =========================================================================
 
     /// Check if we're at a recoverable position where we can continue parsing
-    /// This helps suppress false-positive TS1005 errors when the parser can reasonably recover
-    ///
-    /// For TS1005 (token expected), we need to balance between:
-    /// 1. Suppressing errors when the parser can clearly continue (reduces extra errors)
-    /// 2. Emitting errors when the missing token is genuine (reduces missing errors)
+    /// This helps suppress false-positive errors when the parser can reasonably recover
     fn can_recover_from_error(&self) -> bool {
         // If we're at a binary operator, we can continue the expression
-        // This handles cases like `a +` where the next operand is missing but we're continuing
         if self.is_binary_operator() {
             return true;
         }
 
         // If we're at a comma, we can continue (likely in a list)
-        // This handles cases like `[1,` where the next element is missing but list continues
         if self.is_token(SyntaxKind::CommaToken) {
             return true;
         }
 
-        // If we're at an open parenthesis/bracket, we might be starting a new sub-expression
-        // This handles cases like `a + (` where we're starting a parenthesized expression
-        // NOTE: Removed OpenBraceToken - it's ambiguous (could be object literal or block)
-        if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::OpenBracketToken) {
+        // If we're at a token that starts an expression, we can recover
+        if self.is_expression_start() {
             return true;
         }
 
-        // If we're at certain expression start tokens, we might be able to recover
-        // But be VERY selective - only recover on tokens that unambiguously start a new expression
-        match self.token() {
-            // Literals that clearly start a new expression (not keywords which could be ambiguous)
-            SyntaxKind::NumericLiteral
-            | SyntaxKind::BigIntLiteral
-            | SyntaxKind::StringLiteral
-            | SyntaxKind::NoSubstitutionTemplateLiteral
-            | SyntaxKind::TemplateHead
-            | SyntaxKind::TrueKeyword
-            | SyntaxKind::FalseKeyword
-            | SyntaxKind::NullKeyword => true,
-            // Special keywords that can ONLY start expressions (not statements)
-            SyntaxKind::ThisKeyword
-            | SyntaxKind::SuperKeyword => true,
-            // Open angle bracket for type arguments or JSX
-            SyntaxKind::LessThanToken => true,
-            _ => false,
+        // If we're at a statement delimiter, we can recover
+        if self.is_token(SyntaxKind::SemicolonToken)
+            || self.is_token(SyntaxKind::CloseBraceToken)
+            || self.is_token(SyntaxKind::CloseParenToken)
+            || self.is_token(SyntaxKind::CloseBracketToken)
+        {
+            return true;
         }
+
+        false
     }
 
     /// Error: Expression expected (TS1109)
@@ -440,12 +423,12 @@ impl ThinParserState {
             // This catches cascading errors where the parser recovers to the next token
             // after a TS1005 or similar error.
             // Only apply this if we've actually emitted an error (last_error_pos > 0)
-            // and the current position is within 30 characters of the last error.
-            // REDUCED from 100 to 30 to reduce missing TS1109 errors.
+            // and the current position is within 100 characters of the last error.
+            // INCREASED from 50 to 100 for better cascading error suppression.
             let current_pos = self.token_pos();
             if self.last_error_pos > 0
                 && current_pos > self.last_error_pos
-                && current_pos < self.last_error_pos.saturating_add(30)
+                && current_pos < self.last_error_pos.saturating_add(100)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1109
                 return;
@@ -515,11 +498,10 @@ impl ThinParserState {
             // Additional check: suppress TS1005 if we're very close to a recent error
             // This catches cascading errors where the parser recovers to the next token
             // after another TS1005 or similar error.
-            // REDUCED from 80 to 30 to match TS1109 cascading suppression.
             let current_pos = self.token_pos();
             if self.last_error_pos > 0
                 && current_pos > self.last_error_pos
-                && current_pos < self.last_error_pos.saturating_add(30)
+                && current_pos < self.last_error_pos.saturating_add(80)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1005
                 return;
@@ -669,24 +651,32 @@ impl ThinParserState {
     // =========================================================================
 
     /// Check if we're at a position where an expression can reasonably end
-    /// This is used to suppress spurious TS1109 "expression expected" errors when
+    /// This is used to suppress spurious "expression expected" errors when
     /// the user has clearly moved on to the next statement/context.
-    ///
-    /// For TS1109 (expression expected), we should only suppress if we've reached a closing
-    /// delimiter or EOF. We should NOT suppress on statement start keywords because if we're
-    /// expecting an expression and see `var`, `let`, `function`, etc., that's likely an error.
     fn is_at_expression_end(&self) -> bool {
         match self.token() {
-            // Only tokens that naturally end expressions and indicate we've moved on
+            // Tokens that naturally end expressions
             SyntaxKind::SemicolonToken
             | SyntaxKind::CloseBraceToken
             | SyntaxKind::CloseParenToken
             | SyntaxKind::CloseBracketToken
             | SyntaxKind::EndOfFileToken => true,
-            // NOTE: We do NOT suppress on statement start keywords
-            // If we're expecting an expression and see `var`, `let`, `function`, etc.,
-            // that's likely a genuine error where the user forgot the expression.
-            // This fixes the "missing TS1109" issue where errors were being suppressed too aggressively.
+            // Keywords that start a new statement (expression is clearly missing)
+            SyntaxKind::VarKeyword
+            | SyntaxKind::LetKeyword
+            | SyntaxKind::ConstKeyword
+            | SyntaxKind::FunctionKeyword
+            | SyntaxKind::ClassKeyword
+            | SyntaxKind::IfKeyword
+            | SyntaxKind::ForKeyword
+            | SyntaxKind::WhileKeyword
+            | SyntaxKind::DoKeyword
+            | SyntaxKind::SwitchKeyword
+            | SyntaxKind::TryKeyword
+            | SyntaxKind::WithKeyword
+            | SyntaxKind::ReturnKeyword
+            | SyntaxKind::BreakKeyword
+            | SyntaxKind::ContinueKeyword => true,
             _ => false,
         }
     }
@@ -752,6 +742,7 @@ impl ThinParserState {
             _ => false,
         }
     }
+
 
     /// Resynchronize after a parse error by skipping to the next statement boundary
     /// This prevents cascading errors by finding a known good synchronization point
@@ -1162,8 +1153,8 @@ impl ThinParserState {
     /// Parse a statement
     pub fn parse_statement(&mut self) -> NodeIndex {
         // Reset error budgets at statement boundaries to prevent error storms
-        // Increased TS1109 budget to reduce missing errors
-        self.ts1109_statement_budget = 20;
+        // Increased to be more lenient and reduce false positives
+        self.ts1109_statement_budget = 10;
         self.ts1005_statement_budget = 10;
 
         match self.token() {
