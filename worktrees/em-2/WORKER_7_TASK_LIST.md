@@ -6,7 +6,110 @@
 
 ---
 
-## 🔴 CRITICAL TASK COMPLETED: Fix Global Scope / Lib Injection (TS2304) ✅
+## 🟢 NEW TASK: Module Symbol Resolution (TS7005, TS7008, TS2792)
+
+**Priority:** 🔴 CRITICAL (Priority 2.5 - Post-Solver Fix)
+**Assigned:** 2026-01-14
+**Status:** 🔵 STARTING
+
+### Problem Statement
+
+The conformance validation revealed that after inverting solver defaults, the next biggest blocker is **module symbol resolution**. When symbols are imported from other modules, WASM fails to resolve them correctly, causing:
+
+1. **TS7005 (489 extra):** "Symbol 'X' cannot be referenced from a module"
+2. **TS7008 (336 extra):** "Module 'X' has no exported member 'Y'"
+3. **TS2792 (161 missing):** `import()` type resolution failures
+4. **TS2304 (340 extra + 114 missing):** Cannot find name (many are import-related)
+
+These errors poison downstream type checking because unresolved symbols trigger ERROR types from the solver (which is now working correctly), but the root cause is that we're not finding symbols that SHOULD be available.
+
+### Root Cause Analysis
+
+Module symbol resolution involves multiple layers:
+1. **Parser:** Parses `import { foo } from 'bar'` statements
+2. **Binder:** Resolves module imports and creates symbol references
+3. **Module System:** Loads module files and builds module graph
+4. **Symbol Table:** Cross-file symbol lookup
+
+The gap is likely in how we:
+- Build the module dependency graph
+- Resolve exported symbols from imported modules
+- Handle re-exports (`export * from 'x'`)
+- Handle `import()` type-only imports (TS2792)
+
+### Action Items
+
+#### Phase 1: Investigation
+1. **Study TypeScript's Module Resolution**
+   - Read `wasm/specs/` for module architecture docs
+   - Understand current implementation in `wasm/src/binder/module.rs` (if exists)
+   - Trace how `import` statements are parsed and bound
+
+2. **Analyze Test Failures**
+   - Find failing tests with TS7005/TS7008 errors
+   - Create minimal reproduction cases
+   - Compare with TypeScript's expected behavior
+
+3. **Identify the Gap**
+   - Check if modules are being loaded/parsed
+   - Check if exports are being registered
+   - Check if imports look up exports correctly
+
+#### Phase 2: Implementation
+1. **Fix Module Export Registration**
+   - Ensure exported symbols are tracked in module metadata
+   - Handle `export`, `export default`, `export *`
+   - Store export maps for cross-file resolution
+
+2. **Fix Import Symbol Resolution**
+   - When binding `import { foo } from 'bar'`, resolve 'bar' module
+   - Look up 'foo' in bar's export map
+   - Create symbol reference in importing module's scope
+
+3. **Handle `import()` Type-Only Imports**
+   - TS2792: `import('./foo').then(...)` type resolution
+   - This is a dynamic import - ensure type info is loaded
+
+4. **Fix Re-exports**
+   - `export * from 'x'` should merge x's exports
+   - `export { foo } from 'x'` should create local alias
+
+### Files to Investigate
+- `wasm/src/binder/mod.rs` - Main binder logic
+- `wasm/src/binder/symbol_table.rs` - Symbol storage
+- `wasm/src/parser/` - Import statement parsing
+- `wasm/src/checker/` - Module checking logic
+- `wasm/specs/` - Architecture documentation
+
+### Success Criteria
+- **TS7005 (Extra):** Reduce from 489 to <100
+- **TS7008 (Extra):** Reduce from 336 to <50
+- **TS2792 (Missing):** Reduce from 161 to <20
+- **TS2304 (Extra):** Reduce from 340 to <150 (some will be fixed by better imports)
+- **Exact Match:** Increase from 28.5% to 35%+
+
+### Expected Impact
+This fix is **high leverage** because:
+1. Module resolution issues are pervasive (800+ combined errors)
+2. These errors block type checking in imported code
+3. Fixing imports will unblock other semantic checks
+4. This is the logical next step after solver defaults
+
+### Testing
+1. Run conformance suite after each major fix
+2. Focus on tests in `externalModules/` directory
+3. Verify imports resolve correctly in multi-file scenarios
+4. Check `import()` dynamic imports
+
+### Notes
+- **This is not about `lib.d.ts` injection** (that was fixed by worker-7's previous task)
+- **This is about user-defined module imports** (`import { x } from './y'`)
+- May need to coordinate with worker-6 (TS2304 global scope) if there's overlap
+- May need to coordinate with worker-5 (parser) if import parsing is broken
+
+---
+
+## Previous Task: Invert Solver Defaults ✅ COMPLETED
 
 **Priority:** 🔴 CRITICAL (Priority 2)
 **Status:** ✅ COMPLETED (2026-01-14)
