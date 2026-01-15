@@ -4,7 +4,15 @@ Maintained by EM-1
 
 ## Current Tasks
 
-*No active tasks*
+### [PENDING] Task 2: Fix missing-ts2322-by-category.txt - Tuple Category
+- Status: Not Started
+- Description: Fix all TS2322 (Type 'X' is not assignable to type 'Y') errors in the **Tuple** category from `missing-ts2322-by-category.txt`
+- Details:
+  1. Locate and analyze the "Tuple" section in missing-ts2322-by-category.txt
+  2. For each test case, understand the expected behavior
+  3. Implement fixes in the TypeScript compiler (likely in `wasm/src/thin_checker.rs` or related type checking files)
+  4. Add or modify test cases to verify the fixes
+  5. Run tests to ensure no regressions
 
 ---
 
@@ -45,13 +53,8 @@ function foo() {
 
 - **Worktree:** `/tmp/orchestrator-workspace/worktrees/worker-1`
 - **Branch:** `worker-1`
-- **Target branch:** `em-team-1`
+- **Target branch:** `rust`
 - **Squad:** Type Squad
-- **Focus:** Implicit `this` handling (TS2683)
-
-## Next Assignment
-
-*Awaiting next task from EM-1*
 
 ---
 
@@ -61,3 +64,4 @@ function foo() {
 - Created WORKER_1_TASK_LIST.md template
 - Completed TS2683 fix (c958fc9cb)
 - Merged to em-team-1
+- Assigned Task 2: Fix TS2322 Tuple category
