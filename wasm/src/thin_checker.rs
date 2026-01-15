@@ -21,7 +21,7 @@ use crate::checker::types::diagnostics::{
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
 use crate::parser::syntax_kind_ext;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ImportDeclData, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::solver::{ContextualTypeContext, TypeId, TypeInterner};
@@ -629,6 +629,7 @@ impl<'a> ThinCheckerState<'a> {
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 self.current_this_type().unwrap_or(TypeId::UNKNOWN)
             }
+            k if k == SyntaxKind::SuperKeyword as u16 => self.get_type_of_super_keyword(idx),
 
             // Literals - preserve literal types when contextual typing expects them.
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -737,9 +738,9 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
                     let expr_type = self.get_type_of_node(unary.expression);
                     // If the awaited type is Promise-like, extract the type argument
-                    // Otherwise, just return the type as-is
+                    // Otherwise, return UNKNOWN as a fallback (consistent with Task 4-6 changes)
                     self.promise_like_return_type_argument(expr_type)
-                        .unwrap_or(expr_type)
+                        .unwrap_or(TypeId::UNKNOWN)
                 } else {
                     // Return UNKNOWN instead of ANY when await expression cannot be resolved
                     TypeId::UNKNOWN
@@ -13728,6 +13729,31 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Get the type of a `super` keyword expression.
+    ///
+    /// When used in a constructor call (e.g., `super()`), this returns the
+    /// base class constructor type. When used in property access (e.g., `super.method()`),
+    /// the type is resolved through the normal property access mechanism.
+    ///
+    /// Returns the base class constructor type if in a derived class, otherwise ERROR.
+    fn get_type_of_super_keyword(&mut self, idx: NodeIndex) -> TypeId {
+        // Check if we're in a class context
+        if let Some(ref class_info) = self.ctx.enclosing_class {
+            // Get the base class
+            if let Some(base_class_idx) = self.get_base_class_idx(class_info.class_idx) {
+                // Get the base class node and class data
+                if let Some(base_node) = self.ctx.arena.get(base_class_idx) {
+                    if let Some(base_class) = self.ctx.arena.get_class(base_node) {
+                        // Return the constructor type of the base class
+                        return self.get_class_constructor_type(base_class_idx, base_class);
+                    }
+                }
+            }
+        }
+        // Not in a class or no base class - return ERROR
+        TypeId::ERROR
+    }
+
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
     pub fn error_argument_count_mismatch_at(
         &mut self,
@@ -15803,8 +15829,9 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check an import declaration for unresolved modules.
+    /// Check an import declaration for unresolved modules and missing exports.
     /// Emits TS2792 when the module cannot be resolved.
+    /// Emits TS2305 when a module exists but doesn't export a specific member.
     fn check_import_declaration(&mut self, stmt_idx: NodeIndex) {
         use crate::checker::types::diagnostics::{
             diagnostic_codes, diagnostic_messages, format_message,
@@ -15836,6 +15863,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
+                // Module exists, check if individual imports are exported
+                self.check_imported_members(import, module_name);
                 return;
             }
         }
@@ -15843,6 +15872,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module exists in the module_exports map (cross-file module resolution)
         // This enables resolving imports from other files in the same compilation
         if self.ctx.binder.module_exports.contains_key(module_name) {
+            // Module exists, check if individual imports are exported
+            self.check_imported_members(import, module_name);
             return;
         }
 
@@ -15857,6 +15888,89 @@ impl<'a> ThinCheckerState<'a> {
         // without access to the module graph (aside from ambient module declarations).
         let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
         self.error_at_node(import.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
+    }
+
+    /// Check if individual imported members exist in the module's exports.
+    /// Emits TS2305 for each missing export.
+    fn check_imported_members(&mut self, import: &ImportDeclData, module_name: &str) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
+        };
+
+        // Get the import clause
+        let clause_node = match self.ctx.arena.get(import.import_clause) {
+            Some(node) => node,
+            None => return,
+        };
+
+        let clause = match self.ctx.arena.get_import_clause(clause_node) {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Get named_bindings (NamedImports or NamespaceImport)
+        let bindings_node = match self.ctx.arena.get(clause.named_bindings) {
+            Some(node) => node,
+            None => return,
+        };
+
+        // Check if this is NamedImports (import { a, b })
+        if bindings_node.kind == crate::parser::syntax_kind_ext::NAMED_IMPORTS {
+            let named_imports = match self.ctx.arena.get_named_imports(bindings_node) {
+                Some(ni) => ni,
+                None => return,
+            };
+
+            // Get the module's exports table
+            let exports_table = match self.ctx.binder.module_exports.get(module_name) {
+                Some(table) => table,
+                None => return,
+            };
+
+            // Check each import specifier
+            for element_idx in &named_imports.elements.nodes {
+                let element_node = match self.ctx.arena.get(*element_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let specifier = match self.ctx.arena.get_specifier(element_node) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                // Get the name being imported (property_name if present, otherwise name)
+                let name_idx = if specifier.property_name.is_none() {
+                    specifier.name
+                } else {
+                    specifier.property_name
+                };
+
+                let name_node = match self.ctx.arena.get(name_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let identifier = match self.ctx.arena.get_identifier(name_node) {
+                    Some(id) => id,
+                    None => continue,
+                };
+
+                let import_name = &identifier.escaped_text;
+
+                // Check if this import exists in the module's exports
+                if !exports_table.has(import_name) {
+                    // Emit TS2305: Module has no exported member
+                    let message = format_message(
+                        diagnostic_messages::MODULE_HAS_NO_EXPORTED_MEMBER,
+                        &[module_name, import_name]
+                    );
+                    self.error_at_node(specifier.name, &message, diagnostic_codes::MODULE_HAS_NO_EXPORTED_MEMBER);
+                }
+            }
+        }
+        // Note: Namespace imports (import * as ns) don't need individual checks
+        // Default imports don't need checks here (they're handled differently)
     }
 
     /// Check an export declaration's module specifier for unresolved modules.
@@ -21479,10 +21593,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        if self.type_ref_is_promise_like(return_type) {
-            return Some(TypeId::ANY);
-        }
-
+        // If we can't extract the type argument from a Promise-like type,
+        // return None instead of ANY/UNKNOWN (consistent with Task 4-6 changes)
+        // This allows the caller (await expressions) to use UNKNOWN as fallback
         None
     }
 
@@ -21536,14 +21649,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(&first_arg) = args.first() {
                 return Some(first_arg);
             }
-            return Some(TypeId::ANY);
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(TypeId::UNKNOWN);
         }
 
         let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(args.first().copied().unwrap_or(TypeId::UNKNOWN));
         }
 
         if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {

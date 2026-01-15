@@ -259,7 +259,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 
     /// Check a module/namespace declaration.
     pub fn check_module_declaration(&mut self, module_idx: NodeIndex) {
-        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
+        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
         use crate::scanner::SyntaxKind;
 
         let Some(node) = self.ctx.arena.get(module_idx) else {
@@ -276,12 +276,29 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
                 if let Some(name_node) = self.ctx.arena.get(module.name) {
                     if name_node.kind == SyntaxKind::StringLiteral as u16 {
                         if let Some(lit) = self.ctx.arena.get_literal(name_node) {
+                            // Check TS5061 first
                             if self.is_relative_module_name(&lit.text) {
                                 self.ctx.error(
                                     name_node.pos,
                                     name_node.end - name_node.pos,
                                     diagnostic_messages::AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME.to_string(),
                                     diagnostic_codes::AMBIENT_MODULE_DECLARATION_CANNOT_SPECIFY_RELATIVE_MODULE_NAME,
+                                );
+                            }
+                            // TS2664: Check if the module being augmented exists
+                            // declare module "nonexistent" { } -> Error if module doesn't exist
+                            // Only emit TS2664 in .ts files, not .d.ts files
+                            // In .d.ts files, module augmentations are allowed even if the module doesn't exist
+                            else if !self.module_exists(&lit.text) && !self.is_declaration_file() {
+                                let message = format_message(
+                                    diagnostic_messages::INVALID_MODULE_NAME_IN_AUGMENTATION,
+                                    &[&lit.text]
+                                );
+                                self.ctx.error(
+                                    name_node.pos,
+                                    name_node.end - name_node.pos,
+                                    message,
+                                    diagnostic_codes::INVALID_MODULE_NAME_IN_AUGMENTATION,
                                 );
                             }
                         }
@@ -294,6 +311,29 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
                 self.check_module_body(module.body);
             }
         }
+    }
+
+    /// Check if the current file is a declaration file (.d.ts).
+    fn is_declaration_file(&self) -> bool {
+        self.ctx.file_name.ends_with(".d.ts")
+    }
+
+    /// Check if a module exists (for TS2664 check).
+    /// Returns true if the module is in resolved_modules or module_exports.
+    fn module_exists(&self, module_name: &str) -> bool {
+        // Check if the module was resolved by the CLI driver (multi-file mode)
+        if let Some(ref resolved) = self.ctx.resolved_modules {
+            if resolved.contains(module_name) {
+                return true;
+            }
+        }
+
+        // Check if the module exists in the module_exports map (cross-file module resolution)
+        if self.ctx.binder.module_exports.contains_key(module_name) {
+            return true;
+        }
+
+        false
     }
 
     /// Check if a module name is relative (starts with ./ or ../)

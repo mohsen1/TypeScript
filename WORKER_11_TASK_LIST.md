@@ -1,106 +1,110 @@
 # Worker 11 Task List
 
-Maintained by EM-1 (reassigned from EM-3)
+Maintained by EM-3
 
 ## Active Task
 
-### 🎯 NEW ASSIGNMENT: Investigate Missing TS2322 Patterns 🟡
-**Priority:** MEDIUM-HIGH (Strategic Investigation)
-**Assigned:** 2026-01-15
-**Owner:** worker-11
-**Branch:** worker-11
-**Status:** 🔄 READY TO START
+### Task 7: Fix TS2322 Type Accuracy - Balance Missing and Extra Errors
 
-### Task Description
-Investigate why 105 TS2322 (Type Mismatch) errors are missing. Worker-11's previous analysis identified abstract constructor assignability as the primary issue. This task is to DEEP DIVE into the patterns and prepare a fix strategy - DO NOT implement yet.
+**Priority:** 🔴 CRITICAL (167 total errors: 48 missing + 119 extra)
 
-### Problem Analysis
-From WORKER_11_TASK_6_ANALYSIS.md:
-- **Missing TS2322:** 105 occurrences
-- **Primary Issue:** Abstract Constructor Assignability
-  - `typeof AbstractClass` not properly detected as non-assignable
-  - Override logic exists but not triggered for TypeQuery expressions
-- **Secondary Issues:**
-  - Await type resolution (unknown vs boolean)
-  - Abstract method type errors (methods typed as error)
-  - Async method with super issues
+**Current Baseline (from 2025-01-15 conformance tests):**
+- **Missing TS2322:** 48 occurrences (2.6% of 1822 tests)
+- **Extra TS2322:** 119 occurrences (6.5% of 1822 tests)
+- **Net imbalance:** 71 extra errors
 
-### Action Items
+**Problem:**
+TS2322 (Type 'X' is not assignable to type 'Y') has accuracy issues in both directions:
 
-#### Phase 1: Deep Pattern Analysis (INVESTIGATION ONLY)
-- [ ] Collect 10-15 concrete examples of missing TS2322 errors
-- [ ] Categorize each missing error by pattern:
-  - Pattern A: Abstract constructor assignability
-  - Pattern B: Await type resolution
-  - Pattern C: Abstract method typing
-  - Pattern D: Other
-- [ ] For each pattern, identify:
-  - Expected TypeScript behavior
-  - Actual WASM behavior
-  - Code location responsible
-  - Why the check is failing
+1. **Missing Errors (48):** Type incompatibilities not detected
+   - Most likely causes:
+     - Generic type resolution failures
+     - Conditional type evaluation gaps
+     - Union/intersection type compatibility
+     - Solver bailouts on complex types
+     - Control Flow Analysis (CFA) definite assignment tracking
 
-#### Phase 2: Code Tracing
-- [ ] Trace abstract constructor assignability logic:
-  - Find where TypeQuery expressions are checked
-  - Find where abstract class types are handled
-  - Find why override logic isn't triggered
-  - Document exact code locations
-- [ ] Trace await type resolution:
-  - Find where await expression types are determined
-  - Find why `unknown` is used instead of `boolean`
-  - Document code path
-- [ ] Trace abstract method typing:
-  - Find where method types are inferred
-  - Find why abstract methods get typed as `error`
-  - Document root cause
+2. **Extra Errors (119):** False positives on valid code
+   - Most likely causes:
+     - Over-strict type narrowing
+     - Incorrect generic constraint checking
+     - Discriminated union type failures
+     - Literal type widening issues
+     - Method signature compatibility problems
 
-#### Phase 3: Fix Strategy Document
-- [ ] Create detailed implementation plan for each pattern
-- [ ] Document expected test result changes:
-  - How many missing TS2322 errors will be found?
-  - Will any extra errors be introduced?
-  - Impact on conformance score?
-- [ ] Identify potential risks:
-  - Could this break existing tests?
-  - Are there edge cases to handle?
-  - Dependencies on other fixes?
-- [ ] Prioritize fixes by ROI (errors found vs implementation effort)
+**Action Items:**
 
-### Success Metrics
-- [ ] All 105 missing TS2322 errors categorized by pattern
-- [ ] Root cause identified for each pattern
-- [ ] Detailed fix strategy document created
-- [ ] Expected impact quantified (error count changes)
-- [ ] NO CODE IMPLEMENTED - investigation only
+1. **Analyze the 48 Missing TS2322 Errors**
+   - Use `wasm/differential-test/find-missing-ts2322.mjs` to extract failing test cases
+   - Categorize by root cause:
+     - Generic type resolution failures
+     - Conditional type evaluation
+     - Mapped type handling
+     - Union/intersection compatibility
+     - CFA-related (properties not known to be assigned)
+   - Create prioritized list by frequency
 
-### Deliverables
-1. **Pattern Analysis Document:**
-   - Categorized list of all 105 missing TS2322 errors
-   - 5-10 representative examples per category
-   - Expected vs actual behavior for each
+2. **Analyze the 119 Extra TS2322 Errors**
+   - Use `wasm/differential-test/find-extra-ts2322.mjs` to extract false positives
+   - Categorize by pattern:
+     - Type narrowing too aggressive
+     - Generic constraints over-checked
+     - Literal types not widening when they should
+     - Discriminant property checks failing
+     - Method signature compatibility
+   - Create prioritized list by frequency
 
-2. **Code Trace Document:**
-   - Exact code locations for each pattern
-   - Call stacks showing how type checking flows
-   - Root cause analysis for each failure
+3. **Fix Missing Errors (Priority P0)**
+   - Focus on highest-frequency categories first
+   - Fix solver bailouts on complex types
+   - Add CFA tracking where needed:
+     - Property assignments in all code paths
+     - Variable declarations in closures
+     - Array/object destructuring
+   - Improve intersection/union type checking
+   - Test with extracted failing cases
 
-3. **Fix Strategy Document:**
-   - Step-by-step implementation plan
-   - Expected test result changes
-   - Risk assessment
-   - Dependencies on other fixes
+4. **Fix Extra Errors (Priority P1)**
+   - Refine type narrowing logic
+   - Fix generic constraint checking
+   - Properly handle literal type widening
+   - Fix discriminant union type checking
+   - Improve method signature compatibility
+   - Test with extracted false positive cases
 
-4. **Updated Task List:**
-   - Mark investigation complete
-   - Set `Ready for Implementation: Yes`
+5. **Testing and Validation**
+   - Run `wasm/differential-test/find-missing-ts2322.mjs` before/after
+   - Run `wasm/differential-test/find-extra-ts2322.mjs` before/after
+   - Target: Reduce both to <30 each
+   - Verify no regressions in passing tests
+   - Run full conformance suite: `./wasm/differential-test/run-conformance.sh --max=2000`
 
-### Status
-- **Previous Tasks:** ✅ Parser Error Recovery, ✅ TS2322 Analysis (Task 6)
-- **Current Task:** 🟡 TS2322 Pattern Investigation (Deep Dive)
-- **Implementation Phase:** NO - Investigation only
-- **Ready to Start:** ✅ YES
-- **Last Updated:** 2026-01-15
+**Success Criteria:**
+- Reduce Missing TS2322 from 48 to <15 (70% reduction)
+- Reduce Extra TS2322 from 119 to <30 (75% reduction)
+- Net improvement: 167 errors → 45 errors (73% reduction)
+- Overall conformance improvement: +5-10 percentage points
+
+**Files to Work On:**
+- `wasm/src/solver/` - Type resolution and subtyping logic
+- `wasm/src/checker/control_flow.rs` - Definite assignment analysis
+- `wasm/src/thin_checker.rs` - Type checking and diagnostic emission
+- `wasm/src/checker/narrowing.rs` - Type narrowing (if exists)
+
+**Related Work:**
+- Builds on Tasks 2-6 (previous TS2322 investigations)
+- Coordinates with Worker 9 (parser fixes)
+- Coordinates with Worker 2 (module import fixes)
+
+**Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --max=2000` after changes
+- Focus on type-related test categories (classes, es6, async)
+- Use TS2322 finder scripts to measure improvement
+- Target: <30 missing, <30 extra TS2322 errors
+
+---
 
 ## Recent Merge (2025-01-15)
 
@@ -150,11 +154,6 @@ From WORKER_11_TASK_6_ANALYSIS.md:
 - Priority 3: Abstract method typing
 
 **Target Branch:** rust
-
-## Merged to rust
-✅ **All completed tasks have been merged to origin/rust branch** (2024-01-14)
-
-## Completed Tasks
 
 ### Task 4: Implement ERROR type diagnostic emission fix ✅
 - [x] Comment out diagnostic suppression in `error_type_not_assignable_with_reason_at` (line 13074-13076)
