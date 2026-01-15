@@ -283,3 +283,46 @@ Awaiting EM-1 direction on which task to assign next.
 - Work in: /tmp/orchestrator-workspace/worktrees/worker-2
 - Push to worker-2 branch when complete
 - Do not touch other teams' directories
+
+---
+
+## Worker-2 Merge Summary (January 15, 2026)
+
+### EM-1 Merge Details:
+**Merge Commit:** `4ed30d05ac8`
+**Branch:** worker-2 → em-team-1
+**Status:** ✅ Successfully merged (investigation documentation)
+
+### Commits Merged:
+1. **Comprehensive Available Tasks Investigation Report** (434519fc27a)
+   - Documented all available tasks for potential reassignment
+   - Identified Class Property Type Inference & Validation as available
+   - Noted TS2322 Type Accuracy Balance (worker-11 in progress)
+   - Documented Module Resolution Validation (worker-10 not started)
+
+2. **Recursion Guards Investigation Findings** (d4264e9e192)
+   - Confirmed task already implemented with depth counter (MAX_DEPTH = 100)
+   - Verified cycle detection using coinductive semantics (GFP)
+   - Confirmed TS2589 error emission when depth exceeded
+   - Zero crashes found in all test scenarios
+
+3. **Task Status Update** (ed4c331e75d)
+   - Updated worker-2 status: ready for new assignment
+   - All assigned tasks and investigations completed
+   - Awaiting EM-1 direction on next task
+
+4. **TS1005/TS1109 Parser Noise Investigation** (82095fce371)
+   - Confirmed task completed by worker-5
+   - 96% reduction achieved (701 → ~29 errors)
+   - Goal exceeded (target was <40 errors)
+
+5. **TS2304 Global Scope Fix Verification** (ba6690b32b7)
+   - Verified lib.d.ts loading mechanism working correctly
+   - Confirmed 0 extra TS2304 errors in testing
+   - Issue fixed in previous commits
+
+### Files Modified:
+- `WORKER_2_TASK_LIST.md` - Comprehensive investigation documentation
+
+### Summary:
+Worker-2 completed all investigation tasks and is ready for new work. All high-priority tasks from PROJECT_DIRECTION.md have been completed by other workers or were already implemented.
