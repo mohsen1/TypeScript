@@ -3938,11 +3938,12 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::TypePredicate;
 
         if type_annotation.is_none() {
-            return (TypeId::ANY, None);
+            // Return UNKNOWN instead of ANY to enforce strict type checking
+            return (TypeId::UNKNOWN, None);
         }
 
         let Some(node) = self.ctx.arena.get(type_annotation) else {
-            return (TypeId::ANY, None);
+            return (TypeId::UNKNOWN, None);
         };
 
         if node.kind != syntax_kind_ext::TYPE_PREDICATE {
@@ -4251,7 +4252,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -4922,7 +4923,7 @@ impl<'a> ThinCheckerState<'a> {
                                     None
                                 }
                             })
-                            .unwrap_or(TypeId::ANY);
+                            .unwrap_or(TypeId::UNKNOWN);
                         entry.setter = Some(setter_type);
                     }
                 }
@@ -6893,7 +6894,7 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(op) = op_str {
             return match evaluator.evaluate(left_type, right_type, op) {
                 BinaryOpResult::Success(result) => result,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
         }
 
@@ -7017,7 +7018,7 @@ impl<'a> ThinCheckerState<'a> {
                     continue;
                 }
                 _ => {
-                    type_stack.push(TypeId::ANY);
+                    type_stack.push(TypeId::UNKNOWN);
                     continue;
                 }
             };
@@ -7025,12 +7026,12 @@ impl<'a> ThinCheckerState<'a> {
             let result = evaluator.evaluate(left_type, right_type, op_str);
             let result_type = match result {
                 BinaryOpResult::Success(result_type) => result_type,
-                BinaryOpResult::TypeError { .. } => TypeId::ANY,
+                BinaryOpResult::TypeError { .. } => TypeId::UNKNOWN,
             };
             type_stack.push(result_type);
         }
 
-        type_stack.pop().unwrap_or(TypeId::ANY)
+        type_stack.pop().unwrap_or(TypeId::UNKNOWN)
     }
 
     /// Get type of variable declaration.
@@ -7058,8 +7059,9 @@ impl<'a> ThinCheckerState<'a> {
             return self.get_type_of_node(var_decl.initializer);
         }
 
-        // No initializer - implicit any
-        TypeId::ANY
+        // No initializer - use UNKNOWN to enforce strict checking
+        // This requires explicit type annotation or prevents unsafe usage
+        TypeId::UNKNOWN
     }
 
     fn apply_this_substitution_to_call_return(
@@ -9763,7 +9765,9 @@ impl<'a> ThinCheckerState<'a> {
             self.check_type_for_parameter_properties(type_annotation);
             self.return_type_and_predicate(type_annotation)
         } else {
-            (TypeId::ANY, None)
+            // Use UNKNOWN as default to enforce strict checking
+            // This ensures return statements are checked even without annotation
+            (TypeId::UNKNOWN, None)
         };
 
         // Evaluate Application types in return type to get their structural form
@@ -14445,7 +14449,8 @@ impl<'a> ThinCheckerState<'a> {
                         let mut return_type = if has_type_annotation {
                             self.get_type_of_node(func.type_annotation)
                         } else {
-                            TypeId::ANY
+                            // Use UNKNOWN to enforce strict checking
+                            TypeId::UNKNOWN
                         };
 
                         self.cache_parameter_types(&func.parameters.nodes, None);

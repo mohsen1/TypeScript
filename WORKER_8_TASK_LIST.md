@@ -1,112 +1,188 @@
 # Worker-8 Task List
 
-**Squad:** CFA & Stability (Critical Path)
+**Squad:** Syntax (Parser Error Recovery)
 **Branch:** `worker-8`
 **EM:** EM-2
 *Assigned: 2025-01-14*
+*Updated: 2025-01-14*
+
+---
+
+## Previous Tasks - Complete ✅
+
+### 1. Recursion Guards (TS2589) ✅
+- Added depth tracking to solver
+- Emit TS2589 when recursion exceeds 100 levels
+- No more stack overflow crashes
+
+### 2. Class Property Initialization (TS2564) ✅
+- Already implemented in codebase
+- Verified working via conformance tests
+- Not in missing errors list
+
+### 3. Invert Solver Defaults ✅
+- Changed function return defaults from ANY to UNKNOWN (3 locations)
+- Changed variable defaults from ANY to UNKNOWN (3 locations)
+- Changed expression defaults from ANY to UNKNOWN (4 locations)
+- Total: 13 fixes, tests show improved strictness
 
 ---
 
 ## Priority Mission
 
-Fix Class Property Initialization and add Recursion Guards. **Target: Reduce TS2564 missing errors from 413 to <20.**
+**Fix Parser Noise - Error Resynchronization**
+
+**Current Issue:** 701 extra parser errors (TS1005: 439, TS1109: 262) are false positives. The parser emits errors on valid TypeScript syntax, then crashes or produces malformed ASTs, making semantic checking unreliable.
+
+**Root Cause:** When the ThinParser hits unexpected tokens, it:
+1. Emits an error (correct)
+2. Returns early or creates error nodes (WRONG - should continue parsing)
+3. Doesn't resynchronize to the next valid token (WRONG)
+
+**Goal:** Implement error resynchronization so the parser can recover and continue parsing the rest of the file.
+
+**Target Impact:** Reduce TS1005/TS1109 from 701 to <40
 
 ---
 
-## Assigned Tasks
+## New Assigned Tasks
 
-### 1. Implement Recursion Guards (TS2589)
-**Priority:** P0 - Critical (Stability)
-**File:** `wasm/src/solver/` or `wasm/src/checker/`
+### 1. Implement Error Resynchronization in Parser
+**Priority:** P0 - Critical
+**File:** `wasm/src/parser/thin_parser.rs`
 
-**Issue:** `types/typeRelationships/recursiveTypes` test cases cause stack overflow panics. The compiler crashes instead of emitting TS2589 ("Type instantiation is excessively deep").
-
-**Root Cause:** No recursion depth tracking in `solve_subtype` or `check_expression`. Infinite recursion occurs with mutually recursive types.
+**Issue:** Parser doesn't resynchronize after errors, causing cascading failures.
 
 **Solution:**
-1. Add `recursion_depth: u32` counter to solver context
-2. Increment counter in `solve_subtype` before recursive calls
-3. Return error type when limit exceeded (default: 100 levels)
-4. Emit TS2589 at the call site
-5. Add same guard to `check_expression` for expression recursion
+1. Add `synchronize()` method that advances to the next synchronization point
+2. Synchronization points: `;`, `}`, `)`, `]`, end of file
+3. Call `synchronize()` after emitting parser errors
+4. Continue parsing instead of returning early
+
+**Test Case:**
+```typescript
+// Current: Fails to parse after first error
+function foo() {
+    return 1,
+}
+
+function bar() {  // Never reached
+    return 2;
+}
+
+// Target: Parse both functions, emit error on line 2, continue
+```
 
 **Code Locations:**
-- `wasm/src/solver/mod.rs` - Main solver implementation
-- `wasm/src/checker/thin_checker.rs` - Expression checking
+- `parse_statement()` - add resync after error
+- `parse_expression_statement()` - add resync after error
+- `parse_function_body()` - add resync after error
+- Anywhere `emit_error()` is called
 
 **Success Criteria:**
-- No stack overflow crashes
-- TS2589 emitted for deep recursion
-- Tests pass without panic
+- Parser continues after syntax errors
+- Rest of file is parsed correctly
+- Fewer cascading errors
+- AST is well-formed even with syntax errors
 
 **Status:** ⏳ TODO
 
 ---
 
-### 2. Fix Class Property Initialization (TS2564)
+### 2. Fix ASI (Automatic Semicolon Insertion)
 **Priority:** P1 - High Impact
-**File:** `wasm/src/checker/`
+**File:** `wasm/src/parser/thin_parser.rs`
 
-**Issue:** TS2564 ("Property 'x' has no initializer and is not definitely assigned in the constructor") is the #1 missing error with 413 occurrences.
-
-**Root Cause:** The `strictPropertyInitialization` check is not implemented in `thin_checker.rs`.
+**Issue:** Missing or incorrect semicolon insertion causes TS1005 errors.
 
 **Solution:**
-1. Implement control flow analysis for class constructors
-2. Track property assignments in all constructor code paths
-3. Emit TS2564 for properties without:
-   - Default initializer (`x: number = 5`)
-   - Assignment in all constructor branches
-   - Definite assignment assertion (`x!`)
-4. Handle `declare` properties (always allowed)
-5. Handle abstract classes (skip check)
-
-**Code Locations:**
-- `wasm/src/checker/thin_checker.rs` - Main checker
-- `wasm/src/checker/control_flow.rs` - CFA infrastructure (exists)
-- `wasm/src/checker/flow_analyzer.rs` - Flow analysis (exists)
+1. Review TypeScript's ASI rules from spec
+2. Implement rules:
+   - Insert `;` at end of line if next token is `}`, `)`, `]`
+   - Insert `;` at end of line if statement could be complete
+   - Don't insert if would create `for ( ; ... )` pattern
+   - Handle `do...while` correctly
+3. Match TypeScript's ASI exactly
 
 **Test Cases:**
 ```typescript
-class A {
-    x: number;  // ERROR: TS2564
+// ASI should insert semicolon here
+let x = 5
+console.log(x)  // Should work, not error
+
+// ASI should NOT insert here (for loop)
+for (let i = 0
+     i < 10
+     i++) {  // Should parse correctly
 }
 
-class B {
-    y: number;  // OK: has initializer
-    constructor() {
-        this.y = 5;
-    }
-}
-
-class C {
-    z!: number;  // OK: definite assignment assertion
-}
+// do-while ASI
+do {
+    break
+} while (false)  // Semicolon inserted here
 ```
 
 **Success Criteria:**
-- Detect missing property initialization
-- Handle all code paths in constructor
-- Reduce TS2564 missing errors from 413 to <20
+- ASI matches TypeScript exactly
+- No false positive TS1005 from missing semicolons
+- `for` loops with line breaks parse correctly
+- `do...while` loops parse correctly
 
 **Status:** ⏳ TODO
 
 ---
 
-### 3. Enable Strict Property Initialization in Tests
+### 3. Fix Binary Expression Error Recovery
 **Priority:** P2
-**File:** `wasm/src/cli/` or test runner
+**File:** `wasm/src/parser/thin_parser.rs`
 
-**Issue:** The `strictPropertyInitialization` compiler option may not be enabled in test runs.
+**Issue:** Invalid binary expressions cause parser to give up instead of skipping to next token.
 
 **Solution:**
-1. Verify test runner enables `strictPropertyInitialization`
-2. Update compiler options if needed
-3. Re-run conformance tests after Task 2 implementation
+1. When binary expression parsing fails:
+   - Emit error for the invalid expression
+   - Skip to the next statement-ending token
+   - Continue with next statement
+2. Don't let expression errors cascade
 
-**Code Locations:**
-- `wasm/src/cli/mod.rs`
-- Test configuration files
+**Test Case:**
+```typescript
+// Invalid expression, but rest should parse
+let x = a + * b  // Error: invalid expression
+let y = 5  // Should be parsed correctly
+```
+
+**Success Criteria:**
+- Expression errors don't cascade
+- Next statement is parsed
+- Only the invalid expression gets an error
+
+**Status:** ⏳ TODO
+
+---
+
+### 4. Improve Error Node Handling
+**Priority:** P3
+**File:** `wasm/src/parser/thin_parser.rs` and downstream
+
+**Issue:** Error nodes from parser aren't handled consistently by the checker.
+
+**Solution:**
+1. Ensure `ERROR` nodes are always created (not `None`)
+2. Type check `ERROR` nodes gracefully (return `TypeId::ERROR`)
+3. Don't emit cascading errors from already-errorred nodes
+4. Use `is_error()` checks before processing
+
+**Test Case:**
+```typescript
+let x = invalid syntax here  // Error from parser
+let y = x + 1  // Should not emit additional errors (x is error)
+```
+
+**Success Criteria:**
+- Error nodes don't cause cascading errors
+- Checker handles `ERROR` nodes gracefully
+- One syntax error = one diagnostic (ideally)
 
 **Status:** ⏳ TODO
 
@@ -114,65 +190,93 @@ class C {
 
 ## Implementation Plan
 
-### Phase 1: Recursion Guards (Task 1)
-1. Read `wasm/src/solver/mod.rs` to understand solver structure
-2. Add recursion depth tracking to solver context
-3. Implement depth limit check in `solve_subtype`
-4. Add TS2589 emission
-5. Add unit tests for recursive types
-6. Verify no crashes on `recursiveTypes` tests
+### Phase 1: Add Synchronization Infrastructure (2-3 hours)
+1. Implement `synchronize_to(tokens: &[SyntaxKind]) -> bool`
+2. Implement `skip_to_statement_end() -> bool`
+3. Add `can_resume_from(token: SyntaxKind) -> bool`
+4. Unit tests for sync behavior
 
-### Phase 2: Class Property Checks (Task 2)
-1. Study existing CFA infrastructure in `control_flow.rs`
-2. Understand property declaration flow
-3. Implement property initialization tracking
-4. Add TS2564 emission logic
-5. Handle edge cases (declare, abstract, definite assignment)
-6. Write comprehensive tests
+### Phase 2: Update Error Sites to Use Sync (3-4 hours)
+1. Find all `emit_error()` call sites
+2. Add `synchronize()` call after each error
+3. Test on failing conformance cases
+4. Verify AST is still well-formed
 
-### Phase 3: Validation (Task 3)
-1. Enable strictPropertyInitialization in tests
-2. Run full conformance suite
-3. Measure TS2564 reduction
-4. Verify TS2589 emissions prevent crashes
+### Phase 3: Fix ASI (2-3 hours)
+1. Review TypeScript ASI spec/implementation
+2. Implement ASI rules in `try_insert_semicolon()`
+3. Add ASI tests
+4. Verify against TypeScript behavior
+
+### Phase 4: Expression Recovery (1-2 hours)
+1. Update `parse_binary_expression()` to resync
+2. Update `parse_assignment_expression()` to resync
+3. Test on complex invalid expressions
+
+### Phase 5: Error Node Handling (1-2 hours)
+1. Audit checker for `ERROR` node handling
+2. Add guards where needed
+3. Ensure no crashes on error nodes
+4. Test cascading error scenarios
+
+### Phase 6: Validation (1 hour)
+1. Run conformance tests
+2. Measure TS1005/TS1109 reduction
+3. Verify no regressions
+4. Check for new false positives
 
 ---
 
 ## Success Metrics
 
 ### Before Implementation
-- **TS2564 Missing:** 413 errors
-- **Stack Overflow Crashes:** 2+ test failures
-- **Stability:** Crashes on recursive types
+- **TS1005 (Parser):** 439 extra errors
+- **TS1109 (Parser):** 262 extra errors
+- **Total Parser Noise:** 701 errors
+- **Parser Crashes:** Some tests fail to parse completely
 
 ### After Implementation (Target)
-- **TS2564 Missing:** <20 errors (95%+ reduction)
-- **Stack Overflow Crashes:** 0
-- **Stability:** All tests complete with proper errors
+- **TS1005/TS1109:** <40 total (95% reduction)
+- **Parser Crashes:** 0
+- **Error Recovery:** Parser continues after syntax errors
+- **AST Quality:** Well-formed even with syntax errors
 
 ---
 
 ## Notes
 
 **Dependencies:**
-- CFA infrastructure already exists in `wasm/src/checker/control_flow.rs`
-- Solver code in `wasm/src/solver/` needs recursion guards
-
-**Synergies:**
-- Recursion guards enable testing of more complex type relationships
-- TS2564 implementation validates CFA correctness
+- Parser changes affect entire pipeline
+- Must work with existing token stream
+- Can't change token positions (affects error reporting)
 
 **Risks:**
-- CFA may need enhancements for all code paths
-- Constructor control flow can be complex (try/catch, early returns)
+- ASI is subtle and complex
+- Sync points might skip too much (under-parsing)
+- Sync points might skip too little (over-parsing)
+- Need to match TypeScript's exact behavior
+
+**Synergies:**
+- Fixes semantic checking (AST is well-formed)
+- Enables better error messages
+- Improves conformance across all tests
+
+**Testing Strategy:**
+1. Unit tests for sync logic
+2. Compare with TypeScript on invalid syntax
+3. Use conformance tests with `@error` directive
+4. Manual testing on edge cases
 
 ---
 
 ## Next Steps
 
-1. Start with Task 1 (Recursion Guards) - straightforward, stabilizes tests
-2. Move to Task 2 (TS2564) - uses existing CFA infrastructure
-3. Complete Task 3 (Validation) - measure and verify
+1. **Phase 1:** Add sync infrastructure
+2. **Phase 2:** Update error sites with sync
+3. **Phase 3:** Fix ASI
+4. **Phase 4:** Expression recovery
+5. **Phase 5:** Error node handling
+6. **Phase 6:** Validate and measure
 
 **When complete:** Push to `worker-8` branch and notify EM-2 for review.
 
