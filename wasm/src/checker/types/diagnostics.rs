@@ -126,6 +126,8 @@ pub mod diagnostic_messages {
     pub const CLASS_INCORRECTLY_IMPLEMENTS: &str =
         "Class '{0}' incorrectly implements interface '{1}'.";
     pub const CLASS_INCORRECTLY_EXTENDS: &str = "Class '{0}' incorrectly extends base class '{1}'.";
+    pub const TYPE_IS_NOT_A_CONSTRUCTOR_FUNCTION_TYPE: &str =
+        "Type '{0}' is not a constructor function type.";
     pub const PROPERTY_HAS_NO_INITIALIZER: &str =
         "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
     pub const CANNOT_ASSIGN_READONLY: &str =
@@ -311,6 +313,7 @@ pub mod diagnostic_codes {
     pub const MEMBER_IS_NOT_ACCESSIBLE: u32 = 2341;
     pub const PROPERTY_IS_PRIVATE: u32 = 2341;
     pub const PROPERTY_IS_PROTECTED: u32 = 2445;
+    pub const TYPE_IS_NOT_A_CONSTRUCTOR_FUNCTION_TYPE: u32 = 2507; // Type 'X' is not a constructor function type.
     pub const CANNOT_EXTEND_SEALED_CLASS: u32 = 2509;
     pub const CONSTRUCTOR_CANNOT_HAVE_RETURN_TYPE: u32 = 2380;
     pub const STATIC_MEMBERS_CANNOT_REFERENCE_TYPE_PARAMETERS: u32 = 2302;

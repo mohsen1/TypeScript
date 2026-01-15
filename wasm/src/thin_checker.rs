@@ -16047,6 +16047,9 @@ impl<'a> ThinCheckerState<'a> {
                 continue;
             };
 
+            // Check if this is an extends clause (for TS2507 errors)
+            let is_extends_clause = heritage.token == SyntaxKind::ExtendsKeyword as u16;
+
             // Check each type in the heritage clause
             for &type_idx in &heritage.types.nodes {
                 let Some(type_node) = self.ctx.arena.get(type_idx) else {
@@ -16064,18 +16067,47 @@ impl<'a> ThinCheckerState<'a> {
                 // Try to resolve the heritage symbol
                 if self.resolve_heritage_symbol(expr_idx).is_none() {
                     if let Some(expr_node) = self.ctx.arena.get(expr_idx) {
-                        match expr_node.kind {
-                            k if k == SyntaxKind::NullKeyword as u16
-                                || k == SyntaxKind::UndefinedKeyword as u16
-                                || k == SyntaxKind::TrueKeyword as u16
-                                || k == SyntaxKind::FalseKeyword as u16
-                                || k == SyntaxKind::VoidKeyword as u16
-                                || k == SyntaxKind::NumericLiteral as u16
-                                || k == SyntaxKind::StringLiteral as u16 =>
-                            {
-                                continue;
+                        // Check for literals - emit TS2507 for extends clauses
+                        let literal_type_name: Option<&str> = match expr_node.kind {
+                            k if k == SyntaxKind::NullKeyword as u16 => Some("null"),
+                            k if k == SyntaxKind::UndefinedKeyword as u16 => Some("undefined"),
+                            k if k == SyntaxKind::TrueKeyword as u16 => Some("true"),
+                            k if k == SyntaxKind::FalseKeyword as u16 => Some("false"),
+                            k if k == SyntaxKind::VoidKeyword as u16 => Some("void"),
+                            k if k == SyntaxKind::NumericLiteral as u16 => Some("number"),
+                            k if k == SyntaxKind::StringLiteral as u16 => Some("string"),
+                            // Also check for identifiers with reserved names (parsed as identifier)
+                            k if k == SyntaxKind::Identifier as u16 => {
+                                if let Some(ident) = self.ctx.arena.get_identifier(expr_node) {
+                                    match ident.escaped_text.as_str() {
+                                        "undefined" => Some("undefined"),
+                                        "null" => Some("null"),
+                                        "void" => Some("void"),
+                                        _ => None,
+                                    }
+                                } else {
+                                    None
+                                }
                             }
-                            _ => {}
+                            _ => None,
+                        };
+
+                        if let Some(type_name) = literal_type_name {
+                            if is_extends_clause {
+                                use crate::checker::types::diagnostics::{
+                                    diagnostic_codes, diagnostic_messages, format_message,
+                                };
+                                let message = format_message(
+                                    diagnostic_messages::TYPE_IS_NOT_A_CONSTRUCTOR_FUNCTION_TYPE,
+                                    &[type_name],
+                                );
+                                self.error_at_node(
+                                    expr_idx,
+                                    &message,
+                                    diagnostic_codes::TYPE_IS_NOT_A_CONSTRUCTOR_FUNCTION_TYPE,
+                                );
+                            }
+                            continue;
                         }
                     }
                     // Get the name for the error message
