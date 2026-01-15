@@ -56,16 +56,54 @@ EM-1 is responsible for **parser accuracy**. Your team ensures that:
 
 ### Priority 1: Restart Workers 3-4 Under Worker 5's Mentorship
 **Owner:** EM-1 (with Worker 5 as mentor)
+**Status:** 🔴 ACTIVE - Immediate action required
+**Started:** 2026-01-15 13:45
 
 **Problem:** Workers 3-4 did not complete their assigned tasks:
-- Worker 3: Only documentation, no TS1109 implementation
-- Worker 4: Did wrong task (solver defaults instead of TS1005)
+- Worker 3: Only documentation, no TS1109 implementation (262 extra errors)
+- Worker 4: Did wrong task (solver defaults instead of TS1005, 345 extra errors)
 
-**Action Items:**
-1. EM-1 assigns new tasks to Workers 3-4
-2. Worker 5 provides close mentorship
-3. Regular progress checkpoints (daily commits required)
-4. If no progress after 2 days, reassign to different squad
+**Mentorship Framework:**
+
+**Week 1: Intensive Onboarding**
+- Day 1-2: Worker 5 pairs with Workers 3-4 to explain parser architecture
+- Day 3-4: Worker 5 assigns subtasks, reviews code before commits
+- Day 5: Checkpoint - assess progress, adjust approach if needed
+
+**Week 2: Scaled Mentorship**
+- Worker 5 does daily code reviews (morning sync)
+- Workers 3-4 commit daily with specific subtask completion
+- Worker 5 available for questions but not pairing full-time
+
+**Week 3: Independence Assessment**
+- Workers 3-4 work independently with daily check-ins
+- If no substantial progress by end of Week 3, reassign to EM-3 (type checking)
+
+**Specific Tasks Assigned:**
+
+**Worker 3 - TS1109 Suppression (Mentor: Worker 5)**
+- Subtask 3.1: Study existing error recovery in Worker 5's commits
+- Subtask 3.2: Identify 5 conformance tests where TS1109 should be suppressed
+- Subtask 3.3: Implement suppression for expression contexts
+- Subtask 3.4: Test and verify error count reduction
+- **Commit requirement:** Daily commits with `[wasm] parser: TS1109 - <subtask>`
+
+**Worker 4 - TS1005 Suppression (Mentor: Worker 5)**
+- Subtask 4.1: Extend Worker 5's existing token suppression work
+- Subtask 4.2: Identify 5 conformance tests where TS1005 should be suppressed
+- Subtask 4.3: Implement suppression for additional token types
+- Subtask 4.4: Test and verify error count reduction
+- **Commit requirement:** Daily commits with `[wasm] parser: TS1005 - <subtask>`
+
+**Success Criteria:**
+- Week 1: Workers 3-4 complete at least 2 subtasks each
+- Week 2: Substantial code committed (20+ lines per worker)
+- Week 3: Error count reduction measurable (TS1109: 262→200, TS1005: 345→250)
+
+**Fallback Plan:**
+- If Worker 3 shows no progress by Day 5 → reassign to EM-3 (TS2571/TS2683 tasks)
+- If Worker 4 shows no progress by Day 5 → reassign to EM-3 (generic type constraints)
+- Worker 5 takes over both tasks (has proven high throughput)
 
 ### Priority 2: TS1109 Suppression (Parser Expression Expected)
 **Owner:** Worker 3 (restarted) or Worker 5
@@ -165,13 +203,13 @@ Current baseline from rust branch (commit 74df9fd30d):
 
 ---
 
-## Merge Readiness Status (2026-01-15 13:20)
+## Merge Readiness Status (2026-01-15 13:45)
 
 | Worker | Status | Notes |
 |--------|--------|-------|
-| Worker 3 | 🔴 Needs restart | Did not complete TS1109 task |
-| Worker 4 | 🔴 Needs restart | Did wrong task (solver defaults) |
-| Worker 5 | 🟢 Complete | Parser error recovery complete |
+| Worker 3 | 🔵 Restarted | TS1109 suppression - Week 1 mentorship with Worker 5 |
+| Worker 4 | 🔵 Restarted | TS1005 suppression - Week 1 mentorship with Worker 5 |
+| Worker 5 | 🟢 Mentor | Parser recovery complete, mentoring Workers 3-4 |
 
 ---
 
@@ -191,10 +229,10 @@ Current baseline from rust branch (commit 74df9fd30d):
 1. ✅ Create em-team-1 branch
 2. ✅ Create EM_1_TASKS.md
 3. ✅ Worker 5 complete - transfer from EM-2
-4. 🔄 **Restart Workers 3-4** under Worker 5's mentorship
-5. 📅 Assign TS1109 to Worker 3 (or Worker 5 if Worker 3 doesn't progress)
-6. 📅 Assign TS1005 to Worker 4 (or Worker 5 if Worker 4 doesn't progress)
-7. 📋 Track parser error counts
+4. ✅ **Workers 3-4 restarted** under Worker 5's mentorship (2026-01-15 13:45)
+5. 🔄 **Week 1 Checkpoint** - Assess progress by 2026-01-22
+6. 📋 Track parser error counts (TS1109: 262, TS1005: 345)
+7. 📅 **Decision point** 2026-02-05 - Reassign or continue based on progress
 
 ---
 
