@@ -5544,6 +5544,11 @@ impl ThinParserState {
 
         let condition = self.parse_expression();
 
+        // Error recovery: if condition parsing failed badly, resync to close paren
+        if condition.is_none() && !self.is_token(SyntaxKind::CloseParenToken) {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let statement = self.parse_statement();
@@ -5586,6 +5591,14 @@ impl ThinParserState {
             NodeIndex::NONE
         };
 
+        // Error recovery: if initializer parsing failed badly, resync to semicolon
+        if initializer.is_none() && !self.is_token(SyntaxKind::SemicolonToken)
+            && !self.is_token(SyntaxKind::InKeyword)
+            && !self.is_token(SyntaxKind::OfKeyword)
+        {
+            self.resync_after_error();
+        }
+
         // Check for for-in or for-of
         if self.is_token(SyntaxKind::InKeyword) {
             return self.parse_for_in_statement_rest(start_pos, initializer);
@@ -5603,6 +5616,14 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: if condition parsing failed badly, resync to semicolon
+        if condition.is_none() && !self.is_token(SyntaxKind::SemicolonToken)
+            && !self.is_token(SyntaxKind::CloseParenToken)
+        {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::SemicolonToken);
 
         // Incrementor
@@ -5611,6 +5632,12 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: if incrementor parsing failed badly, resync to close paren
+        if incrementor.is_none() && !self.is_token(SyntaxKind::CloseParenToken) {
+            self.resync_after_error();
+        }
+
         self.parse_expected(SyntaxKind::CloseParenToken);
 
         let statement = self.parse_statement();
@@ -5931,7 +5958,16 @@ impl ThinParserState {
                     },
                 ));
             } else {
-                self.next_token(); // Skip unexpected token
+                // Unexpected token in switch body - emit error and recover
+                if self.token_pos() != self.last_error_pos {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.parse_error_at_current_token(
+                        "case or default expected.",
+                        diagnostic_codes::TOKEN_EXPECTED,
+                    );
+                }
+                // Skip unexpected token and continue
+                self.next_token();
             }
         }
 
@@ -6010,6 +6046,17 @@ impl ThinParserState {
         } else {
             NodeIndex::NONE
         };
+
+        // Error recovery: try without catch or finally is invalid
+        if catch_clause.is_none() && finally_block.is_none() {
+            if self.token_pos() != self.last_error_pos {
+                use crate::checker::types::diagnostics::diagnostic_codes;
+                self.parse_error_at_current_token(
+                    "catch or finally expected.",
+                    diagnostic_codes::CATCH_OR_FINALLY_EXPECTED,
+                );
+            }
+        }
 
         let end_pos = self.token_end();
         self.arena.add_try(
