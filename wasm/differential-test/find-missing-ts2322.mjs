@@ -128,7 +128,7 @@ async function main() {
 
   console.log(`\n=== MISSING TS2322 DIAGNOSTICS ===`);
   console.log(`Total files missing TS2322: ${missing.length}`);
-  if (missing.length > 0 && missing.length <= 20) {
+  if (missing.length > 0) {
     console.log('\nFiles:');
     missing.forEach(f => console.log(`  - ${f}`));
   }
