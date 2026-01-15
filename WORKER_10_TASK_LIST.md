@@ -85,13 +85,22 @@ TS2304 means "Cannot find name 'X'". This happens when:
 
 ### After (Your Results)
 - TS2304 Extra: 420 (measured with 3000 test files)
-- TS2304 Missing: ___
+- TS2304 Missing: 5 (in 100-test sample)
+- Exact Match: 46.5%
+
+### Validation (2024-01-14 - em-team-3 merge)
+- Tests Run: 99 (100 sample)
+- Exact Match: 46.5%
+- WASM Crashed: 0
+- Top Missing: TS2524 (7), TS2664 (7), TS2705 (7), TS2304 (5)
+- Top Extra: TS7006 (11), TS1109 (4), TS7011 (4)
 
 ### Summary
 - Reduced extra TS2304 errors from 517 to 420 (-97 errors, -18.8%)
 - Fixed: Definite assignment assertion (`!`) parsing in variable declarations
 - local_reference errors: 433 → 354 (-79)
 - type_parameter errors: 30 → 12 (-18)
+- **Status:** ✅ MERGED to em-team-3
 
 ### Fixed Issue
 Root cause: Parser was not capturing the definite assignment assertion operator `!`
