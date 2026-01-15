@@ -1404,8 +1404,21 @@ const mapped = arr.map((item) => {
     let root_node = arena.get(root).expect("root node");
     let source_file = arena.get_source_file(root_node).expect("source file");
 
-    // Get the map call statement (index 3)
-    let map_call_idx = *source_file.statements.nodes.get(3).expect("map call");
+    // Get the variable statement at index 3 (const mapped = ...)
+    let var_stmt_idx = *source_file.statements.nodes.get(3).expect("variable statement");
+    let var_stmt_node = arena.get(var_stmt_idx).expect("var stmt node");
+    let var_stmt_data = arena.get_variable(var_stmt_node).expect("var stmt data");
+
+    // Get the declaration list
+    let decl_list_idx = *var_stmt_data.declarations.nodes.first().expect("declaration list");
+    let decl_list_node = arena.get(decl_list_idx).expect("decl list node");
+    let decl_list_data = arena.get_variable(decl_list_node).expect("decl list data");
+
+    // Get the first declaration and its initializer (the map call)
+    let decl_idx = *decl_list_data.declarations.nodes.first().expect("declaration");
+    let decl_node = arena.get(decl_idx).expect("decl node");
+    let decl = arena.get_variable_declaration(decl_node).expect("decl data");
+    let map_call_idx = decl.initializer;
     let map_call_node = arena.get(map_call_idx).expect("map call node");
     let map_call = arena.get_call_expr(map_call_node).expect("map call data");
 

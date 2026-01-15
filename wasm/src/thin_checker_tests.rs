@@ -26016,3 +26016,129 @@ class Foo {
         checker.ctx.diagnostics
     );
 }
+
+/// Test that global types from lib.d.ts (Promise, Array, console, etc.) resolve correctly
+/// This verifies the fix for TS2304 errors where global symbols were undefined
+#[test]
+fn test_global_symbol_resolution_from_lib_dts() {
+    use crate::thin_parser::ThinParserState;
+    use crate::lib_loader;
+
+    // Load lib.d.ts
+    let lib_file = lib_loader::load_default_lib_dts();
+    if lib_file.is_none() {
+        // Skip test if lib.d.ts is not available (e.g., when running from different directory)
+        return;
+    }
+    let lib_file = lib_file.unwrap();
+
+    // Source code that uses global types from lib.d.ts
+    let source = r#"
+// Test Promise type resolution
+async function getPromise(): Promise<string> {
+    return Promise.resolve("hello");
+}
+
+// Test Array type resolution
+function processArray(arr: Array<number>): number {
+    return arr.reduce((a, b) => a + b, 0);
+}
+
+// Test ReadonlyArray type resolution
+function readonlyArray(arr: ReadonlyArray<string>): number {
+    return arr.length;
+}
+
+// Test console object
+function logConsole(): void {
+    console.log("test");
+}
+
+// Test Object type
+function objectKeys(obj: Object): string[] {
+    return Object.keys(obj);
+}
+
+// Test Function type
+function applyFunction(fn: Function): void {
+    fn();
+}
+
+// Test String type (constructor, not primitive)
+function stringInstance(str: String): number {
+    return str.length;
+}
+
+// Test Number type (constructor, not primitive)
+function numberInstance(num: Number): number {
+    return num.valueOf();
+}
+
+// Test Boolean type (constructor, not primitive)
+function booleanInstance(bool: Boolean): boolean {
+    return bool.valueOf();
+}
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    // Merge lib symbols into the binder (clone to retain ownership)
+    binder.merge_lib_symbols(&[lib_file.clone()]);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        true, // strict mode
+    );
+
+    // Set lib contexts for type resolution (clone Arc fields)
+    checker.ctx.set_lib_contexts(vec![crate::checker::context::LibContext {
+        arena: lib_file.arena.clone(),
+        binder: lib_file.binder.clone(),
+    }]);
+    
+    checker.check_source_file(root);
+
+    // Filter out non-error diagnostics (we only care about actual errors)
+    let errors: Vec<_> = checker.ctx.diagnostics
+        .iter()
+        .filter(|d| d.code != 0)
+        .collect();
+
+    // We should have NO TS2304 (Cannot find name) errors for global types
+    let ts2304_errors: Vec<_> = errors
+        .iter()
+        .filter(|d| d.code == 2304)
+        .collect();
+
+    assert!(
+        ts2304_errors.is_empty(),
+        "Found TS2304 errors for global types (should be resolved from lib.d.ts): {:?}",
+        ts2304_errors
+    );
+
+    // Also verify no TS2552 (Implicit Any) for the Promise return type
+    // This would indicate Promise wasn't resolved correctly
+    let ts2552_errors: Vec<_> = errors
+        .iter()
+        .filter(|d| d.code == 2552)
+        .collect();
+
+    assert!(
+        ts2552_errors.is_empty(),
+        "Found TS2552 errors (likely from Promise not being resolved): {:?}",
+        ts2552_errors
+    );
+}
