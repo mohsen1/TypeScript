@@ -6641,33 +6641,43 @@ impl ThinParserState {
             }
             SyntaxKind::AwaitKeyword => {
                 // Only parse as await expression if we're in an async context
-                // Otherwise, parse as an identifier (await can be used as a variable name)
-                if self.in_async_context() {
-                    let start_pos = self.token_pos();
-                    self.next_token();
-
-                    // Check for missing operand (e.g., just "await" with nothing after it)
+                if !self.in_async_context() {
+                    // Outside async context, check if await is used as a bare expression
+                    // If followed by semicolon or statement end, report "Expression expected"
+                    // Examples in static blocks where await is a reserved identifier:
+                    //   await;  // Error: Expression expected
+                    //   await (1);  // Error: Expression expected
+                    // But allow: let await = 1;  (declaration)
                     if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
                         use crate::checker::types::diagnostics::diagnostic_codes;
                         self.error_expression_expected();
                     }
-
-                    let expression = self.parse_unary_expression();
-                    let end_pos = self.token_end();
-
-                    self.arena.add_unary_expr_ex(
-                        syntax_kind_ext::AWAIT_EXPRESSION,
-                        start_pos,
-                        end_pos,
-                        UnaryExprDataEx {
-                            expression,
-                            asterisk_token: false,
-                        },
-                    )
-                } else {
-                    // In non-async contexts, await is just an identifier
-                    self.parse_primary_expression()
+                    // Fall through to parse as identifier/postfix expression
+                    return self.parse_postfix_expression();
                 }
+
+                // In async context, parse as await expression
+                let start_pos = self.token_pos();
+                self.next_token();
+
+                // Check for missing operand (e.g., just "await" with nothing after it)
+                if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+                    use crate::checker::types::diagnostics::diagnostic_codes;
+                    self.error_expression_expected();
+                }
+
+                let expression = self.parse_unary_expression();
+                let end_pos = self.token_end();
+
+                self.arena.add_unary_expr_ex(
+                    syntax_kind_ext::AWAIT_EXPRESSION,
+                    start_pos,
+                    end_pos,
+                    UnaryExprDataEx {
+                        expression,
+                        asterisk_token: false,
+                    },
+                )
             }
             SyntaxKind::YieldKeyword => {
                 let start_pos = self.token_pos();
