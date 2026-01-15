@@ -3,7 +3,18 @@
 Maintained by EM-3
 
 ## Active Task
-- None awaiting assignment
+
+### Task 2: Investigate TS2322 solver fallback behavior
+- [ ] Search for solver code that returns `Any` or `Error` as fallback
+- [ ] Identify where `lower_type` and subtyping checks bail out
+- [ ] Document the current fallback strategy in solver/ directory
+- [ ] Find 3-5 concrete examples of missing TS2322 errors from conformance tests
+- [ ] Create a patch plan: change `Any` fallback to `Unknown` for stricter checking
+- [ ] Document potential side effects (may convert missing errors to extra errors)
+
+**Goal:** Understand why 310 TS2322 errors are missing and plan the fix
+
+**Target Branch:** rust
 
 ## Completed Tasks
 
