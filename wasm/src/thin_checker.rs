@@ -9862,16 +9862,19 @@ impl<'a> ThinCheckerState<'a> {
 
             // TS2705: Async function must return Promise
             // Check for arrow functions and function expressions
+            // Note: Async generators (async function* or async *method) should NOT trigger TS2705
+            // because they return AsyncGenerator or AsyncIterator, not Promise
             if !is_function_declaration && has_type_annotation {
-                let is_async = if let Some(func) = self.ctx.arena.get_function(node) {
-                    func.is_async
+                let (is_async, is_generator) = if let Some(func) = self.ctx.arena.get_function(node) {
+                    (func.is_async, func.asterisk_token)
                 } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
-                    self.has_async_modifier(&method.modifiers)
+                    (self.has_async_modifier(&method.modifiers), method.asterisk_token)
                 } else {
-                    false
+                    (false, false)
                 };
 
-                if is_async && !self.is_promise_type(return_type) {
+                // Only check non-generator async functions
+                if is_async && !is_generator && !self.is_promise_type(return_type) {
                     use crate::checker::types::diagnostics::{
                         diagnostic_codes, diagnostic_messages,
                     };
@@ -14620,7 +14623,9 @@ impl<'a> ThinCheckerState<'a> {
 
                         // TS2705: Async function must return Promise
                         // Only check if there's an explicit return type annotation
+                        // Note: Async generators (async function*) return AsyncGenerator, not Promise
                         if func.is_async
+                            && !func.asterisk_token
                             && has_type_annotation
                             && !self.is_promise_type(return_type)
                         {
@@ -20513,6 +20518,10 @@ impl<'a> ThinCheckerState<'a> {
         if !param.type_annotation.is_none() {
             return;
         }
+        // Skip parameters with default values - TypeScript infers the type from the initializer
+        if !param.initializer.is_none() {
+            return;
+        }
         if self.is_this_parameter_name(param.name) {
             return;
         }
@@ -21047,7 +21056,8 @@ impl<'a> ThinCheckerState<'a> {
 
         // TS7008: Member implicitly has an 'any' type
         // Report this error when noImplicitAny is enabled and the property has no type annotation
-        if self.ctx.no_implicit_any && prop.type_annotation.is_none() {
+        // AND no initializer (if there's an initializer, TypeScript can infer the type)
+        if self.ctx.no_implicit_any && prop.type_annotation.is_none() && prop.initializer.is_none() {
             if let Some(member_name) = self.get_property_name(prop.name) {
                 use crate::checker::types::diagnostics::{
                     diagnostic_codes, diagnostic_messages, format_message,
