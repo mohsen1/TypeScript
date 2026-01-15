@@ -2469,17 +2469,12 @@ fn collect_diagnostics(
                 diagnostic_messages::CANNOT_FIND_MODULE,
                 &[specifier.as_str()],
             );
-            let code = if specifier.starts_with('.') || specifier.starts_with('/') {
-                diagnostic_codes::MODULE_NOT_FOUND
-            } else {
-                diagnostic_codes::CANNOT_FIND_MODULE
-            };
             file_diagnostics.push(Diagnostic::error(
                 file.file_name.clone(),
                 start,
                 length,
                 message,
-                code,
+                diagnostic_codes::CANNOT_FIND_MODULE,
             ));
         }
         checker.check_source_file(file.source_file);

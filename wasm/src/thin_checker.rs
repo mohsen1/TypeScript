@@ -14711,6 +14711,11 @@ impl<'a> ThinCheckerState<'a> {
             // Export declarations - descend into the wrapped declaration
             syntax_kind_ext::EXPORT_DECLARATION => {
                 if let Some(export_decl) = self.ctx.arena.get_export_decl(node) {
+                    // Check module specifier for unresolved modules (TS2792)
+                    // This handles cases like: export * as ns from './nonexistent';
+                    if !export_decl.module_specifier.is_none() {
+                        self.check_export_module_specifier(stmt_idx);
+                    }
                     // Check the wrapped declaration (function, class, variable, etc.)
                     if !export_decl.export_clause.is_none() {
                         self.check_statement(export_decl.export_clause);
@@ -15800,12 +15805,50 @@ impl<'a> ThinCheckerState<'a> {
         // This is correct because WASM checker operates on individual files
         // without access to the module graph (aside from ambient module declarations).
         let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
-        let code = if module_name.starts_with('.') || module_name.starts_with('/') {
-            diagnostic_codes::MODULE_NOT_FOUND
-        } else {
-            diagnostic_codes::CANNOT_FIND_MODULE
+        self.error_at_node(import.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
+    }
+
+    /// Check an export declaration's module specifier for unresolved modules.
+    /// Emits TS2792 when the module cannot be resolved.
+    /// Handles cases like: export * as ns from './nonexistent';
+    fn check_export_module_specifier(&mut self, stmt_idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
         };
-        self.error_at_node(import.module_specifier, &message, code);
+
+        if !self.ctx.report_unresolved_imports {
+            return;
+        }
+
+        let Some(node) = self.ctx.arena.get(stmt_idx) else {
+            return;
+        };
+
+        let Some(export_decl) = self.ctx.arena.get_export_decl(node) else {
+            return;
+        };
+
+        // Get module specifier string
+        let Some(spec_node) = self.ctx.arena.get(export_decl.module_specifier) else {
+            return;
+        };
+
+        let Some(literal) = self.ctx.arena.get_literal(spec_node) else {
+            return;
+        };
+
+        let module_name = &literal.text;
+
+        // Check if the module was resolved by the CLI driver (multi-file mode)
+        if let Some(ref resolved) = self.ctx.resolved_modules {
+            if resolved.contains(module_name) {
+                return;
+            }
+        }
+
+        // Emit TS2792 for unresolved export module specifiers
+        let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
+        self.error_at_node(export_decl.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
     }
 
     /// Check heritage clauses (extends/implements) for unresolved names.
