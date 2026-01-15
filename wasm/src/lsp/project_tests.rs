@@ -2438,3 +2438,171 @@ fn test_project_code_actions_missing_import_reexport() {
     let updated = apply_text_edits(source, line_map, edits);
     assert_eq!(updated, "import { bar } from \"./index\";\nbar();\n");
 }
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn test_project_load_tsconfig_strict_true() {
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::env;
+
+    // Create a temporary directory for the test
+    let temp_dir = env::temp_dir().join("typescript_test_strict_true");
+    fs::create_dir_all(&temp_dir).expect("Failed to create temp dir");
+
+    // Create a tsconfig.json with strict: true
+    let tsconfig_path = temp_dir.join("tsconfig.json");
+    let mut file = File::create(&tsconfig_path).expect("Failed to create tsconfig.json");
+    file.write_all(br#"{"compilerOptions": {"strict": true}}"#)
+        .expect("Failed to write tsconfig.json");
+
+    // Create a project and load the tsconfig
+    let mut project = Project::new();
+    project.set_file("test.ts".to_string(), "const x: number = 1;\n".to_string());
+
+    // Verify default is false
+    assert_eq!(project.strict(), false, "Default strict should be false");
+    assert_eq!(project.file("test.ts").unwrap().strict(), false);
+
+    // Load tsconfig
+    let result = project.load_tsconfig(&temp_dir);
+    assert!(result.is_ok(), "load_tsconfig should succeed");
+
+    // Verify strict mode is now true
+    assert_eq!(project.strict(), true, "Strict should be true after loading tsconfig");
+    assert_eq!(
+        project.file("test.ts").unwrap().strict(),
+        true,
+        "Existing files should be updated to strict mode"
+    );
+
+    // Cleanup
+    fs::remove_file(&tsconfig_path).ok();
+    fs::remove_dir(&temp_dir).ok();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn test_project_load_tsconfig_strict_false() {
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::env;
+
+    // Create a temporary directory for the test
+    let temp_dir = env::temp_dir().join("typescript_test_strict_false");
+    fs::create_dir_all(&temp_dir).expect("Failed to create temp dir");
+
+    // Create a tsconfig.json with strict: false
+    let tsconfig_path = temp_dir.join("tsconfig.json");
+    let mut file = File::create(&tsconfig_path).expect("Failed to create tsconfig.json");
+    file.write_all(br#"{"compilerOptions": {"strict": false}}"#)
+        .expect("Failed to write tsconfig.json");
+
+    // Create a project with strict mode initially true
+    let mut project = Project::new();
+    project.set_strict(true);
+    project.set_file("test.ts".to_string(), "const x: number = 1;\n".to_string());
+
+    assert_eq!(project.strict(), true, "Should start with strict=true");
+
+    // Load tsconfig with strict: false
+    let result = project.load_tsconfig(&temp_dir);
+    assert!(result.is_ok(), "load_tsconfig should succeed");
+
+    // Verify strict mode is now false
+    assert_eq!(
+        project.strict(),
+        false,
+        "Strict should be false after loading tsconfig"
+    );
+    assert_eq!(
+        project.file("test.ts").unwrap().strict(),
+        false,
+        "Existing files should be updated to non-strict mode"
+    );
+
+    // Cleanup
+    fs::remove_file(&tsconfig_path).ok();
+    fs::remove_dir(&temp_dir).ok();
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn test_project_load_tsconfig_missing_file() {
+    use std::env;
+
+    // Use a non-existent directory
+    let temp_dir = env::temp_dir().join("typescript_test_nonexistent");
+
+    // Create a project
+    let mut project = Project::new();
+    project.set_strict(true);
+    project.set_file("test.ts".to_string(), "const x: number = 1;\n".to_string());
+
+    assert_eq!(project.strict(), true, "Should start with strict=true");
+
+    // Try to load tsconfig from non-existent directory
+    let result = project.load_tsconfig(&temp_dir);
+    assert!(result.is_ok(), "Missing tsconfig should not error, just keep default");
+
+    // Verify strict mode is unchanged (true, as we set it)
+    assert_eq!(
+        project.strict(),
+        true,
+        "Strict mode should remain unchanged when tsconfig is missing"
+    );
+}
+
+#[cfg(not(target_arch = "wasm32"))]
+#[test]
+fn test_project_load_tsconfig_updates_all_files() {
+    use std::fs::{self, File};
+    use std::io::Write;
+    use std::env;
+
+    // Create a temporary directory for the test
+    let temp_dir = env::temp_dir().join("typescript_test_multi_file");
+    fs::create_dir_all(&temp_dir).expect("Failed to create temp dir");
+
+    // Create a tsconfig.json with strict: true
+    let tsconfig_path = temp_dir.join("tsconfig.json");
+    let mut file = File::create(&tsconfig_path).expect("Failed to create tsconfig.json");
+    file.write_all(br#"{"compilerOptions": {"strict": true}}"#)
+        .expect("Failed to write tsconfig.json");
+
+    // Create a project with multiple files
+    let mut project = Project::new();
+    project.set_file("a.ts".to_string(), "const x = 1;\n".to_string());
+    project.set_file("b.ts".to_string(), "const y = 2;\n".to_string());
+    project.set_file("c.ts".to_string(), "const z = 3;\n".to_string());
+
+    // Verify all files start with strict=false
+    assert_eq!(project.file("a.ts").unwrap().strict(), false);
+    assert_eq!(project.file("b.ts").unwrap().strict(), false);
+    assert_eq!(project.file("c.ts").unwrap().strict(), false);
+
+    // Load tsconfig
+    let result = project.load_tsconfig(&temp_dir);
+    assert!(result.is_ok(), "load_tsconfig should succeed");
+
+    // Verify ALL files have been updated to strict=true
+    assert_eq!(
+        project.file("a.ts").unwrap().strict(),
+        true,
+        "File a.ts should be updated to strict mode"
+    );
+    assert_eq!(
+        project.file("b.ts").unwrap().strict(),
+        true,
+        "File b.ts should be updated to strict mode"
+    );
+    assert_eq!(
+        project.file("c.ts").unwrap().strict(),
+        true,
+        "File c.ts should be updated to strict mode"
+    );
+
+    // Cleanup
+    fs::remove_file(&tsconfig_path).ok();
+    fs::remove_dir(&temp_dir).ok();
+}
