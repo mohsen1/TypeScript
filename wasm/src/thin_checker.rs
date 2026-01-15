@@ -9788,6 +9788,7 @@ impl<'a> ThinCheckerState<'a> {
             node.kind,
             syntax_kind_ext::METHOD_DECLARATION | syntax_kind_ext::CONSTRUCTOR
         );
+        let is_arrow_function = node.kind == syntax_kind_ext::ARROW_FUNCTION;
 
         // Check for duplicate parameter names in function expressions and arrow functions (TS2300)
         // Note: Methods and constructors are checked in check_method_declaration and check_constructor_declaration
@@ -9810,6 +9811,14 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.types,
                 ctx_type,
             ))
+        } else {
+            None
+        };
+
+        // For arrow functions, capture the outer `this` type to preserve lexical `this`
+        // Arrow functions should inherit `this` from their enclosing scope
+        let outer_this_type = if is_arrow_function {
+            self.current_this_type()
         } else {
             None
         };
@@ -9846,10 +9855,14 @@ impl<'a> ThinCheckerState<'a> {
                         self.check_type_for_parameter_properties(param.type_annotation);
                         self.get_type_from_type_node(param.type_annotation)
                     } else if is_this_param {
+                        // For `this` parameter without type annotation:
+                        // - Arrow functions: inherit outer `this` type to preserve lexical scoping
+                        // - Regular functions: use ANY (will trigger TS2683 when used, not TS2571)
+                        // - Contextual type: if provided, use it (for function types with explicit `this`)
                         if let Some(ref helper) = ctx_helper {
-                            helper.get_this_type().unwrap_or(TypeId::UNKNOWN)
+                            helper.get_this_type().or(outer_this_type).unwrap_or(TypeId::ANY)
                         } else {
-                            TypeId::ANY
+                            outer_this_type.unwrap_or(TypeId::ANY)
                         }
                     } else {
                         // Infer from contextual type
