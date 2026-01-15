@@ -129,15 +129,27 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ## Active Task
 
-### Task 7: Refine TS1005 and TS1109 Parser Error Recovery
+### Task 7: Refine TS1005 and TS1109 Parser Error Recovery 🔄 STARTED
 
-**Priority:** 🔴 CRITICAL (286 combined errors: 90 missing TS1005 + 69 missing TS1109 + 15 extra TS1109 + 196 extra TS1005)
+**Started:** 2024-01-14
+**Priority:** 🔴 CRITICAL (27 combined errors: 13 missing TS1109 + 14 extra TS1005)
+
+**Latest Conformance Results (rust branch - 2024-01-14):**
+- **TS1109 Missing:** 13 occurrences (down from 69 baseline!)
+- **TS1005 Extra:** 14 occurrences (down from 196 baseline!)
+- **Combined Scope:** 27 errors (much improved from 286 baseline)
 
 **Problem:**
-Parser error suppression is too aggressive or incomplete:
-- **TS1005:** 90 missing (should emit but don't) + 196 extra (emit but shouldn't)
-- **TS1109:** 69 missing + 15 extra
+Parser error suppression needs refinement to reduce remaining false positives/negatives:
+- **TS1005:** 14 extra errors (emit but shouldn't) - syntax error detection
+- **TS1109:** 13 missing errors (should emit but don't) - expression expected
 - The current `can_recover_from_error()` and `is_at_expression_end()` logic needs refinement
+
+**Progress Note:**
+Previous work (Tasks 1-6) has dramatically reduced the scope:
+- Missing TS1109: 69 → 13 (-81% improvement)
+- Extra TS1005: 196 → 14 (-93% improvement)
+- Remaining 27 errors are the "hard cases" requiring targeted fixes
 
 **Current State:**
 - Worker 1 added `can_recover_from_error()` method
@@ -186,12 +198,16 @@ Parser error suppression is too aggressive or incomplete:
    - Verify no regression in valid code
    - Verify errors appear where expected
 
-**Success Criteria:**
-- Reduce Missing TS1005 from 90 to <15
-- Reduce Missing TS1109 from 69 to <10
-- Reduce Extra TS1005 from 196 to <50
-- Reduce Extra TS1109 from 15 to <5
-- Overall parser parity improvement: 36% → 50%+
+**Success Criteria (Updated for Current State):**
+- Reduce Extra TS1005 from 14 to <5
+- Reduce Missing TS1109 from 13 to <5
+- Combined improvement: 27 → <10 errors (-63%)
+- Overall parser parity improvement: 44.2% → 48%+
+
+**Stretch Goals:**
+- Reduce Extra TS1005 to 0
+- Reduce Missing TS1109 to 0
+- Achieve near-perfect parser error detection
 
 **Files to Work On:**
 - `wasm/src/thin_parser.rs`
