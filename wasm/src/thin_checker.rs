@@ -11022,6 +11022,32 @@ impl<'a> ThinCheckerState<'a> {
         None
     }
 
+    /// Private brand assignability override.
+    /// If both source and target types have private brands, they must match exactly.
+    /// This implements nominal typing for classes with private fields.
+    fn private_brand_assignability_override(
+        &self,
+        source: TypeId,
+        target: TypeId,
+        _env: Option<&crate::solver::TypeEnvironment>,
+    ) -> Option<bool> {
+        let source_brand = self.get_private_brand(source);
+        let target_brand = self.get_private_brand(target);
+
+        match (source_brand, target_brand) {
+            (Some(brand1), Some(brand2)) => {
+                // Both types have private brands - they must match exactly
+                Some(brand1 == brand2)
+            }
+            (Some(_), None) | (None, Some(_)) => {
+                // One type has a private brand, the other doesn't
+                // This is not assignable
+                Some(false)
+            }
+            (None, None) => None, // Neither has private brand, fall through to normal check
+        }
+    }
+
     fn class_symbol_from_expression(&self, expr_idx: NodeIndex) -> Option<SymbolId> {
         let Some(node) = self.ctx.arena.get(expr_idx) else {
             return None;
@@ -11551,6 +11577,9 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(result) = self.constructor_accessibility_override(source, target, Some(&*env)) {
             return result;
         }
+        if let Some(result) = self.private_brand_assignability_override(source, target, Some(&*env)) {
+            return result;
+        }
         if let Some(result) = self.enum_assignability_override(source, target, Some(&*env)) {
             return result;
         }
@@ -11577,6 +11606,9 @@ impl<'a> ThinCheckerState<'a> {
             return result;
         }
         if let Some(result) = self.constructor_accessibility_override(source, target, Some(env)) {
+            return result;
+        }
+        if let Some(result) = self.private_brand_assignability_override(source, target, Some(env)) {
             return result;
         }
         if let Some(result) = self.enum_assignability_override(source, target, Some(env)) {
@@ -15434,6 +15466,39 @@ impl<'a> ThinCheckerState<'a> {
         let Some(name_node) = self.ctx.arena.get(access.name_or_argument) else {
             return;
         };
+
+        // Check if this is a private identifier (method or field)
+        // Private methods are always readonly
+        if self.is_private_identifier_name(access.name_or_argument) {
+            let prop_name = if let Some(ident) = self.ctx.arena.get_identifier(name_node) {
+                ident.escaped_text.clone()
+            } else {
+                return;
+            };
+
+            // Check if this private identifier is a method (not a field)
+            // by resolving the symbol and checking if any declaration is a method
+            let (symbols, _) = self.resolve_private_identifier_symbols(access.name_or_argument);
+            if !symbols.is_empty() {
+                let is_method = symbols.iter().any(|&sym_id| {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        symbol.declarations.iter().any(|&decl_idx| {
+                            if let Some(node) = self.ctx.arena.get(decl_idx) {
+                                return node.kind == syntax_kind_ext::METHOD_DECLARATION;
+                            }
+                            false
+                        })
+                    } else {
+                        false
+                    }
+                });
+
+                if is_method {
+                    self.error_readonly_property_at(&prop_name, target_idx);
+                    return;
+                }
+            }
+        }
 
         let Some(ident) = self.ctx.arena.get_identifier(name_node) else {
             return;
