@@ -206,3 +206,35 @@
 - WASM builds successfully
 - Error noise significantly reduced through smart suppression
 - See WORKER_5_STATUS.md for detailed report
+
+---
+
+## EM-2 Merge Results (2026-01-15 12:26)
+
+### Merge Status: ✅ SUCCESS
+
+**Merge Commit:** `eecc53fb5`
+**Worker Commit:** `2173a3318` - "feat: enhance statement-level error recovery"
+
+### Changes from Worker 5
+**Statement-Level Error Recovery Enhancement:**
+- Added `is_resync_sync_point()` helper for better sync point detection
+  - Includes control structure boundaries (else, case, default, catch, finally)
+  - Includes comma tokens for declaration lists
+- Updated `resync_after_error()` to use new sync points
+  - Improves statement boundary detection for error recovery
+- Enhanced `parse_variable_declaration_list()` with error recovery
+  - Checks if next token can start a declaration after commas
+  - Handles malformed declaration lists (e.g., `let x, , y`)
+
+### File Changed
+- `wasm/src/thin_parser.rs`: +70 lines, -7 lines
+
+### Merge Strategy
+- Clean merge using 'ort' strategy
+- No conflicts
+
+### Task Status
+✅ **Statement-Level Error Recovery - COMPLETE:** Successfully merged into em-team-2
+**Worker 5 Status:** Ready for new task assignment
+
