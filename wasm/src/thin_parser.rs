@@ -628,7 +628,7 @@ impl ThinParserState {
             | SyntaxKind::SemicolonToken  // empty statement
             | SyntaxKind::OpenParenToken  // parenthesized expression
             | SyntaxKind::OpenBracketToken  // array literal/destructuring
-            | SyntaxKind::LessThanToken => true,  // JSX/type argument
+            | SyntaxKind::LessThanToken => true, // JSX/type argument
             _ => false,
         }
     }
