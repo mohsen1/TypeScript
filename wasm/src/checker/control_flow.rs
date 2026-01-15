@@ -582,16 +582,20 @@ impl<'a> FlowAnalyzer<'a> {
         };
 
         if let Some(rhs) = self.assignment_rhs_for_reference(assignment_node, target) {
-            if let Some(node_types) = self.node_types {
-                if let Some(&rhs_type) = node_types.get(&rhs.0) {
-                    return Some(rhs_type);
-                }
-            }
+            // For flow narrowing, prefer literal types from AST nodes over the type checker's widened types
+            // This ensures that `x = 42` narrows to literal 42.0, not just NUMBER
+            // This matches TypeScript's behavior where control flow analysis preserves literal types
             if let Some(literal_type) = self.literal_type_from_node(rhs) {
                 return Some(literal_type);
             }
             if let Some(nullish_type) = self.nullish_literal_type(rhs) {
                 return Some(nullish_type);
+            }
+            // Fall back to type checker's result for non-literal expressions
+            if let Some(node_types) = self.node_types {
+                if let Some(&rhs_type) = node_types.get(&rhs.0) {
+                    return Some(rhs_type);
+                }
             }
             return None;
         }
