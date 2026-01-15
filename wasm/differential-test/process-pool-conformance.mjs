@@ -15,7 +15,7 @@ const __dirname = dirname(__filename);
 
 const CONFIG = {
   wasmPkgPath: resolve(__dirname, '../pkg'),
-  conformanceDir: resolve(__dirname, '../../tests/cases/conformance'),
+  conformanceDir: resolve(__dirname, '../tests/cases/conformance'),
 };
 
 const colors = {
@@ -234,6 +234,12 @@ async function main() {
         stats.extraErrors++;
         for (const code of result.extraInWasm) {
           extraCodeCounts[code] = (extraCodeCounts[code] || 0) + 1;
+          // Track files with specific extra errors for debugging
+          if (!stats.extraFiles) stats.extraFiles = {};
+          if (!stats.extraFiles[code]) stats.extraFiles[code] = [];
+          if (stats.extraFiles[code].length < 3) {
+            stats.extraFiles[code].push(result.relPath);
+          }
         }
       }
     }
@@ -276,6 +282,12 @@ async function main() {
       const sorted = Object.entries(extraCodeCounts).sort((a, b) => b[1] - a[1]).slice(0, 10);
       for (const [code, count] of sorted) {
         log(`    TS${code}: ${count} occurrences`, colors.yellow);
+        // Show example files for debugging
+        if (stats.extraFiles && stats.extraFiles[code]) {
+          for (const file of stats.extraFiles[code].slice(0, 2)) {
+            log(`      - ${file}`, colors.dim);
+          }
+        }
       }
     }
 

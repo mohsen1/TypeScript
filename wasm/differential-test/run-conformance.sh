@@ -59,12 +59,13 @@ docker run --rm \
         # Create structure that matches runner paths:
         # __dirname = /app/differential-test
         # wasmPkgPath = resolve(__dirname, '../pkg') = /app/pkg
-        # conformanceDir = resolve(__dirname, '../../tests/cases/conformance') = /tests/cases/conformance
-        mkdir -p /app/differential-test /app/pkg /tests/cases /tests/lib
+        # conformanceDir = resolve(__dirname, '../tests/cases/conformance') = /app/tests/cases/conformance
+        # libPath = resolve(__dirname, '../tests/lib/lib.d.ts') = /app/tests/lib/lib.d.ts
+        mkdir -p /app/differential-test /app/pkg /app/tests/cases /app/tests/lib
         cp -r /wasm-pkg/* /app/pkg/
         cp -r /runner-src/*.mjs /runner-src/*.js /runner-src/package.json /app/differential-test/ 2>/dev/null || true
-        cp -rL /ts-tests/cases/conformance /tests/cases/ 2>/dev/null || true
-        cp -rL /ts-tests/lib/* /tests/lib/ 2>/dev/null || true
+        cp -rL /ts-tests/cases/conformance /app/tests/cases/ 2>/dev/null || true
+        cp -rL /ts-tests/lib/* /app/tests/lib/ 2>/dev/null || true
         cd /app/differential-test
         npm install --silent 2>/dev/null || true
         node $RUNNER_SCRIPT $RUNNER_ARGS
