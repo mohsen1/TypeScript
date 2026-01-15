@@ -7695,6 +7695,45 @@ impl ThinParserState {
         )
     }
 
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals that can start array elements
+            SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Keywords/identifiers
+            SyntaxKind::Identifier => true,
+            // This keyword
+            SyntaxKind::ThisKeyword => true,
+            // Super keyword
+            SyntaxKind::SuperKeyword => true,
+            // Open bracket (nested array)
+            SyntaxKind::OpenBracketToken => true,
+            // Open brace (object literal)
+            SyntaxKind::OpenBraceToken => true,
+            // Open paren (parenthesized expression)
+            SyntaxKind::OpenParenToken => true,
+            // Prefix operators
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Check if current token can start an object property
     /// Used for error recovery in object literals when commas are missing
     fn is_property_start(&self) -> bool {

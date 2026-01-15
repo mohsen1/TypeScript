@@ -59,7 +59,7 @@ This ensures global symbols from lib.d.ts are available during binding, preventi
 
 ### Task 4: Invert Solver Defaults - Change TypeId::ANY to TypeId::UNKNOWN ✅ COMPLETED
 **Completed:** 2025-01-14
-**Commit:** 0fed63f73
+**Commits:** 0fed63f73 (P0), ae04f7619 (P1)
 
 **Root Cause:**
 The solver was "optimistic" - when it encountered an unknown type or a resolution failure, it returned `TypeId::ANY`. This suppressed type errors downstream because:
@@ -67,28 +67,154 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 - Invalid operations on `any` don't emit errors
 
 **P0 (Critical) Changes Applied:**
-1. Call signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3276-3277)
-2. Construct signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3312-3313)
-3. Type predicate missing annotation: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 3996-3997)
-4. Type predicate missing node: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 4001-4002)
+1. Call signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)`
+2. Construct signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)`
+3. Type predicate missing annotation: Changed `TypeId::ANY` to `TypeId::UNKNOWN`
+4. Type predicate missing node: Changed `TypeId::ANY` to `TypeId::UNKNOWN`
+
+**P1 (High Impact) Changes Applied:**
+1. Binary operand type fallback: `TypeId::ANY` → `TypeId::UNKNOWN`
+2. Missing node in binary expression: `TypeId::ANY` → `TypeId::UNKNOWN`
+3. Type stack unwrap_or defaults: `TypeId::ANY` → `TypeId::UNKNOWN`
 
 **Files Modified:**
-- `wasm/src/thin_checker.rs`: P0 function return defaults
-
-**Expected Impact:**
-- Missing errors will decrease significantly
-- Extra errors will increase initially (this is correct behavior!)
-- Conformance may decrease temporarily, but correctness increases
-- Type errors are properly reported instead of being hidden behind `any`
-
-**Note:** This is a strategic change. Expect a regression in "exact match" percentage, but this is the correct path to correctness.
+- `wasm/src/thin_checker.rs`: P0 and P1 defaults
 
 ---
 
-## Current Task
-_None assigned._ Awaiting EM-3 directive.
+### Task 5: Continue Inverting Solver Defaults - P2/P3 Categories ✅ COMPLETED
+**Completed:** 2025-01-14
+**Commits:** f5343b322e6 (P2)
+
+**P2 (Medium) Changes Applied:**
+1. Parameter without type annotation: `TypeId::ANY` → `TypeId::UNKNOWN`
+2. Index signature key/value types: `TypeId::ANY` → `TypeId::UNKNOWN`
+3. Property type defaults (2 occurrences): `TypeId::ANY` → `TypeId::UNKNOWN`
+4. Class expression fallback: `TypeId::ANY` → `TypeId::UNKNOWN`
+5. Await expression fallback: `TypeId::ANY` → `TypeId::UNKNOWN`
+6. Parenthesized expression fallback: `TypeId::ANY` → `TypeId::UNKNOWN`
+
+**Files Modified:**
+- `wasm/src/thin_checker.rs`: P2 parameter, index signature, property, and expression defaults
+
+---
+
+### Task 6: Complete P3 (Lower) TypeId::ANY to TypeId::UNKNOWN Changes ✅ COMPLETED
+**Completed:** 2025-01-14
+**Commits:** d523d3b3f76 (P3)
+
+**P3 (Lower) Changes Applied:**
+1. Enum without explicit kind (2 occurrences): `TypeId::ANY` → `TypeId::UNKNOWN`
+2. Brand property types (Symbol.toStringTag): `TypeId::ANY` → `TypeId::UNKNOWN`
+3. Known global value names: `TypeId::ANY` → `TypeId::UNKNOWN`
+
+**Files Modified:**
+- `wasm/src/thin_checker.rs`: P3 enum, brand property, and global value defaults
+
+**Note:** P3 symbol resolution fallbacks were left as-is because they return both TypeId and TypeParams. Promise-like argument fallbacks were kept as ANY per PHASE1_ANALYSIS Category A.
+
+---
+
+## Summary of Solver Defaults Work (Tasks 4-6)
+
+**Total Changes:** P0 (Critical), P1 (High), P2 (Medium), and P3 (Lower) defaults changed from TypeId::ANY to TypeId::UNKNOWN.
+
+**Impact:**
+- Missing errors will decrease significantly
+- Type errors properly reported instead of hidden behind `any`
+- Progress toward 95% conformance goal
+- Strategic shift from "optimistic" to "correct" type checking
+
+---
+
+## Active Task
+
+### Task 7: Refine TS1005 and TS1109 Parser Error Recovery
+
+**Priority:** 🔴 CRITICAL (286 combined errors: 90 missing TS1005 + 69 missing TS1109 + 15 extra TS1109 + 196 extra TS1005)
+
+**Problem:**
+Parser error suppression is too aggressive or incomplete:
+- **TS1005:** 90 missing (should emit but don't) + 196 extra (emit but shouldn't)
+- **TS1109:** 69 missing + 15 extra
+- The current `can_recover_from_error()` and `is_at_expression_end()` logic needs refinement
+
+**Current State:**
+- Worker 1 added `can_recover_from_error()` method
+- Worker 5 added `is_at_expression_end()` method
+- Both combined with OR logic: `can_recover_from_error() || is_at_expression_end()`
+- This is causing both false positives and false negatives
+
+**Action Items:**
+
+1. **Analyze Current Error Suppression**
+   - Search for all TS1005 and TS1109 emission points
+   - Trace `can_recover_from_error()` and `is_at_expression_end()` logic
+   - Find where errors are incorrectly suppressed or emitted
+   - File: `wasm/src/thin_parser.rs`
+
+2. **Improve Recovery Detection**
+   - Make `can_recover_from_error()` more specific
+   - Make `is_at_expression_end()` more precise
+   - Add context-aware suppression:
+     - Don't suppress if we're in a type annotation
+     - Don't suppress if we're in an object literal key
+     - Don't suppress if we're in a destructuring pattern
+   - Consider statement boundaries vs expression boundaries
+
+3. **Fix TS1005 (Expected Token)**
+   - Only suppress if next token continues current construct
+   - Don't suppress if we're clearly at a statement boundary
+   - Better handling of:
+     - Missing commas in arrays/objects
+     - Missing semicolons
+     - Missing colons in object types
+     - Missing parentheses
+
+4. **Fix TS1109 (Expression Expected)**
+   - Better detection of when expression is actually required
+   - Don't emit if we're at a valid statement end
+   - Handle:
+     - Empty statements (just semicolons)
+     - Labelled statements
+     - Block statements
+     - Control flow statements
+
+5. **Testing**
+   - Run conformance tests focusing on parser directories
+   - Check `statements/*`, `parser/*`, `expressions/*` tests
+   - Verify no regression in valid code
+   - Verify errors appear where expected
+
+**Success Criteria:**
+- Reduce Missing TS1005 from 90 to <15
+- Reduce Missing TS1109 from 69 to <10
+- Reduce Extra TS1005 from 196 to <50
+- Reduce Extra TS1109 from 15 to <5
+- Overall parser parity improvement: 36% → 50%+
+
+**Files to Work On:**
+- `wasm/src/thin_parser.rs`
+  - `can_recover_from_error()` method (line ~700+)
+  - `is_at_expression_end()` method
+  - `is_expression_start()` method (line ~800)
+  - `error_expression_expected()` method
+  - TS1005 and TS1109 emission points
+
+**Related Work:**
+- Builds on Task 2 (ASI implementation)
+- Builds on Task 3 (error poisoning fix)
+- Coordinates with Worker 1's parser error suppression
+- Coordinates with Worker 5's expression end detection
+
+**Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --all` after changes
+- Focus on parser and statement test categories
+- Measure improvement in exact match percentage
 
 ---
 
 ## Pending Tasks
-_None yet._
+_Awaiting completion of Task 7_

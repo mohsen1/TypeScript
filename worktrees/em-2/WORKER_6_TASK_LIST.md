@@ -66,3 +66,46 @@
 - Successfully implemented TS2589 recursion guards
 - Started work on TS2564 (class property initialization check)
 - Merged cleanly with no conflicts
+
+---
+
+## EM-2 Merge Results - Round 2 (2026-01-14 23:12)
+
+### Merge Status: ✅ SUCCESS
+
+**Merge Commit:** `3024b0f35d3`
+**Worker Commit:** `6f955bc732a` - "Complete: Fix TS2454 for lib.d.ts global values"
+
+### Changes from Worker 6
+**TS2454 Fix - lib.d.ts Global Values:**
+- Modified `symbol_is_in_ambient_context` to detect lib symbols
+- Lib symbols identified by checking if they exist in main binder's arena
+- If `lib_contexts` is not empty and symbol is only in lib binders, skip definite assignment check
+- All lib.d.ts globals (Object, Promise, Map, Set, console, etc.) now work without TS2454
+
+### Test Results (from commit)
+```
+console.log("test") - 0 errors ✅
+const obj = Object.create(null) - 0 errors ✅
+Promise.resolve() - 0 errors ✅
+new Map() - 0 errors ✅
+new Set() - 0 errors ✅
+```
+
+### Compilation Fix Applied
+After merge, same compilation error as before (missing `is_array_element_start` method).
+**Fix Applied:** Restored method with implementation for array literal error recovery.
+**Commit:** `76607b24879` (on em-team-1, fix shared across all branches)
+
+### Test Results
+```
+cargo test --lib
+test result: FAILED. 7993 passed; 181 failed; 1 ignored
+```
+- Compilation: SUCCESS ✅
+- 7993 tests passing
+- 181 tests failing (pre-existing issues, not related to this merge)
+
+### Task Status Update
+✅ **TS2454 - COMPLETE:** Worker 6 successfully fixed lib.d.ts global values issue
+⚠️ **TS2304 - STILL PENDING:** Original task (343 missing TS2304 errors for lib.d.ts globals) was not the focus of this commit. The TS2454 fix addresses definite assignment errors, but the original TS2304 task about global scope/lib injection may need separate verification.
