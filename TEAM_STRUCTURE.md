@@ -24,17 +24,19 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 | Worker | Branch | Squad | Assigned Focus | Status | Throughput |
 |--------|--------|-------|----------------|--------|------------|
-| Worker 3 | worker-3 | Syntax | TS1109 suppression | ❌ **Not done** | None |
-| Worker 4 | worker-4 | Syntax | TS1005 suppression | ❌ **Wrong task** | Low |
-| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Complete | High |
+| Worker 3 | worker-3 | Syntax | TS1109 suppression | 🔵 Week 1 mentorship | TBD |
+| Worker 4 | worker-4 | Syntax | TS1005 suppression | 🔵 Week 1 mentorship | TBD |
+| Worker 5 | worker-5 | Syntax | Parser recovery ✅ Complete | 🟢 Mentor | High |
 
 **EM Branch:** em-team-1
 
 **Leadership:** Worker 5 (exceptional throughput, mentor for Workers 3-4)
 
 **Status:**
-- ⚠️ **Workers 3-4 did not complete tasks** - Need reassignment under Worker 5's mentorship
+- ✅ **Workers 3-4 restarted** on 2026-01-15 13:45 under Worker 5's mentorship
 - ✅ Worker 5 complete - leading Syntax Squad
+- 📅 **Week 1 Checkpoint:** 2026-01-22
+- 📅 **Decision point:** 2026-02-05
 
 **Worker 3 Assessment:**
 - Assigned: TS1109 "Expression expected" suppression (reduce from 262 to <40 errors)
@@ -55,21 +57,21 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 | Worker | Branch | Squad | Current Focus | Status | Throughput |
 |--------|--------|-------|---------------|--------|------------|
-| Worker 6 | worker-6 | Binder | Global scope / lib injection ✅ Complete | 🟢 Ready | Medium |
-| Worker 7 | worker-7 | Semantics | Module symbol resolution (partial) | 🔵 Active | Medium |
-| Worker 8 | worker-8 | LSP | TypeScript config integration | 🟢 Approved | TBD |
+| Worker 6 | worker-6 | Semantics | Module resolution (re-exports, TS2792) | 🔵 Active | Medium |
+| Worker 7 | worker-7 | Semantics | Module resolution (namespace, defaults) | 🔵 Active | Medium |
+| Worker 8 | worker-8 | LSP | TypeScript config integration | ✅ Complete | High |
 
 **EM Branch:** em-team-2
 
 **Status:**
-- ✅ Worker 6 complete - awaiting new task
-- 🔄 Worker 7 active - partial implementation (named imports work, namespace/defaults/re-exports/T2792 pending)
-- 🟢 Worker 8 approved - ready to start LSP config integration
+- ✅ Worker 6 reassigned to help Worker 7 (2026-01-15 13:50)
+- 🔄 Two-pronged module resolution - Workers 6-7 working in parallel
+- ✅ Worker 8 complete - LSP TypeScript config integration merged
 
 **Priority Issues:**
-- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors (Worker 7 - partial implementation)
-- LSP TypeScript config integration (Worker 8 - approved, ready to start)
-- Remaining type checker accuracy issues
+- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors (Workers 6-7)
+- Worker 6: re-exports, TS2792
+- Worker 7: namespace imports, default imports
 
 ---
 
