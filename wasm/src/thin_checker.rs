@@ -7320,6 +7320,7 @@ impl<'a> ThinCheckerState<'a> {
             let env = self.ctx.type_env.borrow();
             let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
             checker.set_strict_function_types(self.ctx.strict_function_types);
+            checker.set_strict_null_checks(self.ctx.strict_null_checks);
             let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
             evaluator.resolve_call(callee_type, &arg_types)
         };
@@ -7990,6 +7991,7 @@ impl<'a> ThinCheckerState<'a> {
             let result = {
                 let env = self.ctx.type_env.borrow();
                 let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+                checker.set_strict_null_checks(self.ctx.strict_null_checks);
                 let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
                 evaluator.resolve_call(func_type, &arg_types)
             };
@@ -8167,6 +8169,7 @@ impl<'a> ThinCheckerState<'a> {
         let result = {
             let env = self.ctx.type_env.borrow();
             let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+            checker.set_strict_null_checks(self.ctx.strict_null_checks);
             let mut evaluator = CallEvaluator::new(self.ctx.types, &mut checker);
             evaluator.resolve_call(construct_type, &arg_types)
         };
@@ -11599,6 +11602,7 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
         checker.set_strict_function_types(self.ctx.strict_function_types);
+        checker.set_strict_null_checks(self.ctx.strict_null_checks);
         checker.is_assignable(source, target)
     }
 
@@ -11630,6 +11634,7 @@ impl<'a> ThinCheckerState<'a> {
 
         let mut checker = CompatChecker::with_resolver(self.ctx.types, env);
         checker.set_strict_function_types(self.ctx.strict_function_types);
+        checker.set_strict_null_checks(self.ctx.strict_null_checks);
         checker.is_assignable(source, target)
     }
 
@@ -11662,7 +11667,8 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::SubtypeChecker;
         let depth_exceeded = {
             let env = self.ctx.type_env.borrow();
-            let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env);
+            let mut checker = SubtypeChecker::with_resolver(self.ctx.types, &*env)
+                .with_strict_null_checks(self.ctx.strict_null_checks);
             let result = checker.is_subtype_of(source, target);
             let depth_exceeded = checker.depth_exceeded;
             (result, depth_exceeded)
@@ -11690,7 +11696,8 @@ impl<'a> ThinCheckerState<'a> {
     ) -> bool {
         use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages};
         use crate::solver::SubtypeChecker;
-        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env);
+        let mut checker = SubtypeChecker::with_resolver(self.ctx.types, env)
+            .with_strict_null_checks(self.ctx.strict_null_checks);
         let result = checker.is_subtype_of(source, target);
         let depth_exceeded = checker.depth_exceeded;
 
@@ -11749,6 +11756,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::CompatChecker;
         let env = self.ctx.type_env.borrow();
         let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        checker.set_strict_null_checks(self.ctx.strict_null_checks);
         for &target in targets {
             if checker.is_assignable(source, target) {
                 return true;

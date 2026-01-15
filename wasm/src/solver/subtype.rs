@@ -225,6 +225,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         }
     }
 
+    /// Set whether strict null checks are enabled.
+    /// When false, null and undefined are assignable to any type.
+    pub fn with_strict_null_checks(mut self, strict_null_checks: bool) -> Self {
+        self.strict_null_checks = strict_null_checks;
+        self
+    }
+
     pub(crate) fn resolve_ref_type(&self, type_id: TypeId) -> TypeId {
         match self.interner.lookup(type_id) {
             Some(TypeKey::Ref(symbol)) => self

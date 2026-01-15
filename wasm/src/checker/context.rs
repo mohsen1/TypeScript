@@ -144,6 +144,12 @@ pub struct CheckerContext<'a> {
     /// This is enabled by strict mode in TypeScript.
     pub strict_property_initialization: bool,
 
+    /// Whether strict null checks are enabled (strictNullChecks).
+    /// When true, null and undefined are not assignable to any other type.
+    /// When false, null and undefined are assignable to any type.
+    /// This is enabled by strict mode in TypeScript.
+    pub strict_null_checks: bool,
+
     // --- Caches ---
     /// Cached types for symbols.
     pub symbol_types: FxHashMap<SymbolId, TypeId>,
@@ -284,6 +290,7 @@ impl<'a> CheckerContext<'a> {
             report_unresolved_imports: true,
             strict_function_types: strict,
             strict_property_initialization: strict,
+            strict_null_checks: strict,
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -345,6 +352,7 @@ impl<'a> CheckerContext<'a> {
             report_unresolved_imports: true,
             strict_function_types: strict,
             strict_property_initialization: strict,
+            strict_null_checks: strict,
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,
