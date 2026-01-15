@@ -1,6 +1,6 @@
 # Team Structure - Project Zang Orchestrator
 
-**Last Updated:** 2026-01-14 (Director Planning Phase)
+**Last Updated:** 2026-01-14 (EM-2 Merge Complete)
 **Branch:** rust
 **Total Workers:** 12
 **Team Size Limit:** ≤ 4 per team
@@ -124,6 +124,42 @@
 
 ---
 
+### 2026-01-14 - EM-2 Merge: Solver Defaults Inversion Complete ✅
+
+**Decision:** Merged EM-2 (Binder Squad) FIRST - out of priority order
+
+**Rationale:**
+- EM-2 completed **Priority #3** (Solver Strictness): Invert solver defaults
+- This work is **foundational** - affects all downstream semantic analysis
+- Worker-8 completed Phases 1-4 of TypeId::ANY → UNKNOWN/ERROR conversion
+- Worker-3 completed TS7008, TS7005, TS2339 semantic error fixes
+- Merging this first provides a better foundation for EM-1 parser work
+
+**Merge Details:**
+- **Commit:** `b4c169560` - "Merge EM-2 (Binder Squad): Solver Defaults Inversion Complete"
+- **Workers Merged:** Worker-3 ✅, Worker-8 ✅
+- **Files Changed:** 13 files, +1670/-114 lines
+- **Key Changes:**
+  - `wasm/src/thin_checker.rs`: Changed ANY→UNKNOWN/ERROR defaults
+  - `wasm/src/solver/diagnostics.rs`: New lazy diagnostics module
+  - `wasm/src/thin_parser.rs`: Error resynchronization improvements
+  - Documentation: PHASE1_ANALYSIS.md, PHASE1_RESYNC_STATUS.md
+
+**Impact Assessment:**
+- ✅ **Expected Regression:** Temporary spike in "Extra Errors" (GOOD - exposes hidden bugs)
+- ✅ **Better Error Detection:** Unknown types no longer hide behind ANY
+- ✅ **Strategic Win:** Enables all downstream semantic analysis to be stricter
+- ⚠️ **May Affect:** EM-1's parser work (need to re-sync on new rust base)
+
+**EM-2 Team Status:**
+- Workers: 5-8 (4 workers, within limit)
+- Tasks: All complete
+- Ready for: New assignment or team resize
+
+**Director Decision:** **NO RESIZING** - EM-2 was working at capacity, all work validated
+
+---
+
 ### 2026-01-14 - Post-Merge Assessment
 
 **Observations:**
@@ -163,4 +199,5 @@
 |------|-------|------|-------------|--------|
 | 2026-01-14 | Initial Setup | All | 4 each | Project kickoff |
 | 2026-01-14 | Director Planning Phase | All | No change | Planning complete, all teams validated |
+| 2026-01-14 | EM-2 Merge (Solver Defaults) | EM-2 | No change | All work validated, at capacity |
 | 2026-01-14 | Post-Merge Review | All | No change | All teams properly staffed |
