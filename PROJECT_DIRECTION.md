@@ -8,6 +8,12 @@ Project Zang is a complete rewrite of the TypeScript compiler and type checker i
 
 **Core Principle:** TypeScript source files (`src/`) remain **read-only** and identical to upstream Microsoft TypeScript. All custom implementation lives in the `wasm/` directory.
 
+
+### Never Break The Build
+
+- All changes must pass the unit tests 
+- No change should reduce conformance test accuracy
+
 ### Key Components
 
 | Component | Location | Purpose |
