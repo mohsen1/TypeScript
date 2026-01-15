@@ -94,7 +94,42 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 **Status:**
 - Both workers ready for new assignments
+- Workers 11-12 assigned to TS2322/type checking tasks
 - See EM_3_TASKS.md for full mission statement and priorities
+
+---
+
+### EM-4: "Quality & Stability Squad" ✅ ACTIVE
+**Focus:** Tier 0 (Cross-cutting) + Tier 3 (Symbol Resolution) + Tier 5 (Async)
+
+| Worker | Branch | Squad | Focus Area | Status | Throughput |
+|--------|--------|-------|------------|--------|------------|
+| Worker 12 | worker-12 | Quality | Parser (TS1109/TS1005) | 🟡 Assigned | TBD |
+| Worker 13 | worker-13 | Quality | Async/Await (TS2705/TS1359) | 🟡 Assigned | TBD |
+| Worker 14 | worker-14 | Quality | Symbol Resolution (TS2304/TS2524) | 🟡 Assigned | TBD |
+
+**EM Branch:** em-team-4
+
+**Leadership:** TBD (needs EM assignment)
+
+**Status:**
+- ✅ EM_4_TASKS.md created with baseline metrics (2025-01-15)
+- ✅ Worker task lists assigned (WORKER_12/13/14_TASK_LIST.md)
+- 📋 Baseline: 28.9% exact match (55/190 files)
+
+**Priority Issues (from EM_4_TASKS.md baseline):**
+
+**Worker 12 - Parser Tier 1:**
+- TS1109: 7 missing, 7 extra (parser accuracy)
+- TS1005: 5 extra ("X expected" false positives)
+
+**Worker 13 - Async Tier 5:**
+- TS2705: 34 missing (async function return types) - **TOP PRIORITY**
+- TS1359: 7 missing ('await' reserved word detection)
+
+**Worker 14 - Symbol Resolution Tier 3:**
+- TS2304: 7 missing ("Cannot find name")
+- TS2524: 12 missing (module member resolution)
 
 ---
 
@@ -205,16 +240,17 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 ## Capacity Planning
 
-**Current State (Post-Rebalancing):** ✅ BALANCED
+**Current State (Post-EM-4 Merge):** ✅ BALANCED
 - EM-1: 3 workers (at capacity)
 - EM-2: 3 workers (at capacity, 🔴 at risk)
 - EM-3: 4 workers (at capacity, Workers 1-2, 11-12)
-- EM-4: 4 workers (at capacity, Workers 9-10, 13-14)
+- EM-4: 3 workers (room for 1 more, Workers 12-14)
 
 **Rebalancing Actions (2025-01-15):**
-- ✅ Workers 9-10 moved from EM-3 to EM-4 (Tier 0 quality)
-- ✅ EM-3 now has 4 workers (within capacity)
-- ✅ EM-4 established with 4 workers (Tier 0 focus)
+- ✅ EM-4 established with Workers 12-14
+- ✅ EM-4 baseline metrics: 28.9% exact match (55/190 files)
+- ✅ Worker assignments: 12→Parser, 13→Async, 14→Symbol Resolution
+- ⚠️ EM-4 has 3 workers (can accept 1 more if needed)
 
 **Future Considerations:**
 - EM-2 needs intervention: Workers 6-7 have zero commits on module resolution
