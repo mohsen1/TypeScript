@@ -15488,7 +15488,7 @@ fn test_application_ref_expansion_with_constraints() {
         constraint: Some(TypeId::NUMBER), // T extends number
         default: None,
     };
-    let t_type = interner.intern(TypeKey::TypeParameter(t_param));
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
 
     // Define: type NumericBox<T extends number> = { value: T }
     let value_name = interner.intern_string("value");
@@ -15511,9 +15511,9 @@ fn test_application_ref_expansion_with_constraints() {
     // Edge case: NumericBox<string> (violates constraint - should this error or still expand?)
     let numeric_box_string = interner.application(numeric_box_ref, vec![TypeId::STRING]);
 
-    // Set up resolver
+    // Set up resolver with type parameters
     let mut env = TypeEnvironment::new();
-    env.insert(SymbolRef(1), numeric_box_body);
+    env.insert_with_params(SymbolRef(1), numeric_box_body, vec![t_param.clone()]);
 
     let evaluator = TypeEvaluator::with_resolver(&interner, &env);
 
@@ -15533,23 +15533,30 @@ fn test_application_ref_expansion_with_constraints() {
     // Evaluate constraint violation case
     let result_invalid = evaluator.evaluate(numeric_box_string);
 
-    // TODO: When Application expansion is implemented,
+    // Expected for invalid case: { value: string }
+    let expected_invalid = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // TODO: When constraint checking is implemented,
     // decide how to handle constraint violations:
     // Option A: Still expand (constraint checking is separate)
     // Option B: Return error type
-    // For now, document current behavior
+    // For now, both cases expand (constraint checking happens elsewhere)
     assert_eq!(
-        result_valid, numeric_box_42,
-        "Current behavior: Application passes through unchanged. \
-         After fix, NumericBox<42> should be {{ value: 42 }}"
+        result_valid, expected_valid,
+        "NumericBox<42> should expand to {{ value: 42 }}"
     );
     assert_eq!(
-        result_invalid, numeric_box_string,
-        "Current behavior: Application passes through unchanged. \
-         After fix, behavior with constraint violation TBD"
+        result_invalid, expected_invalid,
+        "NumericBox<string> should expand to {{ value: string }}, \
+         constraint checking should happen separately"
     );
-
-    let _ = expected_valid;
 }
 
 /// Test Application with never as type argument.
