@@ -752,7 +752,9 @@ impl ThinParserState {
         }
 
         // Skip tokens until we find a synchronization point
-        let mut depth = 0u32;
+        let mut brace_depth = 0u32;
+        let mut paren_depth = 0u32;
+        let mut bracket_depth = 0u32;
         let max_iterations = 1000; // Prevent infinite loops
 
         for _ in 0..max_iterations {
@@ -761,16 +763,16 @@ impl ThinParserState {
                 break;
             }
 
-            // Track brace depth to handle nested blocks
+            // Track nesting depth to handle nested structures
             match self.token() {
                 SyntaxKind::OpenBraceToken => {
-                    depth += 1;
+                    brace_depth += 1;
                     self.next_token();
                     continue;
                 }
                 SyntaxKind::CloseBraceToken => {
-                    if depth > 0 {
-                        depth -= 1;
+                    if brace_depth > 0 {
+                        brace_depth -= 1;
                         self.next_token();
                         continue;
                     }
@@ -778,8 +780,42 @@ impl ThinParserState {
                     self.next_token();
                     break;
                 }
+                SyntaxKind::OpenParenToken => {
+                    paren_depth += 1;
+                    self.next_token();
+                    continue;
+                }
+                SyntaxKind::CloseParenToken => {
+                    if paren_depth > 0 {
+                        paren_depth -= 1;
+                        self.next_token();
+                        continue;
+                    }
+                    // Found closing paren at same level - could be end of expression
+                    // Skip it and check if next token is a statement start
+                    self.next_token();
+                    if self.is_statement_start() {
+                        break;
+                    }
+                    continue;
+                }
+                SyntaxKind::OpenBracketToken => {
+                    bracket_depth += 1;
+                    self.next_token();
+                    continue;
+                }
+                SyntaxKind::CloseBracketToken => {
+                    if bracket_depth > 0 {
+                        bracket_depth -= 1;
+                        self.next_token();
+                        continue;
+                    }
+                    // Found closing bracket at same level - skip it
+                    self.next_token();
+                    continue;
+                }
                 SyntaxKind::SemicolonToken => {
-                    // Semicolon is always a sync point
+                    // Semicolon is always a sync point (even in nested contexts)
                     self.next_token();
                     break;
                 }
@@ -787,11 +823,11 @@ impl ThinParserState {
             }
 
             // If we're at depth 0 and found a statement start, we've resync'd
-            if depth == 0 && self.is_statement_start() {
+            if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 && self.is_statement_start() {
                 break;
             }
 
-            // Otherwise, keep skipping tokens
+            // Keep skipping tokens
             self.next_token();
         }
     }
@@ -7716,6 +7752,31 @@ impl ThinParserState {
             SyntaxKind::Identifier => true,
             // Bracket (computed property)
             SyntaxKind::OpenBracketToken => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals
+            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword | SyntaxKind::NullKeyword => true,
+            // Identifier
+            SyntaxKind::Identifier => true,
+            // This and super
+            SyntaxKind::ThisKeyword | SyntaxKind::SuperKeyword => true,
+            // Nested structures
+            SyntaxKind::OpenBracketToken => true,  // nested array
+            SyntaxKind::OpenBraceToken => true,     // object literal
+            SyntaxKind::OpenParenToken => true,     // parenthesized expression
+            // Unary operators
+            SyntaxKind::ExclamationToken | SyntaxKind::TildeToken | SyntaxKind::PlusToken
+            | SyntaxKind::MinusToken | SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken
+            | SyntaxKind::TypeOfKeyword | SyntaxKind::VoidKeyword | SyntaxKind::DeleteKeyword => true,
             _ => self.is_identifier_or_keyword(),
         }
     }
