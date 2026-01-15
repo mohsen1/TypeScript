@@ -10060,6 +10060,21 @@ impl<'a> ThinCheckerState<'a> {
 
                     let value_type = self.get_type_of_node(prop.initializer);
 
+                    // TS7008: Member implicitly has an 'any' type
+                    // Report this error when noImplicitAny is enabled, the object literal has a contextual type,
+                    // and the property value type is 'any'
+                    if self.ctx.no_implicit_any && prev_context.is_some() && value_type == TypeId::ANY {
+                        let message = format_message(
+                            diagnostic_messages::MEMBER_IMPLICIT_ANY,
+                            &[&name, "any"],
+                        );
+                        self.error_at_node(
+                            prop.name,
+                            &message,
+                            diagnostic_codes::IMPLICIT_ANY_MEMBER,
+                        );
+                    }
+
                     // Restore context
                     self.ctx.contextual_type = prev_context;
 
@@ -10096,6 +10111,25 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(ident) = self.ctx.arena.get_identifier(elem_node) {
                     let value_type = self.get_type_of_node(elem_idx);
                     let name = ident.escaped_text.clone();
+
+                    // TS7008: Member implicitly has an 'any' type
+                    // Report this error when noImplicitAny is enabled, the object literal has a contextual type,
+                    // and the shorthand property value type is 'any'
+                    if self.ctx.no_implicit_any
+                        && self.ctx.contextual_type.is_some()
+                        && value_type == TypeId::ANY
+                    {
+                        let message = format_message(
+                            diagnostic_messages::MEMBER_IMPLICIT_ANY,
+                            &[&name, "any"],
+                        );
+                        self.error_at_node(
+                            elem_idx,
+                            &message,
+                            diagnostic_codes::IMPLICIT_ANY_MEMBER,
+                        );
+                    }
+
                     let name_atom = self.ctx.types.intern_string(&name);
 
                     // Check for duplicate property
