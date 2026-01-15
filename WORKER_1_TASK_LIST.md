@@ -2,66 +2,66 @@
 
 Maintained by EM-1
 
-## 🔴 CURRENT TASK: TS2705 ES Module Import/Export Identifier Validation
+## 🔴 CURRENT TASK: TS1005 Remaining Errors (Complete Phase 2)
 
 **Last Updated:** 2026-01-15
 **Status:** 🔄 ASSIGNED
-**Priority:** 🟡 MEDIUM (HIGH IMPACT)
+**Priority:** 🟡 MEDIUM/HIGH IMPACT
 **Estimated Effort:** 1-2 days
 
 ### Task Description
 
-Fix missing TS2705 errors by implementing proper validation that identifiers used in ES module import/export statements cannot be reserved keywords or specific disallowed identifiers.
+Complete the remaining 5 TS1005 missing errors from the original 17-error analysis. Worker-1 previously fixed 12/17 TS1005 errors via TS1109 implementation. These 5 remaining errors require targeted fixes.
 
-### Background from Investigation Report
+### Background
 
-**Current State (from 487 test sample):**
-- **Missing TS2705 errors:** 34 occurrences (7.0% of all missing errors) - **#1 missing error category**
-- **Error Message:** "Import/export identifier cannot be a keyword or reserved word"
-- **Severity:** 🟡 MEDIUM complexity, HIGH impact
+From previous Task 5 analysis, 5 TS1005 errors remain:
 
-**Root Cause:**
-The parser is not properly validating that identifiers used in ES module import/export statements are not reserved keywords. TypeScript's parser enforces stricter rules for module declarations.
+1. **3 × `']' expected` - private indexers** (HIGH complexity)
+   - Example: `var x = { private [x: string]: string; };`
+   - File: privateIndexer2.ts
+   - Root cause: Parser returns `NodeIndex::NONE` after modifier error in `parse_property_assignment`
+   - Location: `wasm/src/thin_parser.rs:7995-7997`
 
-**Example Cases:**
-- `import { debugger } from "mod"` - `debugger` is reserved
-- `export { if }` - `if` is a keyword
-- `import { await }` - `await` is restricted in module contexts
-- Module namespace declarations with reserved identifiers
+2. **1 × `'export' expected` - default abstract class** (MEDIUM complexity)
+   - Example: `default abstract class C {}`
+   - File: classAbstractManyKeywords.ts
+   - Root cause: `parse_statement()` reports generic error instead of specific TS error
+   - Location: `wasm/src/thin_parser.rs:1378-1382`
+
+3. **1 × `'{' expected` - unknown pattern** (UNKNOWN complexity)
+   - File: classWithPredefinedTypesAsNames2.ts
+   - Status: Requires investigation
 
 ### Implementation Steps
 
-1. **Investigation Phase**
-   - Locate import/export parsing code in `wasm/src/thin_parser.rs`
-   - Identify where identifier validation should occur
-   - Find reserved keywords list/constants
-   - Test with affected test files to confirm missing errors
+1. **Fix Private Indexer Issue (3 errors)**
+   - Investigate `parse_property_assignment` at lines 7995-7997
+   - Parse index signature even with modifiers
+   - Report missing token errors explicitly
+   - Still return `NodeIndex::NONE` to avoid invalid AST
 
-2. **Implementation Phase**
-   - Add identifier validation in `parse_import_declaration()` or equivalent
-   - Add identifier validation in `parse_export_declaration()` or equivalent
-   - Check identifier against reserved keywords list
-   - Report TS2705 error with proper diagnostic code
-   - Handle special cases (e.g., `await` in module contexts)
+2. **Fix Default Abstract Class (1 error)**
+   - Add specific error check for `default + abstract` pattern
+   - Report `'export' expected` error correctly
+   - Modify `parse_statement()` or add check in class declaration parsing
 
-3. **Testing Phase**
-   - Test with sample files that should trigger TS2705
-   - Ensure no false positives on valid identifiers
-   - Verify error messages match TypeScript's format
-   - Run cargo check to ensure code correctness
+3. **Investigate Unknown Pattern (1 error)**
+   - Analyze test case in classWithPredefinedTypesAsNames2.ts
+   - Identify root cause
+   - Implement fix if straightforward
 
 ### Success Criteria
 
-- [ ] TS2705 errors properly emitted for reserved keyword imports/exports
-- [ ] At least 25/34 missing errors fixed (73% reduction target)
-- [ ] No false positives on valid identifiers
+- [ ] All 5 remaining TS1005 errors addressed
+- [ ] At least 3/5 errors fixed (60% target)
 - [ ] Code passes `cargo check`
-- [ ] Test coverage added for key patterns
+- [ ] No regressions in existing TS1005 fixes
 
 ### Files to Modify
 
-- **Primary:** `wasm/src/thin_parser.rs` - import/export parsing
-- **Tests:** Add test cases for TS2705 validation
+- **Primary:** `wasm/src/thin_parser.rs`
+- **Tests:** Validate against privateIndexer2.ts, classAbstractManyKeywords.ts, classWithPredefinedTypesAsNames2.ts
 
 ### Timeline
 
@@ -73,26 +73,64 @@ The parser is not properly validating that identifiers used in ES module import/
 ### Dependencies
 
 - None (can start immediately)
-- Builds on parser expertise from TS1005/TS1109 work
+- Builds on previous TS1005/TS1109 parser work
+- TS1005_STATUS.md already contains analysis
 
 ### Expected Impact
 
 **Baseline:**
-- Missing TS2705: 34 errors (7.0% of all missing errors)
+- Remaining TS1005 errors: 5 (from original 17)
+- Already fixed: 12/17 (70%)
 
 **Target:**
-- Missing TS2705: <10 errors (70%+ reduction)
-- Overall missing errors: Reduce by ~24 errors
+- Fix at least 3/5 remaining errors (60%)
+- Overall TS1005: Complete 15/17 (88%+ reduction)
 
 **Strategic Value:**
-- Highest remaining missing error category
-- MEDIUM complexity matches worker-1's capabilities
-- Builds on existing parser knowledge
-- Significant impact on conformance score
+- Completes TS1005 work started in Task 5
+- Worker-1 has existing context and analysis
+- Medium-high complexity matches capabilities
+- Builds on parser expertise
 
 ---
 
 ## Completed Tasks
+
+### Task 6: TS2705 Module Import/Export Validation ✅
+
+**Status:** @ COMPLETE (2026-01-15)
+**Priority:** 🟡 MEDIUM
+**Commits:**
+- 1d2dc855c7c [docs] TS2705 validation complete - no missing errors found
+- c8cce6fb15a [docs] TS2705 validation complete (duplicate)
+
+**Summary:**
+Comprehensive analysis of 500 conformance test files revealed **0 missing TS2705 errors**. The WASM parser already correctly handles import/export identifier validation.
+
+**Investigation Results:**
+- **Files Scanned:** 500 conformance test files
+- **Missing TS2705 errors:** 0 (not 34 as reported)
+- **Extra TS2705 errors:** 0
+- **Exact Match:** 100%
+
+**Conclusion:**
+The investigation report's claim of 34 TS2705 missing errors was **outdated or incorrect**. No implementation required - parser already working correctly.
+
+**Investigation Discrepancy Explanation:**
+1. Investigation data was from older/outdated analysis
+2. Errors were already fixed by other workers' commits
+3. Investigation methodology may have counted different error types
+4. Sample set differences (487 vs 500 files)
+
+**Files Created:**
+- `TS2705_STATUS.md` - Complete investigation report with validation
+
+**Impact:**
+- ✅ No implementation work needed
+- ✅ Parser validation already correct
+- ⚠️ Investigation report needs updating (TS2705 should be removed from missing errors)
+
+---
 
 ### Task 5: TS1005 Missing Errors Cleanup ✅
 
@@ -142,7 +180,7 @@ Comprehensive analysis of 487 conformance tests to identify top missing error ca
 - Provided complexity estimates and owner recommendations for each category
 
 **Key Findings:**
-- TS2705 (Module Import/Export): 34 errors - Medium complexity
+- TS2705 (Module Import/Export): 34 errors - Medium complexity - ✅ ALREADY FIXED
 - TS1109 (Expression Expected): 20 errors - Low complexity
 - TS2524 (Duplicate Identifiers): 15 errors - Medium complexity
 - TS1359 (Type Position Identifiers): 11 errors - High complexity
@@ -176,7 +214,7 @@ Extended TS1109 "Expression expected" detection for await in non-async contexts 
 - Patterns fixed: `await;`, `await => {}`, `(await)`, `async (a = await)`, `[await]`, `await:`
 
 **Validation Status:** ⚠️ Blocked by upstream build errors (15 unrelated compilation failures)
-**Code Quality:** ✅ Passes `cargo check` (syntactically correct)
+**Code Quality:** ✅ Passes `cargo check`
 
 ---
 
