@@ -6336,7 +6336,7 @@ impl<'a> ThinCheckerState<'a> {
         use crate::solver::{SymbolRef, TypeKey, TypeLowering};
 
         let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         };
 
         let flags = symbol.flags;
@@ -6368,7 +6368,7 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
         // Namespace / Module
@@ -6437,7 +6437,7 @@ impl<'a> ThinCheckerState<'a> {
                 return (self.get_type_of_function(implementation_decl), Vec::new());
             }
 
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
         // Interface - return interface type with call signatures
@@ -6465,7 +6465,7 @@ impl<'a> ThinCheckerState<'a> {
             if !value_decl.is_none() {
                 return (self.get_type_of_interface(value_decl), Vec::new());
             }
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
         // Type alias - resolve using checker's get_type_from_type_node to properly resolve symbols
@@ -6493,7 +6493,7 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
         // Variable - get type from annotation or infer from initializer
@@ -6529,7 +6529,7 @@ impl<'a> ThinCheckerState<'a> {
                     }
                 }
             }
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
         // Alias - resolve the aliased type (import x = ns.member or ES6 imports)
@@ -6578,13 +6578,13 @@ impl<'a> ThinCheckerState<'a> {
                         return (self.get_type_of_symbol(export_sym_id), Vec::new());
                     }
                 }
-                // Module not found in exports - fall through to ANY
+                // Module not found in exports - fall through to UNKNOWN
             }
 
-            return (TypeId::ANY, Vec::new());
+            return (TypeId::UNKNOWN, Vec::new());
         }
 
-        (TypeId::ANY, Vec::new())
+        (TypeId::UNKNOWN, Vec::new())
     }
 
     fn is_const_variable_declaration(&self, var_decl_idx: NodeIndex) -> bool {
@@ -7895,7 +7895,7 @@ impl<'a> ThinCheckerState<'a> {
                 if expected != TypeId::ANY && expected != TypeId::UNKNOWN {
                     if let Some(arg_node) = self.ctx.arena.get(arg_idx) {
                         if arg_node.kind == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION {
-                            let arg_type = arg_types.get(i).copied().unwrap_or(TypeId::ANY);
+                            let arg_type = arg_types.get(i).copied().unwrap_or(TypeId::UNKNOWN);
                             self.check_object_literal_excess_properties(
                                 arg_type, expected, arg_idx,
                             );
@@ -21827,12 +21827,12 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         // Fallback: if the alias expands to a promise-like type reference (e.g., Promise from lib),
-        // treat it as Promise<any> even if we can't get the type argument.
+        // treat it as Promise<unknown> if we can't get the type argument.
         // This handles cases like: type PromiseAlias<T> = Promise<T> where Promise comes from lib.
         if self.type_ref_is_promise_like(lowered) {
             // If we have args, try to return the first one (the T in Promise<T>)
-            // Otherwise return ANY as a safe fallback
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+            // Otherwise return UNKNOWN for stricter type checking
+            return Some(args.first().copied().unwrap_or(TypeId::UNKNOWN));
         }
 
         None
