@@ -18,7 +18,7 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should be TS2683
 ## Current Status: 🟡 Assigned 2026-01-15
 
 ### Task 1: Investigate TS2571 Emissions
-**Status:** 🔄 In Progress
+**Status:** ✅ Complete
 **Priority:** HIGH
 
 **Objective:** Understand where and why TS2571 is being emitted incorrectly.
@@ -45,7 +45,7 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should be TS2683
 ---
 
 ### Task 2: Fix TS2571 → TS2683 Conversion
-**Status:** ⏳ Pending (depends on Task 1)
+**Status:** ✅ Complete
 **Priority:** HIGH
 
 **Objective:** Modify code to emit TS2683 instead of TS2571 in appropriate contexts.
@@ -67,7 +67,7 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should be TS2683
 ---
 
 ### Task 3: Validate and Test
-**Status:** ⏳ Pending
+**Status:** 🔄 In Progress
 **Priority:** MEDIUM
 
 **Action Items:**
@@ -159,4 +159,6 @@ When ready for merge:
 
 | Date | Task | Status | Notes |
 |------|------|--------|-------|
-| 2026-01-15 | Task 1 | 🔄 In Progress | Initial assignment, investigating TS2571 emissions |
+| 2026-01-15 | Task 1 | ✅ Complete | Found root cause at thin_checker.rs:9812-9817, created ts2571_investigation.md |
+| 2026-01-15 | Task 2 | ✅ Complete | Implemented fix: arrow functions inherit outer `this`, regular functions use ANY instead of UNKNOWN |
+| 2026-01-15 | Task 3 | 🔄 In Progress | Awaiting EM-3 merge to run conformance tests |
