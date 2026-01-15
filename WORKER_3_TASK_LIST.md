@@ -1,109 +1,145 @@
-# Worker 3 Task List
+# WORKER-3 TASK LIST
 
-Maintained by EM-1
+## Squad: Syntax Squad
+## EM: EM-1
+## Branch: worker-3
 
-## Current Tasks
+---
 
-### [ACTIVE] Task 1: Fix TS7006/TS7005 Extra Errors (Implicit Any Over-reporting)
+## Primary Task: Fix TS1109 "Expression Expected" Noise
 
-**Priority:** High (Tier 4 - Implicit Any Checks)
+**Priority:** 🔴 CRITICAL (Priority 1 for EM-1)
+**Assigned:** 2026-01-15
+**Status:** 🔵 STARTING
 
-**Status:** In Progress - Not Started
+### Problem
 
-**Description:**
-The type checker is emitting TS7006 (parameter implicit any) and TS7005 (variable implicit any) errors in cases where the type can be inferred. This creates noise and false positives.
+The parser emits **TS1109 "Expression expected"** errors for valid TypeScript syntax or fails to recover gracefully after missing expressions. This creates noise that poisons downstream semantic analysis.
 
-**Error Examples:**
-```typescript
-// Should NOT error - type inferred from default value
-function foo(param = 5) {  // Currently emits TS7006, should not
-    return param;
-}
+**Current Impact:** ~262 extra errors in conformance tests
 
-// Should NOT error - type inferred from initializer
-const x = 5;  // Currently may emit TS7005, should not
+### Root Cause
 
-// SHOULD error - no type inference possible
-function bar(param) {  // Should emit TS7006
-    return param;
-}
-```
+The `error_expression_expected()` function in `thin_parser.rs` is called in situations where:
+1. Valid syntax is incorrectly rejected (false positive)
+2. Parser doesn't recover after missing expression, causing cascading errors
+3. Error recovery sync points are insufficient
 
-**Action Items:**
-1. **Locate implicit any checking code** in `wasm/src/thin_checker.rs`
-   - Search for `TS7006` and `TS7005` error codes
-   - Find functions that check parameter and variable types
+### Action Items
 
-2. **Add inference checks** before emitting errors:
-   - Skip TS7006 when `param.initializer.is_some()`
-   - Skip TS7005 when `prop.initializer.is_some()`
-   - Add logic to detect when type can be inferred from usage
+#### Phase 1: Investigation
 
-3. **Test cases to verify:**
+1. **Study Worker 5's TS1005 suppression logic**
+   - Review commit history for `ts1005_statement_budget` implementation
+   - Understand proximity-based error suppression
+   - Apply similar patterns to TS1109
+
+2. **Identify false positive patterns**
+   - Find test cases with TS1109 on valid syntax
+   - Categorize: ASI-related, statement boundaries, edge cases
+   - Document patterns for suppression
+
+#### Phase 2: Implementation
+
+1. **Add `is_at_expression_end()` check before emitting TS1109**
+   - Reuse Worker 5's `is_at_expression_end()` helper
+   - Suppress TS1109 when parser is at natural expression end
+   - Reduces noise for cases like `let x = ;`
+
+2. **Implement statement-level budget**
+   - Track TS1109 errors per statement (similar to TS1005)
+   - Limit to 2 TS1109 errors per statement
+   - Reset budget at statement boundaries
+
+3. **Enhance error recovery**
+   - Improve `resync_after_error()` for expression contexts
+   - Add synchronization points: semicolons, closing braces, keywords
+   - Continue parsing after missing expression
+
+#### Phase 3: Validation
+
+1. **Test with malformed syntax**
    ```typescript
-   // Should NOT error
-   function test1(x = 5) { return x; }
-   function test2({ a = 1 } = {}) { return a; }
-   const y = 10;
-
-   // SHOULD error
-   function test3(z) { return z; }
+   // Should recover without cascading errors
+   let x = ;
+   const y = function() { return ; };
    ```
 
-4. **Run conformance tests:**
+2. **Run conformance tests**
    ```bash
    cd wasm/differential-test
-   bash run-conformance.sh --max=200 --workers=4
+   bash run-conformance.sh --max=500 --workers=4
    ```
-   - Track TS7006 count (target: reduce by ~150+)
-   - Track TS7005 count (target: reduce by ~100+)
+   - Track TS1109 count (target: reduce from 262 to <40)
+   - Ensure no regression in valid syntax detection
 
-5. **Create minimal repro tests** for validation
+3. **Compare with Worker 5's TS1005 work**
+   - Apply same suppression patterns
+   - Ensure consistency in error handling
 
-**Target Metrics:**
-| Error Code | Current | Target |
-|------------|---------|--------|
-| TS7006 extra | ~200 | <50 |
-| TS7005 extra | ~150 | <30 |
+### Files to Work On
+- `wasm/src/thin_parser.rs` - `error_expression_expected()` around line 600-700
+- `wasm/src/thin_parser.rs` - `is_at_expression_end()` helper (add if missing)
+- `wasm/src/thin_parser.rs` - `resync_after_error()` function
 
-**Key Files:**
-- `wasm/src/thin_checker.rs` - implicit any checking functions
-- `wasm/src/checker/types/diagnostics.rs` - error code definitions
+### Success Criteria
+- **TS1109 extra errors:** Reduce from 262 to <40
+- **Parser recovery:** Continues after missing expression
+- **No regression:** Valid syntax still accepted
 
-**Reference:** See `PROJECT_DIRECTION.md` Tier 4 section for rules on when to skip implicit any errors.
+### Testing
+1. Create test file with missing expressions
+2. Verify parser recovers and continues
+3. Run conformance suite before/after
+4. Document error count reduction
 
 ---
 
-## Completed Tasks
+## Reference: Worker 5's TS1005 Work
 
-*None yet*
+Worker 5 successfully implemented similar suppression for TS1005:
+- **Per-statement budget:** 2 TS1005 errors per statement
+- **Proximity suppression:** 80 character threshold
+- **Expression end detection:** `is_at_expression_end()` helper
+
+**Apply these patterns to TS1109.**
 
 ---
 
-## Notes
-
-- **Worktree:** `/tmp/orchestrator-workspace/worktrees/worker-3`
-- **Branch:** `worker-3`
-- **Target branch:** `em-team-1`
-- **Squad:** AnyCheck Squad
-- **Focus:** Implicit any detection (TS7006/TS7005)
-
-## Workflow
+## Instructions
 
 1. Sync with em-team-1: `git pull origin em-team-1`
-2. Create feature branch: `git checkout -b worker-3`
-3. Make changes in `wasm/` directory only
-4. Commit with format: `[wasm] checker: fix TS7006 over-reporting`
+2. Create feature branch from em-team-1
+3. Work on TS1109 suppression ONLY
+4. Commit frequently: `[wasm] parser: add TS1109 expression end detection`
 5. Push to worker-3 branch
 6. Run tests locally
 7. Update this task list with status
 8. Notify EM-1 when ready for merge
 
+---
+
 ## Validation Checklist Before Merge
 
-- [ ] TS7006 errors reduced by target amount
-- [ ] TS7005 errors reduced by target amount
-- [ ] No regression in other error codes
+- [ ] TS1109 errors reduced by target amount (262 → <40)
+- [ ] Parser recovers after missing expression
+- [ ] No regression in valid syntax detection
 - [ ] Conformance tests pass
+- [ ] Code follows Worker 5's suppression patterns
 - [ ] Minimal repro tests validate fix
-- [ ] Code follows Rust best practices
+
+---
+
+## Task Completion Report
+
+*To be filled by EM-1 after merge*
+
+**Status:** ⏳ Pending
+
+**Date:** ⏳ Pending
+
+**Commits:** ⏳ Pending
+
+**Changes Made:** ⏳ Pending
+
+**Results:** ⏳ Pending
