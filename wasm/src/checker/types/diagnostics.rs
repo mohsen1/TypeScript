@@ -163,6 +163,9 @@ pub mod diagnostic_messages {
     pub const FUNCTION_LACKS_ENDING_RETURN_STATEMENT: &str =
         "Function lacks ending return statement and return type does not include 'undefined'.";
     pub const ASYNC_FUNCTION_RETURNS_PROMISE: &str = "Async function return type must be Promise.";
+    pub const ASYNC_FUNCTION_REQUIRES_PROMISE_CONSTRUCTOR: &str =
+        "An async function or method in ES5/ES3 requires the 'Promise' constructor. \
+         Make sure you have a declaration for the 'Promise' constructor or include 'ES2015' in your `--lib` option.";
     pub const UNREACHABLE_CODE_DETECTED: &str = "Unreachable code detected.";
 
     // Generic/type parameter errors
@@ -191,6 +194,8 @@ pub mod diagnostic_messages {
         "'{0}', which lacks return-type annotation, implicitly has an '{1}' return type.";
     pub const IMPLICIT_ANY_RETURN_FUNCTION_EXPRESSION: &str = "Function expression, which lacks return-type annotation, implicitly has an '{0}' return type.";
     pub const CANNOT_FIND_NAME_DID_YOU_MEAN: &str = "Cannot find name '{0}'. Did you mean '{1}'?";
+    pub const AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION: &str =
+        "An 'await' expression is only allowed within an async function.";
 
     // Scanner/parser errors
     pub const NUMERIC_SEPARATORS_NOT_ALLOWED_HERE: &str =
@@ -360,6 +365,7 @@ pub mod diagnostic_codes {
 
     // Promise/async errors
     pub const AWAIT_OUTSIDE_ASYNC: u32 = 1308;
+    pub const AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION: u32 = 1359;
     pub const TYPE_IS_NOT_A_PROMISE: u32 = 2345;
     pub const VOID_NOT_AWAITED: u32 = 2801;
     pub const ASYNC_FUNCTION_WITHOUT_AWAIT: u32 = 80006;

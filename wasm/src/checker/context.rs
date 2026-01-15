@@ -256,6 +256,10 @@ pub struct CheckerContext<'a> {
     /// Control flow graph for definite assignment analysis and type narrowing.
     /// This is built during the binding phase and used by the checker.
     pub flow_graph: Option<FlowGraph<'a>>,
+
+    /// Async context depth - tracks nesting of async functions.
+    /// Used to check if await expressions are within async context (TS1359).
+    pub async_depth: u32,
 }
 
 /// Context for a lib file (arena + binder) for global type resolution.
@@ -325,6 +329,7 @@ impl<'a> CheckerContext<'a> {
             resolved_modules: None,
             lib_contexts: Vec::new(),
             flow_graph,
+            async_depth: 0,
         }
     }
 
@@ -387,6 +392,7 @@ impl<'a> CheckerContext<'a> {
             resolved_modules: None,
             lib_contexts: Vec::new(),
             flow_graph,
+            async_depth: 0,
         }
     }
 
@@ -459,6 +465,34 @@ impl<'a> CheckerContext<'a> {
     /// Get the current expected return type.
     pub fn current_return_type(&self) -> Option<TypeId> {
         self.return_type_stack.last().copied()
+    }
+
+    /// Enter an async context (increment async depth).
+    pub fn enter_async_context(&mut self) {
+        self.async_depth += 1;
+    }
+
+    /// Exit an async context (decrement async depth).
+    pub fn exit_async_context(&mut self) {
+        if self.async_depth > 0 {
+            self.async_depth -= 1;
+        }
+    }
+
+    /// Check if we're currently inside an async function.
+    pub fn in_async_context(&self) -> bool {
+        self.async_depth > 0
+    }
+
+    /// Check if Promise is available in lib files.
+    /// Returns true if any lib context has "Promise" in its file_locals.
+    pub fn has_promise_in_lib(&self) -> bool {
+        for lib_ctx in &self.lib_contexts {
+            if lib_ctx.binder.file_locals.has("Promise") {
+                return true;
+            }
+        }
+        false
     }
 
     /// Check if a modifier list contains a specific modifier kind.
