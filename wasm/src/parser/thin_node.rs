@@ -3727,6 +3727,17 @@ impl ThinNodeArena {
         }
     }
 
+    /// Get jump data (break/continue statements).
+    #[inline]
+    pub fn get_jump_data(&self, node: &ThinNode) -> Option<&JumpData> {
+        use super::syntax_kind_ext::{BREAK_STATEMENT, CONTINUE_STATEMENT};
+        if node.has_data() && (node.kind == BREAK_STATEMENT || node.kind == CONTINUE_STATEMENT) {
+            self.jump_data.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
     /// Get with statement data (stored in if statement pool).
     #[inline]
     pub fn get_with_statement(&self, node: &ThinNode) -> Option<&IfStatementData> {

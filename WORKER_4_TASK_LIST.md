@@ -122,3 +122,34 @@ Reduce missing TS2564 errors from **413 to <20** - ✅ Bug fixes implemented to 
 - High-ROI task - single check eliminates top missing error category
 - Reference TypeScript implementation at `src/compiler/checker.ts`
 - Co-Authored-By: Claude Sonnet 4.5
+
+---
+
+### 2026-01-14 - Second Merge Complete ✅
+**Status:** ✅ SUCCESSFULLY MERGED
+**Merge Commit:** 6fc9e1e59
+**Branch:** worker-4 → em-team-1
+**Result:** Auto-merge, no conflicts
+
+### Additional Work Completed
+1. **Computed Property Tracking Fix** (Commit: f14a143fb)
+   - ✅ Fixed bug: Computed properties with complex expressions were silently skipped
+   - ✅ Modified property name extraction with fallback for complex computed properties
+   - ✅ Added proper name formatting for all ComputedKey variants:
+     - Ident, String, Number, Qualified, Symbol
+
+2. **Additional Tests Added**
+   - ✅ 2 new tests for computed property initialization
+   - ✅ **Total TS2564 tests: 21 (all passing)**
+
+### Code Changes (Second Merge)
+- `wasm/src/thin_checker.rs`: +17 lines (computed property tracking)
+- `wasm/src/thin_checker_tests.rs`: +92 lines (new tests)
+- `WORKER_4_TASK_LIST.md`: +45 lines (updated documentation)
+
+### Success Metric
+Reduce missing TS2564 errors from **413 to <20** - ✅ Comprehensive bug fixes implemented
+
+### Notes
+- Worker-4 has completed multiple rounds of TS2564 improvements
+- Co-Authored-By: Claude Sonnet 4.5

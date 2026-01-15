@@ -3830,3 +3830,203 @@ function f() {
         parser.get_diagnostics()
     );
 }
+
+// =============================================================================
+// Break/Continue Label Storage Tests (Worker-4)
+// =============================================================================
+
+#[test]
+fn test_thin_parser_break_with_label_stores_label() {
+    use crate::parser::thin_node::JumpData;
+
+    let source = r#"
+outer: for (let i = 0; i < 10; i++) {
+    for (let j = 0; j < 10; j++) {
+        if (i === j) break outer;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+
+    // Verify the label is stored
+    let arena = parser.get_arena();
+    let break_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::BREAK_STATEMENT)
+        .expect("break statement not found");
+
+    let jump_data = arena.get_jump_data(break_node).expect("jump data not found");
+    assert!(!jump_data.label.is_none(), "Label should be stored, not NONE");
+
+    // Verify the label is the identifier "outer"
+    if let Some(label_node) = arena.get(jump_data.label) {
+        assert_eq!(label_node.kind, crate::scanner::SyntaxKind::Identifier as u16);
+        if let Some(ident) = arena.get_identifier(label_node) {
+            assert_eq!(ident.escaped_text, "outer");
+        } else {
+            panic!("Expected identifier for label");
+        }
+    } else {
+        panic!("Label node not found in arena");
+    }
+}
+
+#[test]
+fn test_thin_parser_continue_with_label_stores_label() {
+    use crate::parser::thin_node::JumpData;
+
+    let source = r#"
+outer: for (let i = 0; i < 10; i++) {
+    for (let j = 0; j < 10; j++) {
+        if (i === j) continue outer;
+    }
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+
+    // Verify the label is stored
+    let arena = parser.get_arena();
+    let continue_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::CONTINUE_STATEMENT)
+        .expect("continue statement not found");
+
+    let jump_data = arena
+        .get_jump_data(continue_node)
+        .expect("jump data not found");
+    assert!(!jump_data.label.is_none(), "Label should be stored, not NONE");
+
+    // Verify the label is the identifier "outer"
+    if let Some(label_node) = arena.get(jump_data.label) {
+        assert_eq!(label_node.kind, crate::scanner::SyntaxKind::Identifier as u16);
+        if let Some(ident) = arena.get_identifier(label_node) {
+            assert_eq!(ident.escaped_text, "outer");
+        } else {
+            panic!("Expected identifier for label");
+        }
+    } else {
+        panic!("Label node not found in arena");
+    }
+}
+
+#[test]
+fn test_thin_parser_break_without_label_has_none() {
+    use crate::parser::thin_node::JumpData;
+
+    let source = r#"
+for (let i = 0; i < 10; i++) {
+    if (i > 5) break;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+
+    // Verify no label is stored (should be NONE)
+    let arena = parser.get_arena();
+    let break_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::BREAK_STATEMENT)
+        .expect("break statement not found");
+
+    let jump_data = arena.get_jump_data(break_node).expect("jump data not found");
+    assert!(jump_data.label.is_none(), "Label should be NONE for break without label");
+}
+
+#[test]
+fn test_thin_parser_continue_without_label_has_none() {
+    use crate::parser::thin_node::JumpData;
+
+    let source = r#"
+for (let i = 0; i < 10; i++) {
+    if (i > 5) continue;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+
+    // Verify no label is stored (should be NONE)
+    let arena = parser.get_arena();
+    let continue_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::CONTINUE_STATEMENT)
+        .expect("continue statement not found");
+
+    let jump_data = arena
+        .get_jump_data(continue_node)
+        .expect("jump data not found");
+    assert!(
+        jump_data.label.is_none(),
+        "Label should be NONE for continue without label"
+    );
+}
+
+#[test]
+fn test_thin_parser_labeled_statement_parses() {
+    let source = r#"
+myLabel: while (true) {
+    break myLabel;
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+    assert!(parser.get_diagnostics().is_empty());
+
+    // Verify labeled statement is parsed
+    let arena = parser.get_arena();
+    let labeled_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::LABELED_STATEMENT)
+        .expect("labeled statement not found");
+
+    assert!(labeled_node.pos > 0, "Labeled statement should have position");
+}
+
+#[test]
+fn test_thin_parser_break_with_asi_before_label() {
+    use crate::parser::thin_node::JumpData;
+
+    // ASI applies before label on new line
+    let source = r#"
+outer: for (;;) {
+    break
+    outer;  // This becomes a separate expression statement (unused label)
+}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    assert!(!root.is_none());
+
+    // The break should have NONE for label due to ASI
+    let arena = parser.get_arena();
+    let break_node = arena
+        .nodes
+        .iter()
+        .find(|node| node.kind == syntax_kind_ext::BREAK_STATEMENT)
+        .expect("break statement not found");
+
+    let jump_data = arena.get_jump_data(break_node).expect("jump data not found");
+    // After ASI, the label on the next line is a separate statement
+    assert!(jump_data.label.is_none(), "Label should be NONE due to ASI after break");
+}

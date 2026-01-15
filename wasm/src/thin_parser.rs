@@ -5427,8 +5427,8 @@ impl ThinParserState {
         let start_pos = self.token_pos();
         self.parse_expected(SyntaxKind::BreakKeyword);
 
-        // Optional label (TODO: store in break statement node)
-        let _label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        // Optional label
+        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5437,8 +5437,12 @@ impl ThinParserState {
         self.parse_semicolon();
         let end_pos = self.token_end();
 
-        self.arena
-            .add_token(syntax_kind_ext::BREAK_STATEMENT as u16, start_pos, end_pos)
+        self.arena.add_jump(
+            syntax_kind_ext::BREAK_STATEMENT as u16,
+            start_pos,
+            end_pos,
+            crate::parser::thin_node::JumpData { label },
+        )
     }
 
     /// Parse continue statement
@@ -5447,7 +5451,7 @@ impl ThinParserState {
         self.parse_expected(SyntaxKind::ContinueKeyword);
 
         // Optional label
-        let _label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
+        let label = if !self.can_parse_semicolon() && self.is_identifier_or_keyword() {
             self.parse_identifier_name()
         } else {
             NodeIndex::NONE
@@ -5456,10 +5460,11 @@ impl ThinParserState {
         self.parse_semicolon();
         let end_pos = self.token_end();
 
-        self.arena.add_token(
+        self.arena.add_jump(
             syntax_kind_ext::CONTINUE_STATEMENT as u16,
             start_pos,
             end_pos,
+            crate::parser::thin_node::JumpData { label },
         )
     }
 
