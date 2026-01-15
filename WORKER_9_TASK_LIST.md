@@ -59,7 +59,7 @@ This ensures global symbols from lib.d.ts are available during binding, preventi
 
 ### Task 4: Invert Solver Defaults - Change TypeId::ANY to TypeId::UNKNOWN ✅ COMPLETED
 **Completed:** 2025-01-14
-**Commit:** 0fed63f73
+**Commits:** 0fed63f73 (P0), ae04f7619 (P1)
 
 **Root Cause:**
 The solver was "optimistic" - when it encountered an unknown type or a resolution failure, it returned `TypeId::ANY`. This suppressed type errors downstream because:
@@ -67,13 +67,18 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 - Invalid operations on `any` don't emit errors
 
 **P0 (Critical) Changes Applied:**
-1. Call signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3276-3277)
-2. Construct signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)` (line 3312-3313)
-3. Type predicate missing annotation: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 3996-3997)
-4. Type predicate missing node: Changed `TypeId::ANY` to `TypeId::UNKNOWN` (line 4001-4002)
+1. Call signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)`
+2. Construct signature return default: Changed `(TypeId::ANY, None)` to `(TypeId::UNKNOWN, None)`
+3. Type predicate missing annotation: Changed `TypeId::ANY` to `TypeId::UNKNOWN`
+4. Type predicate missing node: Changed `TypeId::ANY` to `TypeId::UNKNOWN`
+
+**P1 (High Impact) Changes Applied:**
+1. Binary operand type fallback: `TypeId::ANY` → `TypeId::UNKNOWN`
+2. Missing node in binary expression: `TypeId::ANY` → `TypeId::UNKNOWN`
+3. Type stack unwrap_or defaults: `TypeId::ANY` → `TypeId::UNKNOWN`
 
 **Files Modified:**
-- `wasm/src/thin_checker.rs`: P0 function return defaults
+- `wasm/src/thin_checker.rs`: P0 and P1 defaults
 
 **Expected Impact:**
 - Missing errors will decrease significantly
