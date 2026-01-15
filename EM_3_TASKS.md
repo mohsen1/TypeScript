@@ -157,12 +157,12 @@ Current baseline from rust branch (commit 05236939f):
 
 ---
 
-## Merge Readiness Status (2026-01-15)
+## Merge Readiness Status (2026-01-15 13:25)
 
 | Worker | Status | Notes |
 |--------|--------|-------|
-| worker-1 | 🟢 Complete | TS2683 fix complete (c958fc9cb), needs new task |
-| worker-2 | 🟢 Complete | super() fix complete (dc7519914), needs new task |
+| worker-1 | 🔵 Active | TS2683 fix complete, assigned TS2322 categorization (Priority 1) |
+| worker-2 | 🔵 Active | super() fix complete, assigned TS2322 fixes (Priority 1) |
 
 ---
 
@@ -181,10 +181,10 @@ Current baseline from rust branch (commit 05236939f):
 
 1. ✅ Create em-team-3 branch
 2. ✅ Create EM_3_TASKS.md
-3. 🔄 Assign Priority 1 (TS2322 accuracy) to worker-1 or worker-2
-4. 🔄 Assign Priority 2 (TS2571 over-reporting) to remaining worker
-5. 📅 Run conformance tests to establish baseline
-6. 📋 Track type checker error counts
+3. ✅ Assign Priority 1 (TS2322 accuracy) to worker-1 (categorization) and worker-2 (fixes)
+4. 📅 Run conformance tests to establish baseline
+5. 📋 Track type checker error counts
+6. 🔄 Review Worker 1's categorization, guide Worker 2's fixes
 
 ---
 

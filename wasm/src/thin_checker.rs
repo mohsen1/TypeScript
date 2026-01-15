@@ -2421,13 +2421,19 @@ impl<'a> ThinCheckerState<'a> {
 
         let base =
             if let Some(sym_id) = self.resolve_value_symbol_for_lowering(type_query.expr_name) {
+                eprintln!("=== get_type_from_type_query ===");
+                eprintln!("  name: {:?}, sym_id: {:?}", name_text, sym_id);
                 if !has_type_args {
                     let resolved = self.get_type_of_symbol(crate::binder::SymbolId(sym_id));
+                    eprintln!("  resolved type: {:?}", resolved);
                     if resolved != TypeId::ANY && resolved != TypeId::ERROR {
+                        eprintln!("  => returning resolved type directly");
                         return resolved;
                     }
                 }
-                self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)))
+                let typequery_type = self.ctx.types.intern(TypeKey::TypeQuery(SymbolRef(sym_id)));
+                eprintln!("  => returning TypeQuery type: {:?}", typequery_type);
+                typequery_type
             } else if self
                 .resolve_type_symbol_for_lowering(type_query.expr_name)
                 .is_some()
@@ -10849,18 +10855,28 @@ impl<'a> ThinCheckerState<'a> {
         let target_is_abstract = self.is_abstract_constructor_type(target, env);
         let target_is_concrete = self.is_concrete_constructor_target(target, env);
 
+        // Debug output for abstract constructor assignability
+        eprintln!("=== abstract_constructor_assignability_override ===");
+        eprintln!("source: {:?}, is_abstract: {}", source, source_is_abstract);
+        eprintln!("target: {:?}, is_abstract: {}, is_concrete: {}", target, target_is_abstract, target_is_concrete);
+
         if !source_is_abstract {
+            eprintln!("=> Returning None (source is not abstract)");
             return None;
         }
         if target_is_abstract {
+            eprintln!("=> Returning None (target is abstract)");
             return None;
         }
         if target == TypeId::ANY || target == TypeId::UNKNOWN || target == TypeId::ERROR {
+            eprintln!("=> Returning None (target is special type)");
             return None;
         }
         if target_is_concrete {
+            eprintln!("=> Returning Some(false) (abstract to concrete)");
             return Some(false);
         }
+        eprintln!("=> Returning None (no match)");
         None
     }
 
