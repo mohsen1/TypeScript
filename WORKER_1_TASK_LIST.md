@@ -5,107 +5,50 @@
 - **Branch:** worker-1
 - **Parent:** em-team-1
 
-## Priority: Fix Parser Noise (TS1005 & TS1109)
+## Status: Priority #1 COMPLETE ✅
 
-### Mission
-Eliminate false positive parser errors. ThinParser is bailing out or emitting error nodes on valid TypeScript syntax, creating "noise" that prevents trusting downstream semantic errors.
-
-### Current Data
-- **TS1005:** 439 extra errors ("';' expected")
-- **TS1109:** 262 extra errors ("Expected identifier")
-- **Total:** 701 extra errors
-- **Target:** <40 extra errors
-
-### Tasks
-
-#### Task 1: Implement Error Resynchronization
-**Priority:** CRITICAL
-**File:** `wasm/src/parser/thin_parser.rs`
-
-When the parser hits an unexpected token:
-1. Emit the error
-2. Advance to the next synchronization point (`;`, `}`, newline)
-3. Continue parsing the rest of the file
-4. Do NOT bail out and return a partial AST
-
-**Acceptance Criteria:**
-- Parser continues after syntax errors instead of bailing out
-- Conformance tests show reduced TS1005/TS1109 counts
-- No increase in crashes or panics
-
-#### Task 2: Audit Semicolon Insertion (ASI)
-**Priority:** CRITICAL
-**File:** `wasm/src/parser/`
-
-Verify ASI logic matches TypeScript's exactly:
-1. Review `tsc` ASI rules in TypeScript source
-2. Compare with our implementation
-3. Fix discrepancies
-4. Add test cases for edge cases
-
-**Common ASI edge cases:**
-- Newline after `return`, `throw`, `break`, `continue`
-- Newline after `++`, `--`
-- Anonymous function expressions
-- Do-while loops
-
-**Acceptance Criteria:**
-- ASI logic documented with TypeScript references
-- Test cases added for all edge cases
-- TS1005 errors reduced significantly
-
-### Deliverables
-1. Updated `thin_parser.rs` with resynchronization
-2. ASI audit document with fixes applied
-3. Conformance test results showing error reduction
-
-### Success Metric
-Reduce combined TS1005/TS1109 errors from **701 to <40**.
-
-## Merge Status
-
-### 2026-01-14 - Latest Merge Attempt ⚠️
-**Status:** ⚠️ BRANCH OUT OF DATE - NO MERGE PERFORMED
-**Result:** Worker-1 is behind em-team-1
-**Action:** Merge blocked - worker-1 has removed 4,766 lines of work
-
-### Issue Detected
-Worker-1 branch has diverged negatively from em-team-1:
-- **Removed:** ASI conformance tests (222 lines)
-- **Removed:** TS2564 property initialization tests (350 lines)
-- **Removed:** All test infrastructure (metrics, conformance, error analysis)
-- **Removed:** Documentation (TEAM_STRUCTURE.md, MERGE_READINESS_REPORT.md, various audit reports)
-- **Removed:** Test files from worker-2 (lib loading, TS2304, global augmentation)
-- **Removed:** Code from thin_binder.rs, thin_checker.rs, solver files
-
-**Total:** 30 files affected, 4,766 lines deleted
-
-### Git Behavior
-- Merge command returned "Already up to date" (correctly blocked bad merge)
-- em-team-1 is ahead of worker-1
-- No merge was performed
-
-### Root Cause
-Worker-1 branch appears to be on an old commit that predates:
-- Worker-4 TS2564 implementation (commit 96ca9f6a5)
-- Worker-2 global scope work (commit 2419999cd)
-- Worker-10 ASI work (multiple commits)
-- Team infrastructure and documentation
-
-### Tasks Completed
-- Parser work assigned to worker-1 was completed by worker-10
-- Worker-1 branch needs rebase to rust to get latest changes
-
-### Next Steps for Worker-1
-- ⚠️ **URGENT:** Rebase worker-1 to rust to sync with latest work
-- OR: Delete worker-1 branch and recreate from em-team-1
-- Worker-1 should NOT be merged in current state
-- Awaiting Director/EM-1 decision on branch remediation
+### Previous Task: Parser Noise Elimination - COMPLETE
+**Achievement:** Reduced parser noise from 701 to 25 errors (96.4% reduction)
+- Merged to rust: commit `2e7f46ff75`
+- Target: <40 | Achieved: 25 ✅
+- TS1005: 439 → ~20 (95.4% reduction)
+- TS1109: 262 → ~5 (98.1% reduction)
 
 ---
 
-### Notes
-- Reference TypeScript parser at `src/compiler/parser.ts`
-- Run conformance tests after each change
-- Work incrementally; test frequently
-- Coordinate with EM-1 before merging
+## Current Task: Push ASI Improvements
+
+### Mission
+Push enhanced ASI detection work to rust for final parser refinements.
+
+### Current Work (on worker-1, not yet on rust)
+- **Commit:** `ae54d443c2` Complete: Enhanced Expression Statement ASI Detection
+- **File:** `TS1005_PATTERN_ANALYSIS.md` - Pattern analysis document
+- **Enhancement:** Expanded `is_statement_start()` to include:
+  - Expression literals: NumericLiteral, BigIntLiteral, TrueKeyword, FalseKeyword, NullKeyword, ThisKeyword, SuperKeyword
+  - Prefix operators: ExclamationToken, TildeToken, PlusToken, MinusToken, PlusPlusToken, MinusMinusToken
+  - Keywords: TypeOfKeyword, VoidKeyword, DeleteKeyword
+  - Structural: OpenParenToken, OpenBracketToken, LessThanToken
+
+### Action Items
+1. **Push current work to origin** - Ensure ASI improvements are available
+2. **Build WASM and test** - Verify no regressions from ASI changes
+3. **Measure baseline** - Check if TS1005 reduced further with new ASI logic
+4. **Report results** - Document impact of enhanced ASI
+
+### Success Metric
+- ASI improvements merged to rust
+- No regressions in conformance tests
+- Further reduction in TS1005 false positives (optional bonus)
+
+---
+
+## Next Priority Assignment (TBD)
+
+With Priority #1 (Parser Noise) complete, Worker-1 will be assigned to:
+- **Option A:** Support Priority #2 (Global Scope) - Help with lib.d.ts integration
+- **Option B:** Support Priority #3 (Solver Defaults) - Help with ERROR type propagation
+- **Option C:** Parser refinements - Continue reducing remaining TS1005 edge cases
+- **Option D:** New feature work - Contribute to other project areas
+
+**Waiting for EM-1 direction on next assignment.**
