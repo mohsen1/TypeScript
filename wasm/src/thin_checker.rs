@@ -13109,25 +13109,26 @@ impl<'a> ThinCheckerState<'a> {
     /// For detailed errors with elaboration (e.g., "property 'x' is missing"),
     /// use `error_type_not_assignable_with_reason_at` instead.
     pub fn error_type_not_assignable_at(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This suppression prevented valid TS2322 errors from being emitted when types couldn't be
-        // resolved (e.g., TS2304 "Cannot find name 'Foo'" followed by TS2322 "Type 'number' is not
-        // assignable to type 'Foo'").
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // The solver layer correctly returns SubtypeResult::False for ERROR types, but the checker
-        // was suppressing diagnostics before they could be created. This behavior caused ~310
-        // missing TS2322 errors in the conformance suite.
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // TypeScript emits both errors (TS2304 + TS2322), so we should too. Removing this
-        // suppression matches TypeScript's behavior and improves conformance by ~14pp.
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation details.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
@@ -13158,28 +13159,26 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         use crate::solver::{CompatChecker, TypeFormatter};
 
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This was the primary suppression point preventing ~310 TS2322 errors from being emitted.
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // Rationale for removal:
-        // 1. The solver layer (subtype.rs) correctly returns SubtypeResult::False for ERROR types
-        // 2. The compat layer (compat.rs) properly delegates to the subtype checker
-        // 3. Only the checker layer was suppressing diagnostics BEFORE creation
-        // 4. TypeScript emits both TS2304 (cannot find name) AND TS2322 (not assignable)
-        // 5. Hiding these errors masks real bugs and hurts user experience
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // Impact on conformance:
-        // - Expected improvement: +200-250 visible TS2322 errors
-        // - Exact match: 30.8% → ~45% (+14pp)
-        // - Missing errors: 57.8% → ~35% (-23pp)
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation and WORKER_11_TASK_4_SUMMARY.md for impact.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some((source_level, target_level)) =
             self.constructor_accessibility_mismatch(source, target, None)
