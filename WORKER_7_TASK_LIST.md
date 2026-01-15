@@ -6,11 +6,163 @@
 
 ---
 
+## 🔄 REASSIGNED: Complete Module Import Resolution
+
+**Priority:** 🔴 CRITICAL (Tier 3 - Module System)
+
+**Status:** 🟢 REASSIGNED TO COMPLETE IMPLEMENTATION
+
+**Assigned:** 2026-01-15 14:05
+
+**Previous Status:** Partial work salvaged (6 compilation bugs fixed by EM-2)
+
+---
+
+## Background: Previous Partial Work
+
+Worker-7 previously implemented basic named import resolution:
+- ✅ Basic named imports: `import { foo } from 'bar'`
+- ✅ Symbol resolution for imported names
+- ✅ Cross-module symbol references
+
+**Missing Features (to be completed):**
+- ❌ Namespace imports: `import * as ns from 'module'`
+- ❌ Default exports: `import Foo from 'module'`
+- ❌ Re-exports: `export * from 'x'`, `export { foo } from 'x'`
+- ❌ Dynamic imports: `import('./module').then(...)`
+- ❌ Type-only imports: `import type { Foo } from 'module'`
+
+---
+
+## Current Task: Complete Module Import Resolution
+
+### Problem
+
+The module import resolution is partially implemented but missing key features. This causes:
+- **TS7005:** Symbol cannot be referenced from a module
+- **TS7008:** Module has no exported member
+- **TS2792:** `import()` type resolution failures
+- **TS2304:** Cannot find name (import-related)
+
+### Root Cause
+
+The initial implementation only handled basic named imports. The following features need to be added:
+
+1. **Namespace Imports**
+   ```typescript
+   import * as fs from 'fs';
+   fs.readFile(); // Should resolve to fs namespace
+   ```
+
+2. **Default Exports**
+   ```typescript
+   import Foo from './foo';
+   // Should resolve to default export
+   ```
+
+3. **Re-exports**
+   ```typescript
+   export * from 'utils';
+   export { helper } from 'utils';
+   // Should merge/create aliases
+   ```
+
+4. **Dynamic Imports**
+   ```typescript
+   import('./module').then(m => m.default);
+   // Should resolve module type
+   ```
+
+### Action Items
+
+#### Phase 1: Complete Import Resolution
+
+1. **Implement Namespace Imports**
+   - Parse `import * as ns from 'module'` syntax
+   - Create namespace object symbol with all exports
+   - Resolve property accesses on namespace
+
+2. **Implement Default Exports**
+   - Track default export symbol separately
+   - Resolve `import Foo from 'module'` to default export
+   - Handle `export default` declarations
+
+3. **Implement Re-exports**
+   - `export * from 'x'` - merge all exports
+   - `export { foo } from 'x'` - create alias
+   - Track re-export chains
+
+4. **Implement Dynamic Imports**
+   - Resolve `import()` expressions
+   - Load module type for Promise return type
+   - Handle `import().then()` type narrowing
+
+#### Phase 2: Testing
+
+1. **Test Namespace Imports**
+   ```typescript
+   import * as React from 'react';
+   React.createElement();
+   ```
+
+2. **Test Default Exports**
+   ```typescript
+   import Component from './component';
+   new Component();
+   ```
+
+3. **Test Re-exports**
+   ```typescript
+   // utils.ts
+   export * from './helpers';
+   export const version = '1.0';
+   ```
+
+4. **Test Dynamic Imports**
+   ```typescript
+   const mod = await import('./module');
+   mod.foo();
+   ```
+
+### Files to Work On
+
+- `wasm/src/binder/mod.rs` - Main binder logic
+- `wasm/src/binder/symbol_table.rs` - Symbol storage and lookup
+- `wasm/src/thin_parser.rs` - Import statement parsing (if needed)
+- `wasm/src/thin_binder.rs` - Import resolution implementation
+
+### Success Criteria
+
+- **TS7005 (Extra):** Reduce from 489 to <100
+- **TS7008 (Extra):** Reduce from 336 to <50
+- **TS2792 (Missing):** Reduce from 161 to <20
+- Namespace imports work correctly
+- Default exports resolve properly
+- Re-exports merge/alias correctly
+- Dynamic imports type correctly
+
+### Expected Impact
+
+This is **high leverage** because:
+1. Module resolution issues are pervasive (800+ combined errors)
+2. These errors block type checking in imported code
+3. Completing the implementation unblocks other semantic checks
+4. Previous partial work provides foundation
+
+### Testing Strategy
+
+1. Add unit tests for each import type
+2. Test edge cases (circular imports, missing exports, etc.)
+3. Run conformance suite after each major feature
+4. Focus on tests in `externalModules/` directory
+
+---
+
 ## 🟢 NEW TASK: Module Symbol Resolution (TS7005, TS7008, TS2792)
 
 **Priority:** 🔴 CRITICAL (Priority 2.5 - Post-Solver Fix)
 **Assigned:** 2026-01-14
-**Status:** 🔵 STARTING
+**Status:** 🔵 SUPERSEDED BY REASSIGNMENT
 
 ### Problem Statement
 

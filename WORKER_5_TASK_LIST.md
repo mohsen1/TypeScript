@@ -322,13 +322,13 @@ Added new logic for:
 
 ---
 
-## Next Task: Fix TS2348 "Cannot Invoke Expression" Over-Reporting
+## Current Task: Fix TS2348 "Cannot Invoke Expression" Over-Reporting
 
-**Priority:** 🟢 MEDIUM (Tier 2 - Type Checker Accuracy)
+**Priority:** 🟡 HIGH (Tier 2 - Type Checker Accuracy)
 
-**Status:** 🟢 READY TO START
+**Status:** 🟢 ASSIGNED AND READY TO START
 
-**Assigned:** 2026-01-15
+**Assigned:** 2026-01-15 14:05
 
 ### Problem
 

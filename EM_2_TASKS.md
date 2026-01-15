@@ -21,11 +21,12 @@ EM-2 is responsible for **semantic accuracy**. Your team ensures that:
 
 ## Team Composition
 
-| Worker | Squad | Focus Area | Status | Throughput |
-|--------|-------|------------|--------|------------|
-| Worker 6 | Semantics | Module symbol resolution (re-exports, TS2792) | 🔵 Active | Medium |
-| Worker 7 | Semantics | Module symbol resolution (namespace, defaults) | 🔵 Active | Medium |
-| Worker 8 | LSP | TypeScript config integration | 🟢 Approved | TBD |
+| Worker | Squad | Current Task | Status | Priority |
+|--------|-------|--------------|--------|----------|
+| Worker 5 | Syntax | TS2348 callable expression over-reporting | 🟢 Assigned | 🟡 HIGH |
+| Worker 6 | Binder | TS7006/TS7005 implicit any over-reporting | 🟢 Assigned | 🔴 CRITICAL |
+| Worker 7 | Semantics | Complete module import resolution | 🔄 Reassigned | 🔴 CRITICAL |
+| Worker 8 | LSP | TS2322 type assignability over-reporting | 🟢 Assigned | 🟡 HIGH |
 
 **EM Branch:** em-team-2
 
@@ -232,10 +233,75 @@ Current baseline from rust branch (commit 74df9fd30d):
 1. ✅ Create em-team-2 branch
 2. ✅ Create EM_2_TASKS.md
 3. ✅ **Worker 6 reassigned** to help Worker 7 (2026-01-15 13:50)
-4. 🔄 **Two-pronged module resolution** - Workers 6-7 working in parallel
-5. 🔄 **Daily EM-2 sync** with Workers 6-7 to prevent conflicts
-6. 📅 **Activate Worker 8** on LSP TypeScript config integration (after module progress)
-7. 📋 Track semantic error counts (TS7005: 489, TS7008: 336, TS2792: 161)
+4. ✅ **All workers assigned new tasks** (2026-01-15 14:05)
+5. 🔄 **Monitor worker progress** on current tasks
+6. 🔄 **Merge worker branches** as they complete tasks
+7. 📋 Track error reduction metrics (conformance tests)
+
+---
+
+## Current Task Assignments (2026-01-15 14:05)
+
+### Worker 5: Fix TS2348 "Cannot Invoke Expression" Over-Reporting
+- **Priority:** 🟡 HIGH (Tier 2 - Type Checker Accuracy)
+- **Squad:** Syntax Squad
+- **Problem:** Type checker emits TS2348 errors for callable expressions
+- **Files:** `wasm/src/thin_checker.rs`
+- **Target:** Reduce TS2348 over-reporting by 50%+
+
+### Worker 6: Fix TS7006/TS7005 Implicit Any Over-Reporting
+- **Priority:** 🔴 CRITICAL (Tier 4 - Implicit Any Checks)
+- **Squad:** Binder Squad
+- **Problem:** ~200 extra TS7006 and ~150 extra TS7005 errors
+- **Root Cause:** Doesn't check if type can be inferred from default values/initializers
+- **Files:** `wasm/src/thin_checker.rs`
+- **Target:** Reduce TS7006 from ~200 to <100, TS7005 from ~150 to <75
+- **Coordination:** Worker-3 (EM-1) also working on TS7006
+
+### Worker 7: Complete Module Import Resolution
+- **Priority:** 🔴 CRITICAL (Tier 3 - Module System)
+- **Squad:** Semantics Squad
+- **Status:** 🔄 Reassigned to complete partial implementation
+- **Completed:** Basic named imports
+- **Missing:** Namespace imports, default exports, re-exports, dynamic imports
+- **Files:** `wasm/src/binder/mod.rs`, `wasm/src/thin_binder.rs`
+- **Target:** TS7005 <100, TS7008 <50, TS2792 <20
+
+### Worker 8: Fix TS2322 Type Assignability Over-Reporting
+- **Priority:** 🟡 HIGH (Tier 1 - Type Assignability)
+- **Squad:** LSP Squad
+- **Problem:** ~6 extra TS2322 errors in conformance tests
+- **Root Cause:** May not recognize structural type compatibility, type narrowing
+- **Files:** `wasm/src/thin_checker.rs`, `wasm/src/checker/types/subtype.rs`
+- **Target:** Reduce TS2322 from ~6 to <3
+- **Coordination:** Worker-2 (EM-1) also working on type assignability
+
+---
+
+## Completed Work Summary
+
+### Worker 5 (Syntax Squad) ✅
+- ASI (Automatic Semicolon Insertion) implementation
+- Statement-level error recovery
+- Object/array literal error recovery
+- Control statement error recovery
+- ESLint ignore for WASM test library
+- **Impact:** TS1109 reduced from 700+ to 7
+
+### Worker 6 (Binder Squad) ✅
+- TS2589 recursion guards
+- TS2454 lib.d.ts global values fix
+- Lib symbol injection enhancement
+- **Impact:** TS2304 reduced to 7 missing
+
+### Worker 7 (Semantics Squad) ⚠️
+- Module import resolution (partial - basic named imports only)
+- **Status:** Salvaged and merged, needs completion
+
+### Worker 8 (LSP Squad) ✅
+- TS2564 verification (implementation already existed)
+- LSP TypeScript Config Integration
+- **Impact:** LSP now respects tsconfig.json strict setting
 
 ---
 

@@ -514,3 +514,127 @@ Worker-8's LSP TypeScript Config Integration has been successfully merged into e
 
 **Impact:** LSP features (hover, completions, signature help, diagnostics) now respect the project's `strict` setting from `tsconfig.json` instead of hardcoding `strict = false`.
 
+---
+
+## Current Task: Fix TS2322 Type Assignability Over-Reporting
+
+**Priority:** 🟡 HIGH (Tier 1 - Type Assignability)
+
+**Status:** 🟢 ASSIGNED AND READY TO START
+
+**Assigned:** 2026-01-15 14:05
+
+### Problem
+
+The type checker emits **TS2322 "Type X is not assignable to type Y"** errors in situations where the types ARE actually compatible, or emits the error too eagerly without considering:
+- Type narrowing through control flow analysis
+- Union type compatibility
+- Generic type constraints
+- Structural typing rules
+
+**Current Impact:** ~6 extra TS2322 errors in conformance tests (specifically in async/super conflict tests)
+
+### Root Cause
+
+The TS2322 check may be:
+1. Not recognizing structural type compatibility correctly
+2. Not considering type guards or control flow analysis
+3. Too strict on union type assignability
+4. Not handling generic type parameter constraints
+5. Checking assignability before type refinement
+
+**Examples to investigate:**
+
+```typescript
+// May incorrectly emit TS2322 when types are compatible
+function test<T extends string>(x: T) {
+    const y: string = x;  // Should NOT error - T extends string
+}
+
+// May emit TS2322 in async/await contexts
+class Base {}
+class Derived extends Base {}
+async function test() {
+    const result: Promise<Base> = Promise.resolve(new Derived());
+    // Should NOT error - Derived is assignable to Base
+}
+```
+
+### Action Items
+
+1. **Locate TS2322 emission points** in `wasm/src/thin_checker.rs`
+   - Search for `TS2322` or diagnostic_codes::TS2322
+   - Find "is not assignable to" error message
+   - Understand assignability check logic
+
+2. **Add assignability checks before emitting TS2322:**
+   - Check if source type extends target type
+   - Check if types are structurally compatible
+   - Consider union type members
+   - Apply type narrowing from control flow
+
+3. **Implement improved assignability logic:**
+   ```rust
+   // Pseudo-code for the fix
+   if is_subtype(source_type, target_type) {
+       // Don't emit TS2322 - types are compatible
+       continue;
+   }
+
+   if is_union_type(source_type) {
+       if any_union_member_is_assignable(source_type, target_type) {
+           // Don't emit TS2322 - union member is compatible
+           continue;
+       }
+   }
+
+   if has_type_guard_context(node) {
+       let narrowed_type = apply_type_guards(source_type);
+       if is_assignable(narrowed_type, target_type) {
+           // Don't emit TS2324 - type guard narrows correctly
+           continue;
+       }
+   }
+   ```
+
+4. **Test cases to verify:**
+   ```typescript
+   // Should NOT emit TS2322
+   function test1<T extends string>(x: T): string {
+       return x;
+   }
+
+   // Should NOT emit TS2322
+   class Base {}
+   class Derived extends Base {}
+   const d: Derived = new Base();  // Should error (reverse)
+   const b: Base = new Derived();  // Should NOT error
+
+   // Should emit TS2322
+   const x: string = 42;
+   ```
+
+5. **Run conformance tests:**
+   ```bash
+   cd wasm/differential-test
+   bash run-conformance.sh --max=500 --workers=4
+   ```
+   - Track TS2322 count before/after
+   - Ensure legitimate TS2322 errors are still emitted
+   - Check for regressions in other error codes
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS2322 extra | ~6 | <3 |
+| Legitimate TS2322 | TBD | Maintain 100% |
+
+**Key Files:**
+- `wasm/src/thin_checker.rs` - TS2322 emission points, assignability checks
+- `wasm/src/checker/types/subtype.rs` - Subtyping logic (may exist)
+- `wasm/src/checker/types/diagnostics.rs` - Error code definitions
+
+**Reference:** See `PROJECT_DIRECTION.md` Tier 1 section for TS2322 handling.
+
+**Coordination:** Worker-2 (EM-1) is also working on type assignability. Coordinate to avoid duplicate work.
+
