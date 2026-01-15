@@ -10770,16 +10770,20 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         env: Option<&crate::solver::TypeEnvironment>,
     ) -> Option<bool> {
-        if !self.is_abstract_constructor_type(source, env) {
+        let source_is_abstract = self.is_abstract_constructor_type(source, env);
+        let target_is_abstract = self.is_abstract_constructor_type(target, env);
+        let target_is_concrete = self.is_concrete_constructor_target(target, env);
+
+        if !source_is_abstract {
             return None;
         }
-        if self.is_abstract_constructor_type(target, env) {
+        if target_is_abstract {
             return None;
         }
         if target == TypeId::ANY || target == TypeId::UNKNOWN || target == TypeId::ERROR {
             return None;
         }
-        if self.is_concrete_constructor_target(target, env) {
+        if target_is_concrete {
             return Some(false);
         }
         None
