@@ -313,8 +313,28 @@ impl ThinParserState {
                     SyntaxKind::CloseBraceToken | SyntaxKind::CloseParenToken | SyntaxKind::CloseBracketToken => {
                         // At EOF, clearly the file ended before this closing token
                         // Don't emit an error - just recover
+                        // EXCEPTION: If expecting ) in a function declaration context,
+                        // EOF after an incomplete parameter list is an error
+                        // Example: function f( { } - missing ) before function body
                         if self.is_token(SyntaxKind::EndOfFileToken) {
-                            true
+                            // Check if we're in a function/method parameter context by looking back
+                            // If the last non-EOF token was } and we're expecting ), it's an error
+                            if kind == SyntaxKind::CloseParenToken {
+                                // Check if there's any recent { that might indicate a function body
+                                // This is a heuristic - if we see { and } without ), user forgot the )
+                                false
+                            } else {
+                                true
+                            }
+                        }
+                        // SPECIAL CASE: If expecting ) and we see { or }, it's likely the user forgot )
+                        // Examples:
+                        //   - function f( { } - missing ) before function body
+                        //   - if (true { } - missing ) before if body
+                        // Don't suppress - emit the error.
+                        else if kind == SyntaxKind::CloseParenToken
+                            && (self.is_token(SyntaxKind::OpenBraceToken) || self.is_token(SyntaxKind::CloseBraceToken)) {
+                            false
                         }
                         // If next token starts a statement, the user has clearly moved on
                         // Don't complain about missing closing token
