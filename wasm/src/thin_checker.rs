@@ -21,7 +21,7 @@ use crate::checker::types::diagnostics::{
 use crate::checker::{CheckerContext, EnclosingClassInfo, FlowAnalyzer};
 use crate::interner::Atom;
 use crate::parser::syntax_kind_ext;
-use crate::parser::thin_node::ThinNodeArena;
+use crate::parser::thin_node::{ImportDeclData, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::solver::{ContextualTypeContext, TypeId, TypeInterner};
@@ -629,6 +629,7 @@ impl<'a> ThinCheckerState<'a> {
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 self.current_this_type().unwrap_or(TypeId::UNKNOWN)
             }
+            k if k == SyntaxKind::SuperKeyword as u16 => self.get_type_of_super_keyword(idx),
 
             // Literals - preserve literal types when contextual typing expects them.
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -737,9 +738,9 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
                     let expr_type = self.get_type_of_node(unary.expression);
                     // If the awaited type is Promise-like, extract the type argument
-                    // Otherwise, just return the type as-is
+                    // Otherwise, return UNKNOWN as a fallback (consistent with Task 4-6 changes)
                     self.promise_like_return_type_argument(expr_type)
-                        .unwrap_or(expr_type)
+                        .unwrap_or(TypeId::UNKNOWN)
                 } else {
                     // Return UNKNOWN instead of ANY when await expression cannot be resolved
                     TypeId::UNKNOWN
@@ -13098,25 +13099,26 @@ impl<'a> ThinCheckerState<'a> {
     /// For detailed errors with elaboration (e.g., "property 'x' is missing"),
     /// use `error_type_not_assignable_with_reason_at` instead.
     pub fn error_type_not_assignable_at(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This suppression prevented valid TS2322 errors from being emitted when types couldn't be
-        // resolved (e.g., TS2304 "Cannot find name 'Foo'" followed by TS2322 "Type 'number' is not
-        // assignable to type 'Foo'").
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // The solver layer correctly returns SubtypeResult::False for ERROR types, but the checker
-        // was suppressing diagnostics before they could be created. This behavior caused ~310
-        // missing TS2322 errors in the conformance suite.
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // TypeScript emits both errors (TS2304 + TS2322), so we should too. Removing this
-        // suppression matches TypeScript's behavior and improves conformance by ~14pp.
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation details.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
@@ -13147,28 +13149,26 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         use crate::solver::{CompatChecker, TypeFormatter};
 
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This was the primary suppression point preventing ~310 TS2322 errors from being emitted.
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // Rationale for removal:
-        // 1. The solver layer (subtype.rs) correctly returns SubtypeResult::False for ERROR types
-        // 2. The compat layer (compat.rs) properly delegates to the subtype checker
-        // 3. Only the checker layer was suppressing diagnostics BEFORE creation
-        // 4. TypeScript emits both TS2304 (cannot find name) AND TS2322 (not assignable)
-        // 5. Hiding these errors masks real bugs and hurts user experience
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // Impact on conformance:
-        // - Expected improvement: +200-250 visible TS2322 errors
-        // - Exact match: 30.8% → ~45% (+14pp)
-        // - Missing errors: 57.8% → ~35% (-23pp)
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation and WORKER_11_TASK_4_SUMMARY.md for impact.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some((source_level, target_level)) =
             self.constructor_accessibility_mismatch(source, target, None)
@@ -13716,6 +13716,31 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             false
         }
+    }
+
+    /// Get the type of a `super` keyword expression.
+    ///
+    /// When used in a constructor call (e.g., `super()`), this returns the
+    /// base class constructor type. When used in property access (e.g., `super.method()`),
+    /// the type is resolved through the normal property access mechanism.
+    ///
+    /// Returns the base class constructor type if in a derived class, otherwise ERROR.
+    fn get_type_of_super_keyword(&mut self, idx: NodeIndex) -> TypeId {
+        // Check if we're in a class context
+        if let Some(ref class_info) = self.ctx.enclosing_class {
+            // Get the base class
+            if let Some(base_class_idx) = self.get_base_class_idx(class_info.class_idx) {
+                // Get the base class node and class data
+                if let Some(base_node) = self.ctx.arena.get(base_class_idx) {
+                    if let Some(base_class) = self.ctx.arena.get_class(base_node) {
+                        // Return the constructor type of the base class
+                        return self.get_class_constructor_type(base_class_idx, base_class);
+                    }
+                }
+            }
+        }
+        // Not in a class or no base class - return ERROR
+        TypeId::ERROR
     }
 
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
@@ -15793,8 +15818,9 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
-    /// Check an import declaration for unresolved modules.
+    /// Check an import declaration for unresolved modules and missing exports.
     /// Emits TS2792 when the module cannot be resolved.
+    /// Emits TS2305 when a module exists but doesn't export a specific member.
     fn check_import_declaration(&mut self, stmt_idx: NodeIndex) {
         use crate::checker::types::diagnostics::{
             diagnostic_codes, diagnostic_messages, format_message,
@@ -15826,6 +15852,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module was resolved by the CLI driver (multi-file mode)
         if let Some(ref resolved) = self.ctx.resolved_modules {
             if resolved.contains(module_name) {
+                // Module exists, check if individual imports are exported
+                self.check_imported_members(import, module_name);
                 return;
             }
         }
@@ -15833,6 +15861,8 @@ impl<'a> ThinCheckerState<'a> {
         // Check if the module exists in the module_exports map (cross-file module resolution)
         // This enables resolving imports from other files in the same compilation
         if self.ctx.binder.module_exports.contains_key(module_name) {
+            // Module exists, check if individual imports are exported
+            self.check_imported_members(import, module_name);
             return;
         }
 
@@ -15847,6 +15877,89 @@ impl<'a> ThinCheckerState<'a> {
         // without access to the module graph (aside from ambient module declarations).
         let message = format_message(diagnostic_messages::CANNOT_FIND_MODULE, &[module_name]);
         self.error_at_node(import.module_specifier, &message, diagnostic_codes::CANNOT_FIND_MODULE);
+    }
+
+    /// Check if individual imported members exist in the module's exports.
+    /// Emits TS2305 for each missing export.
+    fn check_imported_members(&mut self, import: &ImportDeclData, module_name: &str) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
+        };
+
+        // Get the import clause
+        let clause_node = match self.ctx.arena.get(import.import_clause) {
+            Some(node) => node,
+            None => return,
+        };
+
+        let clause = match self.ctx.arena.get_import_clause(clause_node) {
+            Some(c) => c,
+            None => return,
+        };
+
+        // Get named_bindings (NamedImports or NamespaceImport)
+        let bindings_node = match self.ctx.arena.get(clause.named_bindings) {
+            Some(node) => node,
+            None => return,
+        };
+
+        // Check if this is NamedImports (import { a, b })
+        if bindings_node.kind == crate::parser::syntax_kind_ext::NAMED_IMPORTS {
+            let named_imports = match self.ctx.arena.get_named_imports(bindings_node) {
+                Some(ni) => ni,
+                None => return,
+            };
+
+            // Get the module's exports table
+            let exports_table = match self.ctx.binder.module_exports.get(module_name) {
+                Some(table) => table,
+                None => return,
+            };
+
+            // Check each import specifier
+            for element_idx in &named_imports.elements.nodes {
+                let element_node = match self.ctx.arena.get(*element_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let specifier = match self.ctx.arena.get_specifier(element_node) {
+                    Some(s) => s,
+                    None => continue,
+                };
+
+                // Get the name being imported (property_name if present, otherwise name)
+                let name_idx = if specifier.property_name.is_none() {
+                    specifier.name
+                } else {
+                    specifier.property_name
+                };
+
+                let name_node = match self.ctx.arena.get(name_idx) {
+                    Some(node) => node,
+                    None => continue,
+                };
+
+                let identifier = match self.ctx.arena.get_identifier(name_node) {
+                    Some(id) => id,
+                    None => continue,
+                };
+
+                let import_name = &identifier.escaped_text;
+
+                // Check if this import exists in the module's exports
+                if !exports_table.has(import_name) {
+                    // Emit TS2305: Module has no exported member
+                    let message = format_message(
+                        diagnostic_messages::MODULE_HAS_NO_EXPORTED_MEMBER,
+                        &[module_name, import_name]
+                    );
+                    self.error_at_node(specifier.name, &message, diagnostic_codes::MODULE_HAS_NO_EXPORTED_MEMBER);
+                }
+            }
+        }
+        // Note: Namespace imports (import * as ns) don't need individual checks
+        // Default imports don't need checks here (they're handled differently)
     }
 
     /// Check an export declaration's module specifier for unresolved modules.
@@ -21449,10 +21562,9 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        if self.type_ref_is_promise_like(return_type) {
-            return Some(TypeId::ANY);
-        }
-
+        // If we can't extract the type argument from a Promise-like type,
+        // return None instead of ANY/UNKNOWN (consistent with Task 4-6 changes)
+        // This allows the caller (await expressions) to use UNKNOWN as fallback
         None
     }
 
@@ -21506,14 +21618,16 @@ impl<'a> ThinCheckerState<'a> {
             if let Some(&first_arg) = args.first() {
                 return Some(first_arg);
             }
-            return Some(TypeId::ANY);
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(TypeId::UNKNOWN);
         }
 
         let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
-            return Some(args.first().copied().unwrap_or(TypeId::ANY));
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(args.first().copied().unwrap_or(TypeId::UNKNOWN));
         }
 
         if symbol.flags & symbol_flags::TYPE_ALIAS != 0 {

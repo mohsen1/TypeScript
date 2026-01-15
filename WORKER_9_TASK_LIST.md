@@ -129,6 +129,39 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ## Active Task
 
+### Task 8: Fix TS2322 Type Compatibility Errors 🔄 IN PROGRESS
+
+**Started:** 2025-01-15
+**Priority:** HIGH (103 missing + 593 extra = 696 total TS2322 errors)
+
+**Pattern 1: Fix Type 'error' Assignability ✅ COMPLETED**
+**Commit:** 35949f55eda (2025-01-15)
+
+**Changes Applied:**
+- Added selective diagnostic suppression in `error_type_not_assignable_at()`
+- Added selective diagnostic suppression in `error_type_not_assignable_with_reason_at()`
+- Suppress TS2322 emission when source or target type IS `TypeId::ERROR`
+- Fixes "Type 'error' is not assignable to type 'X'" errors
+- Should fix 7 out of 10 false positive test files
+
+**Rationale:**
+- When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+- Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+- TypeScript doesn't emit these errors - it only reports the resolution failure
+- The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors, but that was too broad
+- We now suppress only when source/target IS ERROR (not when it CONTAINS ERROR)
+
+**Estimated Impact:**
+- Reduce Extra TS2322 from 593 to ~300 (49% improvement)
+- Combined improvement: 696 → ~400 errors (43% improvement)
+
+**Remaining Patterns:**
+- Pattern 2: Await type inference returns `unknown` (3 test files)
+- Pattern 3: Super call type inference (4 test files)
+- Missing TS2322 error: Abstract constructor assignability (1 test file)
+
+---
+
 ### Task 7: Refine TS1005 and TS1109 Parser Error Recovery ✅ COMPLETED
 
 **Started:** 2024-01-14
@@ -241,5 +274,264 @@ The solver was "optimistic" - when it encountered an unknown type or a resolutio
 
 ---
 
+<<<<<<< HEAD
+## Completed Tasks
+
+### Task 8: TS2322 Type Compatibility & Shorthand Method Fixes ✅ COMPLETED
+
+**Completed:** 2025-01-15
+**Priority:** 🔴 HIGH (167 total TS2322 errors + 16 TS2304 from shorthand methods)
+
+**Achievements:**
+
+**1. Shorthand Method Parameter Contextual Typing**
+- **Fixed:** "Cannot find name 'type'" errors in shorthand methods with tuple parameters
+- **Problem:** Shorthand methods with tuple parameter types weren't getting proper type inference
+- **Example:**
+  ```typescript
+  type FooMethod = {
+    method(...args: [type: string, cb: (e: string) => void]): void;
+  }
+  let fooM: FooMethod = {
+    method(type, cb) {  // Was: Cannot find name 'type', 'cb'
+      return type;      // Now: Works correctly
+    }
+  };
+  ```
+- **Solution:** Added contextual typing for shorthand method parameters
+- **File:** `wasm/src/checker/control_flow.rs`
+- **Impact:** Resolves 16 TS2304 errors from Worker-12's class property task
+
+**2. TS2451 Error Implementation**
+- **Implemented:** TS2451 error for block-scoped redeclaration
+- **Error Message:** "Cannot redeclare block-scoped variable 'X'"
+- **Status:** Complete and working
+- **File:** `wasm/src/checker/`
+- **Example:**
+  ```typescript
+  {
+    let x = 1;
+    let x = 2;  // TS2451: Cannot redeclare block-scoped variable 'x'
+  }
+  ```
+
+**Task 8 Analysis:**
+- Analyzed 167 TS2322 errors (48 missing + 119 extra)
+- Identified shorthand method typing as key issue
+- Fixed contextual typing for method parameters
+- Implemented TS2451 for block-scoped declarations
+
+**Documentation:**
+- TASK_8_SUMMARY.md: Complete analysis and findings
+- TASK_8_TEST_FAILURES.md: Detailed test failure analysis
+
+**Bonus Achievement:**
+Worker-9 completed work that was assigned to Worker-12 (class properties), demonstrating:
+- Excellent capability across multiple error categories
+- Readiness for high-priority task reassignment
+- Ability to unblock stalled work
+
+**Status:** ✅ Merged to em-team-3 and rust
+
+---
+
+## Active Task
+
+### Task 9: Module Resolution Validation with Multi-File Tests 🔄 ASSIGNED
+
+**Assigned:** 2025-01-15
+**Priority:** 🔴 HIGH (65 combined errors: 34 TS2705 + 15 TS2524 + 9 TS2683 + 7 TS2664)
+**Status:** 🔄 ASSIGNED - Ready to begin validation
+
+**Note:** This task reassigned from Worker-10 who appears unavailable.
+
+### Problem
+Module resolution infrastructure is complete (102 lines implemented by Worker-10 in Task 1), but the current conformance test suite only has **0 multi-file tests**. This means cross-file module resolution cannot be validated with the existing test suite.
+
+**Current Module Resolution Errors (from 487 single-file tests):**
+- **TS2705:** 34 missing - "Required type information is not available"
+- **TS2524:** 15 missing - "Module has no exported member 'X'"
+- **TS2683:** 9 missing - "Type declaration has no export"
+- **TS2664:** 7 missing - "Type requires a type reference directive"
+- **Total:** 65 missing errors (#1 missing error category)
+
+**Why Single-File Tests Don't Help:**
+- Module_exports tracking only activates with multiple files
+- Import/export resolution requires cross-file symbol lookup
+- TS2705/TS2524/TS2683/TS2664 only occur in real multi-file scenarios
+- Current 487 tests are all single-file (0 multi-file tests)
+
+### Context
+
+**What Was Implemented (Worker-10 Task 1):**
+1. **Symbol Structure Changes (binder.rs):**
+   - `import_module: Option<String>` - tracks './file' for imports
+   - `import_name: Option<String>` - tracks renamed imports
+
+2. **Binder Changes (thin_binder.rs):**
+   - `module_exports: FxHashMap<String, SymbolTable>` - tracks exports per module
+   - Extracts module specifier from import declarations
+   - Tracks import metadata for symbols
+
+3. **Parallel Binding (parallel.rs):**
+   - Collects exported symbols during merge phase
+   - Builds module_exports table for cross-file resolution
+
+4. **Type Checker (thin_checker.rs):**
+   - Cross-file module resolution using module_exports
+   - Suppresses TS2705 if module exists in exports table
+   - Resolves import types using exported symbols
+
+**The Gap:** Infrastructure exists but is untested because:
+- No multi-file test cases in conformance suite
+- Cannot verify module_exports actually gets populated
+- Cannot verify cross-file resolution works end-to-end
+- Cannot measure actual improvement in TS2705/TS2524/TS2683/TS2664
+
+### Action Items
+
+#### 1. Create Multi-File Test Cases 🔴 P0
+Create test files to validate module resolution:
+
+**Test Case 1: Named Export/Import**
+```typescript
+// file1.ts
+export function foo() { return 42; }
+export const bar = "hello";
+
+// file2.ts
+import { foo, bar } from './file1';
+const x = foo(); // Should work
+const y = bar;   // Should work
+import { baz } from './file1'; // Should emit TS2524
+```
+
+**Test Case 2: Default Export/Import**
+```typescript
+// file1.ts
+export default function() { return 42; }
+
+// file2.ts
+import fn from './file1';
+fn(); // Should work
+```
+
+**Test Case 3: Re-exports**
+```typescript
+// file1.ts
+export function foo() { return 42; }
+
+// file2.ts
+export { foo } from './file1';
+export { bar } from './file1'; // Should emit TS2524
+
+// file3.ts
+import { foo } from './file2';
+foo(); // Should work
+```
+
+**Test Case 4: Type-Only Imports**
+```typescript
+// file1.ts
+export interface Foo { x: number; }
+export type Bar = string;
+
+// file2.ts
+import type { Foo, Bar } from './file1';
+const x: Foo = { x: 42 };
+const y: Bar = "hello";
+```
+
+**Test Case 5: Renamed Imports**
+```typescript
+// file1.ts
+export function foo() { return 42; }
+
+// file2.ts
+import { foo as bar } from './file1';
+bar(); // Should work
+```
+
+#### 2. Add Multi-File Test Runner Support 🔴 P0
+- **File:** `wasm/differential-test/run-conformance.sh`
+- Check if TypeScript conformance tests have multi-file scenarios
+- If yes, enable them in the test runner
+- If no, create custom multi-file test harness
+
+#### 3. Validate Implementation 🔴 P1
+Once multi-file tests exist:
+
+1. **Verify module_exports Population:**
+   - Add debug logging in `parallel.rs` to confirm exports are collected
+   - Check that `module_exports` map is non-empty after merge
+   - Verify export names match expected symbols
+
+2. **Verify Cross-File Resolution:**
+   - Add debug logging in `thin_checker.rs` to confirm resolution
+   - Check that imports resolve to correct export symbols
+   - Verify TS2705 suppression works when module exists
+
+3. **Measure Improvement:**
+   - Run tests before fixes to get baseline
+   - Run tests after fixes to measure improvement
+   - Target: 65 → <10 errors (-85%)
+
+#### 4. Fix Any Issues Found 🟡 P2
+Based on validation results, fix issues:
+
+**Potential Issues:**
+- Module_exports not populated → Fix parallel.rs collection logic
+- Cross-file resolution failing → Fix thin_checker.rs resolution logic
+- TS2705 still firing → Verify module existence check logic
+- TS2524 still firing → Verify export name matching logic
+
+### Files to Work On
+- `test/conformance/` - Create multi-file test cases
+- `wasm/differential-test/run-conformance.sh` - Enable multi-file tests
+- `wasm/src/parallel.rs` - Debug/fix export collection
+- `wasm/src/thin_checker.rs` - Debug/fix cross-file resolution
+- `wasm/src/thin_binder.rs` - Debug/fix import tracking
+
+### Success Criteria
+- Create 5+ multi-file test cases covering export/import scenarios
+- Enable multi-file test execution in conformance runner
+- Verify module_exports gets populated correctly
+- Verify cross-file resolution works end-to-end
+- Reduce module resolution errors: 65 → <10 (-85%)
+- Exact match improvement: 31.4% → 40%+ (+9pp)
+
+### Testing Strategy
+1. Create test cases in `test/conformance/multi-file/` directory
+2. Create test harness to run multi-file scenarios
+3. Add debug logging to track module_exports population
+4. Add debug logging to track cross-file resolution
+5. Run tests and verify expected behavior
+6. Fix any issues found
+7. Remove debug logging
+8. Run full conformance suite to measure improvement
+
+### Estimated Effort
+- Test case creation: 2-3 hours
+- Test harness setup: 1-2 hours
+- Validation and debugging: 2-3 hours
+- Fixing issues: 2-4 hours
+- **Total:** 1-2 days
+
+### Related Work
+- Builds on Worker-10 Task 1 (Module Resolution Implementation)
+- Worker-9 just completed Task 8 (shorthand method typing)
+- Demonstrated capability with complex type system work
+
+**Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --all` after changes
+- Focus on module-related test categories
+- Verify module exports population and cross-file resolution
+- Target: 65 → <10 module resolution errors
+
+---
+=======
 ## Pending Tasks
-_Awaiting completion of Task 7_
+_Awaiting continuation of Task 8 (Patterns 2-3 and missing TS2322 error)_
+>>>>>>> 96b22ab8864 (docs: Update WORKER_9_TASK_LIST.md with Task 8 Pattern 1 completion)

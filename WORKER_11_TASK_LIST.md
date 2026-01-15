@@ -3,7 +3,108 @@
 Maintained by EM-3
 
 ## Active Task
-- None awaiting assignment
+
+### Task 7: Fix TS2322 Type Accuracy - Balance Missing and Extra Errors
+
+**Priority:** 🔴 CRITICAL (167 total errors: 48 missing + 119 extra)
+
+**Current Baseline (from 2025-01-15 conformance tests):**
+- **Missing TS2322:** 48 occurrences (2.6% of 1822 tests)
+- **Extra TS2322:** 119 occurrences (6.5% of 1822 tests)
+- **Net imbalance:** 71 extra errors
+
+**Problem:**
+TS2322 (Type 'X' is not assignable to type 'Y') has accuracy issues in both directions:
+
+1. **Missing Errors (48):** Type incompatibilities not detected
+   - Most likely causes:
+     - Generic type resolution failures
+     - Conditional type evaluation gaps
+     - Union/intersection type compatibility
+     - Solver bailouts on complex types
+     - Control Flow Analysis (CFA) definite assignment tracking
+
+2. **Extra Errors (119):** False positives on valid code
+   - Most likely causes:
+     - Over-strict type narrowing
+     - Incorrect generic constraint checking
+     - Discriminated union type failures
+     - Literal type widening issues
+     - Method signature compatibility problems
+
+**Action Items:**
+
+1. **Analyze the 48 Missing TS2322 Errors**
+   - Use `wasm/differential-test/find-missing-ts2322.mjs` to extract failing test cases
+   - Categorize by root cause:
+     - Generic type resolution failures
+     - Conditional type evaluation
+     - Mapped type handling
+     - Union/intersection compatibility
+     - CFA-related (properties not known to be assigned)
+   - Create prioritized list by frequency
+
+2. **Analyze the 119 Extra TS2322 Errors**
+   - Use `wasm/differential-test/find-extra-ts2322.mjs` to extract false positives
+   - Categorize by pattern:
+     - Type narrowing too aggressive
+     - Generic constraints over-checked
+     - Literal types not widening when they should
+     - Discriminant property checks failing
+     - Method signature compatibility
+   - Create prioritized list by frequency
+
+3. **Fix Missing Errors (Priority P0)**
+   - Focus on highest-frequency categories first
+   - Fix solver bailouts on complex types
+   - Add CFA tracking where needed:
+     - Property assignments in all code paths
+     - Variable declarations in closures
+     - Array/object destructuring
+   - Improve intersection/union type checking
+   - Test with extracted failing cases
+
+4. **Fix Extra Errors (Priority P1)**
+   - Refine type narrowing logic
+   - Fix generic constraint checking
+   - Properly handle literal type widening
+   - Fix discriminant union type checking
+   - Improve method signature compatibility
+   - Test with extracted false positive cases
+
+5. **Testing and Validation**
+   - Run `wasm/differential-test/find-missing-ts2322.mjs` before/after
+   - Run `wasm/differential-test/find-extra-ts2322.mjs` before/after
+   - Target: Reduce both to <30 each
+   - Verify no regressions in passing tests
+   - Run full conformance suite: `./wasm/differential-test/run-conformance.sh --max=2000`
+
+**Success Criteria:**
+- Reduce Missing TS2322 from 48 to <15 (70% reduction)
+- Reduce Extra TS2322 from 119 to <30 (75% reduction)
+- Net improvement: 167 errors → 45 errors (73% reduction)
+- Overall conformance improvement: +5-10 percentage points
+
+**Files to Work On:**
+- `wasm/src/solver/` - Type resolution and subtyping logic
+- `wasm/src/checker/control_flow.rs` - Definite assignment analysis
+- `wasm/src/thin_checker.rs` - Type checking and diagnostic emission
+- `wasm/src/checker/narrowing.rs` - Type narrowing (if exists)
+
+**Related Work:**
+- Builds on Tasks 2-6 (previous TS2322 investigations)
+- Coordinates with Worker 9 (parser fixes)
+- Coordinates with Worker 2 (module import fixes)
+
+**Target Branch:** rust
+
+**Testing:**
+- Run `./wasm/differential-test/run-conformance.sh --max=2000` after changes
+- Focus on type-related test categories (classes, es6, async)
+- Use TS2322 finder scripts to measure improvement
+- Target: <30 missing, <30 extra TS2322 errors
+
+---
 
 ## Recent Merge (2025-01-15)
 
@@ -53,11 +154,6 @@ Maintained by EM-3
 - Priority 3: Abstract method typing
 
 **Target Branch:** rust
-
-## Merged to rust
-✅ **All completed tasks have been merged to origin/rust branch** (2024-01-14)
-
-## Completed Tasks
 
 ### Task 4: Implement ERROR type diagnostic emission fix ✅
 - [x] Comment out diagnostic suppression in `error_type_not_assignable_with_reason_at` (line 13074-13076)
