@@ -13337,6 +13337,36 @@ impl<'a> ThinCheckerState<'a> {
             return;
         }
 
+        // Check for private brand mismatch and generate specific error message
+        if let Some(detail) = self.private_brand_mismatch_error(source, target) {
+            use crate::checker::types::diagnostics::{
+                diagnostic_codes, diagnostic_messages, format_message,
+            };
+
+            let Some(loc) = self.get_source_location(idx) else {
+                return;
+            };
+
+            let source_type = self.format_type(source);
+            let target_type = self.format_type(target);
+            let message = format_message(
+                diagnostic_messages::TYPE_NOT_ASSIGNABLE,
+                &[&source_type, &target_type],
+            );
+
+            let diag = Diagnostic::error(
+                self.ctx.file_name.clone(),
+                loc.start,
+                loc.length(),
+                message,
+                diagnostic_codes::TYPE_NOT_ASSIGNABLE_TO_TYPE,
+            )
+            .with_related(self.ctx.file_name.clone(), loc.start, loc.length(), detail);
+
+            self.ctx.diagnostics.push(diag);
+            return;
+        }
+
         let Some(loc) = self.get_source_location(idx) else {
             return;
         };
@@ -20870,6 +20900,55 @@ impl<'a> ThinCheckerState<'a> {
             (Some(brand1), Some(brand2)) => brand1 == brand2,
             _ => false,
         }
+    }
+
+    /// Extract the name of the private field from a brand string.
+    /// Returns the private field name (e.g., "#foo") if found, None otherwise.
+    fn get_private_field_name_from_brand(&self, type_id: TypeId) -> Option<String> {
+        use crate::solver::TypeKey;
+
+        let key = self.ctx.types.lookup(type_id)?;
+        let properties = match key {
+            TypeKey::Object(shape_id) | TypeKey::ObjectWithIndex(shape_id) => {
+                &self.ctx.types.object_shape(shape_id).properties
+            }
+            TypeKey::Callable(callable_id) => {
+                &self.ctx.types.callable_shape(callable_id).properties
+            }
+            _ => return None,
+        };
+
+        // Find the first non-brand private property (starts with #)
+        for prop in properties {
+            let name = self.ctx.types.resolve_atom(prop.name);
+            if name.starts_with('#') && !name.starts_with("__private_brand_") {
+                return Some(name);
+            }
+        }
+        None
+    }
+
+    /// Check if there's a private brand mismatch between two types and return an appropriate error message.
+    /// Returns Some(error_message) if there's a private brand mismatch, None otherwise.
+    fn private_brand_mismatch_error(&self, source: TypeId, target: TypeId) -> Option<String> {
+        let source_brand = self.get_private_brand(source)?;
+        let target_brand = self.get_private_brand(target)?;
+
+        // Only report if both have brands but they're different
+        if source_brand == target_brand {
+            return None;
+        }
+
+        // Try to get the private field name from the source type
+        let field_name = self.get_private_field_name_from_brand(source)
+            .unwrap_or_else(|| "[private field]".to_string());
+
+        Some(format!(
+            "Property '{}' in type '{}' refers to a different member that cannot be accessed from within type '{}'.",
+            field_name,
+            self.format_type(source),
+            self.format_type(target)
+        ))
     }
 
     fn private_member_declaring_type(&mut self, sym_id: SymbolId) -> Option<TypeId> {
