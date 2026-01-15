@@ -1,137 +1,163 @@
-# Worker 4 Task List
+# WORKER-4 TASK LIST
 
-Maintained by EM-1
+## Squad: Syntax Squad
+## EM: EM-1
+## Branch: worker-4
 
-## Current Tasks
+---
 
-### [ACTIVE] Task 1: Fix Async/Await Type Checking (TS2705, TS1359)
+## Primary Task: Fix TS1005 "X Expected" Noise
 
-**Priority:** High (Tier 5 - Async/Await)
+**Priority:** 🔴 CRITICAL (Priority 1 for EM-1)
+**Assigned:** 2026-01-15
+**Status:** 🔵 STARTING
 
-**Status:** In Progress - Not Started
+### Problem
 
-**Description:**
-The type checker needs correct handling of async functions, generators, and await expressions. Current gaps include TS2705 (async function return type checking), TS1359 ('await' reserved word detection), and async generator return types.
+The parser emits **TS1005 "X expected"** errors for valid TypeScript syntax or emits excessive errors when a single token is missing. This creates noise that makes the parser appear overly strict.
 
-**Error Examples:**
-```typescript
-// TS2705 - Async function return type checking
-async function foo(): Promise<number> {
-    return 42;  // Should OK
-    return "string";  // Should error: Type 'string' is not assignable to type 'number'
-}
+**Current Impact:** ~345-439 extra errors in conformance tests
 
-// TS1359 - 'await' reserved word detection
-function regular() {
-    await Promise.resolve(1);  // Should error: 'await' is only allowed in async functions
-}
+**Note:** Worker 5 already implemented significant TS1005 suppression. Worker 4 should focus on **remaining gaps** not covered by Worker 5's work.
 
-// Async generators
-async function* gen(): AsyncGenerator<number> {
-    yield 1;  // Should OK
-    yield Promise.resolve(2);  // Should handle correctly
-}
-```
+### Root Cause
 
-**Action Items:**
+The parser emits TS1005 in situations where:
+1. Error recovery could continue but instead emits multiple errors
+2. ASI (Automatic Semicolon Insertion) should apply but doesn't
+3. Proximity-based suppression doesn't cover all cases
+4. Statement boundary detection is incomplete
 
-1. **Locate async-related code** in `wasm/src/thin_checker.rs`
-   - Search for `async`, `await`, `Promise` handling
-   - Find function return type checking for async functions
-   - Locate generator type handling
+### Action Items
 
-2. **Implement TS2705 checks:**
-   - Verify async function return type is `Promise<T>` or compatible
-   - Check that returned values match the Promise's type parameter
-   - Handle implicit Promise wrapping
+#### Phase 1: Investigation
 
-3. **Implement TS1359 checks:**
-   - Detect `await` usage in non-async functions
-   - Emit TS1359 error when found
-   - Add context check for async function scope
+1. **Study Worker 5's completed TS1005 work**
+   - Review commits: `a05322809`, `3032addf9`, `15f610e58`, `84eabaff2`
+   - Understand `ts1005_statement_budget` (2 errors per statement)
+   - Understand proximity-based suppression (80 character threshold)
+   - Identify what's NOT covered by Worker 5's implementation
 
-4. **Fix async generator handling:**
-   - Distinguish between `AsyncGenerator` and `Promise` return types
-   - Handle `yield` expressions in async generators
-   - Ensure proper type inference for async generators
+2. **Find remaining TS1005 patterns**
+   - Run conformance tests and analyze TS1005 failures
+   - Categorize: Not suppressed, wrong proximity, ASI gaps
+   - Document patterns Worker 5 didn't cover
 
-5. **Test cases to verify:**
+3. **Check ASI edge cases**
+   - ASI for restricted productions (Worker 5 completed)
+   - ASI for other contexts (may have gaps)
+   - Semicolon inference in expression statements
+
+#### Phase 2: Implementation
+
+1. **Enhance TS1005 suppression** (focus on gaps):
+   - Extend proximity suppression to additional contexts
+   - Add statement budget for currently uncovered contexts
+   - Handle edge cases Worker 5's work doesn't cover
+
+2. **Fix ASI gaps** (if any remain):
+   - Review `can_parse_semicolon_for_restricted_production()`
+   - Check ASI in non-restricted productions
+   - Ensure semicolon inference works in all contexts
+
+3. **Improve error recovery**:
+   - After TS1005 error, sync to next valid token
+   - Avoid cascading TS1005 errors for single missing token
+   - Better statement boundary detection
+
+#### Phase 3: Validation
+
+1. **Test with malformed syntax**
    ```typescript
-   // TS2705 - Return type mismatches
-   async function bad1(): Promise<number> {
-       return "string";  // Should error
-   }
+   // Should emit 1 TS1005, not multiple
+   const obj = { foo bar baz };
 
-   // TS1359 - await in non-async
-   function bad2() {
-       await Promise.resolve(1);  // Should error
-   }
-
-   // Should work correctly
-   async function good1(): Promise<number> {
-       return 42;
-   }
-
-   async function* good2(): AsyncGenerator<number> {
-       yield 1;
-   }
+   // Should recover with ASI
+   return
+   x + y
    ```
 
-6. **Run conformance tests:**
+2. **Run conformance tests**
    ```bash
    cd wasm/differential-test
-   bash run-conformance.sh --max=200 --workers=4
+   bash run-conformance.sh --max=500 --workers=4
    ```
-   - Track TS2705 missing errors (target: fill gaps)
-   - Track TS1359 missing errors (target: emit correctly)
-   - Ensure no regressions in async handling
+   - Track TS1005 count (target: reduce from 345 to <50)
+   - Ensure no regression in valid syntax detection
+   - Verify ASI works correctly
 
-**Target Metrics:**
-| Error Code | Current | Target |
-|------------|---------|--------|
-| TS2705 gaps | Unknown | Fill all gaps |
-| TS1359 missing | Unknown | 100% detection |
-| Async generator issues | Unknown | Correct handling |
+3. **Coordinate with Worker 3**:
+   - Worker 3 is working on TS1109 (similar approach)
+   - Share patterns and suppression logic
+   - Ensure consistency across parser error handling
 
-**Key Files:**
-- `wasm/src/thin_checker.rs` - async-related functions
-- `wasm/src/checker/types/diagnostics.rs` - error code definitions
+### Files to Work On
+- `wasm/src/thin_parser.rs` - TS1005 error emission points
+- `wasm/src/thin_parser.rs` - `resync_after_error()` function
+- `wasm/src/thin_parser.rs` - ASI-related functions
 
-**Reference:** See `PROJECT_DIRECTION.md` Tier 5 section for async/await requirements.
+### Success Criteria
+- **TS1005 extra errors:** Reduce from 345 to <50
+- **ASI coverage:** All ASI test cases pass
+- **Error recovery:** Single missing token = 1-2 errors, not cascading
+
+### Testing
+1. Create test file with various TS1005 scenarios
+2. Verify error count is minimal (not cascading)
+3. Run conformance suite before/after
+4. Document error count reduction
 
 ---
 
-## Completed Tasks
+## Reference: Worker 5's Completed TS1005 Work
 
-*None yet*
+**Worker 5 already implemented:**
+- ✅ Per-statement budget: 2 TS1005 errors per statement
+- ✅ Proximity suppression: 80 character threshold
+- ✅ Expression end detection: `is_at_expression_end()`
+- ✅ ASI for restricted productions: `can_parse_semicolon_for_restricted_production()`
+- ✅ Object literal error recovery
+- ✅ Array literal error recovery
+
+**Worker 4 should:** Extend and fill gaps, not redo Worker 5's work
 
 ---
 
-## Notes
-
-- **Worktree:** `/tmp/orchestrator-workspace/worktrees/worker-4`
-- **Branch:** `worker-4`
-- **Target branch:** `em-team-1`
-- **Squad:** Async Squad
-- **Focus:** Async/await type checking (TS2705, TS1359)
-
-## Workflow
+## Instructions
 
 1. Sync with em-team-1: `git pull origin em-team-1`
-2. Create feature branch: `git checkout -b worker-4`
-3. Make changes in `wasm/` directory only
-4. Commit with format: `[wasm] checker: implement TS2705 async return type checking`
+2. Create feature branch from em-team-1
+3. Work on TS1005 gaps ONLY (don't redo Worker 5's work)
+4. Commit frequently: `[wasm] parser: extend TS1005 suppression for edge cases`
 5. Push to worker-4 branch
 6. Run tests locally
 7. Update this task list with status
 8. Notify EM-1 when ready for merge
 
+---
+
 ## Validation Checklist Before Merge
 
-- [ ] TS2705 errors emitted for async return type mismatches
-- [ ] TS1359 errors emitted for await in non-async functions
-- [ ] Async generators return correct types
-- [ ] No regression in other error codes
+- [ ] TS1005 errors reduced by target amount (345 → <50)
+- [ ] No duplication of Worker 5's work
+- [ ] ASI works for all test cases
+- [ ] Error recovery prevents cascading errors
 - [ ] Conformance tests pass
+- [ ] Code follows Worker 5's suppression patterns
 - [ ] Minimal repro tests validate fix
-- [ ] Code follows Rust best practices
+
+---
+
+## Task Completion Report
+
+*To be filled by EM-1 after merge*
+
+**Status:** ⏳ Pending
+
+**Date:** ⏳ Pending
+
+**Commits:** ⏳ Pending
+
+**Changes Made:** ⏳ Pending
+
+**Results:** ⏳ Pending
