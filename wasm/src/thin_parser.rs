@@ -110,8 +110,8 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
-            ts1109_statement_budget: 10, // Increased: Allow 10 TS1109 errors per statement (more lenient)
-            ts1005_statement_budget: 10, // Increased: Allow 10 TS1005 errors per statement (more lenient)
+            ts1109_statement_budget: 20, // Allow more TS1109 errors to reduce missing errors
+            ts1005_statement_budget: 10, // Keep TS1005 budget as-is (we're trying to reduce extra errors)
         }
     }
 
@@ -125,8 +125,8 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
-        self.ts1109_statement_budget = 10; // Reset error budget (increased)
-        self.ts1005_statement_budget = 10; // Reset error budget (increased)
+        self.ts1109_statement_budget = 20; // Reset error budget (increased for TS1109)
+        self.ts1005_statement_budget = 10; // Reset error budget (unchanged for TS1005)
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -1162,8 +1162,8 @@ impl ThinParserState {
     /// Parse a statement
     pub fn parse_statement(&mut self) -> NodeIndex {
         // Reset error budgets at statement boundaries to prevent error storms
-        // Increased to be more lenient and reduce false positives
-        self.ts1109_statement_budget = 10;
+        // Increased TS1109 budget to reduce missing errors
+        self.ts1109_statement_budget = 20;
         self.ts1005_statement_budget = 10;
 
         match self.token() {
