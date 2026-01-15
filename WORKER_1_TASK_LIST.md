@@ -1,103 +1,140 @@
-# Worker-1 Task List
+# Worker 1 Task List
 
-## ✅ COMPLETED: Parser Noise (TS1005 & TS1109) - Phase 1
-**Status:** @ COMPLETED (2026-01-15)
+Maintained by EM-1
+
+## 🔴 CURRENT TASK: Missing Error Categories Investigation
+
+**Last Updated:** 2026-01-15
+**Status:** 🔄 ASSIGNED
+**Priority:** 🟡 MEDIUM
+**Timeline:** 1-2 days (parallel with worker-2's validation)
+
+### Task Description
+
+While worker-2 runs the full conformance baseline validation, investigate the top missing error categories to prepare a prioritized task backlog. This work can proceed in parallel and will accelerate the next planning cycle.
+
+### Context
+
+From previous analysis, we know:
+- Exact match is at 44.2% (target: 80%+)
+- Many missing error categories identified but not fully investigated
+- worker-11 identified TS2322 as critical (105 missing errors)
+- Other categories need similar investigation
+
+### Deliverables
+
+1. **Run Quick Conformance Sample**
+   ```bash
+   cd wasm/differential-test
+   ./run-conformance.sh --samples 200 2>&1 | tee quick-sample-$(date +%Y%m%d).log
+   ```
+
+2. **Analyze Missing Errors**
+   - Extract top 10 missing error categories by frequency
+   - For each top 5 categories, provide:
+     - Error code (TSXXXX)
+     - Frequency (count and percentage)
+     - 2-3 representative test cases
+     - Hypothesized root cause
+     - Estimated fix complexity (low/medium/high)
+     - Suggested owner (worker or team)
+
+3. **Create Investigation Report**
+   - Document findings in `MISSING_ERRORS_INVESTIGATION.md`
+   - Include summary table of top categories
+   - Provide recommendations for priority order
+
+### Example Output Format
+
+```markdown
+# Missing Errors Investigation
+
+## Top 5 Missing Error Categories
+
+| Error Code | Count | % | Complexity | Description |
+|------------|-------|---|------------|-------------|
+| TS2322 | 105 | 15% | High | Type mismatch - Abstract Constructor Assignability |
+| TS7006 | 87 | 12% | Medium | Implicit Any |
+| TS2575 | 52 | 7% | Low | Parameter duplication |
+| ... | ... | ... | ... | ... |
+
+## Detailed Analysis
+
+### TS2322: Type Mismatch
+**Frequency:** 105 occurrences (15%)
+**Root Cause:** typeof AbstractClass not detected as non-assignable in TypeQuery expressions
+**Test Cases:**
+- testAbstractConstructorAssignability1
+- testAbstractConstructorAssignability2
+**Complexity:** HIGH - requires subtype checker changes
+**Suggested Owner:** worker-11 (has analysis ready)
+
+### TS7006: Implicit Any
+...
+```
+
+### Success Criteria
+
+- [ ] Quick conformance sample run (200 tests)
+- [ ] Top 5 missing error categories identified
+- [ ] Each category has 2-3 test cases documented
+- [ ] Root cause hypotheses provided
+- [ ] Complexity estimates provided
+- [ ] `MISSING_ERRORS_INVESTIGATION.md` created
+- [ ] Priority order recommendations provided
+
+### Contingency: If TS1005/TS1109 Target Missed
+
+If worker-2's validation shows TS1005/TS1109 did not meet the <40 target:
+1. **PAUSE** this investigation immediately
+2. **PIVOT** to TS1005/TS1109 Phase 2 refinements
+3. Focus on remaining parser error recovery issues
+4. Coordinate with worker-5 (EM-2) who achieved 96% reduction
+
+### Timeline
+
+- **Day 1:** Run conformance sample, extract error data
+- **Day 2:** Analyze patterns, document findings, create report
+
+### Impact
+
+**MEDIUM** - Provides critical data for next planning cycle:
+- Accelerates task assignment for all workers
+- Identifies quick wins vs. strategic investments
+- Helps balance workload across teams
+- Enables data-driven prioritization
+
+---
+
+## Completed Tasks
+
+### TS1005/TS1109 Parser Noise Reduction ✅
+
+**Status:** @ COMPLETE (2026-01-15)
 **Priority:** 🔴 CRITICAL
-**Owner:** worker-1
-**Branch:** worker-1
+**Commits:**
+- 9596bd4f1bb [wasm] parser: allow reserved keywords in dotted module names
+- 72ec386a349 [wasm] parser: fix await identifier allowed in static blocks
+- 2c8b88308b0 [wasm] parser: comprehensive error suppression for TS1005/TS1109
 
-### Summary
-Successfully implemented parser error recovery improvements to reduce TS1005 and TS1109 extra errors.
+**Summary:**
+Enhanced parser error recovery to reduce false positive TS1005 and TS1109 errors.
 
-### Completed Work
-**Three commits merged to em-team-1:**
-1. `9596bd4f1bb` - [wasm] parser: allow reserved keywords in dotted module names
-2. `72ec386a349` - [wasm] parser: fix await identifier allowed in static blocks
-3. `2c8b88308b0` - [wasm] parser: comprehensive error suppression for TS1005/TS1109
+**Improvements:**
+1. Module names with reserved keywords: `declare namespace test.class {}` now valid
+2. Await in static blocks: `static { let await = 1; }` now correctly parsed
+3. Error recovery suppression: More lenient parsing at recovery boundaries
 
-### Files Modified
-- `wasm/src/thin_parser.rs` - Error recovery improvements (78 insertions, 19 deletions)
+**Target:** Reduce TS1005/TS1109 from ~700 to <40
+**Status:** Implementation complete, validation pending conformance tests
 
-### Improvements Delivered
-1. **Module names with reserved keywords**: `declare namespace test.class {}` now valid
-2. **Await in static blocks**: `static { let await = 1; }` now correctly parsed
-3. **Error recovery suppression**: More lenient parsing at recovery boundaries to reduce false positives
-
-### Target vs Results
-- **Target:** Reduce TS1005/TS1109 from ~700 to <40
-- **Implementation:** ✅ Complete
-- **Status:** ⏳ Validation pending (awaiting worker-2's conformance test results)
-
----
-
-## Current Status: ⏸️ AWAITING VALIDATION RESULTS
-
-**Status:** @ PENDING (2026-01-15)
-**Reason:** Worker-2 is running comprehensive conformance tests to validate all completed work
-
-### Next Steps (After Validation Results)
-
-**Scenario A: Target Met (<40 extra errors)**
-- Mark Phase 1 as fully complete
-- Assign new task (see recommendations below)
-
-**Scenario B: Target Not Met (Still >40 extra errors)**
-- Begin Phase 2: Additional parser refinements
-- Focus on remaining edge cases
-- Address specific error patterns identified in validation
-
----
-
-## Potential Next Tasks (Awaiting Assignment)
-
-### Option 1: Phase 2 Parser Refinement (If validation shows need)
-- Target: Remaining TS1005/TS1109 edge cases
-- Focus: ASI improvements, additional recovery patterns
-- Estimated effort: 2-3 days
-
-### Option 2: TS2322/TS7006 Error Accuracy (New tactical work)
-- Target: Reduce type mismatch and implicit any missing errors
-- Focus: Type checking improvements in `wasm/src/checker/`
-- Estimated effort: 3-5 days
-
-### Option 3: Conformance Test Infrastructure
-- Target: Improve test automation and reporting
-- Focus: Better diagnostics, automated regression detection
-- Estimated effort: 2-3 days
+**Merge Status:** ✅ Merged to em-team-1
 
 ---
 
 ## Notes
+
 - Work in: /tmp/orchestrator-workspace/worktrees/worker-1
 - Push to worker-1 branch when complete
-- Do not touch other teams' directories
-- Awaiting EM-1 guidance on next task assignment
-- Last Updated: 2026-01-15
-
----
-
-## Worker-1 Merge Summary (2026-01-15)
-
-**Latest Merge Commit:** `a2fd647c520` (pushed to origin/em-team-1)
-**Previous Merge Commit:** `7c7df3b2acc`
-
-### Latest Changes Merged:
-**[wasm] parser: support optional chaining in heritage clauses** (2f011a64e49)
-- Fixed parsing of class extends/implements clauses with optional chaining
-- TypeScript allows: `class C extends A?.B {}` and `class C implements A?.B {}`
-- Added support for QuestionDotToken case in property access chain loop
-- Sets question_dot_token to true when ?. is encountered in heritage clauses
-
-### Code Changes:
-- `wasm/src/thin_parser.rs` - Added QuestionDotToken handling in parse_heritage_left_hand_expression
-- 21 insertions to support optional chaining syntax
-
-### Previous Merged Work:
-**[wasm] parser: allow keywords as labels in labeled statements** (7c7df3b2acc)
-- Fixed parsing of labeled statements where label is a reserved keyword
-- Example: `await: if (true) { ... }`
-
-### Overall Progress:
-- **Phase 1:** ✅ Complete (5 parser improvements total)
-- **Validation:** ⏳ Pending conformance test results
-- **Status:** Awaiting validation to determine if Phase 2 needed
+- Coordinate with worker-2 (running parallel validation)
+- If TS1005/TS1109 target missed, pivot immediately to Phase 2
