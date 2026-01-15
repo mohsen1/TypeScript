@@ -15110,8 +15110,10 @@ impl<'a> ThinCheckerState<'a> {
             // TS7005: Variable implicitly has an 'any' type
             // Report this error when noImplicitAny is enabled and the variable has no type annotation
             // and the inferred type is 'any'
+            // Skip if there's an initializer - TypeScript infers the type from it
             if self.ctx.no_implicit_any
                 && var_decl.type_annotation.is_none()
+                && var_decl.initializer.is_none()
                 && final_type == TypeId::ANY
             {
                 if let Some(ref name) = var_name {
