@@ -11,9 +11,14 @@
 ---
 
 ## ✅ COMPLETED: Application Expansion Tests (2026-01-15)
-- **Status:** Complete and pushed (commit b2b7678f5bf)
+- **Status:** ✅ MERGED into em-team-1 (commit f54e163d33f)
 - **Summary:** Fixed all failing application expansion tests in the type solver
 - **Test Results:** All 34/34 application expansion tests passing 🎉
+- **Merge Details:**
+  - Merge commit: f54e163d33f "Merge worker-4 branch into em-team-1"
+  - Pushed to origin: em-team-1 branch
+  - Rebased successfully with remote changes
+  - No conflicts during merge
 
 ## Changes Made:
 1. **Fixed test setup** (`evaluate_tests.rs`):
