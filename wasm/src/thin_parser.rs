@@ -538,15 +538,15 @@ impl ThinParserState {
     /// Check if we can parse a semicolon (ASI rules)
     /// Returns true if current token is semicolon or ASI applies
     ///
-    /// ASI (Automatic Semicolon Insertion) rules:
+    /// ASI (Automatic Semicolon Insertion) rules (matching TypeScript):
     /// 1. Explicit semicolon
     /// 2. Before closing brace
     /// 3. At EOF
-    /// 4. After line break IF next token starts a statement
+    /// 4. After line break (no additional checks!)
     ///
-    /// Note: Statement start detection is enhanced to include expression literals
-    /// (numbers, booleans, null, this, super) and prefix operators (!, ~, +, -, etc.)
-    /// to improve ASI for expression statements.
+    /// Note: This matches TypeScript's canParseSemicolon() implementation exactly.
+    /// The previous "enhanced" ASI with statement start checks was causing
+    /// false-positive TS1005 errors because it was more restrictive than TypeScript.
     fn can_parse_semicolon(&self) -> bool {
         // Explicit semicolon
         if self.is_token(SyntaxKind::SemicolonToken) {
@@ -563,25 +563,8 @@ impl ThinParserState {
             return true;
         }
 
-        // ASI applies after line break
-        if self.scanner.has_preceding_line_break() {
-            // Enhanced ASI: Check if next token starts a statement
-            // This handles cases like:
-            //   return
-            //   x + y;
-            // Where ASI should apply because 'x' starts an expression statement
-            if self.is_statement_start() {
-                return true;
-            }
-            // Also allow ASI before common statement delimiters
-            if self.is_token(SyntaxKind::CloseParenToken)
-                || self.is_token(SyntaxKind::CloseBracketToken)
-            {
-                return true;
-            }
-        }
-
-        false
+        // ASI applies after line break (matching TypeScript - no extra checks!)
+        self.scanner.has_preceding_line_break()
     }
 
     // =========================================================================
@@ -645,7 +628,7 @@ impl ThinParserState {
             | SyntaxKind::SemicolonToken  // empty statement
             | SyntaxKind::OpenParenToken  // parenthesized expression
             | SyntaxKind::OpenBracketToken  // array literal/destructuring
-            | SyntaxKind::LessThanToken  // JSX/type argument => true,
+            | SyntaxKind::LessThanToken => true,  // JSX/type argument
             _ => false,
         }
     }
