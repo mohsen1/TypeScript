@@ -320,3 +320,120 @@ Added new logic for:
 4. Array literal error recovery ✅
 5. Control statement error recovery ✅
 
+---
+
+## Next Task: Fix TS2348 "Cannot Invoke Expression" Over-Reporting
+
+**Priority:** 🟢 MEDIUM (Tier 2 - Type Checker Accuracy)
+
+**Status:** 🟢 READY TO START
+
+**Assigned:** 2026-01-15
+
+### Problem
+
+The type checker emits **TS2348 "Cannot invoke an expression whose type lacks a call signature"** errors in situations where the expression IS actually callable, or emits the error too eagerly without considering type refinement.
+
+**Current Impact:** TBD (needs conformance test analysis)
+
+### Root Cause
+
+The TS2348 check may be:
+1. Not recognizing callable types correctly (functions, classes with call signatures)
+2. Not considering type guards or control flow analysis
+3. Not handling union types that contain callable members
+4. Checking expressions too early before type narrowing
+
+**Examples to investigate:**
+
+```typescript
+// May incorrectly emit TS2348 when type should be narrowed
+function test(x: string | (() => void)) {
+    if (typeof x === 'function') {
+        x();  // Should NOT error - type guard narrows to function
+    }
+}
+
+// May emit TS2348 for callable class instances
+class CallableClass {
+    invoke() {}
+}
+const instance = new CallableClass();
+instance();  // Should NOT error - has call signature
+```
+
+### Action Items
+
+1. **Locate TS2348 emission points** in `wasm/src/thin_checker.rs`
+   - Search for `TS2348` or diagnostic_codes::TS2348
+   - Find "Cannot invoke an expression" error message
+   - Understand the check logic
+
+2. **Add callable type checks before emitting TS2348:**
+   - Check if the type has a call signature (is it a function type?)
+   - Check if the type is a class with a `call` method
+   - Consider union types - if ANY member is callable, the union might be callable
+   - Check for type guards - has control flow narrowed the type?
+
+3. **Implement type refinement logic:**
+   ```rust
+   // Pseudo-code for the fix
+   if is_union_type {
+       if any_member_is_callable(type) {
+           // Don't emit TS2348 - union contains callable
+           continue;
+       }
+   }
+
+   if has_type_guard_context(node) {
+       // Check if type guard narrows to callable
+       let narrowed_type = apply_type_guards(type);
+       if is_callable(narrowed_type) {
+           // Don't emit TS2348
+           continue;
+       }
+   }
+   ```
+
+4. **Test cases to verify:**
+   ```typescript
+   // Should NOT emit TS2348
+   function test1(x: string | (() => void)) {
+       if (typeof x === 'function') {
+           x();
+       }
+   }
+
+   // Should NOT emit TS2348
+   class Foo {
+       call() {}
+   }
+   const f = new Foo();
+   f.call();
+
+   // Should emit TS2348
+   const notCallable = 42;
+   notCallable();
+   ```
+
+5. **Run conformance tests:**
+   ```bash
+   cd wasm/differential-test
+   bash run-conformance.sh --max=500 --workers=4
+   ```
+   - Track TS2348 count before/after
+   - Ensure legitimate TS2348 errors are still emitted
+   - Check for regressions in other error codes
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS2348 extra | TBD | Reduce by 50%+ |
+| Legitimate TS2348 | TBD | Maintain 100% |
+
+**Key Files:**
+- `wasm/src/thin_checker.rs` - TS2348 emission points, type checking logic
+- `wasm/src/checker/types/diagnostics.rs` - error code definitions
+
+**Reference:** See `PROJECT_DIRECTION.md` Tier 2 section for TS2348 handling.
+
