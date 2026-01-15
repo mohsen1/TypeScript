@@ -31,11 +31,20 @@ Maintained by EM-3
 - Exact match: 30.8% → ~45% (+14pp)
 - Missing errors: 57.8% → ~35% (-23pp)
 
-**Status:** IMPLEMENTATION COMPLETE - Ready for conformance testing
+**Status:** ✅ COMPLETE - Merged to rust via em-team-3
+
+**Validation Results (2024-01-14):**
+- Tests Run: 99 (100 sample)
+- Exact Match: 46.5%
+- WASM Crashed: 0
+- Top Missing: TS2524 (7), TS2664 (7), TS2705 (7), TS2304 (5)
+- Top Extra: TS7006 (11), TS1109 (4), TS7011 (4)
+
+**Note:** Combined with worker-9's TypeId::UNKNOWN fix, overall type checking has significantly improved. TS2322 is now properly emitted for ERROR types.
 
 **Risk:** Low - matches TypeScript behavior
 
-**Target Branch:** rust
+**Target Branch:** rust (merged via em-team-3 → rust)
 
 ### Task 3: Diagnostic emission audit for ERROR type handling ✅
 - [x] Search for all places where check_subtype returns SubtypeResult::False
