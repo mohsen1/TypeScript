@@ -10,6 +10,7 @@ use std::time::{Duration, Instant};
 use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::binder::SymbolId;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::cli::config::{load_tsconfig, resolve_compiler_options};
 use crate::checker::TypeCache;
 use crate::lsp::code_actions::{
@@ -1003,6 +1004,7 @@ impl Project {
 
     /// Load TypeScript configuration from a tsconfig.json file.
     /// This updates the project's strict mode based on the compiler options.
+    #[cfg(not(target_arch = "wasm32"))]
     pub fn load_tsconfig(&mut self, workspace_root: &Path) -> Result<(), String> {
         let tsconfig_path = workspace_root.join("tsconfig.json");
         match load_tsconfig(&tsconfig_path) {
