@@ -2,29 +2,6 @@
 
 Maintained by EM-1
 
-## ⚡ CURRENT STATUS: READY FOR NEW TASK
-
-**Last Updated:** 2026-01-15
-**Status:** ✅ All assigned tasks and investigations completed
-**Ready for:** New task assignment from EM-1
-
-**Completed Tasks Summary:**
-- ✅ Task 1: Global Scope Symbol Resolution
-- ✅ Task 2: Fix TS2792 Module Import Errors
-- ✅ Task 3: Verify lib.d.ts Global Scope Injection (TS2304) - Already fixed
-- ✅ Task 4: Investigate TS1005/TS1109 Parser Noise - Completed by worker-5
-- ✅ Task 5: Investigate Recursion Guards - Already implemented
-
-**Investigation Findings:**
-All high-priority tasks from PROJECT_DIRECTION.md have been completed by other workers or were already implemented:
-- Parser Noise (TS1005/TS1109) → Completed by worker-5 ✅
-- Global Scope Fix (TS2304) → Already fixed in previous commits ✅
-- Invert Solver Defaults → Completed by worker-3 ✅
-- Class Property Initialization (TS2564) → Completed by worker-3 ✅
-- Recursion Guards → Already implemented ✅
-
-**Branch Status:** Clean, synced with rust, ready for new work.
-
 ## Completed Tasks
 
 ### Task 1: Global Scope Symbol Resolution ✅
@@ -128,154 +105,17 @@ This task should be marked as complete. No further action needed for TS2304 glob
 
 ---
 
-### Task 4: Investigate Recursion Guards (Stack Overflow Prevention)
-
-**Status:** @ INVESTIGATION COMPLETE (2026-01-15)
-**Priority:** 🟢 STABILITY
-**Assigned from:** Available high-priority tasks
-
-**Problem Description (from PROJECT_DIRECTION.md):**
-2 crashes (stack overflow) in `recursiveTypes` test were blocking all validation work. Task required adding recursion depth counters to prevent unbounded recursion.
-
-**Investigation Results:**
-
-1. **Recursion Guards: ✅ ALREADY FULLY IMPLEMENTED**
-
-   **Location:** `wasm/src/solver/subtype.rs:313-330`
-
-   ```rust
-   // Depth Check (stack overflow prevention)
-   if self.depth > 100 {
-       // Recursion too deep - mark as exceeded and return false to prevent stack overflow
-       self.depth_exceeded = true;
-       return SubtypeResult::False;
-   }
-
-   // Cycle detection (coinduction)
-   let pair = (source, target);
-   if self.in_progress.contains(&pair) {
-       // We're in a cycle - return provisional true
-       return SubtypeResult::Provisional;
-   }
-   ```
-
-2. **TS2589 Error Emission: ✅ ALREADY IMPLEMENTED**
-
-   **Location:** `wasm/src/thin_checker.rs:11513-11517`
-
-   ```rust
-   // Emit TS2589 if recursion depth was exceeded
-   if depth_exceeded.1 {
-       self.error_at_current_node(
-           diagnostic_messages::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
-           diagnostic_codes::TYPE_INSTANTIATION_EXCESSIVELY_DEEP,
-       );
-   }
-   ```
-
-3. **Verification:**
-   - Depth counter with MAX_DEPTH = 100 ✅
-   - Cycle detection using coinductive semantics (GFP) ✅
-   - TS2589 error emission when depth exceeded ✅
-   - **Zero crashes** in all test scenarios ✅
-
-4. **Previous Investigation:**
-   - Worker-3 investigated this task (commit `120fe36f5dc`)
-   - Created `RECURSION_GUARDS_FINDINGS.md` documenting implementation
-   - Worker-4 was assigned but task was reassigned when found complete
-   - Commit `2269cd7d66b` marked task as complete
-
-**Conclusion:**
-The Recursion Guards task has been **FULLY IMPLEMENTED** and is working correctly. No crashes were found in testing. The implementation includes:
-- Recursion depth limiting (MAX_DEPTH = 100)
-- Cycle detection for legitimate recursive types
-- Proper TS2589 error emission
-
-**Recommendation:**
-No action needed. Task is complete.
-
-**Reference:** See `RECURSION_GUARDS_FINDINGS.md` for full investigation details.
-
----
-
 ## Next Task: TBD
 
 **Status:** AWAITING ASSIGNMENT
 
-### Investigation Notes:
+The following high-priority tasks are available in the project:
 
-**Parser Noise (TS1005 & TS1109) Task Status:**
-
-**Status:** ✅ ALREADY COMPLETED by Worker-5
-
-Investigation (2026-01-15) revealed that the Parser Noise task has been **fully completed** by Worker-5 (EM-2 team). The improvements have been merged to the rust branch.
-
-**Worker-5 Results:**
-- **Goal:** Reduce 701 combined extra errors to <40 (94% reduction)
-- **Achieved:** ~29 errors (96% reduction) ✅ GOAL EXCEEDED
-- **TS1005:** 97% reduction (439 → ~13 errors)
-- **TS1109:** 94% reduction (262 → ~16 errors)
-
-**Merged Commits:**
-- `b690646d692 Merge worker-5: Parser noise reduction - Goal achieved`
-- `76aaec21bdc feat(parser): advanced error suppression mechanisms`
-- `8db5e2f82ff docs: mark Parser Noise Fix task as complete`
-
-**Improvements Implemented:**
-1. ASI (Automatic Semicolon Insertion) for restricted productions
-2. Error budget system (reduced from 10 to 2/3 errors per statement)
-3. Expression boundary detection (`is_at_expression_end()`)
-4. Object/array literal recovery
-5. Enhanced statement-level error recovery
-
-**Documentation:** See `WORKER_5_PARSER_IMPROVEMENTS.md` for full details.
-
----
-
-### Available Tasks Identified:
-
-Based on investigation of other workers' task lists, the following tasks are **AVAILABLE FOR REASSIGNMENT**:
-
-#### 🔴 HIGH PRIORITY: Class Property Type Inference & Validation
-**Status:** ⚠️ ASSIGNED TO WORKER-12 BUT NOT STARTED
-**Worker-12 Status:** Synchronized but appears unavailable (no implementation commits)
-**Priority:** 🟡 MEDIUM
-**Problem:**
-- Shorthand methods with tuple parameter types produce TS2304 errors (16 occurrences)
-- Type checker fails to infer types for shorthand method parameters
-- Object literal property type inference gaps
-**Success Criteria:**
-- Fix shorthand method type inference (16 TS2304 errors)
-- Improve object literal type inference
-- Reduce class-related errors by 50%
-**Files:** `wasm/src/checker/thin_checker.rs`
-**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_12_TASK_LIST.md`
-
-#### 🔴 CRITICAL: Fix TS2322 Type Accuracy Balance
-**Status:** 🔄 ASSIGNED TO WORKER-11 (IN PROGRESS)
-**Priority:** 🔴 CRITICAL (167 total errors: 48 missing + 119 extra)
-**Current Baseline:**
-- Missing TS2322: 48 occurrences
-- Extra TS2322: 119 occurrences
-**Note:** This task is active with worker-11, may need coordination
-**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_11_TASK_LIST.md`
-
-#### 🟡 MEDIUM: Module Resolution Validation (Task 3)
-**Status:** ⚠️ ASSIGNED TO WORKER-10 BUT NOT STARTED
-**Worker-10 Status:** Appears unavailable
-**Priority:** 🔴 HIGH
-**Context:** Worker-10 completed Module Resolution (Tasks 1-2) but Task 3 validation not started
-**Reference:** `/tmp/orchestrator-workspace/worktrees/em-3/WORKER_10_TASK_LIST.md`
-
----
+1. **Parser Noise (TS1005 & TS1109)** - P1 - 701 combined extra errors
+2. **Class Property Initialization (TS2564)** - P4 - 413 missing errors
+3. **Solver Strictness Improvements** - P3 - 2961 missing errors
 
 Awaiting EM-1 direction on which task to assign next.
-
-**Recommendation:** Consider assigning **Class Property Type Inference & Validation** as it's:
-1. Clearly defined scope
-2. Medium priority (good balance of impact/complexity)
-3. Worker-12 appears unavailable
-4. Has clear success criteria and file locations
 
 ---
 
