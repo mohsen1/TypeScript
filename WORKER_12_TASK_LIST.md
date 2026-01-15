@@ -1,12 +1,93 @@
 # WORKER-12 TASK LIST
 
-## Squad: CFA (Control Flow Analysis) Squad
+## Squad: em-team-3
 ## EM: EM-3
 ## Branch: worker-12
 
 ---
 
-## Primary Task: Implement Class Property Initialization Checks (TS2564)
+## Primary Task: Class Property Type Inference & Validation
+
+**Assigned:** 2024-01-14
+**Priority:** 🟡 MEDIUM
+**Status:** 🔄 STARTED
+
+### Problem
+While TS2564 (strictPropertyInitialization) is already implemented, there are other class property issues in the codebase:
+- Property type inference in object literals
+- Class method parameter types (especially with shorthand methods)
+- Property access on generic types
+- Class heritage (extends/implements) type checking
+
+### Context
+Based on latest conformance validation (2024-01-14), top class-related issues:
+- Shorthand methods with tuple parameter types producing TS2304 errors (16 occurrences)
+- Type checker failing to infer types for shorthand method parameters
+- Object literal property type inference gaps
+
+### Action Items
+
+#### 1. Investigate Shorthand Method Type Inference
+- **Issue:** Shorthand methods with tuple parameter types produce "Cannot find name" errors
+- **Example:**
+  ```typescript
+  type FooMethod = {
+    method(...args: [type: string, cb: (e: string) => void]): void;
+  }
+  let fooM: FooMethod = {
+    method(type, cb) {  // Error: Cannot find name 'type', 'cb'
+      return type;
+    }
+  };
+  ```
+- **Root Cause:** Type checker fails to infer types for shorthand method parameters when signature has tuple type
+- **File:** `wasm/src/checker/thin_checker.rs`
+
+#### 2. Fix Object Literal Property Type Inference
+- **File:** `wasm/src/checker/thin_checker.rs`
+- Ensure property types are inferred from object literal target type
+- Handle contextual typing for object literal properties
+
+#### 3. Class Heritage Type Checking
+- **File:** `wasm/src/checker/thin_checker.rs`
+- Verify `extends` clauses are properly checked
+- Ensure `implements` clauses validate interface compliance
+
+#### 4. Generic Class Handling
+- **File:** `wasm/src/checker/thin_checker.rs`
+- Ensure generic type parameters are properly propagated
+- Handle class properties with generic types
+
+### Files to Work On
+- `wasm/src/checker/thin_checker.rs` (Primary)
+- `wasm/src/binder/thin_binder.rs` (if binding issues)
+- `wasm/src/types/subtype.rs` (if subtype checking issues)
+
+### Success Criteria
+- Fix shorthand method type inference (16 TS2304 errors)
+- Improve object literal type inference
+- Reduce class-related errors by 50%
+- Exact match improvement: 44.2% → 46%+
+
+### Testing
+- Run: `./wasm/differential-test/run-conformance.sh --all`
+- Focus on class, object literal, and type inference tests
+- Verify no regression in valid code
+
+---
+
+## Instructions
+
+1. Create branch from `rust` branch
+2. Focus on class property type inference issues
+3. Run conformance tests frequently to track progress
+4. Push to `worker-12` branch when ready for review
+5. Mark "Ready for Merge: Yes" when done
+6. EM-3 will merge and validate before escalating
+
+---
+
+## Completed Task: TS2564 Class Property Initialization ✅
 
 **Priority:** @ TACTICAL (Priority 4 for EM-3)
 **Dependency:** Can start in parallel with other workers
