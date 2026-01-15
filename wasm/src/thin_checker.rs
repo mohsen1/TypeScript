@@ -20816,6 +20816,28 @@ impl<'a> ThinCheckerState<'a> {
         // Push type parameters (like <U> in `fn<U>(id: U)`) before checking types
         let (_type_params, type_param_updates) = self.push_type_parameters(&method.type_parameters);
 
+        // Extract parameter types from contextual type (for object literal methods)
+        // This enables shorthand method parameter type inference
+        let mut param_types: Vec<Option<TypeId>> = Vec::new();
+        if let Some(ctx_type) = self.ctx.contextual_type {
+            let ctx_helper = ContextualTypeContext::with_expected(self.ctx.types, ctx_type);
+
+            for (i, &param_idx) in method.parameters.nodes.iter().enumerate() {
+                if let Some(param_node) = self.ctx.arena.get(param_idx) {
+                    if let Some(param) = self.ctx.arena.get_parameter(param_node) {
+                        let type_id = if !param.type_annotation.is_none() {
+                            // Use explicit type annotation if present
+                            Some(self.get_type_from_type_node(param.type_annotation))
+                        } else {
+                            // Infer from contextual type
+                            ctx_helper.get_parameter_type(i)
+                        };
+                        param_types.push(type_id);
+                    }
+                }
+            }
+        }
+
         let has_type_annotation = !method.type_annotation.is_none();
         let mut return_type = if has_type_annotation {
             self.get_type_from_type_node(method.type_annotation)
@@ -20823,7 +20845,13 @@ impl<'a> ThinCheckerState<'a> {
             TypeId::ANY
         };
 
-        self.cache_parameter_types(&method.parameters.nodes, None);
+        // Cache parameter types for use in method body
+        // If we have contextual types, use them; otherwise fall back to type annotations or UNKNOWN
+        if param_types.is_empty() {
+            self.cache_parameter_types(&method.parameters.nodes, None);
+        } else {
+            self.cache_parameter_types(&method.parameters.nodes, Some(&param_types));
+        }
 
         // Check for duplicate parameter names (TS2300)
         self.check_duplicate_parameters(&method.parameters);
