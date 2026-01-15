@@ -209,3 +209,59 @@ and the inferred type is 'any'.
 ✅ Code changes fixing variable type inference (32 lines across 3 files)
 ✅ Updated audit document with Task 5 changes (WORKER_3_AUDIT.md)
 ✅ Conformance test comparison to be run
+
+---
+
+### Task 6: Fix Remaining TS7008 Errors (Object Literals)
+**Priority:** HIGH
+**Assigned:** 2026-01-14
+**Status:** 🔄 IN PROGRESS
+
+**Problem:**
+Based on conformance test results, **TS7008** still has 39 missing errors:
+- "Member '{0}' implicitly has an '{1}' type"
+- Task 3 fixed class properties, but object literal properties still don't generate TS7008
+- Object literal properties without type annotations fall back to 'any' when noImplicitAny is enabled
+
+**Current Status:**
+- Task 3 reduced TS7008 from 133 → 39 (70.6% improvement)
+- Class properties now correctly generate TS7008
+- Object literal properties still missing TS7008 errors
+
+**Objective:**
+Extend TS7008 generation to object literal properties when `noImplicitAny` is enabled
+and the property has no type annotation and the inferred type is 'any'.
+
+**Files to Audit:**
+- `wasm/src/thin_checker.rs` - Object literal expression checking
+- `wasm/src/solver/*.rs` - Object literal type resolution
+
+**Steps:**
+1. Search for object literal property checking code
+2. Find where object literal properties get their types
+3. Ensure TS7008 is generated when noImplicitAny is enabled and property has no type annotation
+4. Verify TS7008 error messages are generated correctly for object literals
+
+**Expected Impact:**
+- TS7008 missing errors should decrease from 39
+- Better error messages for object literal properties missing type annotations
+- Consistent with class property TS7008 fixes
+
+**Acceptance Criteria:**
+- Object literal properties without types generate TS7008 when noImplicitAny is enabled
+- Object literal property type inference errors are exposed (not hidden by ANY fallback)
+- Code compiles without errors
+- Conformance test shows improvement in TS7008
+
+**Deliverables:**
+1. Code changes fixing object literal property type inference
+2. Updated audit document with Task 6 changes
+3. Conformance test comparison showing TS7008 improvement
+
+**Success Metric:**
+Reduce TS7005 missing errors from 39 to <20 (target: <50% remaining)
+
+**Notes:**
+- This continues the work from Task 3
+- Object literals are a common TypeScript pattern
+- Aligns with TypeScript's noImplicitAny behavior
