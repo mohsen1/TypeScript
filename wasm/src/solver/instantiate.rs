@@ -39,10 +39,26 @@ impl TypeSubstitution {
     ///
     /// `type_params` - The declared type parameters (e.g., `<T, U>`)
     /// `type_args` - The provided type arguments (e.g., `<string, number>`)
+    ///
+    /// When type_args has fewer elements than type_params, default values
+    /// from the type parameters are used for the remaining parameters.
     pub fn from_args(type_params: &[TypeParamInfo], type_args: &[TypeId]) -> Self {
         let mut map = FxHashMap::default();
-        for (param, &arg) in type_params.iter().zip(type_args.iter()) {
-            map.insert(param.name, arg);
+        for (i, param) in type_params.iter().enumerate() {
+            let type_id = if i < type_args.len() {
+                type_args[i]
+            } else {
+                // Use default value if type argument not provided
+                match param.default {
+                    Some(default) => default,
+                    None => {
+                        // No default and no argument - leave this parameter unsubstituted
+                        // It will remain as a TypeParameter in the result
+                        continue;
+                    }
+                }
+            };
+            map.insert(param.name, type_id);
         }
         TypeSubstitution { map }
     }
