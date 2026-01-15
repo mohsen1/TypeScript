@@ -73,3 +73,25 @@ Successfully implemented parser error recovery improvements to reduce TS1005 and
 - Do not touch other teams' directories
 - Awaiting EM-1 guidance on next task assignment
 - Last Updated: 2026-01-15
+
+---
+
+## Worker-1 Merge Summary (2026-01-15)
+
+**Merge Commit:** `7c7df3b2acc` (pushed to origin/em-team-1)
+
+### Latest Changes Merged:
+**[wasm] parser: allow keywords as labels in labeled statements**
+- Fixed parsing of labeled statements where label is a reserved keyword
+- Example: `await: if (true) { ... }`
+- Addresses TS1109 "Expression expected" errors in valid code
+- Particularly affects static blocks using keyword labels
+
+### Code Changes:
+- `wasm/src/thin_parser.rs` - Extended parse_statement() to handle keywords as labels
+- Check if token is identifier/keyword AND followed by colon (labeled statement)
+
+### Overall Progress:
+- **Phase 1:** ✅ Complete (4 parser improvements total)
+- **Validation:** ⏳ Pending conformance test results
+- **Status:** Awaiting validation to determine if Phase 2 needed
