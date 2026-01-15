@@ -5600,6 +5600,17 @@ impl<'a> ThinCheckerState<'a> {
             return false;
         };
 
+        // Quick check: if lib_contexts is not empty and symbol is not in main binder's arena,
+        // it's likely from lib.d.ts which is all ambient
+        if !self.ctx.lib_contexts.is_empty() {
+            // Check if symbol exists in main binder's symbol arena
+            let is_from_lib = self.ctx.binder.get_symbols().get(sym_id).is_none();
+            if is_from_lib {
+                // Symbol is from lib.d.ts, which is all ambient (declare statements)
+                return true;
+            }
+        }
+
         for &decl_idx in &symbol.declarations {
             // Check if the variable statement has a declare modifier
             if let Some(var_stmt_idx) = self.find_enclosing_variable_statement(decl_idx) {
@@ -13098,25 +13109,26 @@ impl<'a> ThinCheckerState<'a> {
     /// For detailed errors with elaboration (e.g., "property 'x' is missing"),
     /// use `error_type_not_assignable_with_reason_at` instead.
     pub fn error_type_not_assignable_at(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This suppression prevented valid TS2322 errors from being emitted when types couldn't be
-        // resolved (e.g., TS2304 "Cannot find name 'Foo'" followed by TS2322 "Type 'number' is not
-        // assignable to type 'Foo'").
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // The solver layer correctly returns SubtypeResult::False for ERROR types, but the checker
-        // was suppressing diagnostics before they could be created. This behavior caused ~310
-        // missing TS2322 errors in the conformance suite.
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // TypeScript emits both errors (TS2304 + TS2322), so we should too. Removing this
-        // suppression matches TypeScript's behavior and improves conformance by ~14pp.
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation details.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
@@ -13147,28 +13159,26 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         use crate::solver::{CompatChecker, TypeFormatter};
 
-        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
-        // Previously, this function would silently return if source or target types contained ERROR.
-        // This was the primary suppression point preventing ~310 TS2322 errors from being emitted.
+        // SELECTIVE DIAGNOSTIC SUPPRESSION (2025-01-15 - Task 8 Pattern 1)
         //
-        // Rationale for removal:
-        // 1. The solver layer (subtype.rs) correctly returns SubtypeResult::False for ERROR types
-        // 2. The compat layer (compat.rs) properly delegates to the subtype checker
-        // 3. Only the checker layer was suppressing diagnostics BEFORE creation
-        // 4. TypeScript emits both TS2304 (cannot find name) AND TS2322 (not assignable)
-        // 5. Hiding these errors masks real bugs and hurts user experience
+        // When source or target type IS ERROR, suppress the TS2322 emission.
+        // This prevents unhelpful errors like "Type 'error' is not assignable to type 'string'".
         //
-        // Impact on conformance:
-        // - Expected improvement: +200-250 visible TS2322 errors
-        // - Exact match: 30.8% → ~45% (+14pp)
-        // - Missing errors: 57.8% → ~35% (-23pp)
+        // Rationale:
+        // 1. When a type resolves to ERROR, it means the symbol couldn't be resolved (TS2304)
+        // 2. Emitting TS2322 for "Type 'error' is not assignable" provides no additional value
+        // 3. TypeScript doesn't emit these errors - it only reports the resolution failure
+        // 4. This fixes 7 out of 10 false positive test files (Pattern 1 in Task 8)
         //
-        // Old code:
-        // if self.type_contains_error(source) || self.type_contains_error(target) {
-        //     return;
-        // }
+        // The Worker 11 change removed all ERROR suppression to fix missing TS2322 errors,
+        // but that was too broad. We need to be more selective:
+        // - Suppress when source/target IS ERROR (can't provide useful error message)
+        // - Don't suppress when source/target CONTAINS ERROR (e.g., union with error member)
         //
-        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation and WORKER_11_TASK_4_SUMMARY.md for impact.
+        // See: TASK_8_TEST_FAILURES.md Pattern 1 for full investigation details.
+        if source == TypeId::ERROR || target == TypeId::ERROR {
+            return;
+        }
 
         if let Some((source_level, target_level)) =
             self.constructor_accessibility_mismatch(source, target, None)
@@ -16297,6 +16307,10 @@ impl<'a> ThinCheckerState<'a> {
                 diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER,
             );
         }
+
+        // TODO: Check for TS2565 (Property used before being assigned in constructor)
+        // This requires analyzing the constructor body for `this.X` accesses that occur
+        // before X is assigned. Implementation needs further debugging.
     }
 
     fn property_requires_initialization(
@@ -16304,6 +16318,8 @@ impl<'a> ThinCheckerState<'a> {
         member_idx: NodeIndex,
         prop: &crate::parser::thin_node::PropertyDeclData,
     ) -> bool {
+        use crate::scanner::SyntaxKind;
+
         if !prop.initializer.is_none()
             || prop.question_token
             || prop.exclamation_token
@@ -16311,6 +16327,20 @@ impl<'a> ThinCheckerState<'a> {
             || self.has_abstract_modifier(&prop.modifiers)
             || self.has_declare_modifier(&prop.modifiers)
         {
+            return false;
+        }
+
+        // Properties with string or numeric literal names are not checked for strict property initialization
+        // Example: class C { "b": number; 0: number; }  // These are not checked
+        let Some(name_node) = self.ctx.arena.get(prop.name) else {
+            return false;
+        };
+        if matches!(
+            name_node.kind,
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16
+        ) {
             return false;
         }
 

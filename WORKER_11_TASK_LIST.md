@@ -1,9 +1,106 @@
 # Worker 11 Task List
 
-Maintained by EM-3
+Maintained by EM-1 (reassigned from EM-3)
 
 ## Active Task
-- None awaiting assignment
+
+### 🎯 NEW ASSIGNMENT: Investigate Missing TS2322 Patterns 🟡
+**Priority:** MEDIUM-HIGH (Strategic Investigation)
+**Assigned:** 2026-01-15
+**Owner:** worker-11
+**Branch:** worker-11
+**Status:** 🔄 READY TO START
+
+### Task Description
+Investigate why 105 TS2322 (Type Mismatch) errors are missing. Worker-11's previous analysis identified abstract constructor assignability as the primary issue. This task is to DEEP DIVE into the patterns and prepare a fix strategy - DO NOT implement yet.
+
+### Problem Analysis
+From WORKER_11_TASK_6_ANALYSIS.md:
+- **Missing TS2322:** 105 occurrences
+- **Primary Issue:** Abstract Constructor Assignability
+  - `typeof AbstractClass` not properly detected as non-assignable
+  - Override logic exists but not triggered for TypeQuery expressions
+- **Secondary Issues:**
+  - Await type resolution (unknown vs boolean)
+  - Abstract method type errors (methods typed as error)
+  - Async method with super issues
+
+### Action Items
+
+#### Phase 1: Deep Pattern Analysis (INVESTIGATION ONLY)
+- [ ] Collect 10-15 concrete examples of missing TS2322 errors
+- [ ] Categorize each missing error by pattern:
+  - Pattern A: Abstract constructor assignability
+  - Pattern B: Await type resolution
+  - Pattern C: Abstract method typing
+  - Pattern D: Other
+- [ ] For each pattern, identify:
+  - Expected TypeScript behavior
+  - Actual WASM behavior
+  - Code location responsible
+  - Why the check is failing
+
+#### Phase 2: Code Tracing
+- [ ] Trace abstract constructor assignability logic:
+  - Find where TypeQuery expressions are checked
+  - Find where abstract class types are handled
+  - Find why override logic isn't triggered
+  - Document exact code locations
+- [ ] Trace await type resolution:
+  - Find where await expression types are determined
+  - Find why `unknown` is used instead of `boolean`
+  - Document code path
+- [ ] Trace abstract method typing:
+  - Find where method types are inferred
+  - Find why abstract methods get typed as `error`
+  - Document root cause
+
+#### Phase 3: Fix Strategy Document
+- [ ] Create detailed implementation plan for each pattern
+- [ ] Document expected test result changes:
+  - How many missing TS2322 errors will be found?
+  - Will any extra errors be introduced?
+  - Impact on conformance score?
+- [ ] Identify potential risks:
+  - Could this break existing tests?
+  - Are there edge cases to handle?
+  - Dependencies on other fixes?
+- [ ] Prioritize fixes by ROI (errors found vs implementation effort)
+
+### Success Metrics
+- [ ] All 105 missing TS2322 errors categorized by pattern
+- [ ] Root cause identified for each pattern
+- [ ] Detailed fix strategy document created
+- [ ] Expected impact quantified (error count changes)
+- [ ] NO CODE IMPLEMENTED - investigation only
+
+### Deliverables
+1. **Pattern Analysis Document:**
+   - Categorized list of all 105 missing TS2322 errors
+   - 5-10 representative examples per category
+   - Expected vs actual behavior for each
+
+2. **Code Trace Document:**
+   - Exact code locations for each pattern
+   - Call stacks showing how type checking flows
+   - Root cause analysis for each failure
+
+3. **Fix Strategy Document:**
+   - Step-by-step implementation plan
+   - Expected test result changes
+   - Risk assessment
+   - Dependencies on other fixes
+
+4. **Updated Task List:**
+   - Mark investigation complete
+   - Set `Ready for Implementation: Yes`
+
+### Status
+- **Previous Tasks:** ✅ Parser Error Recovery, ✅ TS2322 Analysis (Task 6)
+- **Current Task:** 🟡 TS2322 Pattern Investigation (Deep Dive)
+- **Implementation Phase:** NO - Investigation only
+- **Ready to Start:** ✅ YES
+- **Last Updated:** 2026-01-15
 
 ## Recent Merge (2025-01-15)
 
