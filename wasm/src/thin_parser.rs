@@ -6643,15 +6643,38 @@ impl ThinParserState {
                 // Only parse as await expression if we're in an async context
                 if !self.in_async_context() {
                     // Outside async context, check if await is used as a bare expression
-                    // If followed by semicolon or statement end, report "Expression expected"
-                    // Examples in static blocks where await is a reserved identifier:
-                    //   await;  // Error: Expression expected
-                    //   await (1);  // Error: Expression expected
+                    // If followed by tokens that can't start an expression, report "Expression expected"
+                    // Examples where await is a reserved identifier but invalid as expression:
+                    //   await;  // Error: Expression expected (in static blocks)
+                    //   await (1);  // Error: Expression expected (in static blocks)
+                    //   async (a = await) => {}  // Error: Expression expected (parameter default)
+                    //   async (a = await => x) => {}  // Error: Expression expected (before arrow)
                     // But allow: let await = 1;  (declaration)
-                    if self.can_parse_semicolon() || self.is_token(SyntaxKind::SemicolonToken) {
+
+                    // Look ahead to see what token comes after 'await'
+                    let snapshot = self.scanner.save_state();
+                    let current_token = self.current_token;
+                    self.next_token(); // consume 'await'
+                    let next_token = self.token();
+                    self.scanner.restore_state(snapshot);
+                    self.current_token = current_token;
+
+                    let has_following_expression = !matches!(
+                        next_token,
+                        SyntaxKind::SemicolonToken
+                            | SyntaxKind::CloseParenToken
+                            | SyntaxKind::CloseBracketToken
+                            | SyntaxKind::CommaToken
+                            | SyntaxKind::ColonToken
+                            | SyntaxKind::EqualsGreaterThanToken
+                            | SyntaxKind::EndOfFileToken
+                    );
+
+                    if !has_following_expression {
                         use crate::checker::types::diagnostics::diagnostic_codes;
                         self.error_expression_expected();
                     }
+
                     // Fall through to parse as identifier/postfix expression
                     return self.parse_postfix_expression();
                 }
