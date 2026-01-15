@@ -3,7 +3,26 @@
 Maintained by EM-3
 
 ## Active Task
-- None awaiting assignment
+
+### Task 4: Implement ERROR type diagnostic emission fix
+- [ ] Comment out diagnostic suppression in `error_type_not_assignable_with_reason_at` (line 13074-13076)
+- [ ] Comment out diagnostic suppression in `error_type_not_assignable_at` (line 13042-13044)
+- [ ] Add detailed comment explaining why suppression was removed
+- [ ] Run unit tests to ensure no regressions
+- [ ] Build WASM module to verify compilation
+- [ ] Document expected conformance improvements
+- [ ] Create implementation summary
+
+**Goal:** Remove explicit diagnostic suppression to restore TS2322 error emission for ERROR types
+
+**Expected Impact:**
+- +200-250 visible TS2322 errors
+- Exact match: 30.8% → ~45% (+14pp)
+- Missing errors: 57.8% → ~35% (-23pp)
+
+**Risk:** Low - matches TypeScript behavior
+
+**Target Branch:** rust
 
 ## Completed Tasks
 
