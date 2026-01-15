@@ -1440,13 +1440,18 @@ const mapped = arr.map((item) => {
     // Get the property access expression x.length
     let prop_access = return_data.expression;
 
+    // Get the identifier x from the property access
+    let prop_access_node = arena.get(prop_access).expect("prop access node");
+    let access_expr = arena.get_access_expr(prop_access_node).expect("access expr data");
+    let x_identifier = access_expr.expression;
+
     let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
     // The variable x should be narrowed to string in the map callback
     let flow_in_callback = binder.get_node_flow(prop_access);
     assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside map callback");
 
-    let narrowed_in_callback = analyzer.get_flow_type(prop_access, union, flow_in_callback.unwrap());
+    let narrowed_in_callback = analyzer.get_flow_type(x_identifier, union, flow_in_callback.unwrap());
     assert_eq!(narrowed_in_callback, TypeId::STRING);
 }
 
@@ -1830,16 +1835,26 @@ const filtered = arr.filter((item) => {
     let return_node = arena.get(return_stmt).expect("return node");
     let return_data = arena.get_return_statement(return_node).expect("return data");
 
-    // Get the typeof x expression
-    let typeof_expr = return_data.expression;
+    // Get the typeof x expression (binary expression: typeof x === "string")
+    let typeof_bin_expr = return_data.expression;
+
+    // Get the typeof expression node (left side of binary)
+    let typeof_bin_node = arena.get(typeof_bin_expr).expect("bin expr node");
+    let typeof_bin = arena.get_binary_expr(typeof_bin_node).expect("bin expr data");
+    let typeof_expr = typeof_bin.left;  // This is the typeof x expression
 
     let union = types.union(vec![TypeId::STRING, TypeId::NUMBER]);
 
+    // Get the identifier x from the typeof expression
+    let typeof_node = arena.get(typeof_expr).expect("typeof expr node");
+    let typeof_unary = arena.get_unary_expr(typeof_node).expect("typeof expr data");
+    let x_identifier = typeof_unary.operand;
+
     // The variable x inside the filter callback should be narrowed to string
-    let flow_in_callback = binder.get_node_flow(typeof_expr);
+    let flow_in_callback = binder.get_node_flow(typeof_bin_expr);
     assert!(flow_in_callback.is_some(), "Flow should be recorded for expression inside filter callback");
 
-    let narrowed_in_callback = analyzer.get_flow_type(typeof_expr, union, flow_in_callback.unwrap());
+    let narrowed_in_callback = analyzer.get_flow_type(x_identifier, union, flow_in_callback.unwrap());
     assert_eq!(narrowed_in_callback, TypeId::STRING);
 }
 
