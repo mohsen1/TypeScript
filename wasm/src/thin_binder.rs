@@ -992,6 +992,7 @@ impl ThinBinderState {
 
             // Class declarations
             k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                self.record_flow(idx);
                 self.bind_class_declaration(arena, node, idx);
             }
             k if k == syntax_kind_ext::CLASS_EXPRESSION => {
@@ -1026,6 +1027,7 @@ impl ThinBinderState {
 
             // If statement - build flow graph for type narrowing
             k if k == syntax_kind_ext::IF_STATEMENT => {
+                self.record_flow(idx);
                 if let Some(if_stmt) = arena.get_if_statement(node) {
                     // Bind the condition expression (record identifiers in it)
                     self.bind_expression(arena, if_stmt.expression);
@@ -1134,6 +1136,7 @@ impl ThinBinderState {
 
             // For statement
             k if k == syntax_kind_ext::FOR_STATEMENT => {
+                self.record_flow(idx);
                 if let Some(loop_data) = arena.get_loop(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, loop_data.initializer);
@@ -1184,6 +1187,7 @@ impl ThinBinderState {
             k if k == syntax_kind_ext::FOR_IN_STATEMENT
                 || k == syntax_kind_ext::FOR_OF_STATEMENT =>
             {
+                self.record_flow(idx);
                 if let Some(for_data) = arena.get_for_in_of(node) {
                     self.enter_scope(ContainerKind::Block, idx);
                     self.bind_node(arena, for_data.initializer);
@@ -1489,6 +1493,11 @@ impl ThinBinderState {
                 if let Some(unary) = arena.get_unary_expr(node) {
                     self.bind_node(arena, unary.operand);
                 }
+            }
+
+            // Identifier references - record current flow for type narrowing queries
+            k if k == SyntaxKind::Identifier as u16 => {
+                self.record_flow(idx);
             }
 
             _ => {
@@ -2776,6 +2785,7 @@ impl ThinBinderState {
     }
 
     fn bind_switch_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        self.record_flow(idx);
         if let Some(switch_data) = arena.get_switch(node) {
             self.bind_expression(arena, switch_data.expression);
 
@@ -2850,6 +2860,7 @@ impl ThinBinderState {
     }
 
     fn bind_try_statement(&mut self, arena: &ThinNodeArena, node: &ThinNode, idx: NodeIndex) {
+        self.record_flow(idx);
         if let Some(try_data) = arena.get_try(node) {
             let pre_try_flow = self.current_flow;
             let end_label = self.create_branch_label();
