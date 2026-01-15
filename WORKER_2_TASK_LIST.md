@@ -5,117 +5,143 @@
 - **Branch:** worker-2
 - **Parent:** em-team-1
 
-## Priority: Fix Global Scope (TS2304)
-
-### Mission
-Fix the root cause of "error poisoning" - missing global symbols like `console`, `Promise`, `Array` cause cascading failures where undefined symbols are treated as `Any`, suppressing legitimate type errors.
-
-### Current Data
-- **Extra TS2304:** 343 errors ("Cannot find name 'X'")
-- **Missing TS2304:** 116 errors
-- **Root Cause:** lib.d.ts not loaded correctly in test runner
-- **Target:** <10 extra errors
-
 ---
 
 ## Previous Work Completed ✅
 
-### 1. Fix `file_locals` Population from Library Context
-**Status:** ✅ COMPLETE
-**File:** `src/thin_binder.rs`
-**Commit:** `f0103f305`
+### Priority 2: Global Scope Fix (TS2304) - Complete ✅
+**Status:** ✅ INVESTIGATION COMPLETE
+**Commit:** `b5d253d7f2`
+**Merged:** rust (commit `2e7f46ff75`)
 
-Lib symbols are now preserved across binding process with user symbol precedence.
+**Tasks Completed:**
+1. Verified Lib.d.ts Loading in Test Runner ✅
+2. Analyzed Global Merging Across Files ✅
+3. Investigated Missing TS2304 Errors ✅
 
-### 2. Ensure Global Symbols Are Accessible in All Files
-**Status:** ✅ COMPLETE (addressed by Task 1)
+**Findings:**
+- lib.d.ts loading working correctly (11/11 tests passed)
+- All global symbols resolve properly (0 TS2304 errors)
+- No code changes needed - infrastructure already correct
 
 ---
 
-## Current Tasks
+## NEW ASSIGNMENT
 
-### Task 1: Verify Lib.d.ts Loading in Test Runner ✅ COMPLETE
-**Priority:** CRITICAL
-**Files:** `wasm/src/integration/`, test runner
-**Completed:** 2026-01-14
-**Commit:** `2419999cd`
+### Priority: Conformance Test Validation & Error Analysis
 
-**Findings:**
-- lib.d.ts loading is working correctly in test runner
-- Test runner loads lib.d.ts via `parser.addLibFile()` at lines 289-291 of `conformance-runner.mjs`
-- Lib symbols are properly merged into file_locals during binding
-- Lib contexts are set up for type checking via `set_lib_contexts()`
-- Confirmed: no TS2304 errors for global symbols (console, Array, Object, Promise)
+#### Mission
+With parser noise eliminated and global scope verified, the next priority is to validate the conformance test results and identify remaining error patterns. This will guide the next wave of targeted fixes.
 
-**Test Files:**
-- `wasm/test_lib_loading.mjs` - Basic lib loading verification
-- `wasm/test_ts2304.mjs` - TS2304 error testing
+### Current Data (from PROJECT_DIRECTION.md)
+- **Exact Match:** 30.1% → Target: 80%+
+- **Parser Noise (TS1005/TS1109):** Was ~700, now <40 (ELIMINATED) ✅
+- **Global Scope (TS2304):** Was 343, now verified working ✅
 
-### Task 2: Fix Global Merging Across Files ✅ COMPLETE
-**Priority:** CRITICAL
-**File:** `wasm/src/binder/`
-**Completed:** 2026-01-14
-**Commit:** `2419999cd`
+### Tasks
 
-**Findings:**
-- Global merging is working correctly
-- Binder tracks `global_augmentations` for interfaces declared in `declare global` blocks
-- Type checker merges lib types with augmentations using intersection
-- `resolve_lib_type_by_name()` in `thin_checker.rs:1293-1338` handles augmentation merging
-- Confirmed: Window interface augmentation works correctly
-- No TS2339 errors when using augmented properties
-
-**Test Files:**
-- `wasm/test_global_aug.mjs` - Global augmentation testing
-
-### Task 3: Investigate Missing TS2304 Errors ✅ COMPLETE
+#### Task 1: Run Conformance Tests & Establish Baseline
 **Priority:** HIGH
-**Completed:** 2026-01-14
-**Commit:** `2419999cd`
+**Estimated Time:** 2-3 hours
 
-**Findings:**
-- Root cause was already fixed by commit `f0103f305` ("Fix `file_locals` Population from Library Context")
-- Current implementation properly handles lib symbol preservation across binding process
-- The 343 extra TS2304 errors mentioned in task list appear to be from an earlier state
-- No issues found in current implementation - lib symbols resolve correctly
-- User code can override lib symbols with proper precedence
+Run the conformance test suite and capture current error distribution:
+1. Build WASM module: `npm run wasm:build`
+2. Run conformance tests from main repo (not worktree) OR use embedded runner
+3. Capture error code distribution (TS####)
+4. Compare against baseline from PROJECT_DIRECTION.md
+5. Identify top 10 remaining error codes by frequency
+
+**Deliverable:** Error distribution report with:
+- Total tests run
+- Exact/equivalent match percentage
+- Top 10 extra error codes with counts
+- Top 10 missing error codes with counts
+- Comparison to baseline (identify what improved)
+
+**Acceptance Criteria:**
+- Tests run without crashes
+- Clear snapshot of current state
+- Identifiable top error patterns
+
+#### Task 2: Analyze Remaining Extra Errors
+**Priority:** HIGH
+**Estimated Time:** 2-3 hours
+
+For the top 5 extra error codes from Task 1:
+1. Research what the error means (TypeScript spec)
+2. Find 3-5 example test cases for each error
+3. Categorize by root cause:
+   - **Parser Issues:** AST structure differs
+   - **Type Inference:** Logic differs from tsc
+   - **Symbol Resolution:** Binding/scoping issues
+   - **Control Flow:** Missing analysis
+   - **Other:**
+4. Estimate complexity of fixing (Simple/Medium/Complex)
+
+**Deliverable:** Error analysis document with:
+- Error code, description, and spec reference
+- 3-5 example test cases per error
+- Root cause categorization
+- Complexity estimates
+- Recommended priority order
+
+**Acceptance Criteria:**
+- Clear understanding of error patterns
+- Actionable recommendations for next tasks
+
+#### Task 3: Validate Recent Fixes Impact
+**Priority:** MEDIUM
+**Estimated Time:** 1-2 hours
+
+Verify that recent EM-1, EM-2, EM-3 fixes had expected impact:
+1. Check TS1005/TS1109 errors (should be <40 combined)
+2. Check TS2322/TS7006 errors (solver defaults may have increased these)
+3. Check TS2589 errors (recursion guards should eliminate crashes)
+4. Document any unexpected regressions
+
+**Deliverable:** Validation report with:
+- Before/after comparison for fixed error codes
+- Identification of any regressions
+- Assessment of whether fixes met targets
+
+**Acceptance Criteria:**
+- Confirmation that parser noise is eliminated
+- Understanding of solver defaults impact
+- No crashes in test suite
 
 ---
 
 ## Deliverables
-1. Verified lib.d.ts loading in test runner
-2. Corrected global merging logic
-3. Analysis of missing TS2304 errors
-4. Conformance test results showing TS2304 reduction
+
+1. **Error Distribution Report** - Current state snapshot
+2. **Error Analysis Document** - Top 5 extra errors categorized
+3. **Validation Report** - Recent fixes impact confirmed
 
 ## Success Metric
-Reduce extra TS2304 errors from **343 to <10**.
 
-## Merge Status
+**Primary Goal:** Establish clear picture of remaining work with actionable priorities.
 
-### 2026-01-14 - Tasks Completed ✅
-**Status:** ALL TASKS COMPLETE
-**Commit:** `2419999cd`
-**Branch:** worker-2
+**Target Output:**
+- Concrete error counts and categories
+- Ranked list of next fix priorities
+- Confidence that recent fixes are working
 
-### Tasks Completed
-- ✅ Task 1: Verify Lib.d.ts Loading in Test Runner
-- ✅ Task 2: Fix Global Merging Across Files
-- ✅ Task 3: Investigate Missing TS2304 Errors
+## Notes
 
-### Test Results
-- ✅ lib.d.ts loading verified - no TS2304 errors for global symbols
-- ✅ Global merging verified - Window augmentation works correctly
-- ✅ All acceptance criteria met
+- **Environment:** Conformance tests may require main repo (not worktree)
+- **Tools:** Use Worker 12's metrics infrastructure if available
+- **Focus:** Analysis over implementation - document before fixing
+- **Collaboration:** Coordinate with EM-1 on priority assignments based on findings
 
-### Next Steps
-- Awaiting EM-1 review and merge to rust branch
-- Ready for downstream validation by worker-3 (solver strictness)
+## Workflow
+
+1. Sync: `git fetch origin && git pull origin worker-2 --rebase`
+2. Read this task list
+3. Execute Task 1 → Task 2 → Task 3 sequentially
+4. Commit findings after each task
+5. Push and await EM-1 review
 
 ---
 
-## Notes
-- Global scope issues cause cascading failures - fix this first
-- Coordinate with worker-3 (solver strictness) to validate downstream effects
-- Reference TypeScript's lib loading logic
-- Previous work on lib symbol preservation is merged (commit 95153ca2a)
+**Assigned:** 2026-01-14
+**Status:** 🟡 ACTIVE - Ready to begin
