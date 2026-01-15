@@ -629,6 +629,7 @@ impl<'a> ThinCheckerState<'a> {
             k if k == SyntaxKind::ThisKeyword as u16 => {
                 self.current_this_type().unwrap_or(TypeId::UNKNOWN)
             }
+            k if k == SyntaxKind::SuperKeyword as u16 => self.get_type_of_super_keyword(idx),
 
             // Literals - preserve literal types when contextual typing expects them.
             k if k == SyntaxKind::NumericLiteral as u16 => {
@@ -13715,6 +13716,31 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             false
         }
+    }
+
+    /// Get the type of a `super` keyword expression.
+    ///
+    /// When used in a constructor call (e.g., `super()`), this returns the
+    /// base class constructor type. When used in property access (e.g., `super.method()`),
+    /// the type is resolved through the normal property access mechanism.
+    ///
+    /// Returns the base class constructor type if in a derived class, otherwise ERROR.
+    fn get_type_of_super_keyword(&mut self, idx: NodeIndex) -> TypeId {
+        // Check if we're in a class context
+        if let Some(ref class_info) = self.ctx.enclosing_class {
+            // Get the base class
+            if let Some(base_class_idx) = self.get_base_class_idx(class_info.class_idx) {
+                // Get the base class node and class data
+                if let Some(base_node) = self.ctx.arena.get(base_class_idx) {
+                    if let Some(base_class) = self.ctx.arena.get_class(base_node) {
+                        // Return the constructor type of the base class
+                        return self.get_class_constructor_type(base_class_idx, base_class);
+                    }
+                }
+            }
+        }
+        // Not in a class or no base class - return ERROR
+        TypeId::ERROR
     }
 
     /// Report an argument count mismatch error using solver diagnostics with source tracking.
