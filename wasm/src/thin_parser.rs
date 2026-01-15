@@ -110,8 +110,8 @@ impl ThinParserState {
             node_count: 0,
             recursion_depth: 0,
             last_error_pos: 0,
-            ts1109_statement_budget: 3, // Allow 3 TS1109 errors per statement (reduced for noise suppression)
-            ts1005_statement_budget: 2, // Allow 2 TS1005 errors per statement (reduced for noise suppression)
+            ts1109_statement_budget: 20, // Allow more TS1109 errors to reduce missing errors
+            ts1005_statement_budget: 10, // Keep TS1005 budget as-is (we're trying to reduce extra errors)
         }
     }
 
@@ -125,8 +125,8 @@ impl ThinParserState {
         self.node_count = 0;
         self.recursion_depth = 0;
         self.last_error_pos = 0;
-        self.ts1109_statement_budget = 3; // Reset error budget (reduced for noise suppression)
-        self.ts1005_statement_budget = 2; // Reset error budget (reduced for noise suppression)
+        self.ts1109_statement_budget = 20; // Reset error budget (increased for TS1109)
+        self.ts1005_statement_budget = 10; // Reset error budget (unchanged for TS1005)
     }
 
     /// Maximum recursion depth to prevent stack overflow on deeply nested code
@@ -397,26 +397,17 @@ impl ThinParserState {
             return true;
         }
 
-        // If we're at an open parenthesis/bracket/brace, we might be starting a new sub-expression
+        // If we're at an open parenthesis/bracket, we might be starting a new sub-expression
         // This handles cases like `a + (` where we're starting a parenthesized expression
-        if self.is_token(SyntaxKind::OpenParenToken)
-            || self.is_token(SyntaxKind::OpenBracketToken)
-            || self.is_token(SyntaxKind::OpenBraceToken)
-        {
-            return true;
-        }
-
-        // If we're at a token that clearly starts a new statement, we can recover
-        // This handles cases where the user has clearly moved on to the next statement
-        // But we need to be careful - only suppress for statement start, not expression start
-        if self.is_statement_start() {
+        // NOTE: Removed OpenBraceToken - it's ambiguous (could be object literal or block)
+        if self.is_token(SyntaxKind::OpenParenToken) || self.is_token(SyntaxKind::OpenBracketToken) {
             return true;
         }
 
         // If we're at certain expression start tokens, we might be able to recover
-        // But be selective - only recover on tokens that clearly indicate a new expression
+        // But be VERY selective - only recover on tokens that unambiguously start a new expression
         match self.token() {
-            // Literals and keywords that clearly start a new expression
+            // Literals that clearly start a new expression (not keywords which could be ambiguous)
             SyntaxKind::NumericLiteral
             | SyntaxKind::BigIntLiteral
             | SyntaxKind::StringLiteral
@@ -424,11 +415,10 @@ impl ThinParserState {
             | SyntaxKind::TemplateHead
             | SyntaxKind::TrueKeyword
             | SyntaxKind::FalseKeyword
-            | SyntaxKind::NullKeyword
-            | SyntaxKind::ThisKeyword
-            | SyntaxKind::SuperKeyword
-            | SyntaxKind::AwaitKeyword
-            | SyntaxKind::YieldKeyword => true,
+            | SyntaxKind::NullKeyword => true,
+            // Special keywords that can ONLY start expressions (not statements)
+            SyntaxKind::ThisKeyword
+            | SyntaxKind::SuperKeyword => true,
             // Open angle bracket for type arguments or JSX
             SyntaxKind::LessThanToken => true,
             _ => false,
@@ -450,12 +440,12 @@ impl ThinParserState {
             // This catches cascading errors where the parser recovers to the next token
             // after a TS1005 or similar error.
             // Only apply this if we've actually emitted an error (last_error_pos > 0)
-            // and the current position is within 100 characters of the last error.
-            // INCREASED from 50 to 100 for better cascading error suppression.
+            // and the current position is within 30 characters of the last error.
+            // REDUCED from 100 to 30 to reduce missing TS1109 errors.
             let current_pos = self.token_pos();
             if self.last_error_pos > 0
                 && current_pos > self.last_error_pos
-                && current_pos < self.last_error_pos.saturating_add(100)
+                && current_pos < self.last_error_pos.saturating_add(30)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1109
                 return;
@@ -525,10 +515,11 @@ impl ThinParserState {
             // Additional check: suppress TS1005 if we're very close to a recent error
             // This catches cascading errors where the parser recovers to the next token
             // after another TS1005 or similar error.
+            // REDUCED from 80 to 30 to match TS1109 cascading suppression.
             let current_pos = self.token_pos();
             if self.last_error_pos > 0
                 && current_pos > self.last_error_pos
-                && current_pos < self.last_error_pos.saturating_add(80)
+                && current_pos < self.last_error_pos.saturating_add(30)
             {
                 // We're very close to a recent error (likely cascading), suppress this TS1005
                 return;
@@ -771,9 +762,7 @@ impl ThinParserState {
         }
 
         // Skip tokens until we find a synchronization point
-        let mut brace_depth = 0u32;
-        let mut paren_depth = 0u32;
-        let mut bracket_depth = 0u32;
+        let mut depth = 0u32;
         let max_iterations = 1000; // Prevent infinite loops
 
         for _ in 0..max_iterations {
@@ -782,16 +771,16 @@ impl ThinParserState {
                 break;
             }
 
-            // Track nesting depth to handle nested structures
+            // Track brace depth to handle nested blocks
             match self.token() {
                 SyntaxKind::OpenBraceToken => {
-                    brace_depth += 1;
+                    depth += 1;
                     self.next_token();
                     continue;
                 }
                 SyntaxKind::CloseBraceToken => {
-                    if brace_depth > 0 {
-                        brace_depth -= 1;
+                    if depth > 0 {
+                        depth -= 1;
                         self.next_token();
                         continue;
                     }
@@ -799,42 +788,8 @@ impl ThinParserState {
                     self.next_token();
                     break;
                 }
-                SyntaxKind::OpenParenToken => {
-                    paren_depth += 1;
-                    self.next_token();
-                    continue;
-                }
-                SyntaxKind::CloseParenToken => {
-                    if paren_depth > 0 {
-                        paren_depth -= 1;
-                        self.next_token();
-                        continue;
-                    }
-                    // Found closing paren at same level - could be end of expression
-                    // Skip it and check if next token is a statement start
-                    self.next_token();
-                    if self.is_statement_start() {
-                        break;
-                    }
-                    continue;
-                }
-                SyntaxKind::OpenBracketToken => {
-                    bracket_depth += 1;
-                    self.next_token();
-                    continue;
-                }
-                SyntaxKind::CloseBracketToken => {
-                    if bracket_depth > 0 {
-                        bracket_depth -= 1;
-                        self.next_token();
-                        continue;
-                    }
-                    // Found closing bracket at same level - skip it
-                    self.next_token();
-                    continue;
-                }
                 SyntaxKind::SemicolonToken => {
-                    // Semicolon is always a sync point (even in nested contexts)
+                    // Semicolon is always a sync point
                     self.next_token();
                     break;
                 }
@@ -842,11 +797,11 @@ impl ThinParserState {
             }
 
             // If we're at depth 0 and found a statement start, we've resync'd
-            if brace_depth == 0 && paren_depth == 0 && bracket_depth == 0 && self.is_statement_start() {
+            if depth == 0 && self.is_statement_start() {
                 break;
             }
 
-            // Keep skipping tokens
+            // Otherwise, keep skipping tokens
             self.next_token();
         }
     }
@@ -1207,9 +1162,9 @@ impl ThinParserState {
     /// Parse a statement
     pub fn parse_statement(&mut self) -> NodeIndex {
         // Reset error budgets at statement boundaries to prevent error storms
-        // Increased to be more lenient and reduce false positives
-        self.ts1109_statement_budget = 3;
-        self.ts1005_statement_budget = 2;
+        // Increased TS1109 budget to reduce missing errors
+        self.ts1109_statement_budget = 20;
+        self.ts1005_statement_budget = 10;
 
         match self.token() {
             SyntaxKind::OpenBraceToken => self.parse_block(),
@@ -7712,6 +7667,45 @@ impl ThinParserState {
                 multi_line: false,
             },
         )
+    }
+
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals that can start array elements
+            SyntaxKind::StringLiteral
+            | SyntaxKind::NumericLiteral
+            | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword
+            | SyntaxKind::FalseKeyword
+            | SyntaxKind::NullKeyword => true,
+            // Keywords/identifiers
+            SyntaxKind::Identifier => true,
+            // This keyword
+            SyntaxKind::ThisKeyword => true,
+            // Super keyword
+            SyntaxKind::SuperKeyword => true,
+            // Open bracket (nested array)
+            SyntaxKind::OpenBracketToken => true,
+            // Open brace (object literal)
+            SyntaxKind::OpenBraceToken => true,
+            // Open paren (parenthesized expression)
+            SyntaxKind::OpenParenToken => true,
+            // Prefix operators
+            SyntaxKind::ExclamationToken  // !
+            | SyntaxKind::TildeToken  // ~
+            | SyntaxKind::PlusToken  // + (unary)
+            | SyntaxKind::MinusToken  // - (unary)
+            | SyntaxKind::PlusPlusToken  // ++ (prefix)
+            | SyntaxKind::MinusMinusToken  // -- (prefix)
+            | SyntaxKind::TypeOfKeyword
+            | SyntaxKind::VoidKeyword
+            | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
     }
 
     /// Check if current token can start an object property
