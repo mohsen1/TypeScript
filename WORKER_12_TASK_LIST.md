@@ -276,6 +276,45 @@ All missing errors involve async/await transformations where:
 - More straightforward implementation
 - Catches errors earlier in compilation pipeline
 
+---
+
+## Additional Analysis: TS2524 Deep Dive ✅
+
+**Status:** ✅ COMPLETE
+**Date:** 2026-01-14
+**Self-Directed Work** - Analyzing third error code, found relationship
+
+### Critical Finding: TS2524 is DUPLICATE of TS1109
+
+**Created:** `wasm/differential-test/TS2524_ANALYSIS.md`
+
+**Results:**
+- **Files with TS2524 (TSC):** 15
+- **Files with TS2524 (WASM):** 0
+- **Missing by WASM:** 100% (all 15 files)
+- **Root Cause:** Same as TS1109 - `await` in parameter defaults
+
+**Error Message:**
+"'await' expressions cannot be used in a parameter initializer."
+
+**Key Discovery:**
+TS2524 and TS1109 are **duplicate error reporting** for the same bug:
+- Same 15 files have both TS1109 and TS2524
+- TS1109: Generic "Expression expected"
+- TS2524: Specific "await in parameter initializer"
+- Fix TS1109 → TS2524 gets fixed automatically
+
+**Impact:** 🟡 MEDIUM (but FREE with TS1109 fix)
+
+**Recommendation:**
+- Do NOT implement TS2524 separately
+- Track TS1109+TS2524 as one combined issue: 30 files, 41 errors
+- Single parser fix resolves both error codes
+
+**Tools Created:**
+- `analyze-ts2524.mjs` - Analysis tool
+- `ts2524-analysis.json` - Test data (15 affected files)
+
 ## Recommendations for Next Phase
 
 **High Priority:**
