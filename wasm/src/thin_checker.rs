@@ -16314,6 +16314,10 @@ impl<'a> ThinCheckerState<'a> {
                 diagnostic_codes::PROPERTY_HAS_NO_INITIALIZER,
             );
         }
+
+        // TODO: Check for TS2565 (Property used before being assigned in constructor)
+        // This requires analyzing the constructor body for `this.X` accesses that occur
+        // before X is assigned. Implementation needs further debugging.
     }
 
     fn property_requires_initialization(
@@ -16321,6 +16325,8 @@ impl<'a> ThinCheckerState<'a> {
         member_idx: NodeIndex,
         prop: &crate::parser::thin_node::PropertyDeclData,
     ) -> bool {
+        use crate::scanner::SyntaxKind;
+
         if !prop.initializer.is_none()
             || prop.question_token
             || prop.exclamation_token
@@ -16328,6 +16334,20 @@ impl<'a> ThinCheckerState<'a> {
             || self.has_abstract_modifier(&prop.modifiers)
             || self.has_declare_modifier(&prop.modifiers)
         {
+            return false;
+        }
+
+        // Properties with string or numeric literal names are not checked for strict property initialization
+        // Example: class C { "b": number; 0: number; }  // These are not checked
+        let Some(name_node) = self.ctx.arena.get(prop.name) else {
+            return false;
+        };
+        if matches!(
+            name_node.kind,
+            k if k == SyntaxKind::StringLiteral as u16
+                || k == SyntaxKind::NoSubstitutionTemplateLiteral as u16
+                || k == SyntaxKind::NumericLiteral as u16
+        ) {
             return false;
         }
 
