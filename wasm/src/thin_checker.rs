@@ -6523,10 +6523,24 @@ impl<'a> ThinCheckerState<'a> {
                             return (self.get_type_of_node(import.module_specifier), Vec::new());
                         }
                     }
-                    // Handle ES6 named imports - these are already handled by IMPORT_DECLARATION
-                    // but fall through to ANY for now as they need module resolution
+                    // Handle ES6 named imports (import { X } from './module')
+                    // Use the import_module field to resolve to the actual export
+                    // Check if this symbol has import tracking metadata
                 }
             }
+
+            // For ES6 imports with import_module set, resolve using module_exports
+            if let Some(ref module_name) = symbol.import_module {
+                // Use import_name if set (for renamed imports), otherwise use escaped_name
+                let export_name = symbol.import_name.as_ref().unwrap_or(&symbol.escaped_name);
+                if let Some(exports_table) = self.ctx.binder.module_exports.get(module_name) {
+                    if let Some(export_sym_id) = exports_table.get(export_name) {
+                        return (self.get_type_of_symbol(export_sym_id), Vec::new());
+                    }
+                }
+                // Module not found in exports - fall through to ANY
+            }
+
             return (TypeId::ANY, Vec::new());
         }
 
@@ -15788,6 +15802,12 @@ impl<'a> ThinCheckerState<'a> {
             if resolved.contains(module_name) {
                 return;
             }
+        }
+
+        // Check if the module exists in the module_exports map (cross-file module resolution)
+        // This enables resolving imports from other files in the same compilation
+        if self.ctx.binder.module_exports.contains_key(module_name) {
+            return;
         }
 
         // Note: We do NOT skip TS2792 for declared_modules (ambient modules).
