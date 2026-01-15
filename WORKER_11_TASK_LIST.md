@@ -3,7 +3,21 @@
 Maintained by EM-3
 
 ## Active Task
-- None awaiting assignment
+
+### Task 3: Diagnostic emission audit for ERROR type handling
+- [ ] Search for all places where check_subtype returns SubtypeResult::False
+- [ ] Verify PendingDiagnostic is created for every False result involving ERROR types
+- [ ] Trace diagnostic flow from subtype.rs → diagnostics.rs → checker → emitter
+- [ ] Identify where ERROR type diagnostics might be suppressed or filtered
+- [ ] Add debug logging to track diagnostic creation and emission
+- [ ] Test with 5-10 conformance cases that should have TS2322 but don't
+- [ ] Create findings report with specific code locations needing fixes
+
+**Goal:** Verify ERROR types properly emit TS2322 diagnostics and identify suppression points
+
+**Priority:** 1 (High - addresses Task 2 finding #1)
+
+**Target Branch:** rust
 
 ## Completed Tasks
 
