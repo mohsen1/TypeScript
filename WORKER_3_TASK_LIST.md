@@ -1,94 +1,192 @@
 # Worker-3 Task List
 
-## ✅ COMPLETED: Invert Solver Defaults (Stop being "Nice")
-**Priority:** 🔴 CRITICAL (Strategic)
+## 🟢 CURRENT TASK: Recursion Guards (Stack Overflow Prevention)
+**Priority:** 🟢 STABILITY (Critical)
 **Owner:** worker-3
 **Branch:** worker-3
-**Status:** ✅ COMPLETE
+**Status:** 🟡 IN PROGRESS
 **Assigned:** 2026-01-15
-**Completed:** 2026-01-15
 
 ---
 
 ## Task Description
 
-**Problem:** Missing 2,961 errors (60% of all errors). We are missing 184 `TS2322` (Type Mismatch) and 357 `TS7006` (Implicit Any) errors.
+**Problem:** 2 Crashes (Stack Overflow) on `types/typeRelationships/recursiveTypes` test.
 
-**Root Cause:** The compiler was "optimistic"—when it encountered an unknown type or a resolution failure, it returned `TypeId::ANY`. This hid type errors instead of exposing them.
+**Root Cause:** The `solve_subtype` and `check_expression` functions recurse infinitely on recursive types, causing the WASM process to panic/stack overflow.
 
-**Target:** Change default from `ANY` to `UNKNOWN` to expose hidden type errors
+**Target:** Add recursion depth counters and return TS2589 error instead of crashing
 
 ---
 
-## Results
+## Analysis Required
 
-### Changes Made
-**File:** `wasm/src/checker/expr.rs`
+### Phase 1: Investigation (DO THIS FIRST)
 
-Changed 3 locations where `TypeId::ANY` was being returned as a default/fallback to `TypeId::UNKNOWN`:
+**Before making changes:**
 
-1. **Line 47-48**: Missing node resolution
-   - Before: `return TypeId::ANY;`
-   - After: `return TypeId::UNKNOWN;`
+1. **Find the crash location:**
+   ```bash
+   cd /tmp/orchestrator-workspace/worktrees/worker-3/wasm
+   # Run the failing test
+   cargo test recursiveTypes
+   # Or run the specific conformance test
+   ```
 
-2. **Line 72-74**: Parenthesized expression parsing failure
-   - Before: `TypeId::ANY`
-   - After: `TypeId::UNKNOWN`
+2. **Understand the recursion:**
+   - Read `wasm/src/solver/subtype.rs` - find `solve_subtype` function
+   - Read `wasm/src/checker/` - find `check_expression` function
+   - Look for cycle detection mechanisms (Salsa queries should handle this)
+   - Identify where infinite recursion occurs
 
-3. **Line 77-80**: Unhandled expressions (default case)
-   - Before: `_ => TypeId::ANY,`
-   - After: `_ => TypeId::UNKNOWN,`
+3. **Study existing cycle handling:**
+   - Check if Salsa's cycle recovery is working
+   - Look for `CycleStack` or similar tracking
+   - Read `wasm/specs/SOLVER.md` section 1.4 on "Coinduction"
 
-### Validation Results (100 conformance tests)
+4. **Find the test case:**
+   ```bash
+   find /tmp/orchestrator-workspace/worktrees/worker-3/tests -name "*recursiveTypes*" -o -name "*recursive*"
+   ```
 
-#### Overall Metrics
-- **Exact Match**: 44.2% (up from ~30% baseline) ✅
-- **Same Error Count**: 53.7%
-- **WASM Crashed**: 0 ✅
-- **Tests with missing errors**: 46 (48.4%)
-- **Tests with extra errors**: 30 (31.6%)
+---
 
-#### Error Code Changes
+## Implementation Plan
 
-**TS7006 (Implicit Any) - ✅ EXPECTED INCREASE**
-- Extra errors: 11 occurrences
-- Before: Missing ~357 errors
-- After: Now catching implicit any errors that were previously hidden
+### Phase 2: Add Recursion Guards
 
-**TS2322 (Type Mismatch) - ✅ EXPECTED INCREASE**
-- Extra errors: 4 occurrences
-- Before: Missing ~184 errors
-- After: Now catching type mismatches that were previously hidden
+**Goal:** Prevent stack overflow by limiting recursion depth and returning TS2589 error.
 
-**TS1005 (Parser Error)**
-- Extra errors: 14 occurrences
-- Status: Known from previous parser noise fix (24 remaining edge cases)
+**Key Functions to Guard:**
 
-### Impact
+1. **wasm/src/solver/subtype.rs**
+   - Add `recursion_depth: u32` parameter to `solve_subtype`
+   - Check depth before recursing
+   - Return `TypeId::ERROR` or emit TS2589 when limit exceeded
 
-✅ **Hidden errors now exposed**: Successfully reveals type errors masked by permissive `any` default
+2. **wasm/src/checker/` (expression checking)
+   - Add recursion counter to expression type checking
+   - Guard recursive property access chains (e.g., `obj.a.b.c.d...`)
 
-✅ **Better type safety**: `unknown` is the sound top type requiring explicit narrowing
+**Pattern:**
 
-✅ **More accurate diagnostics**: Errors reflect actual type mismatches instead of silently accepting `any`
+```rust
+// BEFORE (infinite recursion):
+fn solve_subtype(&self, sub: TypeId, sup: TypeId) -> bool {
+    // ... check cache ...
+    
+    // Recurse deeply
+    self.solve_subtype(sub_prop, sup_prop)
+}
 
-✅ **No regressions**: Zero crashes, exact match rate improved
+// AFTER (guarded):
+fn solve_subtype_impl(&self, sub: TypeId, sup: TypeId, depth: u32) -> bool {
+    const MAX_DEPTH: u32 = 100;
+    
+    if depth >= MAX_DEPTH {
+        // Return error instead of crashing
+        return self.error_excessively_deep();
+    }
+    
+    // ... check cache ...
+    
+    // Recurse with depth counter
+    self.solve_subtype_impl(sub_prop, sup_prop, depth + 1)
+}
 
-### Conclusion
+// Public wrapper (no depth parameter)
+fn solve_subtype(&self, sub: TypeId, sup: TypeId) -> bool {
+    self.solve_subtype_impl(sub, sup, 0)
+}
+```
 
-The solver defaults inversion is **working as intended**. By changing from `TypeId::ANY` to `TypeId::UNKNOWN`:
+### Phase 3: Error Emission
 
-1. ✅ We're now exposing hidden type errors
-2. ✅ TS7006 (Implicit Any) errors increased as expected
-3. ✅ TS2322 (Type Mismatch) errors increased as expected
-4. ✅ No regressions or crashes
-5. ✅ Overall exact match rate improved (44.2% vs ~30% baseline)
+**When limit exceeded:**
+- Emit TS2589: "Type instantiation is excessively deep and possibly infinite."
+- Return `TypeId::ERROR` to stop further recursion
+- Log the recursion depth for debugging
 
-This creates a better baseline for fixing the root causes of these type errors.
+---
+
+## Success Criteria
+
+- [ ] No stack overflow crashes on recursiveTypes test
+- [ ] TS2589 error emitted when recursion depth > 100
+- [ ] Conformance tests run without crashes
+- [ ] No regression in non-recursive type checking
+- [ ] Recursion depth limit is configurable (const)
+
+---
+
+## Workflow
+
+1. **Sync with latest rust:**
+   ```bash
+   git fetch origin
+   git rebase origin/rust
+   ```
+
+2. **Investigation Phase:**
+   - Run the crashing test to confirm the issue
+   - Identify exact recursion point
+   - Study existing cycle handling
+
+3. **Implementation Phase:**
+   - Add recursion depth parameter to solve_subtype
+   - Add depth checking with MAX_DEPTH constant
+   - Implement error emission for excessive depth
+   - Test with recursive types
+
+4. **Validation:**
+   - Run recursiveTypes test - should pass now
+   - Run full conformance test suite
+   - Verify no regressions
+   - Check for TS2589 errors in appropriate places
+
+5. **Commit and Push:**
+   ```bash
+   git add -A
+   git commit -m "feat(solver): add recursion guards to prevent stack overflow"
+   git push origin worker-3 --force
+   ```
+
+6. **STOP** - Wait for EM-1 review
+
+---
+
+## Deliverables
+
+1. Recursion depth counters in solve_subtype and check_expression
+2. TS2589 error emission when depth limit exceeded
+3. No more stack overflow crashes
+4. Conformance tests showing stability
+5. Updated task list with "Complete" status
+
+---
+
+## Known Risks
+
+1. **Breaking valid deep types:**
+   - **Mitigation:** Set MAX_DEPTH high enough (100-200) to handle reasonable cases
+   
+2. **Performance impact:**
+   - **Mitigation:** Depth counter is just a u32 increment - minimal overhead
+   
+3. **False positives:**
+   - **Mitigation:** Only trigger on genuinely excessive recursion (>100 levels)
 
 ---
 
 ## Previous Tasks: ✅ COMPLETE
+
+### Invert Solver Defaults (Stop being "Nice") ✅
+**Status:** ✅ Complete
+**Results:**
+- Changed TypeId::ANY defaults to TypeId::UNKNOWN
+- TS7006 (Implicit Any): 11 extra errors - catching previously hidden
+- TS2322 (Type Mismatch): 4 extra errors - catching previously hidden
+- Exact Match: 44.2% (up from ~30% baseline)
 
 ### Parser Noise Fix (TS1005 & TS1109) ✅
 **Status:** ✅ Complete
@@ -106,6 +204,7 @@ This creates a better baseline for fixing the root causes of these type errors.
 
 ## Status
 
-- **Current Task:** None - All tasks complete ✅
+- **Current Task:** Recursion Guards (Stack Overflow Prevention)
+- **Phase:** Investigation (Phase 1)
 - **Last Updated:** 2026-01-15
-- **Ready for Review:** ✅ YES
+- **Ready to Start:** ✅ YES
