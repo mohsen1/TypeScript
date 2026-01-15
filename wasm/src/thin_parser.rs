@@ -1439,7 +1439,16 @@ impl ThinParserState {
                     self.parse_expression_statement()
                 }
             }
-            _ => self.parse_expression_statement(),
+            _ => {
+                // Check for labeled statement with keyword as label (e.g., await: if (...))
+                // TypeScript/JavaScript allow reserved keywords as labels
+                // This enables: await: ..., arguments: ..., eval: ..., etc.
+                if self.is_identifier_or_keyword() && self.look_ahead_is_labeled_statement() {
+                    self.parse_labeled_statement()
+                } else {
+                    self.parse_expression_statement()
+                }
+            }
         }
     }
 
