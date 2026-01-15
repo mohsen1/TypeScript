@@ -71,7 +71,7 @@ wasm-pack build --target web --out-dir pkg
 
 **Goal:** Fix cross-cutting gaps that block correctness across all tiers. LSP strictness work can be deferred.
 
-| Issue | Description | Owner |
+| Issue | Description | Owner | 
 |-------|-------------|-------|
 | Application type expansion | `TypeKey::Application` is not expanded, leading to incorrect diagnostics/assignability | Unassigned |
 | Readonly types | `readonly` arrays/tuples are currently treated as mutable | Unassigned |
