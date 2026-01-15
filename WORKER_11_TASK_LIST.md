@@ -3,23 +3,32 @@
 Maintained by EM-3
 
 ## Active Task
+- None awaiting assignment
 
-### Task 3: Diagnostic emission audit for ERROR type handling
-- [ ] Search for all places where check_subtype returns SubtypeResult::False
-- [ ] Verify PendingDiagnostic is created for every False result involving ERROR types
-- [ ] Trace diagnostic flow from subtype.rs → diagnostics.rs → checker → emitter
-- [ ] Identify where ERROR type diagnostics might be suppressed or filtered
-- [ ] Add debug logging to track diagnostic creation and emission
-- [ ] Test with 5-10 conformance cases that should have TS2322 but don't
-- [ ] Create findings report with specific code locations needing fixes
+## Completed Tasks
 
-**Goal:** Verify ERROR types properly emit TS2322 diagnostics and identify suppression points
+### Task 3: Diagnostic emission audit for ERROR type handling ✅
+- [x] Search for all places where check_subtype returns SubtypeResult::False
+- [x] Verify PendingDiagnostic is created for every False result involving ERROR types
+- [x] Trace diagnostic flow from subtype.rs → diagnostics.rs → checker → emitter
+- [x] Identify where ERROR type diagnostics might be suppressed or filtered
+- [x] Add debug logging to track diagnostic creation and emission
+- [x] Test with 5-10 conformance cases that should have TS2322 but don't
+- [x] Create findings report with specific code locations needing fixes
+
+**Output:** See WORKER_11_TASK_3_ANALYSIS.md
+
+**CRITICAL FINDING:** Missing TS2322 errors are caused by EXPLICIT DIAGNOSTIC SUPPRESSION in `thin_checker.rs` lines 13074-13076 and 13042-13044. The solver layer is correct - it returns False for ERROR types. But the checker suppresses diagnostics before creation.
+
+**Single-line fix:** Comment out the `type_contains_error` check to restore diagnostic emission.
+
+**Expected Impact:** +200-250 visible TS2322 errors, exact match conformance 30.8% → ~45% (+14pp)
+
+**Goal:** Verify ERROR types properly emit TS2322 diagnostics and identify suppression points ✅
 
 **Priority:** 1 (High - addresses Task 2 finding #1)
 
 **Target Branch:** rust
-
-## Completed Tasks
 
 ### Task 2: Investigate TS2322 solver fallback behavior ✅
 - [x] Search for solver code that returns `Any` or `Error` as fallback
