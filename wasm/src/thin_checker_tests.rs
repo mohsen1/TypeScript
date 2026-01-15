@@ -15024,6 +15024,66 @@ const animal = createAnimal(Animal); // Passing abstract class as value should b
     );
 }
 
+/// Test abstract to concrete constructor type assignability
+///
+/// Abstract constructor types should NOT be assignable to concrete constructor types.
+/// This matches TypeScript's behavior.
+#[test]
+fn test_abstract_to_concrete_constructor_not_assignable() {
+    use crate::thin_parser::ThinParserState;
+
+    let source = r#"
+class A {}
+
+abstract class B extends A {}
+
+class C extends B {}
+
+// Test 1: Abstract B to Concrete A - Should error (TS2322)
+var AA: typeof A = B;
+
+// Test 2: Concrete A to Abstract B - Should be OK (no error)
+var BB: typeof B = A;
+
+// Test 3: Abstract B to Concrete C - Should error (TS2322)
+var CC: typeof C = B;
+"#;
+
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    assert!(
+        parser.get_diagnostics().is_empty(),
+        "Parse errors: {:?}",
+        parser.get_diagnostics()
+    );
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(parser.get_arena(), root);
+
+    let types = TypeInterner::new();
+    let mut checker = ThinCheckerState::new(
+        parser.get_arena(),
+        &binder,
+        &types,
+        "test.ts".to_string(),
+        false,
+    );
+    checker.check_source_file(root);
+
+    let codes: Vec<u32> = checker.ctx.diagnostics.iter().map(|d| d.code).collect();
+    let not_assignable_count = codes.iter().filter(|&&code| code == 2322).count();
+
+    // Should have 2 TS2322 errors:
+    // - Line 8: typeof B (abstract) to typeof A (concrete)
+    // - Line 14: typeof B (abstract) to typeof C (concrete)
+    assert_eq!(
+        not_assignable_count, 2,
+        "Expected 2 TS2322 errors for abstract to concrete constructor assignment, got: {:?}\nDiagnostics: {:?}",
+        codes,
+        checker.ctx.diagnostics
+    );
+}
+
 /// TS Unsoundness #43: Concrete to abstract class assignment
 ///
 /// A concrete class is a subtype of its abstract base class.
