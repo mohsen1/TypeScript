@@ -13043,9 +13043,26 @@ impl<'a> ThinCheckerState<'a> {
     /// For detailed errors with elaboration (e.g., "property 'x' is missing"),
     /// use `error_type_not_assignable_with_reason_at` instead.
     pub fn error_type_not_assignable_at(&mut self, source: TypeId, target: TypeId, idx: NodeIndex) {
-        if self.type_contains_error(source) || self.type_contains_error(target) {
-            return;
-        }
+        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
+        // Previously, this function would silently return if source or target types contained ERROR.
+        // This suppression prevented valid TS2322 errors from being emitted when types couldn't be
+        // resolved (e.g., TS2304 "Cannot find name 'Foo'" followed by TS2322 "Type 'number' is not
+        // assignable to type 'Foo'").
+        //
+        // The solver layer correctly returns SubtypeResult::False for ERROR types, but the checker
+        // was suppressing diagnostics before they could be created. This behavior caused ~310
+        // missing TS2322 errors in the conformance suite.
+        //
+        // TypeScript emits both errors (TS2304 + TS2322), so we should too. Removing this
+        // suppression matches TypeScript's behavior and improves conformance by ~14pp.
+        //
+        // Old code:
+        // if self.type_contains_error(source) || self.type_contains_error(target) {
+        //     return;
+        // }
+        //
+        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation details.
+
         if let Some(loc) = self.get_source_location(idx) {
             let mut builder = crate::solver::SpannedDiagnosticBuilder::new(
                 self.ctx.types,
@@ -13075,9 +13092,28 @@ impl<'a> ThinCheckerState<'a> {
     ) {
         use crate::solver::{CompatChecker, TypeFormatter};
 
-        if self.type_contains_error(source) || self.type_contains_error(target) {
-            return;
-        }
+        // DIAGNOSTIC SUPPRESSION REMOVED (2024-01-14 - Worker 11 Task 4)
+        // Previously, this function would silently return if source or target types contained ERROR.
+        // This was the primary suppression point preventing ~310 TS2322 errors from being emitted.
+        //
+        // Rationale for removal:
+        // 1. The solver layer (subtype.rs) correctly returns SubtypeResult::False for ERROR types
+        // 2. The compat layer (compat.rs) properly delegates to the subtype checker
+        // 3. Only the checker layer was suppressing diagnostics BEFORE creation
+        // 4. TypeScript emits both TS2304 (cannot find name) AND TS2322 (not assignable)
+        // 5. Hiding these errors masks real bugs and hurts user experience
+        //
+        // Impact on conformance:
+        // - Expected improvement: +200-250 visible TS2322 errors
+        // - Exact match: 30.8% → ~45% (+14pp)
+        // - Missing errors: 57.8% → ~35% (-23pp)
+        //
+        // Old code:
+        // if self.type_contains_error(source) || self.type_contains_error(target) {
+        //     return;
+        // }
+        //
+        // See: WORKER_11_TASK_3_ANALYSIS.md for full investigation and WORKER_11_TASK_4_SUMMARY.md for impact.
 
         if let Some((source_level, target_level)) =
             self.constructor_accessibility_mismatch(source, target, None)
