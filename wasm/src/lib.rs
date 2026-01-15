@@ -1632,12 +1632,45 @@ impl WasmProgram {
     /// Returns a JSON object mapping file names to arrays of error codes.
     #[wasm_bindgen(js_name = getDiagnosticCodes)]
     pub fn get_diagnostic_codes(&mut self) -> String {
-        if self.files.is_empty() {
+        if self.files.is_empty() && self.lib_files.is_empty() {
             return "{}".to_string();
         }
 
-        // Parse and bind all files in parallel
-        let bind_results = parse_and_bind_parallel(self.files.clone());
+        // Load lib files for binding (enables global symbol resolution: console, Array, etc.)
+        let lib_file_objects: Vec<Arc<lib_loader::LibFile>> = self
+            .lib_files
+            .iter()
+            .filter_map(|(file_name, source_text)| {
+                // Parse lib file
+                let mut lib_parser = ThinParserState::new(file_name.clone(), source_text.clone());
+                let source_file_idx = lib_parser.parse_source_file();
+
+                if !lib_parser.get_diagnostics().is_empty() {
+                    // Parse errors in lib file - skip it
+                    return None;
+                }
+
+                let mut lib_binder = ThinBinderState::new();
+                lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+                let arena = Arc::new(lib_parser.into_arena());
+                let binder = Arc::new(lib_binder);
+
+                Some(Arc::new(lib_loader::LibFile::new(
+                    file_name.clone(),
+                    arena,
+                    binder,
+                )))
+            })
+            .collect();
+
+        // Parse and bind all files in parallel with lib symbols
+        let bind_results = if !lib_file_objects.is_empty() {
+            use crate::parallel;
+            parallel::parse_and_bind_parallel_with_libs(self.files.clone(), &lib_file_objects)
+        } else {
+            parse_and_bind_parallel(self.files.clone())
+        };
 
         // Collect parse diagnostic codes
         let mut file_codes: std::collections::HashMap<String, Vec<u32>> =
@@ -1671,12 +1704,45 @@ impl WasmProgram {
     /// array of error codes, which can be compared against tsc output.
     #[wasm_bindgen(js_name = getAllDiagnosticCodes)]
     pub fn get_all_diagnostic_codes(&mut self) -> Vec<u32> {
-        if self.files.is_empty() {
+        if self.files.is_empty() && self.lib_files.is_empty() {
             return Vec::new();
         }
 
-        // Parse and bind all files in parallel
-        let bind_results = parse_and_bind_parallel(self.files.clone());
+        // Load lib files for binding (enables global symbol resolution: console, Array, etc.)
+        let lib_file_objects: Vec<Arc<lib_loader::LibFile>> = self
+            .lib_files
+            .iter()
+            .filter_map(|(file_name, source_text)| {
+                // Parse lib file
+                let mut lib_parser = ThinParserState::new(file_name.clone(), source_text.clone());
+                let source_file_idx = lib_parser.parse_source_file();
+
+                if !lib_parser.get_diagnostics().is_empty() {
+                    // Parse errors in lib file - skip it
+                    return None;
+                }
+
+                let mut lib_binder = ThinBinderState::new();
+                lib_binder.bind_source_file(lib_parser.get_arena(), source_file_idx);
+
+                let arena = Arc::new(lib_parser.into_arena());
+                let binder = Arc::new(lib_binder);
+
+                Some(Arc::new(lib_loader::LibFile::new(
+                    file_name.clone(),
+                    arena,
+                    binder,
+                )))
+            })
+            .collect();
+
+        // Parse and bind all files in parallel with lib symbols
+        let bind_results = if !lib_file_objects.is_empty() {
+            use crate::parallel;
+            parallel::parse_and_bind_parallel_with_libs(self.files.clone(), &lib_file_objects)
+        } else {
+            parse_and_bind_parallel(self.files.clone())
+        };
 
         // Collect all parse diagnostic codes
         let mut all_codes: Vec<u32> = Vec::new();
