@@ -23,8 +23,8 @@ EM-2 is responsible for **semantic accuracy**. Your team ensures that:
 
 | Worker | Squad | Focus Area | Status | Throughput |
 |--------|-------|------------|--------|------------|
-| Worker 6 | Binder | Global scope / lib injection | ✅ Complete | Medium |
-| Worker 7 | Semantics | Module symbol resolution | 🔵 Active | Medium |
+| Worker 6 | Semantics | Module symbol resolution (re-exports, TS2792) | 🔵 Active | Medium |
+| Worker 7 | Semantics | Module symbol resolution (namespace, defaults) | 🔵 Active | Medium |
 | Worker 8 | LSP | TypeScript config integration | 🟢 Approved | TBD |
 
 **EM Branch:** em-team-2
@@ -65,34 +65,56 @@ EM-2 is responsible for **semantic accuracy**. Your team ensures that:
 
 ## Team Priorities (Updated 2026-01-15 13:20)
 
-### Priority 1: Module Symbol Resolution (Tier 3)
-**Owner:** Worker 7 (Semantics Squad)
+### Priority 1: Module Symbol Resolution (Tier 3) - 🔴 CRITICAL
+**Owner:** Worker 7 (namespace, defaults) + Worker 6 (re-exports, TS2792)
 
 **Goal:** Fix cross-file symbol resolution
 
 **Current State:**
-- Worker 7 has partial implementation (named imports work)
-- 800+ combined errors (TS7005, TS7008, TS2792)
-- Incomplete: namespace, default, re-exports, TS2792
+- Worker 7 has partial implementation (named imports work ✅)
+- 800+ combined errors (TS7005: 489, TS7008: 336, TS2792: 161)
+- **BLOCKER:** Incomplete for 2+ weeks, blocking real-world usage
 
-**Action Items:**
-1. Build export tables for each module
-2. Resolve imports against export tables
-3. Handle namespace imports
-4. Handle default imports
-5. Handle re-exports
-6. Implement TS2792 `import()` type resolution
+**Two-Pronged Approach (Effective 2026-01-15 13:50):**
+
+**Worker 7 - Namespace and Default Imports**
+- Subtask 7.1: Implement namespace import resolution
+- Subtask 7.2: Implement default import resolution
+- Subtask 7.3: Fix export table building for namespaces
+- Subtask 7.4: Test with conformance suite
+- **Commit requirement:** Daily commits with `[wasm] binder: module - <subtask>`
+
+**Worker 6 - Re-exports and TS2792**
+- Subtask 6.1: Implement re-export resolution (`export * from 'x'`)
+- Subtask 6.2: Implement named re-exports (`export { a } from 'x'`)
+- Subtask 6.3: Implement TS2792 `import()` type resolution
+- Subtask 6.4: Test with conformance suite
+- **Commit requirement:** Daily commits with `[wasm] binder: module - <subtask>`
+
+**Coordination:**
+- EM-2 facilitates daily sync between Workers 6-7
+- Shared workspace: `wasm/src/binder/mod.rs`, `wasm/src/thin_binder.rs`
+- Code reviews required before merging to em-team-2
+- Prevent merge conflicts through communication
 
 **Target Metrics:**
-| Error Code | Current | Target |
-|------------|---------|--------|
-| TS7005 extra | 489 | <100 |
-| TS7008 extra | 336 | <50 |
-| TS2792 missing | 161 | <20 |
+| Error Code | Current | Target | Owner |
+|------------|---------|--------|-------|
+| TS7005 extra | 489 | <100 | Worker 7 |
+| TS7008 extra | 336 | <50 | Worker 7 |
+| TS2792 missing | 161 | <20 | Worker 6 |
+| Re-exports | ??? | 0 extra | Worker 6 |
 
 **Key Files:**
 - `wasm/src/binder/mod.rs` - module resolution
 - `wasm/src/thin_binder.rs` - symbol table management
+- **Shared workspace** - Workers 6-7 must coordinate to avoid conflicts
+
+**Success Criteria:**
+- Week 1 (by 2026-01-22): Substantial progress on namespace/defaults (Worker 7)
+- Week 1 (by 2026-01-22): Substantial progress on re-exports (Worker 6)
+- Week 2 (by 2026-01-29): TS2792 implementation complete (Worker 6)
+- Week 2 (by 2026-01-29): All module errors reduced by 50%
 
 ### Priority 2: LSP TypeScript Config Integration
 **Owner:** Worker 8 (LSP Squad)
@@ -184,12 +206,12 @@ Current baseline from rust branch (commit 74df9fd30d):
 
 ---
 
-## Merge Readiness Status (2026-01-15 13:20)
+## Merge Readiness Status (2026-01-15 13:50)
 
 | Worker | Status | Notes |
 |--------|--------|-------|
-| Worker 6 | 🟢 Complete | TS2454, TS2589, lib injection complete |
-| Worker 7 | 🔵 Active | Module resolution (partial implementation) |
+| Worker 6 | 🔵 Active | Reassigned to help Worker 7 - re-exports, TS2792 |
+| Worker 7 | 🔵 Active | Module resolution (partial) - namespace, defaults |
 | Worker 8 | 🟢 Approved | LSP config integration approved, ready to start |
 
 ---
@@ -209,10 +231,11 @@ Current baseline from rust branch (commit 74df9fd30d):
 
 1. ✅ Create em-team-2 branch
 2. ✅ Create EM_2_TASKS.md
-3. 🔄 **Continue Worker 7** on module resolution to completion
-4. 📅 **Activate Worker 8** on LSP TypeScript config integration
-5. 📅 **Assign new task** to Worker 6 (type checker accuracy)
-6. 📋 Track semantic error counts
+3. ✅ **Worker 6 reassigned** to help Worker 7 (2026-01-15 13:50)
+4. 🔄 **Two-pronged module resolution** - Workers 6-7 working in parallel
+5. 🔄 **Daily EM-2 sync** with Workers 6-7 to prevent conflicts
+6. 📅 **Activate Worker 8** on LSP TypeScript config integration (after module progress)
+7. 📋 Track semantic error counts (TS7005: 489, TS7008: 336, TS2792: 161)
 
 ---
 
