@@ -74,10 +74,16 @@
 
 ---
 
-### worker-14: Symbol Resolution (Tier 3)
-**Focus:** Fix TS2304 and TS2524 - symbol and module resolution
+### worker-14: Type Checking (Tier 2) - *Previous Assignment*
+**Note:** Worker-14 was assigned union type assignability (TS2322) before EM-4 activation.
+**Status:** Merged task list only - no code changes yet.
+**Action:** EM-4 to review and reassign to current priorities (Symbol Resolution Tier 3).
 
-**Issues:**
+**Previous Focus (from worker-14 branch):**
+- TS2322 - ~548 extra errors (union type assignability)
+- Union-to-union and base-to-union type compatibility
+
+**Current EM-4 Assignment (Symbol Resolution Tier 3):**
 - TS2304 - 7 missing, 5 extra (symbol resolution accuracy)
 - TS2524 - 12 missing (module member resolution)
 
@@ -133,9 +139,18 @@ cd wasm/differential-test && bash run-conformance.sh --max=500 --workers=8
 |--------|------|--------|-------|
 | worker-12 | Parser (TS1109/TS1005) | Pending | - |
 | worker-13 | Async (TS2705/TS1359) | Pending | - |
-| worker-14 | Symbols (TS2304/TS2524) | Pending | - |
+| worker-14 | Symbols (TS2304/TS2524) | Merged | Previous assignment (TS2322) merged - needs reassignment |
 
 ---
 
 **Last Updated:** 2026-01-15
-**Next Review:** After first worker submits PR
+**Next Review:** After worker code submissions
+
+## Recent Activity
+
+### 2026-01-15 - EM-4 Activated
+- Synced with rust branch
+- Created baseline: 28.9% exact match (55/190 tests)
+- Assigned tasks to workers 12, 13, 14
+- Merged worker-14 branch (previous assignment: TS2322 union types)
+- Pushed em-team-4 to origin for Director review
