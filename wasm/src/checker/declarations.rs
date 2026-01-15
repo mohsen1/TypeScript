@@ -281,17 +281,17 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
     fn property_to_key(&self, name_idx: NodeIndex, name_str: &str) -> Option<PropertyKey> {
         if let Some(name_node) = self.ctx.arena.get(name_idx) {
             match name_node.kind {
-                SyntaxKind::Identifier as u16 => {
-                    Some(PropertyKey::Ident(name_str.clone()))
+                k if k == SyntaxKind::Identifier as u16 => {
+                    Some(PropertyKey::Ident(name_str.to_string()))
                 }
-                SyntaxKind::PrivateIdentifier as u16 => {
-                    Some(PropertyKey::Private(name_str.clone()))
+                k if k == SyntaxKind::PrivateIdentifier as u16 => {
+                    Some(PropertyKey::Private(name_str.to_string()))
                 }
-                SyntaxKind::StringLiteral as u16 => {
-                    Some(PropertyKey::Computed(ComputedKey::String(name_str.clone())))
+                k if k == SyntaxKind::StringLiteral as u16 => {
+                    Some(PropertyKey::Computed(ComputedKey::String(name_str.to_string())))
                 }
-                SyntaxKind::NumericLiteral as u16 => {
-                    Some(PropertyKey::Computed(ComputedKey::Number(name_str.clone())))
+                k if k == SyntaxKind::NumericLiteral as u16 => {
+                    Some(PropertyKey::Computed(ComputedKey::Number(name_str.to_string())))
                 }
                 k if k == syntax_kind_ext::COMPUTED_PROPERTY_NAME => {
                     // For computed properties, try to get the identifier
@@ -466,12 +466,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
             };
         };
 
-        let Some(ref statements) = block.statements else {
-            return FlowResult {
-                normal: Some(assigned_in.clone()),
-                exits: None,
-            };
-        };
+        let statements = &block.statements;
 
         let mut current = assigned_in.clone();
         let mut exits: Option<HashSet<PropertyKey>> = None;
@@ -542,7 +537,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
         // Check for binary expression assignment (this.prop = value)
         if node.kind == syntax_kind_ext::BINARY_EXPRESSION {
             if let Some(bin_expr) = self.ctx.arena.get_binary_expr(node) {
-                if bin_expr.operator_token.kind == SyntaxKind::EqualsToken as u16 {
+                if bin_expr.operator_token == SyntaxKind::EqualsToken as u16 {
                     // Check if left side is a property access (this.prop)
                     if self.is_this_property_access(bin_expr.left) {
                         if let Some(prop_key) = self.extract_property_key(bin_expr.left) {
@@ -571,7 +566,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
             return false;
         }
 
-        let Some(prop_access) = self.ctx.arena.get_property_access_expr(node) else {
+        let Some(prop_access) = self.ctx.arena.get_access_expr(node) else {
             return false;
         };
 
@@ -593,11 +588,11 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
             return None;
         }
 
-        let Some(prop_access) = self.ctx.arena.get_property_access_expr(node) else {
+        let Some(prop_access) = self.ctx.arena.get_access_expr(node) else {
             return None;
         };
 
-        let Some(name_node) = self.ctx.arena.get(prop_access.name) else {
+        let Some(name_node) = self.ctx.arena.get(prop_access.name_or_argument) else {
             return None;
         };
 
@@ -641,10 +636,10 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
 
         // For if-else, we need the intersection of both branches
         // For if-only, we need to intersect with the input (property might not be assigned if condition is false)
-        let normal = if let Some(else_res) = else_result {
+        let normal = if let Some(ref else_res) = else_result {
             // Both branches exist - intersect them
             let then_set = then_result.normal.unwrap_or_default();
-            let else_set = else_res.normal.unwrap_or_default();
+            let else_set = else_res.normal.clone().unwrap_or_default();
             Some(self.intersect_sets(&then_set, &else_set))
         } else {
             // Only then branch - intersect with input
@@ -655,8 +650,8 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
         // Handle exits from both branches
         let mut exits: Option<HashSet<PropertyKey>> = None;
         if let Some(then_exits) = then_result.exits {
-            exits = Some(match else_result {
-                Some(ref else_res) => {
+            exits = Some(match &else_result {
+                Some(else_res) => {
                     if let Some(else_exits) = &else_res.exits {
                         self.intersect_sets(&then_exits, else_exits)
                     } else {
@@ -684,7 +679,7 @@ impl<'a, 'ctx> DeclarationChecker<'a, 'ctx> {
             };
         };
 
-        let Some(try_stmt) = self.ctx.arena.get_try_statement(node) else {
+        let Some(try_stmt) = self.ctx.arena.get_try(node) else {
             return FlowResult {
                 normal: Some(assigned_in.clone()),
                 exits: None,
