@@ -5,6 +5,21 @@ Maintained by EM-3
 ## Active Task
 - None awaiting assignment
 
+## Recent Merge (2025-01-15)
+
+### Parser Error Recovery Improvements ✅ MERGED
+
+**Changes:**
+- Added `resync_after_error()` method to thin_parser.rs for better error recovery
+- Improved parser synchronization after syntax errors
+- Helps prevent cascading errors by finding known good synchronization points
+
+**Status:** Merged to em-team-3
+
+**Impact:**
+- Builds on worker-9's TS1005/TS1109 improvements
+- Contributes to better error recovery across the codebase
+
 ## Completed Tasks
 
 ### Task 6: Fix TS2322 Type Accuracy - Balance Missing (105) and Extra (548) ✅
