@@ -7603,6 +7603,28 @@ impl ThinParserState {
         )
     }
 
+    /// Check if current token can start an object property
+    /// Used for error recovery in object literals when commas are missing
+    fn is_property_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Get/Set accessors
+            SyntaxKind::GetKeyword | SyntaxKind::SetKeyword => true,
+            // Async keyword (for async methods)
+            SyntaxKind::AsyncKeyword => true,
+            // Asterisk (for generator methods)
+            SyntaxKind::AsteriskToken => true,
+            // String/number literals (computed properties or shorthand)
+            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral => true,
+            // Identifier or keyword (property names)
+            SyntaxKind::Identifier => true,
+            // Bracket (computed property)
+            SyntaxKind::OpenBracketToken => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Parse object literal
     fn parse_object_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
@@ -7615,8 +7637,18 @@ impl ThinParserState {
                 properties.push(prop);
             }
 
+            // Try to parse comma separator
             if !self.parse_optional(SyntaxKind::CommaToken) {
-                break;
+                // Missing comma - check if next token looks like another property
+                // If so, suppress the error and continue parsing (better recovery)
+                if self.is_property_start() && !self.is_token(SyntaxKind::CloseBraceToken) {
+                    // We have a property-like token but no comma - likely missing comma
+                    // Suppress the comma error and continue parsing for better recovery
+                    // This handles cases like: {a: 1 b: 2} instead of {a: 1, b: 2}
+                } else {
+                    // Not followed by a property, so we're really done
+                    break;
+                }
             }
         }
 
