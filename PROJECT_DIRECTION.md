@@ -22,7 +22,7 @@ See `wasm/specs` files for other component designs and references.
 
 ### Quality Metrics:
 - **Conformance Tests:** 4,941 TypeScript test cases
-- **Current Performance:** 60.8% exact/equivalent match with TypeScript
+- **Current Performance:** 38.6% exact match (500 test sample, 2026-01-15)
 - **Target Performance:** 95%+ compatibility before production
 
 ## Current Priority Issues
@@ -193,3 +193,154 @@ See `wasm/specs` files for other component designs and references.
 - **Total active workers:** 8-9 (down from 12)
 
 **Rationale:** EM-3's integration tasks are complete. Remaining work is type accuracy (TS2322, TS7006) which benefits from focused, smaller teams. Excess workers can form a "Float Pool" for overflow work, validation, and testing.
+
+---
+
+## Conformance Test Analysis (2026-01-15)
+
+### Latest Test Results (500 tests)
+
+| Metric | Value |
+|--------|-------|
+| Tests Run | 487 |
+| Exact Match | 188 (38.6%) |
+| Same Error Count | 202 (41.5%) |
+| WASM Crashes | 0 |
+| Skipped | 13 |
+
+### Category Breakdown
+
+| Category | Exact Match |
+|----------|-------------|
+| Symbols | 75% (6/8) |
+| async | 44% (79/179) |
+| ambient | 44% (8/18) |
+| classes | 34% (94/277) |
+| asyncGenerators | 33% (1/3) |
+
+### Top Extra Errors (Over-reporting)
+
+| Error Code | Count | Description | Root Cause |
+|------------|-------|-------------|------------|
+| **TS2571** | 30 | Object is of type 'unknown' | `this` in regular functions typed as `unknown` instead of emitting TS2683 |
+| **TS7006** | 24 | Implicit any parameter | Over-reporting in some cases despite previous fixes |
+| **TS2348** | 23 | Cannot invoke expression | Non-callable type being called |
+| **TS2300** | 20 | Duplicate identifier | Symbol table merging issues |
+| **TS2322** | 17 | Type not assignable | Type compatibility false positives |
+| **TS1109** | 13 | Expression expected | Parser errors for `await` in parameter defaults |
+| **TS7005** | 12 | Implicit any variable | Variable type inference failures |
+
+### Top Missing Errors (Under-reporting)
+
+| Error Code | Count | Description | Root Cause |
+|------------|-------|-------------|------------|
+| **TS2705** | 34 | Async function return type | Remaining async cases not covered |
+| **TS2524** | 15 | Module resolution | Module member access failures |
+| **TS1005** | 11 | Token expected | Parser synchronization issues |
+| **TS1109** | 10 | Expression expected | Parser bailing on valid syntax |
+| **TS1359** | 10 | await reserved word | Async context detection |
+| **TS2304** | 10 | Cannot find name | Symbol resolution gaps |
+
+---
+
+## Recent Fixes (2026-01-15)
+
+### 1. TS2507 - Extends Clause Literals ✅
+
+**Commit:** `95102f64c3`
+
+**Problem:** Parser emitted TS1109 for `class C extends undefined/true/42/"hello"` instead of semantic TS2507.
+
+**Solution:**
+- Parser now accepts literals in extends clauses (`thin_parser.rs`)
+- Checker emits TS2507 "Type 'X' is not a constructor function type" (`thin_checker.rs`)
+- Added diagnostic code and message template (`diagnostics.rs`)
+
+**Test Case:**
+```typescript
+class C1 extends undefined { }  // Now: TS2507, Before: TS1109
+class C2 extends 42 { }         // Now: TS2507, Before: TS1109
+```
+
+### 2. TS7006/TS7008 - Implicit Any Over-reporting ✅
+
+**Commit:** `b186bc5df3`
+
+**Problem:** Implicit any errors emitted for parameters/properties with initializers.
+
+**Solution:**
+- Skip TS7006 when parameter has default value (`param.initializer.is_some()`)
+- Skip TS7008 when property has initializer (`prop.initializer.is_some()`)
+
+**Reduction:** 135 → 24 extra errors
+
+### 3. TS2705 - Async Generator Return Type ✅
+
+**Commit:** `b186bc5df3`
+
+**Problem:** Async generators emitting "must return Promise" error.
+
+**Solution:**
+- Added check for generator flag (`!func.asterisk_token`)
+- Async generators return `AsyncGenerator`, not `Promise`
+
+### 4. Docker Path Fix ✅
+
+**Commit:** `3eb0b9e0f5`
+
+**Problem:** Conformance tests failing with `ENOENT: /tests/cases/conformance`
+
+**Solution:**
+- Fixed path resolution from `../../tests` to `../tests`
+- Docker structure: `/app/differential-test` → `../tests` → `/app/tests`
+
+---
+
+## Next Priority Issues
+
+### 1. 🔴 TS2571 "Object is of type 'unknown'" (30 extra)
+
+**Root Cause:** `this` inside regular functions (not methods) returns `TypeId::UNKNOWN` when no type annotation exists. Property access on `unknown` triggers TS2571 instead of TS2683.
+
+**TSC Behavior:** Emits TS2683 "'this' implicitly has type 'any' because it does not have a type annotation."
+
+**Fix Location:** `thin_checker.rs:629-631` - `current_this_type()` handling
+
+**Example:**
+```typescript
+function foo() {
+    this.x = 1;  // WASM: TS2571, TSC: TS2683
+}
+```
+
+### 2. 🔴 TS2507 for Non-Literal Extends (Missing)
+
+**Problem:** `class C extends x { }` where `x: {}` - not emitting TS2507.
+
+**Root Cause:** Only literals are checked; resolved identifiers with non-constructor types need validation.
+
+**Fix:** Check `base_constructor_type_from_expression` return value and emit TS2507 if `None`.
+
+### 3. 🟠 TS1109 Parser Cases (13 extra)
+
+**Problem:** Extra parser errors for `await` in parameter defaults like `function f(await = await)`.
+
+**Root Cause:** Parser doesn't handle `await` as identifier in non-async contexts correctly.
+
+### 4. 🟠 TS2348 Non-Callable (23 extra)
+
+**Problem:** Over-reporting "Cannot invoke expression" errors.
+
+**Root Cause:** Call signature resolution may be too strict or missing overload handling.
+
+---
+
+## File Reference
+
+| File | Purpose |
+|------|---------|
+| `wasm/src/thin_parser.rs` | Parser implementation |
+| `wasm/src/thin_checker.rs` | Type checker implementation |
+| `wasm/src/checker/types/diagnostics.rs` | Error codes and messages |
+| `wasm/differential-test/` | Conformance test infrastructure |
+| `wasm/differential-test/run-conformance.sh` | Docker test runner |
