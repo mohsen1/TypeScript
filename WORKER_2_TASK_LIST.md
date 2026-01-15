@@ -1,6 +1,64 @@
 # Worker 2 Task List
 
-Maintained by EM-2
+Maintained by EM-1 (reassigned from EM-2)
+
+## Active Task
+
+### 🎯 NEW ASSIGNMENT: Parser Noise Cleanup Support 🟢
+**Priority:** LOW-SUPPORT (Worker-1 Backup)
+**Assigned:** 2026-01-15
+**Owner:** worker-2
+**Branch:** worker-2
+**Status:** ⏸️ ON HOLD - Wait for Worker-1 Progress
+
+### Task Description
+Support Worker-1's Parser Noise (TS1005/TS1109) cleanup effort by tackling remaining edge cases after initial implementation. This is a support role - WAIT for worker-1 to make initial progress before starting.
+
+### Problem Analysis
+From PROJECT_DIRECTION.md:
+- **Parser Noise:** ~700 extra errors (TS1005: 439, TS1109: 262)
+- **Root Cause:** ThinParser bailing out on valid syntax, ASI issues
+- **Primary Owner:** Worker-1
+
+### Action Items (ON HOLD - Do NOT start yet)
+
+#### Phase 1: Wait for Worker-1 Progress
+- [ ] Monitor worker-1's progress reports
+- [ ] Review worker-1's initial fixes when available
+- [ ] Identify remaining edge cases from worker-1's results
+
+#### Phase 2: Tackle Remaining Edge Cases
+- [ ] Investigate ASI (Automatic Semicolon Insertion) edge cases
+- [ ] Fix parser error resynchronization in specific contexts:
+  - Object literals
+  - Array literals
+  - Function parameters
+  - Type annotations
+- [ ] Run conformance tests to verify improvements
+
+#### Phase 3: Validation
+- [ ] Run `./wasm/test.sh` (Docker-only!)
+- [ ] Run conformance tests: `./wasm/differential-test/run-conformance.sh --all`
+- [ ] Verify TS1005/TS1109 reduced to <40 combined
+- [ ] Check for regressions
+
+### Success Metrics
+- **TS1005/TS1109 Combined:** Reduce from ~700 to <40
+- **No Regressions:** Don't break existing working tests
+- **Support Worker-1:** Complement their work, not duplicate
+
+### Deliverables
+1. Parser edge case fixes
+2. Conformance test report showing improvement
+3. Updated task list with "Complete" status
+
+### Status
+- **Previous Tasks:** ✅ Module Resolution (TS2792), ✅ Global Scope Resolution
+- **Current Task:** 🟢 Parser Noise Support (ON HOLD)
+- **Ready to Start:** ⏸️ NO - Wait for Worker-1 progress
+- **Last Updated:** 2026-01-15
+
+---
 
 ## Completed Tasks
 
