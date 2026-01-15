@@ -14,7 +14,7 @@
 
 **Priority:** 🔴 CRITICAL (Tier 2 - Type Checker Accuracy)
 **Assigned:** 2026-01-15
-**Status:** 🟡 READY TO START
+**Status:** 🟡 IN PROGRESS - Investigation & Test Setup Complete
 
 ### Problem
 
@@ -180,13 +180,33 @@ The type assignability checker in `thin_checker.rs` doesn't properly handle:
 
 ## Completed Tasks
 
-*None yet - awaiting completion of Task 1*
+### ✅ Phase 1: Investigation Complete (2026-01-15)
+- Created UNION_ASSIGNABILITY_ANALYSIS.md with deep dive
+- Set up test files: test_union_assignability.{rs,ts}
+- Identified root causes in type assignability logic
+- Categorized false positives by type
+
+### 🔄 Phase 2: Implementation Pending
+- [ ] Implement union-to-union assignability check
+- [ ] Implement base-to-union assignability check
+- [ ] Handle generic constraint types
+- [ ] Run validation against conformance tests
+
+---
+
+## Progress Log
+
+**2026-01-15:**
+- ✅ Investigation complete - analysis document created
+- ✅ Test infrastructure set up
+- ✅ Merged to em-team-4
+- 🔄 Ready for implementation phase
 
 ---
 
 ## Notes
 
-- **EM-4 Status:** Pending activation - currently operating provisionally
-- **Team Alignment:** Similar focus to EM-3's Type Checking Squad
-- **Mentorship:** Coordinate with Workers 1-2 (EM-3) for type checking expertise
+- **EM-4 Status:** Active - worker-14 task merged to em-team-4
+- **Team Alignment:** Tier 2 Type Checker Accuracy focus
+- **Next Steps:** Implement fixes in `wasm/src/thin_checker.rs`
 - **Priority:** Union type assignability is foundational - fixes will unblock other type checking improvements
