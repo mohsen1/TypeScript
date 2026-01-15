@@ -1,5 +1,30 @@
 # Worker-3 Task List
 
+## ✅ COMPLETED: Parser Noise Fix (TS1005 & TS1109)
+**Priority:** 🔴 CRITICAL (Highest Priority)
+**Owner:** worker-3
+**Branch:** worker-3
+**Status:** ✅ COMPLETE
+**Assigned:** 2026-01-14
+**Completed:** 2026-01-15
+
+### Results
+- **TS1005**: 24 extra errors (down from 439) - **95% reduction** ✅
+- **TS1109**: 0 extra errors (down from 262) - **100% reduction** ✅
+- **Combined**: 24 extra errors (down from 701) - **97% reduction** ✅
+- **Target**: <40 combined errors - **MET** ✅
+
+### Changes Made
+1. **Fixed await expression parsing** - Now respects async context (only parses as await expression when in async function, otherwise parses as identifier)
+2. **Added AwaitKeyword/YieldKeyword to parse_primary_expression** - Allows these keywords to be parsed as identifiers in expression contexts
+3. **Enhanced is_array_element_start** - Added spread operator, this/super support, and proper fallback
+4. **Removed duplicate function** - Cleaned up duplicate `is_array_element_start` definition
+
+### Remaining Edge Cases
+The 24 remaining TS1005 errors are all the same edge case: `function f(await = await) {}` (non-async function with `await` as parameter name with default value). This is valid TypeScript but requires additional context-aware handling in parameter declarations.
+
+---
+
 ## 🔴 CURRENT TASK: Invert Solver Defaults (Stop being "Nice")
 **Priority:** 🔴 CRITICAL (Strategic)
 **Owner:** worker-3
@@ -19,11 +44,9 @@
 
 ---
 
-## Analysis Required
+## Implementation Plan
 
-### Phase 1: Investigation (DO THIS FIRST)
-
-**Before making any changes:**
+### Phase 1: Understand the Current Behavior
 
 1. **Understand the current behavior:**
    - Search for all places where `TypeId::ANY` is returned as a default
@@ -49,8 +72,6 @@
    - What's the semantic difference?
 
 ---
-
-## Implementation Plan
 
 ### Phase 2: Change Defaults to UNKNOWN
 
@@ -169,28 +190,12 @@ fn some_resolution(&mut self) -> TypeId {
 
 1. **Error Spike:** Expect 500+ new extra errors
    - **Mitigation:** Document which are expected (TS2322/TS7006 increases)
-   
+
 2. **Test Failures:** Some tests may fail due to exposed errors
    - **Mitigation:** Distinguish between "test was wrong" vs "real bug exposed"
 
 3. **Performance:** More errors = slower type checking
    - **Mitigation:** Profile before/after if performance degrades
-
----
-
-## Previous Tasks: ✅ COMPLETE
-
-### Parser Noise Fix (TS1005 & TS1109) ✅
-**Status:** ✅ Complete
-**Results:** 
-- TS1005: 24 extra errors (down from 439) - 95% reduction
-- TS1109: 0 extra errors (down from 262) - 100% reduction
-- Combined: 24 extra errors (down from 701) - 97% reduction
-
-### Class Property Initialization (TS2564) ✅
-**Status:** ✅ Complete
-**Implementation:** strictPropertyInitialization check in `wasm/src/checker/declarations.rs`
-**Tests:** 4 comprehensive unit tests - all passing
 
 ---
 
