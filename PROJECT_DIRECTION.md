@@ -36,7 +36,8 @@ See `wasm/specs` files for other component designs and references.
 *   **Audit Semicolon Insertion (ASI):** Verify our ASI logic matches TypeScript's exactly. Many TS1005 errors are likely missing semicolons we aren't inferring.
 
 ### 2. 🔴 CRITICAL: The "Global Scope" Fix (TS2304)
-**Owner:** Binder Squad
+**Owner:** worker-3
+**Status:** 🟡 IN PROGRESS (Assigned 2026-01-15)
 **Data:** TS2304 appears in both Extra (343) and Missing (116) lists.
 **Analysis:** This is the root of the "Error Poisoning."
 *   **Extra TS2304:** We aren't loading `lib.d.ts` correctly in the test runner, so `console`, `Promise`, and `Array` are undefined.
