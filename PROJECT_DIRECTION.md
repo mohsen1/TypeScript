@@ -67,6 +67,28 @@ wasm-pack build --target web --out-dir pkg
 
 ## Priority Issues
 
+### Tier 0: Quality & Stability Foundations
+
+**Goal:** Fix cross-cutting gaps that block correctness across all tiers. LSP strictness work can be deferred.
+
+| Issue | Description | Owner |
+|-------|-------------|-------|
+| Application type expansion | `TypeKey::Application` is not expanded, leading to incorrect diagnostics/assignability | Unassigned |
+| Readonly types | `readonly` arrays/tuples are currently treated as mutable | Unassigned |
+| AST child enumeration | `get_children` returns empty in parser arenas, breaking traversal-based features | Unassigned |
+| Solver test coverage | `infer/subtype/evaluate` tests are commented out due to API drift | Unassigned |
+| Panic hardening | Non-test paths still `panic!/unwrap` instead of recovering or re-parsing | Unassigned |
+| Definite assignment gaps | TS2565 not implemented; interface type parameters TODO | Unassigned |
+
+**Key Files:** `wasm/src/solver/evaluate.rs`, `wasm/src/solver/intern.rs`, `wasm/src/parser/arena.rs`, `wasm/src/parser/thin_node.rs`, `wasm/src/solver/subtype.rs`, `wasm/src/solver/infer.rs`, `wasm/src/cli/driver.rs`, `wasm/src/interner.rs`, `wasm/src/thin_checker.rs`
+
+**Notes:**
+- Application type expansion should reuse existing instantiation logic (`wasm/src/solver/instantiate.rs`) and re-enable solver tests once updated.
+- Readonly semantics need distinct type representation plus assignability/write checks.
+- AST children should be enumerated per-node-kind for deterministic traversals (do not allocate large temporary trees).
+
+**Deferred (OK to postpone):** LSP strictness from tsconfig (hover/completions/signature/diagnostics) until Tier 0 and Tier 1 stabilize.
+
 ### Tier 1: Parser Accuracy
 
 **Goal:** Parser should accept all valid TypeScript syntax without emitting false errors.
@@ -167,7 +189,7 @@ function foo() {
 ### Priority Order
 
 ```
-Parser (Tier 1) → Symbol Resolution (Tier 3) → Type Checker (Tier 2) → Implicit Any (Tier 4) → Async (Tier 5)
+Quality & Stability (Tier 0) → Parser (Tier 1) → Symbol Resolution (Tier 3) → Type Checker (Tier 2) → Implicit Any (Tier 4) → Async (Tier 5)
 ```
 
 **Rationale:** Parser errors create broken ASTs that poison downstream analysis. Fix syntax handling before semantic checking.
