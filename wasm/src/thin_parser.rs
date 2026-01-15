@@ -7862,6 +7862,31 @@ impl ThinParserState {
         }
     }
 
+    /// Check if current token can start an array element
+    /// Used for error recovery in array literals when commas are missing
+    fn is_array_element_start(&self) -> bool {
+        match self.token() {
+            // Spread operator
+            SyntaxKind::DotDotDotToken => true,
+            // Literals
+            SyntaxKind::StringLiteral | SyntaxKind::NumericLiteral | SyntaxKind::BigIntLiteral
+            | SyntaxKind::TrueKeyword | SyntaxKind::FalseKeyword | SyntaxKind::NullKeyword => true,
+            // Identifier
+            SyntaxKind::Identifier => true,
+            // This and super
+            SyntaxKind::ThisKeyword | SyntaxKind::SuperKeyword => true,
+            // Nested structures
+            SyntaxKind::OpenBracketToken => true,  // nested array
+            SyntaxKind::OpenBraceToken => true,     // object literal
+            SyntaxKind::OpenParenToken => true,     // parenthesized expression
+            // Unary operators
+            SyntaxKind::ExclamationToken | SyntaxKind::TildeToken | SyntaxKind::PlusToken
+            | SyntaxKind::MinusToken | SyntaxKind::PlusPlusToken | SyntaxKind::MinusMinusToken
+            | SyntaxKind::TypeOfKeyword | SyntaxKind::VoidKeyword | SyntaxKind::DeleteKeyword => true,
+            _ => self.is_identifier_or_keyword(),
+        }
+    }
+
     /// Parse object literal
     fn parse_object_literal(&mut self) -> NodeIndex {
         let start_pos = self.token_pos();
