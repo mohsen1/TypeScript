@@ -404,6 +404,13 @@ impl ThinParserState {
                 return;
             }
 
+            // NEW: Suppress error if we're at a natural expression end point
+            // This handles cases like `let x =` where the user forgot the expression
+            // but it's clear they've moved on to the next statement/context
+            if self.is_at_expression_end() {
+                return;
+            }
+
             // Decrement budget - we're about to emit an error
             self.ts1109_statement_budget -= 1;
 
@@ -605,6 +612,37 @@ impl ThinParserState {
     // =========================================================================
     // Error Resynchronization
     // =========================================================================
+
+    /// Check if we're at a position where an expression can reasonably end
+    /// This is used to suppress spurious "expression expected" errors when
+    /// the user has clearly moved on to the next statement/context.
+    fn is_at_expression_end(&self) -> bool {
+        match self.token() {
+            // Tokens that naturally end expressions
+            SyntaxKind::SemicolonToken
+            | SyntaxKind::CloseBraceToken
+            | SyntaxKind::CloseParenToken
+            | SyntaxKind::CloseBracketToken
+            | SyntaxKind::EndOfFileToken => true,
+            // Keywords that start a new statement (expression is clearly missing)
+            SyntaxKind::VarKeyword
+            | SyntaxKind::LetKeyword
+            | SyntaxKind::ConstKeyword
+            | SyntaxKind::FunctionKeyword
+            | SyntaxKind::ClassKeyword
+            | SyntaxKind::IfKeyword
+            | SyntaxKind::ForKeyword
+            | SyntaxKind::WhileKeyword
+            | SyntaxKind::DoKeyword
+            | SyntaxKind::SwitchKeyword
+            | SyntaxKind::TryKeyword
+            | SyntaxKind::WithKeyword
+            | SyntaxKind::ReturnKeyword
+            | SyntaxKind::BreakKeyword
+            | SyntaxKind::ContinueKeyword => true,
+            _ => false,
+        }
+    }
 
     /// Check if current token can start a statement (synchronization point)
     fn is_statement_start(&self) -> bool {
