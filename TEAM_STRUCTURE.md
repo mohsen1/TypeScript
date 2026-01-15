@@ -57,21 +57,22 @@ Project Zang has **3 Engineering Managers (EMs)** and **8 Workers**.
 
 | Worker | Branch | Squad | Current Focus | Status | Throughput |
 |--------|--------|-------|---------------|--------|------------|
-| Worker 6 | worker-6 | Semantics | Module resolution (re-exports, TS2792) | 🔵 Active | Medium |
-| Worker 7 | worker-7 | Semantics | Module resolution (namespace, defaults) | 🔵 Active | Medium |
+| Worker 6 | worker-6 | Semantics | Module resolution (re-exports, TS2792) | 🔴 Not Working | Medium |
+| Worker 7 | worker-7 | Semantics | Module resolution (namespace, defaults) | 🔴 Stalled | Medium |
 | Worker 8 | worker-8 | LSP | TypeScript config integration | ✅ Complete | High |
 
 **EM Branch:** em-team-2
 
 **Status:**
-- ✅ Worker 6 reassigned to help Worker 7 (2026-01-15 13:50)
-- 🔄 Two-pronged module resolution - Workers 6-7 working in parallel
+- ⚠️ Worker 6 reassigned to help Worker 7 (2026-01-15 13:50) - ZERO commits since
+- 🔴 Worker 7 stalled for 2+ weeks on module resolution - NO recent commits
+- 🔴 Two-pronged approach NOT working - daily sync not happening
 - ✅ Worker 8 complete - LSP TypeScript config integration merged
 
 **Priority Issues:**
-- Module resolution (TS7005, TS7008, TS2792) - 800+ combined errors (Workers 6-7)
-- Worker 6: re-exports, TS2792
-- Worker 7: namespace imports, default imports
+- 🔴 CRITICAL: Module resolution (800+ errors) - NO progress from Workers 6-7
+- Worker 6: re-exports, TS2792 - NOT STARTED
+- Worker 7: namespace imports, default imports - STALLED
 
 ---
 
