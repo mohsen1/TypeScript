@@ -14298,6 +14298,9 @@ impl<'a> ThinCheckerState<'a> {
 
             // Check for duplicate identifiers (2300)
             self.check_duplicate_identifiers();
+
+            // Check for unused declarations (6133)
+            self.check_unused_declarations();
         }
     }
 
@@ -14554,6 +14557,94 @@ impl<'a> ThinCheckerState<'a> {
                 Some(enum_decl.name)
             }
             _ => None,
+        }
+    }
+
+    /// Check for unused declarations (TS6133).
+    /// Reports variables, functions, classes, and other declarations that are never referenced.
+    fn check_unused_declarations(&mut self) {
+        use crate::binder::symbol_flags;
+        use crate::checker::types::diagnostics::diagnostic_codes;
+
+        // Collect all declared symbols
+        let mut symbol_ids = FxHashSet::default();
+        if !self.ctx.binder.scopes.is_empty() {
+            for scope in &self.ctx.binder.scopes {
+                for (_, &id) in scope.table.iter() {
+                    symbol_ids.insert(id);
+                }
+            }
+        } else {
+            for (_, &id) in self.ctx.binder.file_locals.iter() {
+                symbol_ids.insert(id);
+            }
+        }
+
+        // Build a set of all referenced symbols
+        let mut referenced_symbols = FxHashSet::default();
+        for deps in self.ctx.symbol_dependencies.values() {
+            for &sym_id in deps {
+                referenced_symbols.insert(sym_id);
+            }
+        }
+
+        // Check each symbol for usage
+        for sym_id in symbol_ids {
+            let Some(symbol) = self.ctx.binder.get_symbol(sym_id) else {
+                continue;
+            };
+
+            // Skip exported symbols - they're part of the public API
+            if symbol.is_exported {
+                continue;
+            }
+
+            // Skip special symbols like constructors, default exports, etc.
+            if symbol.escaped_name == "constructor"
+                || symbol.escaped_name == "default"
+                || symbol.escaped_name == "__esModule"
+            {
+                continue;
+            }
+
+            // Skip imported symbols - they're tracked separately (UNUSED_IMPORT)
+            if symbol.import_module.is_some() {
+                continue;
+            }
+
+            // Skip symbols without declarations (shouldn't happen, but be safe)
+            if symbol.declarations.is_empty() {
+                continue;
+            }
+
+            // Check if this is a declaration type we want to check
+            // We check: variables, functions, classes, enums, type aliases
+            // We skip: interfaces, type parameters, namespaces (they're used structurally)
+            let flags = symbol.flags;
+            let is_checkable = (flags & symbol_flags::VARIABLE) != 0
+                || (flags & symbol_flags::FUNCTION) != 0
+                || (flags & symbol_flags::CLASS) != 0
+                || (flags & symbol_flags::ENUM) != 0
+                || (flags & symbol_flags::TYPE_ALIAS) != 0;
+
+            if !is_checkable {
+                continue;
+            }
+
+            // Check if this symbol is referenced anywhere
+            if referenced_symbols.contains(&sym_id) {
+                continue;
+            }
+
+            // Symbol is not referenced - emit diagnostic for each declaration
+            let name = symbol.escaped_name.clone();
+            let message = format!("'{}' is declared but its value is never read.", name);
+
+            for &decl_idx in &symbol.declarations {
+                if let Some(name_node) = self.get_declaration_name_node(decl_idx) {
+                    self.error_at_node(name_node, &message, diagnostic_codes::UNUSED_VARIABLE);
+                }
+            }
         }
     }
 
