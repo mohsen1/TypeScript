@@ -19,7 +19,7 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 | EM | Worker # | Team Focus | Team Members | Priority |
 |----|----------|------------|--------------|----------|
-| EM-1 | Worker 2 | Tier 0: Quality & Stability | Workers 2, 3, 4 | HIGHEST |
+| EM-1 | Worker 2 | Tier 0: Quality & Stability | Workers 2, 3, 4, 5 | HIGHEST |
 | EM-2 | Worker 6 | Tier 1: Parser Accuracy | Workers 6, 7, 8, 9 | HIGH |
 | EM-3 | Worker 10 | Tier 2-3: Type Checker & Symbol Resolution | Workers 10, 11, 12, 13, 14 | MEDIUM |
 
@@ -92,6 +92,36 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 - [ ] `get_children` returns correct child nodes for all node types
 - [ ] No large temporary allocations during traversal
 - [ ] Traversal-based features work correctly
+
+---
+
+#### Worker 5: Solver Test Coverage Restoration
+**Task:** Re-enable commented out solver tests (infer/subtype/evaluate) due to API drift
+
+**Key Files:**
+- `wasm/src/solver/tests.rs`
+- `wasm/src/solver/infer.rs`
+- `wasm/src/solver/subtype.rs`
+- `wasm/src/solver/evaluate.rs`
+
+**Details:**
+- Solver tests are commented out due to API drift from recent changes
+- Tests cover critical type inference, subtyping, and evaluation logic
+- Need to update test code to match current solver API
+- These tests are essential for validating solver correctness
+
+**Tasks:**
+1. Identify all commented-out solver tests
+2. Update test code to use current solver API
+3. Fix any failing assertions
+4. Ensure tests cover edge cases
+5. Add to CI pipeline
+
+**Acceptance Criteria:**
+- [ ] All solver tests uncommented and passing
+- [ ] Test coverage for infer/subtype/evaluate modules
+- [ ] Tests added to CI pipeline
+- [ ] No test regressions in future changes
 
 ---
 
@@ -382,7 +412,7 @@ These tasks are explicitly deferred until Tier 0, 1, 2, and 3 stabilize:
 ## Priority Order Summary
 
 ```
-1. Workers 2-4 (Tier 0): Quality & Stability Foundations
+1. Workers 2-5 (Tier 0): Quality & Stability Foundations
    └─ Blocks: All downstream accuracy
    └─ Team 1 (EM-1: Worker 2)
 
