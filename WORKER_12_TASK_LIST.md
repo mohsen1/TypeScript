@@ -1,18 +1,19 @@
 # WORKER 12 TASK LIST
 
 ## Worker: worker-12
-## Reports to: EM-3
-## EM Branch: em-team-3
+## Reports to: EM-4
+## EM Branch: em-team-4
 ## Worker Branch: worker-12
 ## Base Branch: rust
 
 ---
 
-## Assignment: TS2571 Over-reporting Fix
+## Assignment: TS1109/TS1005 Parser Fixes
 
-**Priority:** EM-3 Priority 2
-**Status:** 🔵 Active
+**Priority:** EM-4 Tier 1 (Parser Accuracy)
+**Status:** ✅ Complete
 **Started:** 2026-01-15
+**Completed:** 2026-01-15
 
 ---
 
@@ -130,9 +131,17 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should instead b
 
 ## Progress Log
 
-### 2026-01-15
+### 2026-01-15 - Task Completed ✅
+- **Transfer:** Reassigned from EM-3 to EM-4
+- **New Assignment:** TS1109/TS1005 Parser Fixes
+- **Implementation:** Fixed parser false positives for await in default parameters
+- **Merge:** Merged to em-team-4
+- **Validation:** 44.4% exact match (20/45 tests)
+- **Status:** Ready for Director review
+
+### Previous Assignment (EM-3)
 - ✅ Assigned to EM-3, Priority 2 (TS2571 Over-reporting)
-- 🔵 Phase 1: Investigation pending
+- 🔵 Transferred to EM-4 before completion
 
 ---
 
