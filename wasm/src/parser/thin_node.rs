@@ -4700,10 +4700,697 @@ impl NodeAccess for ThinNodeArena {
         Some(&data.text)
     }
 
-    fn get_children(&self, _index: NodeIndex) -> Vec<NodeIndex> {
-        // TODO: Implement proper child enumeration based on node kind
-        // For now, return empty - this would need kind-specific logic
-        Vec::new()
+    fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex> {
+        if index.is_none() {
+            return Vec::new();
+        }
+
+        let node = match self.nodes.get(index.0 as usize) {
+            Some(n) => n,
+            None => return Vec::new(),
+        };
+
+        // Helper to add optional NodeIndex (ignoring NONE)
+        let add_opt = |children: &mut Vec<NodeIndex>, idx: NodeIndex| {
+            if idx.is_some() {
+                children.push(idx);
+            }
+        };
+
+        // Helper to add NodeList (expanding to individual nodes)
+        let add_list = |children: &mut Vec<NodeIndex>, list: &super::ast::NodeList| {
+            children.extend(list.nodes.iter().copied());
+        };
+
+        // Helper to add optional NodeList
+        let add_opt_list = |children: &mut Vec<NodeIndex>, list: &Option<super::ast::NodeList>| {
+            if let Some(l) = list {
+                children.extend(l.nodes.iter().copied());
+            }
+        };
+
+        use super::syntax_kind_ext::*;
+
+        let mut children = Vec::new();
+
+        // Match on node kind and retrieve data from appropriate pool
+        match node.kind {
+            // Names
+            QUALIFIED_NAME => {
+                if let Some(data) = self.get_qualified_name(node) {
+                    children.push(data.left);
+                    children.push(data.right);
+                }
+            }
+            COMPUTED_PROPERTY_NAME => {
+                if let Some(data) = self.get_computed_property(node) {
+                    children.push(data.expression);
+                }
+            }
+
+            // Expressions
+            BINARY_EXPRESSION => {
+                if let Some(data) = self.get_binary_expr(node) {
+                    children.push(data.left);
+                    children.push(data.right);
+                }
+            }
+            PREFIX_UNARY_EXPRESSION | POSTFIX_UNARY_EXPRESSION => {
+                if let Some(data) = self.get_unary_expr(node) {
+                    children.push(data.operand);
+                }
+            }
+            CALL_EXPRESSION | NEW_EXPRESSION => {
+                if let Some(data) = self.get_call_expr(node) {
+                    children.push(data.expression);
+                    add_opt_list(&mut children, &data.type_arguments);
+                    add_opt_list(&mut children, &data.arguments);
+                }
+            }
+            TAGGED_TEMPLATE_EXPRESSION => {
+                if let Some(data) = self.get_tagged_template(node) {
+                    children.push(data.tag);
+                    add_opt_list(&mut children, &data.type_arguments);
+                    children.push(data.template);
+                }
+            }
+            TEMPLATE_EXPRESSION => {
+                if let Some(data) = self.get_template_expr(node) {
+                    children.push(data.head);
+                    add_list(&mut children, &data.template_spans);
+                }
+            }
+            TEMPLATE_SPAN => {
+                if let Some(data) = self.get_template_span(node) {
+                    children.push(data.expression);
+                    children.push(data.literal);
+                }
+            }
+            PROPERTY_ACCESS_EXPRESSION | ELEMENT_ACCESS_EXPRESSION => {
+                if let Some(data) = self.get_access_expr(node) {
+                    children.push(data.expression);
+                    children.push(data.name_or_argument);
+                }
+            }
+            CONDITIONAL_EXPRESSION => {
+                if let Some(data) = self.get_conditional_expr(node) {
+                    children.push(data.condition);
+                    children.push(data.when_true);
+                    children.push(data.when_false);
+                }
+            }
+            ARROW_FUNCTION | FUNCTION_EXPRESSION => {
+                if let Some(data) = self.get_function(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                    children.push(data.body);
+                }
+            }
+            ARRAY_LITERAL_EXPRESSION => {
+                if let Some(data) = self.get_literal_expr(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            OBJECT_LITERAL_EXPRESSION => {
+                if let Some(data) = self.get_literal_expr(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            PARENTHESIZED_EXPRESSION => {
+                if let Some(data) = self.get_parenthesized(node) {
+                    children.push(data.expression);
+                }
+            }
+            YIELD_EXPRESSION => {
+                if let Some(data) = self.get_unary_expr_ex(node) {
+                    add_opt(&mut children, data.expression);
+                }
+            }
+            AWAIT_EXPRESSION => {
+                if let Some(data) = self.get_unary_expr_ex(node) {
+                    children.push(data.expression);
+                }
+            }
+            SPREAD_ELEMENT => {
+                if let Some(data) = self.get_spread(node) {
+                    children.push(data.expression);
+                }
+            }
+            AS_EXPRESSION | SATISFIES_EXPRESSION => {
+                if let Some(data) = self.get_type_assertion(node) {
+                    children.push(data.expression);
+                    children.push(data.type_node);
+                }
+            }
+            TYPE_ASSERTION => {
+                if let Some(data) = self.get_type_assertion(node) {
+                    children.push(data.type_node);
+                    children.push(data.expression);
+                }
+            }
+            NON_NULL_EXPRESSION => {
+                if let Some(data) = self.get_unary_expr_ex(node) {
+                    children.push(data.expression);
+                }
+            }
+
+            // Statements
+            VARIABLE_STATEMENT => {
+                if let Some(data) = self.get_variable(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    // Variable statements contain their declarations directly
+                    add_list(&mut children, &data.declarations);
+                }
+            }
+            VARIABLE_DECLARATION_LIST => {
+                if let Some(data) = self.get_variable(node) {
+                    add_list(&mut children, &data.declarations);
+                }
+            }
+            VARIABLE_DECLARATION => {
+                if let Some(data) = self.get_variable_declaration(node) {
+                    children.push(data.name);
+                    add_opt(&mut children, data.type_annotation);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+            EXPRESSION_STATEMENT => {
+                if let Some(data) = self.get_expression_statement(node) {
+                    children.push(data.expression);
+                }
+            }
+            IF_STATEMENT => {
+                if let Some(data) = self.get_if_statement(node) {
+                    children.push(data.expression);
+                    children.push(data.then_statement);
+                    add_opt(&mut children, data.else_statement);
+                }
+            }
+            WHILE_STATEMENT | DO_STATEMENT | FOR_STATEMENT => {
+                if let Some(data) = self.get_loop(node) {
+                    add_opt(&mut children, data.initializer);
+                    add_opt(&mut children, data.condition);
+                    add_opt(&mut children, data.incrementor);
+                    children.push(data.statement);
+                }
+            }
+            FOR_IN_STATEMENT | FOR_OF_STATEMENT => {
+                if let Some(data) = self.get_for_in_of(node) {
+                    children.push(data.initializer);
+                    children.push(data.expression);
+                    children.push(data.statement);
+                }
+            }
+            SWITCH_STATEMENT => {
+                if let Some(data) = self.get_switch(node) {
+                    children.push(data.expression);
+                    children.push(data.case_block);
+                }
+            }
+            CASE_BLOCK => {
+                if let Some(data) = self.get_block(node) {
+                    add_list(&mut children, &data.statements);
+                }
+            }
+            CASE_CLAUSE | DEFAULT_CLAUSE => {
+                if let Some(data) = self.get_case_clause(node) {
+                    add_opt(&mut children, data.expression);
+                    add_list(&mut children, &data.statements);
+                }
+            }
+            RETURN_STATEMENT => {
+                if let Some(data) = self.get_return_statement(node) {
+                    add_opt(&mut children, data.expression);
+                }
+            }
+            THROW_STATEMENT => {
+                if let Some(data) = self.get_return_statement(node) {
+                    children.push(data.expression);
+                }
+            }
+            TRY_STATEMENT => {
+                if let Some(data) = self.get_try(node) {
+                    children.push(data.try_block);
+                    add_opt(&mut children, data.catch_clause);
+                    add_opt(&mut children, data.finally_block);
+                }
+            }
+            CATCH_CLAUSE => {
+                if let Some(data) = self.get_catch_clause(node) {
+                    add_opt(&mut children, data.variable_declaration);
+                    children.push(data.block);
+                }
+            }
+            LABELED_STATEMENT => {
+                if let Some(data) = self.get_labeled_statement(node) {
+                    children.push(data.label);
+                    children.push(data.statement);
+                }
+            }
+            BREAK_STATEMENT | CONTINUE_STATEMENT => {
+                if let Some(data) = self.get_jump_data(node) {
+                    add_opt(&mut children, data.label);
+                }
+            }
+            WITH_STATEMENT => {
+                if let Some(data) = self.get_with_statement(node) {
+                    children.push(data.expression);
+                    children.push(data.then_statement);
+                }
+            }
+            BLOCK | CLASS_STATIC_BLOCK_DECLARATION => {
+                if let Some(data) = self.get_block(node) {
+                    add_list(&mut children, &data.statements);
+                }
+            }
+
+            // Declarations
+            FUNCTION_DECLARATION => {
+                if let Some(data) = self.get_function(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                    children.push(data.body);
+                }
+            }
+            CLASS_DECLARATION | CLASS_EXPRESSION => {
+                if let Some(data) = self.get_class(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_opt_list(&mut children, &data.heritage_clauses);
+                    add_list(&mut children, &data.members);
+                }
+            }
+            INTERFACE_DECLARATION => {
+                if let Some(data) = self.get_interface(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_opt_list(&mut children, &data.heritage_clauses);
+                    add_list(&mut children, &data.members);
+                }
+            }
+            TYPE_ALIAS_DECLARATION => {
+                if let Some(data) = self.get_type_alias(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    children.push(data.type_node);
+                }
+            }
+            ENUM_DECLARATION => {
+                if let Some(data) = self.get_enum(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_list(&mut children, &data.members);
+                }
+            }
+            ENUM_MEMBER => {
+                if let Some(data) = self.get_enum_member(node) {
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+            MODULE_DECLARATION => {
+                if let Some(data) = self.get_module(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.body);
+                }
+            }
+            MODULE_BLOCK => {
+                if let Some(data) = self.get_module_block(node) {
+                    add_opt_list(&mut children, &data.statements);
+                }
+            }
+
+            // Import/Export
+            IMPORT_DECLARATION | IMPORT_EQUALS_DECLARATION => {
+                if let Some(data) = self.get_import_decl(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.import_clause);
+                    children.push(data.module_specifier);
+                    add_opt(&mut children, data.attributes);
+                }
+            }
+            IMPORT_CLAUSE => {
+                if let Some(data) = self.get_import_clause(node) {
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.named_bindings);
+                }
+            }
+            NAMESPACE_IMPORT | NAMESPACE_EXPORT => {
+                if let Some(data) = self.get_named_imports(node) {
+                    children.push(data.name);
+                }
+            }
+            NAMED_IMPORTS | NAMED_EXPORTS => {
+                if let Some(data) = self.get_named_imports(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            IMPORT_SPECIFIER | EXPORT_SPECIFIER => {
+                if let Some(data) = self.get_specifier(node) {
+                    add_opt(&mut children, data.property_name);
+                    children.push(data.name);
+                }
+            }
+            EXPORT_DECLARATION => {
+                if let Some(data) = self.get_export_decl(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.export_clause);
+                    add_opt(&mut children, data.module_specifier);
+                    add_opt(&mut children, data.attributes);
+                }
+            }
+            EXPORT_ASSIGNMENT => {
+                if let Some(data) = self.get_export_assignment(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    children.push(data.expression);
+                }
+            }
+
+            // Type nodes
+            TYPE_REFERENCE => {
+                if let Some(data) = self.get_type_ref(node) {
+                    children.push(data.type_name);
+                    add_opt_list(&mut children, &data.type_arguments);
+                }
+            }
+            FUNCTION_TYPE | CONSTRUCTOR_TYPE => {
+                if let Some(data) = self.get_function_type(node) {
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    children.push(data.type_annotation);
+                }
+            }
+            TYPE_QUERY => {
+                if let Some(data) = self.get_type_query(node) {
+                    children.push(data.expr_name);
+                    add_opt_list(&mut children, &data.type_arguments);
+                }
+            }
+            TYPE_LITERAL => {
+                if let Some(data) = self.get_type_literal(node) {
+                    add_list(&mut children, &data.members);
+                }
+            }
+            ARRAY_TYPE => {
+                if let Some(data) = self.get_array_type(node) {
+                    children.push(data.element_type);
+                }
+            }
+            TUPLE_TYPE => {
+                if let Some(data) = self.get_tuple_type(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            OPTIONAL_TYPE | REST_TYPE | PARENTHESIZED_TYPE => {
+                if let Some(data) = self.get_wrapped_type(node) {
+                    children.push(data.type_node);
+                }
+            }
+            UNION_TYPE | INTERSECTION_TYPE => {
+                if let Some(data) = self.get_composite_type(node) {
+                    add_list(&mut children, &data.types);
+                }
+            }
+            CONDITIONAL_TYPE => {
+                if let Some(data) = self.get_conditional_type(node) {
+                    children.push(data.check_type);
+                    children.push(data.extends_type);
+                    children.push(data.true_type);
+                    children.push(data.false_type);
+                }
+            }
+            INFER_TYPE => {
+                if let Some(data) = self.get_infer_type(node) {
+                    children.push(data.type_parameter);
+                }
+            }
+            TYPE_OPERATOR => {
+                if let Some(data) = self.get_type_operator(node) {
+                    children.push(data.type_node);
+                }
+            }
+            INDEXED_ACCESS_TYPE => {
+                if let Some(data) = self.get_indexed_access_type(node) {
+                    children.push(data.object_type);
+                    children.push(data.index_type);
+                }
+            }
+            MAPPED_TYPE => {
+                if let Some(data) = self.get_mapped_type(node) {
+                    add_opt(&mut children, data.type_parameter);
+                    add_opt(&mut children, data.name_type);
+                    add_opt(&mut children, data.type_node);
+                    add_opt_list(&mut children, &data.members);
+                }
+            }
+            LITERAL_TYPE => {
+                if let Some(data) = self.get_literal_type(node) {
+                    add_opt(&mut children, data.literal);
+                }
+            }
+            TEMPLATE_LITERAL_TYPE => {
+                if let Some(data) = self.get_template_literal_type(node) {
+                    children.push(data.head);
+                    add_list(&mut children, &data.template_spans);
+                }
+            }
+            NAMED_TUPLE_MEMBER => {
+                if let Some(data) = self.get_named_tuple_member(node) {
+                    children.push(data.name);
+                    children.push(data.type_node);
+                }
+            }
+            TYPE_PREDICATE => {
+                if let Some(data) = self.get_type_predicate(node) {
+                    children.push(data.parameter_name);
+                    add_opt(&mut children, data.type_node);
+                }
+            }
+
+            // Class members
+            PROPERTY_DECLARATION => {
+                if let Some(data) = self.get_property_decl(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.type_annotation);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+            METHOD_DECLARATION => {
+                if let Some(data) = self.get_method_decl(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                    children.push(data.body);
+                }
+            }
+            CONSTRUCTOR => {
+                if let Some(data) = self.get_constructor(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    children.push(data.body);
+                }
+            }
+            GET_ACCESSOR | SET_ACCESSOR => {
+                if let Some(data) = self.get_accessor(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                    children.push(data.body);
+                }
+            }
+            PARAMETER => {
+                if let Some(data) = self.get_parameter(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.type_annotation);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+            TYPE_PARAMETER => {
+                if let Some(data) = self.get_type_parameter(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    children.push(data.name);
+                    add_opt(&mut children, data.constraint);
+                    add_opt(&mut children, data.default);
+                }
+            }
+            DECORATOR => {
+                if let Some(data) = self.get_decorator(node) {
+                    children.push(data.expression);
+                }
+            }
+            HERITAGE_CLAUSE => {
+                if let Some(data) = self.get_heritage_clause(node) {
+                    add_list(&mut children, &data.types);
+                }
+            }
+            EXPRESSION_WITH_TYPE_ARGUMENTS => {
+                if let Some(data) = self.get_expr_type_args(node) {
+                    children.push(data.expression);
+                    add_opt_list(&mut children, &data.type_arguments);
+                }
+            }
+
+            // Binding patterns
+            OBJECT_BINDING_PATTERN | ARRAY_BINDING_PATTERN => {
+                if let Some(data) = self.get_binding_pattern(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            BINDING_ELEMENT => {
+                if let Some(data) = self.get_binding_element(node) {
+                    add_opt(&mut children, data.property_name);
+                    children.push(data.name);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+
+            // Object literal members
+            PROPERTY_ASSIGNMENT => {
+                if let Some(data) = self.get_property_assignment(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    children.push(data.initializer);
+                }
+            }
+            SHORTHAND_PROPERTY_ASSIGNMENT => {
+                if let Some(data) = self.get_shorthand_property(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    children.push(data.name);
+                    add_opt(&mut children, data.object_assignment_initializer);
+                }
+            }
+            SPREAD_ASSIGNMENT => {
+                if let Some(data) = self.get_spread(node) {
+                    children.push(data.expression);
+                }
+            }
+
+            // JSX nodes
+            JSX_ELEMENT => {
+                if let Some(data) = self.get_jsx_element(node) {
+                    children.push(data.opening_element);
+                    add_list(&mut children, &data.children);
+                    add_opt(&mut children, data.closing_element);
+                }
+            }
+            JSX_SELF_CLOSING_ELEMENT | JSX_OPENING_ELEMENT => {
+                if let Some(data) = self.get_jsx_opening(node) {
+                    children.push(data.tag_name);
+                    add_opt_list(&mut children, &data.type_arguments);
+                    add_opt(&mut children, data.attributes);
+                }
+            }
+            JSX_CLOSING_ELEMENT => {
+                if let Some(data) = self.get_jsx_closing(node) {
+                    children.push(data.tag_name);
+                }
+            }
+            JSX_FRAGMENT => {
+                if let Some(data) = self.get_jsx_fragment(node) {
+                    children.push(data.opening_fragment);
+                    add_list(&mut children, &data.children);
+                    children.push(data.closing_fragment);
+                }
+            }
+            JSX_OPENING_FRAGMENT | JSX_CLOSING_FRAGMENT => {
+                // No children
+            }
+            JSX_ATTRIBUTES => {
+                if let Some(data) = self.get_jsx_attributes(node) {
+                    add_list(&mut children, &data.properties);
+                }
+            }
+            JSX_ATTRIBUTE => {
+                if let Some(data) = self.get_jsx_attribute(node) {
+                    children.push(data.name);
+                    add_opt(&mut children, data.initializer);
+                }
+            }
+            JSX_SPREAD_ATTRIBUTE => {
+                if let Some(data) = self.get_jsx_spread_attribute(node) {
+                    children.push(data.expression);
+                }
+            }
+            JSX_EXPRESSION => {
+                if let Some(data) = self.get_jsx_expression(node) {
+                    add_opt(&mut children, data.expression);
+                }
+            }
+            JSX_TEXT => {
+                // No children
+            }
+            JSX_NAMESPACED_NAME => {
+                if let Some(data) = self.get_jsx_namespaced_name(node) {
+                    children.push(data.namespace);
+                    children.push(data.name);
+                }
+            }
+
+            // Signatures
+            CALL_SIGNATURE | CONSTRUCT_SIGNATURE => {
+                if let Some(data) = self.get_signature(node) {
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_opt_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                }
+            }
+            INDEX_SIGNATURE => {
+                if let Some(data) = self.get_index_signature(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                }
+            }
+            PROPERTY_SIGNATURE => {
+                if let Some(data) = self.get_signature(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt(&mut children, data.type_annotation);
+                    // Note: SignatureData doesn't have initializer, property signatures in thin nodes
+                    // use the same structure as method signatures
+                }
+            }
+            METHOD_SIGNATURE => {
+                if let Some(data) = self.get_signature(node) {
+                    add_opt_list(&mut children, &data.modifiers);
+                    add_opt(&mut children, data.name);
+                    add_opt_list(&mut children, &data.type_parameters);
+                    add_opt_list(&mut children, &data.parameters);
+                    add_opt(&mut children, data.type_annotation);
+                }
+            }
+
+            // Source file
+            SOURCE_FILE => {
+                if let Some(data) = self.get_source_file(node) {
+                    add_list(&mut children, &data.statements);
+                    children.push(data.end_of_file_token);
+                }
+            }
+
+            // Nodes with no children (tokens, identifiers, literals)
+            _ => {
+                // Tokens, identifiers, literals, etc. have no children
+            }
+        }
+
+        children
     }
 }
 
