@@ -10960,32 +10960,79 @@ impl<'a> ThinCheckerState<'a> {
         target: TypeId,
         env: Option<&crate::solver::TypeEnvironment>,
     ) -> Option<bool> {
+        use crate::solver::TypeKey;
+
+        // Check if source is an abstract constructor
         let source_is_abstract = self.is_abstract_constructor_type(source, env);
+
+        // Additional check: if source_is_abstract is false, check symbol_types directly
+        let source_is_abstract_from_symbols = if !source_is_abstract {
+            let mut found_abstract = false;
+            for (&sym_id, &cached_type) in self.ctx.symbol_types.iter() {
+                if cached_type == source {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if symbol.flags & symbol_flags::CLASS != 0
+                            && symbol.flags & symbol_flags::ABSTRACT != 0
+                        {
+                            found_abstract = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            found_abstract
+        } else {
+            false
+        };
+
+        let final_source_is_abstract = source_is_abstract || source_is_abstract_from_symbols;
+
+        if !final_source_is_abstract {
+            return None;
+        }
+
+        // Source is abstract - check if target is a non-abstract constructor type
         let target_is_abstract = self.is_abstract_constructor_type(target, env);
-        let target_is_concrete = self.is_concrete_constructor_target(target, env);
 
-        // Debug output for abstract constructor assignability
-        eprintln!("=== abstract_constructor_assignability_override ===");
-        eprintln!("source: {:?}, is_abstract: {}", source, source_is_abstract);
-        eprintln!("target: {:?}, is_abstract: {}, is_concrete: {}", target, target_is_abstract, target_is_concrete);
+        // Also check target via symbol_types
+        let target_is_abstract_from_symbols = {
+            let mut found_abstract = false;
+            for (&sym_id, &cached_type) in self.ctx.symbol_types.iter() {
+                if cached_type == target {
+                    if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                        if symbol.flags & symbol_flags::CLASS != 0
+                            && symbol.flags & symbol_flags::ABSTRACT != 0
+                        {
+                            found_abstract = true;
+                            break;
+                        }
+                    }
+                }
+            }
+            found_abstract
+        };
 
-        if !source_is_abstract {
-            eprintln!("=> Returning None (source is not abstract)");
+        let final_target_is_abstract = target_is_abstract || target_is_abstract_from_symbols;
+
+        // If target is also abstract, allow the assignment (abstract to abstract is OK)
+        if final_target_is_abstract {
             return None;
         }
-        if target_is_abstract {
-            eprintln!("=> Returning None (target is abstract)");
-            return None;
-        }
-        if target == TypeId::ANY || target == TypeId::UNKNOWN || target == TypeId::ERROR {
-            eprintln!("=> Returning None (target is special type)");
-            return None;
-        }
-        if target_is_concrete {
-            eprintln!("=> Returning Some(false) (abstract to concrete)");
+
+        // Check if target is a constructor type (has construct signatures)
+        let target_is_constructor = match self.ctx.types.lookup(target) {
+            Some(TypeKey::Callable(shape_id)) => {
+                let shape = self.ctx.types.callable_shape(shape_id);
+                !shape.construct_signatures.is_empty()
+            }
+            _ => false,
+        };
+
+        // If target is a constructor type but not abstract, reject the assignment
+        if target_is_constructor {
             return Some(false);
         }
-        eprintln!("=> Returning None (no match)");
+
         None
     }
 
@@ -11512,7 +11559,25 @@ impl<'a> ThinCheckerState<'a> {
             TypeKey::Callable(shape_id) => {
                 // For Callable types (constructor types), check if they're in the abstract set
                 // This handles `typeof AbstractClass` which returns a Callable type
-                self.ctx.abstract_constructor_types.contains(&type_id)
+                if self.ctx.abstract_constructor_types.contains(&type_id) {
+                    return true;
+                }
+                // Additional check: iterate through symbol_types to find matching class symbols
+                // This handles cases where the type wasn't added to abstract_constructor_types
+                // or the type is being compared before being cached
+                for (&sym_id, &cached_type) in self.ctx.symbol_types.iter() {
+                    if cached_type == type_id {
+                        // Found a symbol with this type, check if it's an abstract class
+                        if let Some(symbol) = self.ctx.binder.get_symbol(sym_id) {
+                            if symbol.flags & symbol_flags::CLASS != 0
+                                && symbol.flags & symbol_flags::ABSTRACT != 0
+                            {
+                                return true;
+                            }
+                        }
+                    }
+                }
+                false
             }
             TypeKey::Application(app_id) => {
                 // For generic type applications, check the base type
