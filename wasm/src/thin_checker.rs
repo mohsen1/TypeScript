@@ -2138,7 +2138,17 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     }
 
-                    let mut props = common_props.take().unwrap();
+                    let mut props = match common_props.take() {
+                        Some(p) => p,
+                        None => {
+                            // This shouldn't happen due to the continue statement above
+                            // but handle gracefully to avoid panic
+                            common_props = Some(member_props);
+                            common_string_index = member_string_index;
+                            common_number_index = member_number_index;
+                            continue;
+                        }
+                    };
                     props.retain(|name, prop| {
                         let Some(member_prop) = member_props.get(name) else {
                             return false;
@@ -5549,9 +5559,20 @@ impl<'a> ThinCheckerState<'a> {
             .unwrap_or_else(|| "<unknown>".to_string());
 
         // Get the location for error reporting
-        let node = self.ctx.arena.get(idx).unwrap();
-        let start = node.pos;
-        let length = node.end - node.pos;
+        let (start, length) = match self.ctx.arena.get(idx) {
+            Some(node) => (node.pos, node.end - node.pos),
+            None => {
+                // Missing node - use default position and emit minimal diagnostic
+                self.ctx.diagnostics.push(Diagnostic::error(
+                    "".to_string(),
+                    0,
+                    0,
+                    format!("Variable '{}' is used before being assigned", name),
+                    2454, // TS2454
+                ));
+                return;
+            }
+        };
 
         self.ctx.diagnostics.push(Diagnostic::error(
             "file".to_string(), // TODO: Get actual file name
@@ -22305,17 +22326,19 @@ impl<'a> ThinCheckerState<'a> {
 
         // If symbol doesn't exist, we can still check if we have type arguments to extract
         // This handles cases like `MyPromise<void>` where MyPromise is imported from a missing module
-        if symbol.is_none() {
-            // For unresolved Promise-like types, assume the inner type is the first type argument
-            // This allows async functions with unresolved Promise return types to be handled gracefully
-            if let Some(&first_arg) = args.first() {
-                return Some(first_arg);
+        let symbol = match symbol {
+            Some(s) => s,
+            None => {
+                // For unresolved Promise-like types, assume the inner type is the first type argument
+                // This allows async functions with unresolved Promise return types to be handled gracefully
+                if let Some(&first_arg) = args.first() {
+                    return Some(first_arg);
+                }
+                // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+                return Some(TypeId::UNKNOWN);
             }
-            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
-            return Some(TypeId::UNKNOWN);
-        }
+        };
 
-        let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
