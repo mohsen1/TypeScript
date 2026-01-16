@@ -291,3 +291,47 @@ Implement strict null checks in the WASM type checker to match TypeScript's `str
 - [ ] Ready for merge to rust branch
 
 ---
+
+## Investigation Complete (2026-01-15)
+
+**Result:** ✅ Strict Null Checks ALREADY IMPLEMENTED
+
+### Summary
+
+All 5 tasks validated as COMPLETE:
+- ✅ Task 1: Null/undefined types defined (TypeId::NULL, TypeId::UNDEFINED)
+- ✅ Task 2: Nullable type tracking implemented (union types work)
+- ✅ Task 3: Strict null checking rules implemented (strict_null_checks flag)
+- ✅ Task 4: Test cases exist and pass (10/10 tests passing)
+- ✅ Task 5: Conformance tests validated
+
+### Test Results
+
+All 10 strict null checks tests PASS:
+```
+test thin_checker_tests::test_strict_null_checks_non_nullable_success ... ok
+test thin_checker_tests::test_strict_null_checks_null_only ... ok
+test thin_checker_tests::test_strict_null_checks_both_null_and_undefined ... ok
+test thin_checker_tests::test_strict_null_checks_property_access ... ok
+test thin_checker_tests::test_strict_null_checks_undefined_type ... ok
+test solver::compat_tests::test_strict_null_checks_toggle ... ok
+test solver::compat::tests::test_strict_null_checks_toggle ... ok
+test thin_checker_tests::test_strict_null_checks_rejects_null ... ok
+test thin_checker_tests::test_strict_null_checks_rejects_undefined ... ok
+test thin_checker_tests::test_strict_null_checks_on ... ok
+```
+
+### Reference Implementation
+
+**Commit:** `75eca5072` - "feat: add support for strict null checks in type checker"
+
+**Key Files:**
+- wasm/src/solver/subtype.rs - strict_null_checks flag and logic
+- wasm/src/solver/compat.rs - assignability checking with null/undefined
+- wasm/src/solver/operations.rs - property access on nullable types
+- wasm/src/checker/context.rs - configuration flag in CheckerContext
+
+### Conclusion
+
+**NO IMPLEMENTATION WORK REQUIRED** - Feature complete and tested.
+
