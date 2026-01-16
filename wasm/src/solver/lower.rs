@@ -1856,7 +1856,7 @@ impl<'a> TypeLowering<'a> {
             return None;
         }
 
-        while digits.len() > 1 && *digits.last().unwrap() == 0 {
+        while digits.len() > 1 && matches!(digits.last(), Some(&0)) {
             digits.pop();
         }
 

@@ -1572,7 +1572,10 @@ impl<'a> InferenceContext<'a> {
         }
 
         if target_has_rest {
-            let rest_param = target_params.last().unwrap();
+            let rest_param = match target_params.last() {
+                Some(param) => param,
+                None => return false,
+            };
             let rest_elem = self.rest_element_type(rest_param.type_id);
 
             for i in target_fixed..source_fixed {
@@ -1583,7 +1586,10 @@ impl<'a> InferenceContext<'a> {
             }
 
             if source_has_rest {
-                let s_rest = source_params.last().unwrap();
+                let s_rest = match source_params.last() {
+                    Some(param) => param,
+                    None => return false,
+                };
                 let s_rest_elem = self.rest_element_type(s_rest.type_id);
                 if !self.are_parameters_compatible(s_rest_elem, rest_elem, bivariant) {
                     return false;
