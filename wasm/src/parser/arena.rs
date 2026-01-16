@@ -116,13 +116,31 @@ impl NodeAccess for NodeArena {
     }
 
     fn get_children(&self, index: NodeIndex) -> Vec<NodeIndex> {
-        let mut children = Vec::new();
-
-        let Some(node) = self.get(index) else {
-            return children;
+        let node = match self.get(index) {
+            Some(n) => n,
+            None => return Vec::new(),
         };
 
-        use super::ast::Node;
+        // Helper to add optional NodeIndex (ignoring NONE)
+        let add_opt = |children: &mut Vec<NodeIndex>, idx: NodeIndex| {
+            if idx.is_some() {
+                children.push(idx);
+            }
+        };
+
+        // Helper to add NodeList (expanding to individual nodes)
+        let add_list = |children: &mut Vec<NodeIndex>, list: &super::ast::NodeList| {
+            children.extend(list.nodes.iter().copied());
+        };
+
+        // Helper to add optional NodeList
+        let add_opt_list = |children: &mut Vec<NodeIndex>, list: &Option<super::ast::NodeList>| {
+            if let Some(l) = list {
+                children.extend(l.nodes.iter().copied());
+            }
+        };
+
+        let mut children = Vec::new();
 
         match node {
             // Names
@@ -139,728 +157,536 @@ impl NodeAccess for NodeArena {
                 children.push(bin.left);
                 children.push(bin.right);
             }
-            Node::PrefixUnaryExpression(expr) => {
-                children.push(expr.operand);
+            Node::PrefixUnaryExpression(unary) => {
+                children.push(unary.operand);
             }
-            Node::PostfixUnaryExpression(expr) => {
-                children.push(expr.operand);
+            Node::PostfixUnaryExpression(unary) => {
+                children.push(unary.operand);
             }
-            Node::CallExpression(expr) => {
-                children.push(expr.expression);
-                if let Some(type_args) = expr.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-                children.extend(expr.arguments.nodes.iter().copied());
+            Node::CallExpression(call) => {
+                children.push(call.expression);
+                add_opt_list(&mut children, &call.type_arguments);
+                add_list(&mut children, &call.arguments);
             }
-            Node::NewExpression(expr) => {
-                children.push(expr.expression);
-                if let Some(type_args) = expr.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-                if let Some(args) = expr.arguments.as_ref() {
-                    children.extend(args.nodes.iter().copied());
-                }
+            Node::NewExpression(new_expr) => {
+                children.push(new_expr.expression);
+                add_opt_list(&mut children, &new_expr.type_arguments);
+                add_opt_list(&mut children, &new_expr.arguments);
             }
-            Node::TaggedTemplateExpression(expr) => {
-                children.push(expr.tag);
-                if let Some(type_args) = expr.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-                children.push(expr.template);
+            Node::TaggedTemplateExpression(tagged) => {
+                children.push(tagged.tag);
+                add_opt_list(&mut children, &tagged.type_arguments);
+                children.push(tagged.template);
             }
-            Node::TemplateExpression(expr) => {
-                children.push(expr.head);
-                children.extend(expr.template_spans.nodes.iter().copied());
+            Node::TemplateExpression(template) => {
+                children.push(template.head);
+                add_list(&mut children, &template.template_spans);
             }
-            Node::PropertyAccessExpression(expr) => {
-                children.push(expr.expression);
-                children.push(expr.name);
+            Node::PropertyAccessExpression(prop) => {
+                children.push(prop.expression);
+                children.push(prop.name);
             }
-            Node::ElementAccessExpression(expr) => {
-                children.push(expr.expression);
-                children.push(expr.argument_expression);
+            Node::ElementAccessExpression(elem) => {
+                children.push(elem.expression);
+                children.push(elem.argument_expression);
             }
-            Node::ConditionalExpression(expr) => {
-                children.push(expr.condition);
-                children.push(expr.when_true);
-                children.push(expr.when_false);
+            Node::ConditionalExpression(cond) => {
+                children.push(cond.condition);
+                children.push(cond.when_true);
+                children.push(cond.when_false);
             }
-            Node::ArrowFunction(func) => {
-                if let Some(modifiers) = func.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if let Some(type_params) = func.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(func.parameters.nodes.iter().copied());
-                if !func.type_annotation.is_none() {
-                    children.push(func.type_annotation);
-                }
-                children.push(func.body);
+            Node::ArrowFunction(arrow) => {
+                add_opt_list(&mut children, &arrow.modifiers);
+                add_opt_list(&mut children, &arrow.type_parameters);
+                add_list(&mut children, &arrow.parameters);
+                add_opt(&mut children, arrow.type_annotation);
+                children.push(arrow.body);
             }
             Node::FunctionExpression(func) => {
-                if let Some(modifiers) = func.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if !func.name.is_none() {
-                    children.push(func.name);
-                }
-                if let Some(type_params) = func.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(func.parameters.nodes.iter().copied());
-                if !func.type_annotation.is_none() {
-                    children.push(func.type_annotation);
-                }
+                add_opt_list(&mut children, &func.modifiers);
+                add_opt(&mut children, func.name);
+                add_opt_list(&mut children, &func.type_parameters);
+                add_list(&mut children, &func.parameters);
+                add_opt(&mut children, func.type_annotation);
                 children.push(func.body);
             }
-            Node::ObjectLiteralExpression(expr) => {
-                children.extend(expr.properties.nodes.iter().copied());
+            Node::ObjectLiteralExpression(obj) => {
+                add_list(&mut children, &obj.properties);
             }
-            Node::ArrayLiteralExpression(expr) => {
-                children.extend(expr.elements.nodes.iter().copied());
+            Node::ArrayLiteralExpression(arr) => {
+                add_list(&mut children, &arr.elements);
             }
-            Node::ParenthesizedExpression(expr) => {
-                children.push(expr.expression);
+            Node::ParenthesizedExpression(paren) => {
+                children.push(paren.expression);
             }
-            Node::YieldExpression(expr) => {
-                if !expr.expression.is_none() {
-                    children.push(expr.expression);
-                }
+            Node::YieldExpression(yield_expr) => {
+                add_opt(&mut children, yield_expr.expression);
             }
-            Node::AwaitExpression(expr) => {
-                children.push(expr.expression);
+            Node::AwaitExpression(await_expr) => {
+                children.push(await_expr.expression);
             }
-            Node::SpreadElement(expr) => {
-                children.push(expr.expression);
+            Node::SpreadElement(spread) => {
+                children.push(spread.expression);
             }
-            Node::AsExpression(expr) => {
-                children.push(expr.expression);
-                children.push(expr.type_node);
+            Node::AsExpression(as_expr) => {
+                children.push(as_expr.expression);
+                children.push(as_expr.type_node);
             }
-            Node::SatisfiesExpression(expr) => {
-                children.push(expr.expression);
-                children.push(expr.type_node);
+            Node::SatisfiesExpression(sat) => {
+                children.push(sat.expression);
+                children.push(sat.type_node);
             }
-            Node::NonNullExpression(expr) => {
-                children.push(expr.expression);
+            Node::NonNullExpression(non_null) => {
+                children.push(non_null.expression);
             }
-            Node::TypeAssertion(expr) => {
-                children.push(expr.type_node);
-                children.push(expr.expression);
+            Node::TypeAssertion(assertion) => {
+                children.push(assertion.type_node);
+                children.push(assertion.expression);
             }
 
             // Statements
-            Node::VariableStatement(stmt) => {
-                if let Some(modifiers) = stmt.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(stmt.declaration_list);
+            Node::VariableStatement(var_stmt) => {
+                add_opt_list(&mut children, &var_stmt.modifiers);
+                children.push(var_stmt.declaration_list);
             }
             Node::VariableDeclarationList(list) => {
-                children.extend(list.declarations.nodes.iter().copied());
+                add_list(&mut children, &list.declarations);
             }
             Node::VariableDeclaration(decl) => {
                 children.push(decl.name);
-                if !decl.type_annotation.is_none() {
-                    children.push(decl.type_annotation);
-                }
-                if !decl.initializer.is_none() {
-                    children.push(decl.initializer);
-                }
+                add_opt(&mut children, decl.type_annotation);
+                add_opt(&mut children, decl.initializer);
             }
-            Node::ExpressionStatement(stmt) => {
-                children.push(stmt.expression);
+            Node::ExpressionStatement(expr_stmt) => {
+                children.push(expr_stmt.expression);
             }
-            Node::IfStatement(stmt) => {
-                children.push(stmt.expression);
-                children.push(stmt.then_statement);
-                if !stmt.else_statement.is_none() {
-                    children.push(stmt.else_statement);
-                }
+            Node::IfStatement(if_stmt) => {
+                children.push(if_stmt.expression);
+                children.push(if_stmt.then_statement);
+                add_opt(&mut children, if_stmt.else_statement);
             }
-            Node::WhileStatement(stmt) => {
-                children.push(stmt.expression);
-                children.push(stmt.statement);
+            Node::WhileStatement(while_stmt) => {
+                children.push(while_stmt.expression);
+                children.push(while_stmt.statement);
             }
-            Node::DoStatement(stmt) => {
-                children.push(stmt.statement);
-                children.push(stmt.expression);
+            Node::DoStatement(do_stmt) => {
+                children.push(do_stmt.statement);
+                children.push(do_stmt.expression);
             }
-            Node::ForStatement(stmt) => {
-                if !stmt.initializer.is_none() {
-                    children.push(stmt.initializer);
-                }
-                if !stmt.condition.is_none() {
-                    children.push(stmt.condition);
-                }
-                if !stmt.incrementor.is_none() {
-                    children.push(stmt.incrementor);
-                }
-                children.push(stmt.statement);
+            Node::ForStatement(for_stmt) => {
+                add_opt(&mut children, for_stmt.initializer);
+                add_opt(&mut children, for_stmt.condition);
+                add_opt(&mut children, for_stmt.incrementor);
+                children.push(for_stmt.statement);
             }
-            Node::ForInStatement(stmt) => {
-                children.push(stmt.initializer);
-                children.push(stmt.expression);
-                children.push(stmt.statement);
+            Node::ForInStatement(for_in) => {
+                children.push(for_in.initializer);
+                children.push(for_in.expression);
+                children.push(for_in.statement);
             }
-            Node::ForOfStatement(stmt) => {
-                children.push(stmt.initializer);
-                children.push(stmt.expression);
-                children.push(stmt.statement);
+            Node::ForOfStatement(for_of) => {
+                children.push(for_of.initializer);
+                children.push(for_of.expression);
+                children.push(for_of.statement);
             }
-            Node::SwitchStatement(stmt) => {
-                children.push(stmt.expression);
-                children.push(stmt.case_block);
+            Node::SwitchStatement(switch) => {
+                children.push(switch.expression);
+                children.push(switch.case_block);
             }
-            Node::CaseBlock(block) => {
-                children.extend(block.clauses.nodes.iter().copied());
+            Node::CaseBlock(case_block) => {
+                add_list(&mut children, &case_block.clauses);
             }
-            Node::CaseClause(clause) => {
-                children.push(clause.expression);
-                children.extend(clause.statements.nodes.iter().copied());
+            Node::CaseClause(case_clause) => {
+                add_opt(&mut children, case_clause.expression);
+                add_list(&mut children, &case_clause.statements);
             }
-            Node::DefaultClause(clause) => {
-                children.extend(clause.statements.nodes.iter().copied());
+            Node::DefaultClause(default) => {
+                add_list(&mut children, &default.statements);
             }
-            Node::ReturnStatement(stmt) => {
-                if !stmt.expression.is_none() {
-                    children.push(stmt.expression);
-                }
+            Node::ReturnStatement(ret) => {
+                add_opt(&mut children, ret.expression);
             }
-            Node::ThrowStatement(stmt) => {
-                children.push(stmt.expression);
+            Node::ThrowStatement(throw) => {
+                children.push(throw.expression);
             }
-            Node::TryStatement(stmt) => {
-                children.push(stmt.try_block);
-                if !stmt.catch_clause.is_none() {
-                    children.push(stmt.catch_clause);
-                }
-                if !stmt.finally_block.is_none() {
-                    children.push(stmt.finally_block);
-                }
+            Node::TryStatement(try_stmt) => {
+                children.push(try_stmt.try_block);
+                add_opt(&mut children, try_stmt.catch_clause);
+                add_opt(&mut children, try_stmt.finally_block);
             }
-            Node::CatchClause(clause) => {
-                if !clause.variable_declaration.is_none() {
-                    children.push(clause.variable_declaration);
-                }
-                children.push(clause.block);
+            Node::CatchClause(catch) => {
+                add_opt(&mut children, catch.variable_declaration);
+                children.push(catch.block);
             }
-            Node::LabeledStatement(stmt) => {
-                children.push(stmt.label);
-                children.push(stmt.statement);
+            Node::LabeledStatement(labeled) => {
+                children.push(labeled.label);
+                children.push(labeled.statement);
             }
-            Node::BreakStatement(stmt) => {
-                if !stmt.label.is_none() {
-                    children.push(stmt.label);
-                }
+            Node::BreakStatement(brk) => {
+                add_opt(&mut children, brk.label);
             }
-            Node::ContinueStatement(stmt) => {
-                if !stmt.label.is_none() {
-                    children.push(stmt.label);
-                }
+            Node::ContinueStatement(cont) => {
+                add_opt(&mut children, cont.label);
             }
-            Node::WithStatement(stmt) => {
-                children.push(stmt.expression);
-                children.push(stmt.statement);
+            Node::WithStatement(with_stmt) => {
+                children.push(with_stmt.expression);
+                children.push(with_stmt.statement);
             }
             Node::Block(block) => {
-                children.extend(block.statements.nodes.iter().copied());
+                add_list(&mut children, &block.statements);
             }
 
             // Declarations
-            Node::FunctionDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if !decl.name.is_none() {
-                    children.push(decl.name);
-                }
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                if !decl.type_annotation.is_none() {
-                    children.push(decl.type_annotation);
-                }
-                if !decl.body.is_none() {
-                    children.push(decl.body);
-                }
+            Node::FunctionDeclaration(func) => {
+                add_opt_list(&mut children, &func.modifiers);
+                add_opt(&mut children, func.name);
+                add_opt_list(&mut children, &func.type_parameters);
+                add_list(&mut children, &func.parameters);
+                add_opt(&mut children, func.type_annotation);
+                children.push(func.body);
             }
-            Node::ClassDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if !decl.name.is_none() {
-                    children.push(decl.name);
-                }
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                if let Some(heritage) = decl.heritage_clauses.as_ref() {
-                    children.extend(heritage.nodes.iter().copied());
-                }
-                children.extend(decl.members.nodes.iter().copied());
+            Node::ClassDeclaration(class_decl) => {
+                add_opt_list(&mut children, &class_decl.modifiers);
+                add_opt(&mut children, class_decl.name);
+                add_opt_list(&mut children, &class_decl.type_parameters);
+                add_opt_list(&mut children, &class_decl.heritage_clauses);
+                add_list(&mut children, &class_decl.members);
             }
-            Node::InterfaceDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                if let Some(heritage) = decl.heritage_clauses.as_ref() {
-                    children.extend(heritage.nodes.iter().copied());
-                }
-                children.extend(decl.members.nodes.iter().copied());
+            Node::InterfaceDeclaration(iface) => {
+                add_opt_list(&mut children, &iface.modifiers);
+                add_opt(&mut children, iface.name);
+                add_opt_list(&mut children, &iface.type_parameters);
+                add_opt_list(&mut children, &iface.heritage_clauses);
+                add_list(&mut children, &iface.members);
             }
-            Node::PropertySignature(sig) => {
-                if let Some(modifiers) = sig.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(sig.name);
-                if !sig.type_annotation.is_none() {
-                    children.push(sig.type_annotation);
-                }
-                if !sig.initializer.is_none() {
-                    children.push(sig.initializer);
-                }
+            Node::PropertySignature(prop) => {
+                add_opt_list(&mut children, &prop.modifiers);
+                add_opt(&mut children, prop.name);
+                add_opt(&mut children, prop.type_annotation);
+                add_opt(&mut children, prop.initializer);
             }
-            Node::MethodSignature(sig) => {
-                if let Some(modifiers) = sig.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(sig.name);
-                if let Some(type_params) = sig.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(sig.parameters.nodes.iter().copied());
-                if !sig.type_annotation.is_none() {
-                    children.push(sig.type_annotation);
-                }
+            Node::MethodSignature(method) => {
+                add_opt_list(&mut children, &method.modifiers);
+                add_opt(&mut children, method.name);
+                add_opt_list(&mut children, &method.type_parameters);
+                add_list(&mut children, &method.parameters);
+                add_opt(&mut children, method.type_annotation);
             }
-            Node::IndexSignatureDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                children.push(decl.type_annotation);
+            Node::IndexSignatureDeclaration(idx) => {
+                add_opt_list(&mut children, &idx.modifiers);
+                add_list(&mut children, &idx.parameters);
+                add_opt(&mut children, idx.type_annotation);
             }
-            Node::CallSignature(sig) => {
-                if let Some(type_params) = sig.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(sig.parameters.nodes.iter().copied());
-                if !sig.type_annotation.is_none() {
-                    children.push(sig.type_annotation);
-                }
+            Node::CallSignature(call) => {
+                add_opt_list(&mut children, &call.type_parameters);
+                add_list(&mut children, &call.parameters);
+                add_opt(&mut children, call.type_annotation);
             }
-            Node::ConstructSignature(sig) => {
-                if let Some(type_params) = sig.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(sig.parameters.nodes.iter().copied());
-                if !sig.type_annotation.is_none() {
-                    children.push(sig.type_annotation);
-                }
+            Node::ConstructSignature(construct) => {
+                add_opt_list(&mut children, &construct.type_parameters);
+                add_list(&mut children, &construct.parameters);
+                add_opt(&mut children, construct.type_annotation);
             }
-            Node::TypeAliasDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.push(decl.type_node);
+            Node::TypeAliasDeclaration(alias) => {
+                add_opt_list(&mut children, &alias.modifiers);
+                add_opt(&mut children, alias.name);
+                add_opt_list(&mut children, &alias.type_parameters);
+                children.push(alias.type_node);
             }
-            Node::EnumDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                children.extend(decl.members.nodes.iter().copied());
+            Node::EnumDeclaration(enum_decl) => {
+                add_opt_list(&mut children, &enum_decl.modifiers);
+                add_opt(&mut children, enum_decl.name);
+                add_list(&mut children, &enum_decl.members);
             }
             Node::EnumMember(member) => {
-                children.push(member.name);
-                if !member.initializer.is_none() {
-                    children.push(member.initializer);
-                }
+                add_opt(&mut children, member.name);
+                add_opt(&mut children, member.initializer);
             }
-            Node::ModuleDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                children.push(decl.body);
+            Node::ModuleDeclaration(module) => {
+                add_opt_list(&mut children, &module.modifiers);
+                add_opt(&mut children, module.name);
+                add_opt(&mut children, module.body);
             }
             Node::ModuleBlock(block) => {
-                children.extend(block.statements.nodes.iter().copied());
+                add_list(&mut children, &block.statements);
             }
-            Node::PropertyDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if !decl.type_annotation.is_none() {
-                    children.push(decl.type_annotation);
-                }
-                if !decl.initializer.is_none() {
-                    children.push(decl.initializer);
-                }
-            }
-            Node::MethodDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                if !decl.type_annotation.is_none() {
-                    children.push(decl.type_annotation);
-                }
-                if !decl.body.is_none() {
-                    children.push(decl.body);
-                }
-            }
-            Node::ConstructorDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                children.push(decl.body);
-            }
-            Node::GetAccessorDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                if !decl.type_annotation.is_none() {
-                    children.push(decl.type_annotation);
-                }
-                children.push(decl.body);
-            }
-            Node::SetAccessorDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(decl.name);
-                if let Some(type_params) = decl.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(decl.parameters.nodes.iter().copied());
-                children.push(decl.body);
-            }
-            Node::ParameterDeclaration(param) => {
-                if let Some(modifiers) = param.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(param.name);
-                if !param.type_annotation.is_none() {
-                    children.push(param.type_annotation);
-                }
-                if !param.initializer.is_none() {
-                    children.push(param.initializer);
-                }
-            }
-            Node::TypeParameterDeclaration(param) => {
-                if let Some(modifiers) = param.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(param.name);
-                if !param.constraint.is_none() {
-                    children.push(param.constraint);
-                }
-                if !param.default.is_none() {
-                    children.push(param.default);
-                }
-            }
-            Node::Decorator(decorator) => {
-                children.push(decorator.expression);
-            }
-            Node::HeritageClause(clause) => {
-                children.extend(clause.types.nodes.iter().copied());
-            }
-            Node::ExpressionWithTypeArguments(expr) => {
-                children.push(expr.expression);
-                if let Some(type_args) = expr.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-            }
-            Node::ImportDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if !decl.import_clause.is_none() {
-                    children.push(decl.import_clause);
-                }
-                children.push(decl.module_specifier);
-                if !decl.attributes.is_none() {
-                    children.push(decl.attributes);
-                }
+
+            // Import/Export
+            Node::ImportDeclaration(imp) => {
+                add_opt_list(&mut children, &imp.modifiers);
+                add_opt(&mut children, imp.import_clause);
+                children.push(imp.module_specifier);
+                add_opt(&mut children, imp.attributes);
             }
             Node::ImportClause(clause) => {
-                if !clause.name.is_none() {
-                    children.push(clause.name);
-                }
-                if !clause.named_bindings.is_none() {
-                    children.push(clause.named_bindings);
-                }
+                add_opt(&mut children, clause.name);
+                add_opt(&mut children, clause.named_bindings);
             }
-            Node::NamespaceImport(import) => {
-                children.push(import.name);
+            Node::NamespaceImport(ns) => {
+                children.push(ns.name);
             }
-            Node::NamedImports(import) => {
-                children.extend(import.elements.nodes.iter().copied());
+            Node::NamedImports(named) => {
+                add_list(&mut children, &named.elements);
             }
             Node::ImportSpecifier(spec) => {
-                if !spec.property_name.is_none() {
-                    children.push(spec.property_name);
-                }
+                add_opt(&mut children, spec.property_name);
                 children.push(spec.name);
             }
-            Node::ExportDeclaration(decl) => {
-                if let Some(modifiers) = decl.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if !decl.export_clause.is_none() {
-                    children.push(decl.export_clause);
-                }
-                if !decl.module_specifier.is_none() {
-                    children.push(decl.module_specifier);
-                }
-                if !decl.attributes.is_none() {
-                    children.push(decl.attributes);
-                }
+            Node::ExportDeclaration(exp) => {
+                add_opt_list(&mut children, &exp.modifiers);
+                add_opt(&mut children, exp.export_clause);
+                add_opt(&mut children, exp.module_specifier);
+                add_opt(&mut children, exp.attributes);
             }
-            Node::NamedExports(exports) => {
-                children.extend(exports.elements.nodes.iter().copied());
+            Node::NamedExports(named) => {
+                add_list(&mut children, &named.elements);
             }
-            Node::NamespaceExport(exp) => {
-                children.push(exp.name);
+            Node::NamespaceExport(ns) => {
+                children.push(ns.name);
             }
             Node::ExportSpecifier(spec) => {
-                if !spec.property_name.is_none() {
-                    children.push(spec.property_name);
-                }
+                add_opt(&mut children, spec.property_name);
                 children.push(spec.name);
             }
-            Node::ExportAssignment(assignment) => {
-                if let Some(modifiers) = assignment.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(assignment.expression);
+            Node::ExportAssignment(assign) => {
+                add_opt_list(&mut children, &assign.modifiers);
+                children.push(assign.expression);
             }
             Node::ImportAttributes(attrs) => {
-                children.extend(attrs.elements.nodes.iter().copied());
+                add_list(&mut children, &attrs.elements);
             }
             Node::ImportAttribute(attr) => {
                 children.push(attr.name);
                 children.push(attr.value);
             }
 
-            // Binding patterns
-            Node::ObjectBindingPattern(pattern) => {
-                children.extend(pattern.elements.nodes.iter().copied());
-            }
-            Node::ArrayBindingPattern(pattern) => {
-                children.extend(pattern.elements.nodes.iter().copied());
-            }
-            Node::BindingElement(elem) => {
-                if !elem.property_name.is_none() {
-                    children.push(elem.property_name);
-                }
-                children.push(elem.name);
-                if !elem.initializer.is_none() {
-                    children.push(elem.initializer);
-                }
-            }
-
-            // Object literal members
-            Node::PropertyAssignment(assign) => {
-                if let Some(modifiers) = assign.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(assign.name);
-                children.push(assign.initializer);
-            }
-            Node::ShorthandPropertyAssignment(assign) => {
-                if let Some(modifiers) = assign.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                children.push(assign.name);
-                if !assign.object_assignment_initializer.is_none() {
-                    children.push(assign.object_assignment_initializer);
-                }
-            }
-            Node::SpreadAssignment(assign) => {
-                children.push(assign.expression);
-            }
-
-            // JSX nodes
-            Node::JsxElement(el) => {
-                children.push(el.opening_element);
-                children.extend(el.children.nodes.iter().copied());
-                children.push(el.closing_element);
-            }
-            Node::JsxSelfClosingElement(el) => {
-                children.push(el.tag_name);
-                if let Some(type_args) = el.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-                children.push(el.attributes);
-            }
-            Node::JsxOpeningElement(el) => {
-                children.push(el.tag_name);
-                if let Some(type_args) = el.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
-                children.push(el.attributes);
-            }
-            Node::JsxClosingElement(el) => {
-                children.push(el.tag_name);
-            }
-            Node::JsxFragment(frag) => {
-                children.push(frag.opening_fragment);
-                children.extend(frag.children.nodes.iter().copied());
-                children.push(frag.closing_fragment);
-            }
-            Node::JsxAttributes(attrs) => {
-                children.extend(attrs.properties.nodes.iter().copied());
-            }
-            Node::JsxAttribute(attr) => {
-                children.push(attr.name);
-                children.push(attr.initializer);
-            }
-            Node::JsxSpreadAttribute(attr) => {
-                children.push(attr.expression);
-            }
-            Node::JsxExpression(expr) => {
-                if !expr.expression.is_none() {
-                    children.push(expr.expression);
-                }
-            }
-            Node::JsxNamespacedName(name) => {
-                children.push(name.namespace);
-                children.push(name.name);
-            }
-
-            // Template spans
-            Node::TemplateSpan(span) => {
-                children.push(span.literal);
-                children.push(span.expression);
-            }
-
             // Type nodes
-            Node::TypeReference(ty) => {
-                children.push(ty.type_name);
-                if let Some(type_args) = ty.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
+            Node::TypeReference(type_ref) => {
+                children.push(type_ref.type_name);
+                add_opt_list(&mut children, &type_ref.type_arguments);
             }
-            Node::FunctionType(ty) => {
-                if let Some(type_params) = ty.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(ty.parameters.nodes.iter().copied());
-                children.push(ty.type_node);
+            Node::FunctionType(func_type) => {
+                add_opt_list(&mut children, &func_type.type_parameters);
+                add_list(&mut children, &func_type.parameters);
+                children.push(func_type.type_node);
             }
-            Node::ConstructorType(ty) => {
-                if let Some(modifiers) = ty.modifiers.as_ref() {
-                    children.extend(modifiers.nodes.iter().copied());
-                }
-                if let Some(type_params) = ty.type_parameters.as_ref() {
-                    children.extend(type_params.nodes.iter().copied());
-                }
-                children.extend(ty.parameters.nodes.iter().copied());
-                children.push(ty.type_node);
+            Node::ConstructorType(ctor_type) => {
+                add_opt_list(&mut children, &ctor_type.modifiers);
+                add_opt_list(&mut children, &ctor_type.type_parameters);
+                add_list(&mut children, &ctor_type.parameters);
+                children.push(ctor_type.type_node);
             }
-            Node::TypeQuery(ty) => {
-                children.push(ty.expr_name);
-                if let Some(type_args) = ty.type_arguments.as_ref() {
-                    children.extend(type_args.nodes.iter().copied());
-                }
+            Node::TypeQuery(type_query) => {
+                children.push(type_query.expr_name);
+                add_opt_list(&mut children, &type_query.type_arguments);
             }
-            Node::TypeLiteral(ty) => {
-                children.extend(ty.members.nodes.iter().copied());
+            Node::TypeLiteral(type_lit) => {
+                add_list(&mut children, &type_lit.members);
             }
-            Node::ArrayType(ty) => {
-                children.push(ty.element_type);
+            Node::ArrayType(arr_type) => {
+                children.push(arr_type.element_type);
             }
-            Node::TupleType(ty) => {
-                children.extend(ty.elements.nodes.iter().copied());
+            Node::TupleType(tuple) => {
+                add_list(&mut children, &tuple.elements);
             }
-            Node::OptionalType(ty) => {
-                children.push(ty.type_node);
+            Node::OptionalType(opt) => {
+                children.push(opt.type_node);
             }
-            Node::RestType(ty) => {
-                children.push(ty.type_node);
+            Node::RestType(rest) => {
+                children.push(rest.type_node);
             }
-            Node::UnionType(ty) => {
-                children.extend(ty.types.nodes.iter().copied());
+            Node::UnionType(union) => {
+                add_list(&mut children, &union.types);
             }
-            Node::IntersectionType(ty) => {
-                children.extend(ty.types.nodes.iter().copied());
+            Node::IntersectionType(intersection) => {
+                add_list(&mut children, &intersection.types);
             }
-            Node::ConditionalType(ty) => {
-                children.push(ty.check_type);
-                children.push(ty.extends_type);
-                children.push(ty.true_type);
-                children.push(ty.false_type);
+            Node::ConditionalType(cond) => {
+                children.push(cond.check_type);
+                children.push(cond.extends_type);
+                children.push(cond.true_type);
+                children.push(cond.false_type);
             }
-            Node::InferType(ty) => {
-                children.push(ty.type_parameter);
+            Node::InferType(infer) => {
+                children.push(infer.type_parameter);
             }
-            Node::ParenthesizedType(ty) => {
-                children.push(ty.type_node);
+            Node::ParenthesizedType(paren) => {
+                children.push(paren.type_node);
             }
-            Node::TypeOperator(ty) => {
-                children.push(ty.type_node);
+            Node::TypeOperator(op) => {
+                children.push(op.type_node);
             }
-            Node::IndexedAccessType(ty) => {
-                children.push(ty.object_type);
-                children.push(ty.index_type);
+            Node::IndexedAccessType(idx) => {
+                children.push(idx.object_type);
+                children.push(idx.index_type);
             }
-            Node::MappedType(ty) => {
-                children.push(ty.type_parameter);
-                children.push(ty.name_type);
-                if let Some(members) = ty.members.as_ref() {
-                    children.extend(members.nodes.iter().copied());
-                }
+            Node::MappedType(mapped) => {
+                add_opt(&mut children, mapped.type_parameter);
+                add_opt(&mut children, mapped.name_type);
+                add_opt(&mut children, mapped.type_node);
+                add_opt_list(&mut children, &mapped.members);
             }
-            Node::LiteralType(ty) => {
-                children.push(ty.literal);
+            Node::LiteralType(lit) => {
+                add_opt(&mut children, lit.literal);
             }
-            Node::TemplateLiteralType(ty) => {
-                children.push(ty.head);
-                children.extend(ty.template_spans.nodes.iter().copied());
+            Node::TemplateLiteralType(template) => {
+                children.push(template.head);
+                add_list(&mut children, &template.template_spans);
             }
-            Node::NamedTupleMember(member) => {
-                children.push(member.name);
-                children.push(member.type_node);
+            Node::NamedTupleMember(named) => {
+                children.push(named.name);
+                children.push(named.type_node);
             }
             Node::TypePredicate(pred) => {
                 children.push(pred.parameter_name);
-                children.push(pred.type_node);
+                add_opt(&mut children, pred.type_node);
+            }
+
+            // Class members
+            Node::PropertyDeclaration(prop) => {
+                add_opt_list(&mut children, &prop.modifiers);
+                add_opt(&mut children, prop.name);
+                add_opt(&mut children, prop.type_annotation);
+                add_opt(&mut children, prop.initializer);
+            }
+            Node::MethodDeclaration(method) => {
+                add_opt_list(&mut children, &method.modifiers);
+                add_opt(&mut children, method.name);
+                add_opt_list(&mut children, &method.type_parameters);
+                add_list(&mut children, &method.parameters);
+                add_opt(&mut children, method.type_annotation);
+                children.push(method.body);
+            }
+            Node::ConstructorDeclaration(ctor) => {
+                add_opt_list(&mut children, &ctor.modifiers);
+                add_opt_list(&mut children, &ctor.type_parameters);
+                add_list(&mut children, &ctor.parameters);
+                children.push(ctor.body);
+            }
+            Node::GetAccessorDeclaration(getter) => {
+                add_opt_list(&mut children, &getter.modifiers);
+                add_opt(&mut children, getter.name);
+                add_opt_list(&mut children, &getter.type_parameters);
+                add_list(&mut children, &getter.parameters);
+                add_opt(&mut children, getter.type_annotation);
+                children.push(getter.body);
+            }
+            Node::SetAccessorDeclaration(setter) => {
+                add_opt_list(&mut children, &setter.modifiers);
+                add_opt(&mut children, setter.name);
+                add_opt_list(&mut children, &setter.type_parameters);
+                add_list(&mut children, &setter.parameters);
+                children.push(setter.body);
+            }
+            Node::ParameterDeclaration(param) => {
+                add_opt_list(&mut children, &param.modifiers);
+                add_opt(&mut children, param.name);
+                add_opt(&mut children, param.type_annotation);
+                add_opt(&mut children, param.initializer);
+            }
+            Node::TypeParameterDeclaration(type_param) => {
+                add_opt_list(&mut children, &type_param.modifiers);
+                children.push(type_param.name);
+                add_opt(&mut children, type_param.constraint);
+                add_opt(&mut children, type_param.default);
+            }
+            Node::Decorator(decorator) => {
+                children.push(decorator.expression);
+            }
+            Node::HeritageClause(heritage) => {
+                add_list(&mut children, &heritage.types);
+            }
+            Node::ExpressionWithTypeArguments(expr) => {
+                children.push(expr.expression);
+                add_opt_list(&mut children, &expr.type_arguments);
+            }
+
+            // Binding patterns
+            Node::ObjectBindingPattern(pattern) => {
+                add_list(&mut children, &pattern.elements);
+            }
+            Node::ArrayBindingPattern(pattern) => {
+                add_list(&mut children, &pattern.elements);
+            }
+            Node::BindingElement(elem) => {
+                add_opt(&mut children, elem.property_name);
+                children.push(elem.name);
+                add_opt(&mut children, elem.initializer);
+            }
+
+            // Object literal members
+            Node::PropertyAssignment(prop) => {
+                add_opt_list(&mut children, &prop.modifiers);
+                add_opt(&mut children, prop.name);
+                children.push(prop.initializer);
+            }
+            Node::ShorthandPropertyAssignment(shorthand) => {
+                add_opt_list(&mut children, &shorthand.modifiers);
+                children.push(shorthand.name);
+                add_opt(&mut children, shorthand.object_assignment_initializer);
+            }
+            Node::SpreadAssignment(spread) => {
+                children.push(spread.expression);
+            }
+
+            // JSX nodes
+            Node::JsxElement(elem) => {
+                children.push(elem.opening_element);
+                add_list(&mut children, &elem.children);
+                add_opt(&mut children, elem.closing_element);
+            }
+            Node::JsxSelfClosingElement(elem) => {
+                children.push(elem.tag_name);
+                add_opt_list(&mut children, &elem.type_arguments);
+                add_opt(&mut children, elem.attributes);
+            }
+            Node::JsxOpeningElement(elem) => {
+                children.push(elem.tag_name);
+                add_opt_list(&mut children, &elem.type_arguments);
+                add_opt(&mut children, elem.attributes);
+            }
+            Node::JsxClosingElement(elem) => {
+                children.push(elem.tag_name);
+            }
+            Node::JsxFragment(frag) => {
+                children.push(frag.opening_fragment);
+                add_list(&mut children, &frag.children);
+                children.push(frag.closing_fragment);
+            }
+            Node::JsxOpeningFragment(_) => {}
+            Node::JsxClosingFragment(_) => {}
+            Node::JsxAttributes(attrs) => {
+                add_list(&mut children, &attrs.properties);
+            }
+            Node::JsxAttribute(attr) => {
+                children.push(attr.name);
+                add_opt(&mut children, attr.initializer);
+            }
+            Node::JsxSpreadAttribute(spread) => {
+                children.push(spread.expression);
+            }
+            Node::JsxExpression(expr) => {
+                add_opt(&mut children, expr.expression);
+            }
+            Node::JsxText(_) => {}
+            Node::JsxNamespacedName(ns) => {
+                children.push(ns.namespace);
+                children.push(ns.name);
+            }
+
+            // Misc
+            Node::TemplateSpan(span) => {
+                children.push(span.expression);
+                children.push(span.literal);
             }
 
             // Source file
-            Node::SourceFile(file) => {
-                children.extend(file.statements.nodes.iter().copied());
-                children.push(file.end_of_file_token);
+            Node::SourceFile(source_file) => {
+                add_list(&mut children, &source_file.statements);
+                children.push(source_file.end_of_file_token);
             }
 
-            // Leaf nodes (no children)
+            // Nodes with no children (tokens, identifiers, literals)
             Node::Token(_)
             | Node::Identifier(_)
             | Node::PrivateIdentifier(_)
@@ -872,14 +698,9 @@ impl NodeAccess for NodeArena {
             | Node::TemplateHead(_)
             | Node::TemplateMiddle(_)
             | Node::TemplateTail(_)
-            | Node::JsxText(_)
-            | Node::JsxOpeningFragment(_)
-            | Node::JsxClosingFragment(_)
+            | Node::EndOfFileToken(_)
             | Node::EmptyStatement(_)
-            | Node::DebuggerStatement(_)
-            | Node::EndOfFileToken(_) => {
-                // No children
-            }
+            | Node::DebuggerStatement(_) => {}
         }
 
         children

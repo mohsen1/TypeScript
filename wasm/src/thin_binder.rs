@@ -501,7 +501,7 @@ impl ThinBinderState {
         if let Some(file_reexports) = self.reexports.get(module_specifier) {
             // Check for named re-export: `export { foo } from 'bar'`
             if let Some((source_module, original_name)) = file_reexports.get(export_name) {
-                let name_to_lookup = original_name.as_ref().map(|s| s.as_str()).unwrap_or(export_name);
+                let name_to_lookup = original_name.as_deref().unwrap_or(export_name);
                 if debug_enabled {
                     eprintln!(
                         "[RESOLVE_IMPORT] '{}' from module '{}' -> following named re-export from '{}', original name='{}'",
@@ -3235,44 +3235,48 @@ impl ThinBinderState {
                         // Check if this is a re-export: export { foo } from 'module'
                         if !export.module_specifier.is_none() {
                             // Get the module name from module_specifier
-                            let module_name = arena.get(export.module_specifier)
-                                .and_then(|node| arena.get_literal(node))
-                                .map(|lit| lit.text.clone());
+                            let module_name = if export.module_specifier.is_some() {
+                                let idx = export.module_specifier;
+                                arena.get(idx).and_then(|node| arena.get_literal(node))
+                                    .map(|lit| lit.text.clone())
+                            } else {
+                                None
+                            };
 
                             if let Some(source_module) = module_name {
                                 let current_file = self.debugger.current_file.clone();
 
-                                // Collect all identifier names first (before mutable borrow)
-                                let mut reexport_info: Vec<(Option<String>, Option<String>)> = Vec::new();
+                                // Collect all the export mappings first (before mutable borrow)
+                                let mut export_mappings: Vec<(String, Option<String>)> = Vec::new();
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
                                             // Get the original name (property_name) and exported name (name)
-                                            let original_name = if !spec.property_name.is_none() {
-                                                self.get_identifier_name(arena, spec.property_name).map(|s| s.to_string())
+                                            let original_name = if spec.property_name.is_some() {
+                                                self.get_identifier_name(arena, spec.property_name)
                                             } else {
                                                 None
                                             };
-                                            let exported_name = if !spec.name.is_none() {
-                                                self.get_identifier_name(arena, spec.name).map(|s| s.to_string())
+                                            let exported_name = if spec.name.is_some() {
+                                                self.get_identifier_name(arena, spec.name)
                                             } else {
                                                 None
                                             };
-                                            reexport_info.push((original_name, exported_name));
+
+                                            if let Some(exported) = exported_name.or(original_name) {
+                                                export_mappings.push((
+                                                    exported.to_string(),
+                                                    original_name.map(|s| s.to_string()),
+                                                ));
+                                            }
                                         }
                                     }
                                 }
 
-                                // Now insert into reexports (with mutable borrow)
+                                // Now apply the mutable borrow to insert the mappings
                                 let file_reexports = self.reexports.entry(current_file).or_default();
-                                for (original_name, exported_name) in reexport_info {
-                                    if let Some(exported) = exported_name.as_ref().or(original_name.as_ref()) {
-                                        // Store: exported_name -> (source_module, original_name)
-                                        file_reexports.insert(
-                                            exported.to_string(),
-                                            (source_module.clone(), original_name.map(|s| s.to_string())),
-                                        );
-                                    }
+                                for (exported, original) in export_mappings {
+                                    file_reexports.insert(exported, (source_module.clone(), original));
                                 }
                             }
                         } else {
@@ -3342,9 +3346,13 @@ impl ThinBinderState {
             // Handle `export * from 'module'` (wildcard re-exports)
             // This is when export_clause is None but module_specifier is not None
             if export.export_clause.is_none() && !export.module_specifier.is_none() {
-                let module_name = arena.get(export.module_specifier)
-                    .and_then(|node| arena.get_literal(node))
-                    .map(|lit| lit.text.clone());
+                let module_name = if export.module_specifier.is_some() {
+                    let idx = export.module_specifier;
+                    arena.get(idx).and_then(|node| arena.get_literal(node))
+                        .map(|lit| lit.text.clone())
+                } else {
+                    None
+                };
 
                 if let Some(source_module) = module_name {
                     let current_file = self.debugger.current_file.clone();
