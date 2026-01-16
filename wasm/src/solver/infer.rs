@@ -907,21 +907,6 @@ impl<'a> InferenceContext<'a> {
             return unique[0];
         }
 
-        // Try to find a more specific common type
-        // For example, if we have [string, "hello"], the result should be string
-        // If we have ["hello", "world"], the result should be the union of both literals,
-        // which widens to string
-
-        // First, check if all types are literals of the same primitive type
-        let common_base = self.find_common_base_type(&unique);
-        if let Some(base) = common_base {
-            // All types share a common base type
-            // Check if using the base type would be more specific than a union
-            if self.all_types_are_narrower_than_base(&unique, base) {
-                return base;
-            }
-        }
-
         // Try to find the best single type that satisfies all candidates
         // Check if one type is a supertype of all others
         for &candidate in &unique {
@@ -931,6 +916,9 @@ impl<'a> InferenceContext<'a> {
         }
 
         // Create union of all types
+        // Note: For literals of the same type (e.g., "a" | "b"), we return the union
+        // rather than widening to the base type. This matches TypeScript's behavior
+        // where inference from multiple literals keeps the literal union.
         self.interner.union(unique)
     }
 
