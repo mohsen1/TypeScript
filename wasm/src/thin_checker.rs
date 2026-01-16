@@ -5549,7 +5549,17 @@ impl<'a> ThinCheckerState<'a> {
             .unwrap_or_else(|| "<unknown>".to_string());
 
         // Get the location for error reporting
-        let node = self.ctx.arena.get(idx).unwrap();
+        let Some(node) = self.ctx.arena.get(idx) else {
+            // If the node doesn't exist in the arena, emit error with position 0
+            self.ctx.diagnostics.push(Diagnostic::error(
+                "file".to_string(), // TODO: Get actual file name
+                0,
+                0,
+                format!("Variable '{}' is used before being assigned", name),
+                2454, // TS2454
+            ));
+            return;
+        };
         let start = node.pos;
         let length = node.end - node.pos;
 
