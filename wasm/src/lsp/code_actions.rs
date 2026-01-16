@@ -173,6 +173,9 @@ impl<'a> CodeActionProvider<'a> {
                 if let Some(action) = self.unused_import_quickfix(diag) {
                     actions.push(action);
                 }
+                if let Some(action) = self.unused_declaration_quickfix(diag) {
+                    actions.push(action);
+                }
                 if let Some(action) = self.missing_property_quickfix(diag) {
                     actions.push(action);
                 }
@@ -231,6 +234,168 @@ impl<'a> CodeActionProvider<'a> {
             edit: Some(WorkspaceEdit { changes }),
             is_preferred: true,
         })
+    }
+
+    fn unused_declaration_quickfix(&self, diag: &LspDiagnostic) -> Option<CodeAction> {
+        let code = diag.code?;
+        if code != crate::checker::types::diagnostics::diagnostic_codes::UNUSED_VARIABLE {
+            return None;
+        }
+
+        let start_offset = self
+            .line_map
+            .position_to_offset(diag.range.start, self.source)?;
+        let node_idx = find_node_at_offset(self.arena, start_offset);
+        if node_idx.is_none() {
+            return None;
+        }
+
+        // Find the parent declaration node
+        let decl_node = self.find_declaration_node(node_idx)?;
+        let (edit, name) = self.build_declaration_removal_edit(decl_node)?;
+
+        let mut changes = std::collections::HashMap::new();
+        changes.insert(self.file_name.clone(), vec![edit]);
+
+        let title = format!("Remove unused declaration '{}'", name);
+
+        Some(CodeAction {
+            title,
+            kind: CodeActionKind::QuickFix,
+            edit: Some(WorkspaceEdit { changes }),
+            is_preferred: true,
+        })
+    }
+
+    /// Find the declaration node containing the given node (identifier).
+    fn find_declaration_node(&self, node_idx: NodeIndex) -> Option<NodeIndex> {
+        let mut current = node_idx;
+        for _ in 0..10 {
+            // Traverse up to find the declaration
+            let Some(node) = self.arena.get(current) else {
+                break;
+            };
+
+            match node.kind {
+                syntax_kind_ext::VARIABLE_DECLARATION
+                | syntax_kind_ext::FUNCTION_DECLARATION
+                | syntax_kind_ext::CLASS_DECLARATION
+                | syntax_kind_ext::INTERFACE_DECLARATION
+                | syntax_kind_ext::TYPE_ALIAS_DECLARATION
+                | syntax_kind_ext::ENUM_DECLARATION => {
+                    return Some(current);
+                }
+                _ => {}
+            }
+
+            let Some(ext) = self.arena.get_extended(current) else {
+                break;
+            };
+            if ext.parent.is_none() {
+                break;
+            }
+            current = ext.parent;
+        }
+
+        None
+    }
+
+    /// Build a text edit to remove a declaration node.
+    fn build_declaration_removal_edit(&self, decl_idx: NodeIndex) -> Option<(TextEdit, String)> {
+        let decl_node = self.arena.get(decl_idx)?;
+        let (range, _trailing) = self.declaration_removal_range(decl_node);
+
+        // Get the declaration name for the title
+        let name = match decl_node.kind {
+            syntax_kind_ext::VARIABLE_DECLARATION => {
+                let var_decl = self.arena.get_variable_declaration(decl_node)?;
+                self.arena.get_identifier_text(var_decl.name)?.to_string()
+            }
+            syntax_kind_ext::FUNCTION_DECLARATION => {
+                let func = self.arena.get_function(decl_node)?;
+                self.arena.get_identifier_text(func.name)?.to_string()
+            }
+            syntax_kind_ext::CLASS_DECLARATION => {
+                let class = self.arena.get_class(decl_node)?;
+                self.arena.get_identifier_text(class.name)?.to_string()
+            }
+            syntax_kind_ext::INTERFACE_DECLARATION => {
+                let iface = self.arena.get_interface(decl_node)?;
+                self.arena.get_identifier_text(iface.name)?.to_string()
+            }
+            syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                let alias = self.arena.get_type_alias(decl_node)?;
+                self.arena.get_identifier_text(alias.name)?.to_string()
+            }
+            syntax_kind_ext::ENUM_DECLARATION => {
+                let enum_decl = self.arena.get_enum(decl_node)?;
+                self.arena.get_identifier_text(enum_decl.name)?.to_string()
+            }
+            _ => "declaration".to_string(),
+        };
+
+        let edit = TextEdit {
+            range,
+            new_text: String::new(),
+        };
+
+        Some((edit, name))
+    }
+
+    /// Get the range for removing a declaration, including handling for multi-line declarations.
+    fn declaration_removal_range(&self, node: &crate::parser::thin_node::ThinNode) -> (Range, String) {
+        let mut end = node.end;
+
+        // Include trailing whitespace and newlines
+        let mut trailing = String::new();
+        if let Some(rest) = self.source.get(end as usize..) {
+            // Capture all trailing whitespace
+            let mut offset = 0usize;
+            for &byte in rest.as_bytes() {
+                if byte.is_ascii_whitespace() {
+                    offset += 1;
+                    if byte == b'\n' {
+                        // Include the newline and stop
+                        end += offset as u32;
+                        trailing = "\n".to_string();
+                        break;
+                    }
+                    if byte == b'\r' {
+                        // Check for CRLF
+                        if rest.as_bytes().get(offset) == Some(&b'\n') {
+                            offset += 1;
+                        }
+                        end += offset as u32;
+                        trailing = if offset == 2 { "\r\n" } else { "\r" }.to_string();
+                        break;
+                    }
+                    continue;
+                }
+                // Found non-whitespace - include what we have and stop
+                end += offset as u32;
+                break;
+            }
+
+            // If we didn't find a newline, check if there's a semicolon
+            if trailing.is_empty() {
+                offset = 0;
+                for &byte in rest.as_bytes() {
+                    if byte == b';' {
+                        end += (offset + 1) as u32;
+                        break;
+                    }
+                    if !byte.is_ascii_whitespace() {
+                        break;
+                    }
+                    offset += 1;
+                }
+            }
+        }
+
+        let start_pos = self.line_map.offset_to_position(node.pos, self.source);
+        let end_pos = self.line_map.offset_to_position(end, self.source);
+
+        (Range::new(start_pos, end_pos), trailing)
     }
 
     fn missing_property_quickfix(&self, diag: &LspDiagnostic) -> Option<CodeAction> {

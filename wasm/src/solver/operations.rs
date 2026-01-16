@@ -141,7 +141,69 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                 let shape = self.interner.callable_shape(c_id);
                 self.resolve_callable_call(shape.as_ref(), arg_types)
             }
+            TypeKey::Union(list_id) => {
+                // Handle union types: if all members are callable with compatible signatures,
+                // the union is callable
+                self.resolve_union_call(func_type, list_id, arg_types)
+            }
             _ => CallResult::NotCallable { type_id: func_type },
+        }
+    }
+
+    /// Resolve a call on a union type.
+    ///
+    /// This handles cases like:
+    /// - `(() => void) | (() => string)` - all members callable
+    /// - `string | (() => void)` - mixed callable/non-callable (returns NotCallable)
+    ///
+    /// When all union members are callable with compatible signatures, this returns
+    /// a union of their return types.
+    fn resolve_union_call(
+        &mut self,
+        union_type: TypeId,
+        list_id: TypeListId,
+        arg_types: &[TypeId],
+    ) -> CallResult {
+        let members = self.interner.type_list(list_id);
+
+        // Check each member of the union
+        let mut return_types = Vec::new();
+        let mut failures = Vec::new();
+
+        for &member in members.iter() {
+            let result = self.resolve_call(member, arg_types);
+            match result {
+                CallResult::Success(return_type) => {
+                    return_types.push(return_type);
+                }
+                CallResult::NotCallable { .. } => {
+                    // At least one member is not callable
+                    // This means the union as a whole is not callable
+                    // (we can't call a union without knowing which branch is active)
+                    return CallResult::NotCallable { type_id: union_type };
+                }
+                other => {
+                    // Track failures for potential overload reporting
+                    failures.push(other);
+                }
+            }
+        }
+
+        // If all members succeeded, return a union of their return types
+        if !return_types.is_empty() && failures.is_empty() {
+            if return_types.len() == 1 {
+                return CallResult::Success(return_types[0]);
+            }
+            // Return a union of all return types
+            let union_result = self.interner.union(return_types);
+            CallResult::Success(union_result)
+        } else if !failures.is_empty() {
+            // At least one member failed with a non-NotCallable error
+            // Return the first failure (similar to how overloads are handled)
+            failures.into_iter().next().unwrap()
+        } else {
+            // Should not reach here, but handle gracefully
+            CallResult::NotCallable { type_id: union_type }
         }
     }
 
