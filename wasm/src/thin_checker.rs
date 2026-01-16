@@ -289,11 +289,16 @@ impl<'a> ThinCheckerState<'a> {
             }
         }
 
-        if !self.ctx.binder.scopes.is_empty() {
-            Some(ScopeId(0))
-        } else {
-            None
+        // Only fall back to ScopeId(0) if it's a valid module scope
+        // This prevents using an invalid fallback scope that could cause
+        // symbols to be incorrectly found or not found
+        if let Some(scope) = self.ctx.binder.scopes.get(0) {
+            // Only return ScopeId(0) if it's a module scope (the global/file scope)
+            if scope.kind == ContainerKind::Module {
+                return Some(ScopeId(0));
+            }
         }
+        None
     }
 
     fn resolve_identifier_symbol(&self, idx: NodeIndex) -> Option<SymbolId> {
@@ -481,18 +486,30 @@ impl<'a> ThinCheckerState<'a> {
                 if debug {
                     eprintln!("[BIND_RESOLVE]     -> Found '{}' in lib binder {} as {:?}", name, i, sym_id);
                 }
-                if let Some(symbol) = lib_binder.get_symbol(sym_id) {
+
+                // Try to get symbol data with cross-arena resolution
+                // This handles cases where lib symbols reference other arenas
+                let symbol_opt = lib_binder.get_symbol_with_libs(sym_id, &lib_binders);
+
+                if let Some(symbol) = symbol_opt {
                     let is_class_member = Self::is_class_member_symbol(symbol.flags);
                     if debug {
                         eprintln!("[BIND_RESOLVE]        Symbol flags: 0x{:x}, is_class_member: {}", symbol.flags, is_class_member);
                     }
-                    if !is_class_member {
+                    // For lib binders, be more permissive with class members
+                    // Intrinsic types (Object, Array, etc.) may have class member flags
+                    // but should still be accessible as global values
+                    if !is_class_member || (symbol.flags & symbol_flags::EXPORT_VALUE) != 0 {
                         if debug {
                             eprintln!("[BIND_RESOLVE]     -> SUCCESS: Returning {:?} from lib binder {}", sym_id, i);
                         }
                         return Some(sym_id);
+                    } else if debug {
+                        eprintln!("[BIND_RESOLVE]        SKIPPED: is_class_member without EXPORT_VALUE");
                     }
                 } else {
+                    // No symbol data available - return sym_id anyway
+                    // This handles cross-arena references and ambient declarations
                     if debug {
                         eprintln!("[BIND_RESOLVE]     -> SUCCESS: Found '{}' in lib binder {} (no symbol data)", name, i);
                     }
