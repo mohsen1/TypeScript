@@ -6,15 +6,110 @@
 
 ---
 
-## ✅ APPROVED: Remove Unused Declarations Code Action (2026-01-15)
+## ✅ APPROVED: LSP Inlay Hints Implementation (2026-01-15)
 
 **Status:** 🟢 APPROVED BY EM-2
-**Priority:** 🟡 ENHANCEMENT (Developer Experience)
+**Priority:** 🟢 ENHANCEMENT (High Value Developer Experience)
 **Assigned:** 2026-01-15
 
 ---
 
-## Primary Task: Remove Unused Declarations Code Action
+## Primary Task: LSP Inlay Hints Implementation
+
+**Priority:** 🟢 ENHANCEMENT (High Value Developer Experience)
+
+### Problem
+
+Inlay hints are inline annotations that show helpful information directly in the source code, improving readability and reducing the need to hover for types. TypeScript's tsc provides:
+
+1. **Parameter name hints** - Show parameter names in function calls when omitted
+2. **Type hints** - Show inferred types for variables with implicit types
+3. **Generic parameter hints** - Show inferred generic type arguments
+
+Currently, this project has `wasm/src/lsp/inlay_hints.rs` but it's essentially empty (only 2 lines).
+
+This means users miss out on a valuable quality-of-life feature that improves code comprehension.
+
+### Solution
+
+**Phase 1: Implement Basic Inlay Hints Provider**
+- Create `InlayHintsProvider` struct
+- Implement `provide_inlay_hints()` method
+- Add support for:
+  - Parameter name hints (e.g., `fn(arg)` → `fn(arg: param)`)
+  - Type hints for `let`/`const` without explicit types
+  - Generic parameter hints where inferred
+
+**Phase 2: Integrate with Project**
+- Add `inlay_hints()` method to `Project` in `project.rs`
+- Wire up to existing type checking infrastructure
+- Reuse existing strict mode and type information
+
+### Infrastructure Already Exists
+- ✅ Type checker knows inferred types (via `TypeId` system)
+- ✅ Symbol tracking for parameters and variables
+- ✅ Type interner for efficient type representation
+- ✅ Pattern exists in other LSP features (hover, completions)
+
+### Files to Modify
+- `wasm/src/lsp/inlay_hints.rs` - Implement inlay hints provider
+- `wasm/src/lsp/project.rs` - Add `inlay_hints()` method
+- `wasm/src/lsp/mod.rs` - Export inlay hints types
+
+### Success Criteria
+- Show parameter names in function calls: `foo(value)` → `foo(value: paramName)`
+- Show inferred types: `let x = 1` → `let x: number = 1`
+- Show inferred generic arguments where helpful
+- No hints when types are explicit
+- Hints don't interfere with code editing
+
+### Implementation Details
+
+**Inlay Hint Types:**
+```rust
+pub enum InlayHintKind {
+    Parameter,
+    Type,
+    Generic,
+}
+
+pub struct InlayHint {
+    pub position: Position,
+    pub label: String,
+    pub kind: InlayHintKind,
+    pub tooltip: Option<String>,
+}
+```
+
+**Key Functions:**
+- `provide_inlay_hints(arena, root, range)` - Returns hints for visible range
+- `get_parameter_hints(call_expr)` - Adds parameter names to calls
+- `get_type_hints(declaration)` - Shows inferred types
+- `type_to_string(type_id)` - Converts TypeId to readable string
+
+### Testing
+- Test parameter name hints for function calls
+- Test type hints for variable declarations
+- Test that explicit types don't get redundant hints
+- Test generic parameter hints
+- Test edge cases (arrow functions, object literals, etc.)
+
+### Estimated Effort
+- **Low-Medium complexity** - Type info already exists, mostly presentation
+- **2-3 hours** core implementation
+- **1 hour** integration and testing
+
+### Risk Assessment
+- **Low risk** - Read-only feature, doesn't modify code
+- **Performance** - Should be fast, only processes visible range
+- **Accuracy** - Relies on existing type checker results
+
+---
+
+## ✅ COMPLETE: Remove Unused Declarations Code Action (2026-01-15)
+
+**Status:** ✅ COMPLETE AND MERGED
+**Merge Commit:** `38750c096` - "Merge branch 'worker-8' into em-team-2"
 
 **Priority:** 🟡 ENHANCEMENT (Developer Experience)
 
