@@ -272,14 +272,14 @@ node wasm/differential-test/find-ts1005.mjs
 
 ---
 
-#### Worker 7: TS2571/TS2683 This Type Fix
-**Task:** Fix "'this' implicitly has type 'any'" not being emitted (TS2683), instead incorrectly emitting TS2571
+#### Worker 11: TS2683 This Type Handling
+**Task:** Fix "'this' implicitly has type 'any'" not being emitted (TS2683)
 
 **Key Files:**
 - `wasm/src/thin_checker.rs` (around line 629, `current_this_type()` handling)
 
 **Details:**
-When `this` is used inside a regular function (not a method), it should emit TS2683 but instead types as `unknown` and emits TS2571 on property access.
+When `this` is used inside a regular function (not a method), it should emit TS2683 ("'this' implicitly has type 'any'") but currently types as `unknown` and emits TS2571 on property access.
 
 **Example:**
 ```typescript
@@ -288,33 +288,16 @@ function foo() {
 }
 ```
 
-**Acceptance Criteria:**
-- [ ] TS2683 emitted for `this` in non-method functions
-- [ ] TS2571 no longer incorrectly emitted for `this` access
-- [ ] Proper `this` type inference in all function contexts
-
----
-
-#### Worker 11: TS2571/TS2683 This Type Fix
-**Task:** Fix "'this' implicitly has type 'any'" not being emitted (TS2683), instead incorrectly emitting TS2571
-
-**Key Files:**
-- `wasm/src/thin_checker.rs` (around line 629, `current_this_type()` handling)
-
-**Details:**
-When `this` is used inside a regular function (not a method), it should emit TS2683 but instead types as `unknown` and emits TS2571 on property access.
-
-**Example:**
-```typescript
-function foo() {
-    this.x = 1;  // Should: TS2683, Currently: TS2571
-}
-```
+**Tasks:**
+1. Modify `current_this_type()` to return `any` instead of `unknown` for non-method functions
+2. Emit TS2683 when `this` is used in contexts where it's implicitly typed as `any`
+3. Ensure `this` type inference is correct in all function contexts
+4. Coordinate with Worker 10 on assignability checks
 
 **Acceptance Criteria:**
 - [ ] TS2683 emitted for `this` in non-method functions
-- [ ] TS2571 no longer incorrectly emitted for `this` access
 - [ ] Proper `this` type inference in all function contexts
+- [ ] `this` behavior matches TypeScript compiler
 
 ---
 
