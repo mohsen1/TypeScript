@@ -486,7 +486,7 @@ impl ThinBinderState {
 
         // First, check if it's a direct export from this module
         if let Some(module_table) = self.module_exports.get(module_specifier) {
-            if let Some(&sym_id) = module_table.get(export_name) {
+            if let Some(sym_id) = module_table.get(export_name) {
                 if debug_enabled {
                     eprintln!(
                         "[RESOLVE_IMPORT] '{}' from module '{}' -> direct export symbol id={}",
@@ -501,7 +501,7 @@ impl ThinBinderState {
         if let Some(file_reexports) = self.reexports.get(module_specifier) {
             // Check for named re-export: `export { foo } from 'bar'`
             if let Some((source_module, original_name)) = file_reexports.get(export_name) {
-                let name_to_lookup = original_name.as_ref().unwrap_or(export_name);
+                let name_to_lookup = original_name.as_deref().unwrap_or(export_name);
                 if debug_enabled {
                     eprintln!(
                         "[RESOLVE_IMPORT] '{}' from module '{}' -> following named re-export from '{}', original name='{}'",
@@ -3235,32 +3235,39 @@ impl ThinBinderState {
                         // Check if this is a re-export: export { foo } from 'module'
                         if !export.module_specifier.is_none() {
                             // Get the module name from module_specifier
-                            let module_name = export.module_specifier.and_then(|idx| {
-                                arena.get(idx).and_then(|node| arena.get_literal(node))
+                            let module_name = if export.module_specifier.is_some() {
+                                arena.get(export.module_specifier).and_then(|node| arena.get_literal(node))
                                     .map(|lit| lit.text.clone())
-                            });
+                            } else {
+                                None
+                            };
 
                             if let Some(source_module) = module_name {
                                 let current_file = self.debugger.current_file.clone();
-                                let file_reexports = self.reexports.entry(current_file).or_default();
 
                                 // Track each named re-export
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
                                             // Get the original name (property_name) and exported name (name)
-                                            let original_name = spec.property_name.and_then(|idx| {
-                                                self.get_identifier_name(arena, idx)
-                                            });
-                                            let exported_name = spec.name.and_then(|idx| {
-                                                self.get_identifier_name(arena, idx)
-                                            });
+                                            let original_name = if spec.property_name.is_some() {
+                                                self.get_identifier_name(arena, spec.property_name)
+                                            } else {
+                                                None
+                                            };
+                                            let exported_name = if spec.name.is_some() {
+                                                self.get_identifier_name(arena, spec.name)
+                                            } else {
+                                                None
+                                            };
 
                                             if let Some(exported) = exported_name.or(original_name) {
                                                 // Store: exported_name -> (source_module, original_name)
+                                                let original_name_str: Option<String> = original_name.map(|s| s.to_string());
+                                                let file_reexports = self.reexports.entry(current_file.clone()).or_default();
                                                 file_reexports.insert(
                                                     exported.to_string(),
-                                                    (source_module.clone(), original_name.map(|s| s.to_string())),
+                                                    (source_module.clone(), original_name_str),
                                                 );
                                             }
                                         }
@@ -3334,10 +3341,12 @@ impl ThinBinderState {
             // Handle `export * from 'module'` (wildcard re-exports)
             // This is when export_clause is None but module_specifier is not None
             if export.export_clause.is_none() && !export.module_specifier.is_none() {
-                let module_name = export.module_specifier.and_then(|idx| {
-                    arena.get(idx).and_then(|node| arena.get_literal(node))
+                let module_name = if export.module_specifier.is_some() {
+                    arena.get(export.module_specifier).and_then(|node| arena.get_literal(node))
                         .map(|lit| lit.text.clone())
-                });
+                } else {
+                    None
+                };
 
                 if let Some(source_module) = module_name {
                     let current_file = self.debugger.current_file.clone();
