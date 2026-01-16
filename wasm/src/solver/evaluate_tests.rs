@@ -14852,10 +14852,10 @@ fn test_conditional_infer_extract_state_pattern() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    // TODO: Function infer pattern matching with union parameter types is not fully implemented.
+    // Function infer pattern matching with union parameter types now works correctly.
     // Expected behavior: should extract the state type: number
-    // Current behavior: returns never because the union pattern matching doesn't bind the infer variable.
-    assert_eq!(result, TypeId::NEVER);
+    // With Application type expansion working, we can now correctly extract the state type.
+    assert_eq!(result, concrete_state);
 }
 
 #[test]
@@ -14951,10 +14951,10 @@ fn test_conditional_infer_extract_action_pattern() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    // TODO: Function infer pattern matching with any state type is not fully implemented.
+    // Function infer pattern matching with any state type now works correctly.
     // Expected behavior: should extract the action type: { type: "inc" } | { type: "dec" }
-    // Current behavior: returns never because the infer binding in function parameter fails.
-    assert_eq!(result, TypeId::NEVER);
+    // With Application type expansion working, we can now correctly extract the action type.
+    assert_eq!(result, concrete_action);
 }
 
 #[test]
