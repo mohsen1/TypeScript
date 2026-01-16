@@ -19,9 +19,9 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 | EM | Worker # | Team Focus | Team Members | Priority |
 |----|----------|------------|--------------|----------|
-| EM-1 | Worker 2 | Tier 0: Quality & Stability | Workers 2, 3, 4, 5 | HIGHEST |
-| EM-2 | Worker 6 | Tier 1: Parser Accuracy | Workers 6, 7, 8, 9 | HIGH |
-| EM-3 | Worker 10 | Tier 2-3: Type Checker & Symbol Resolution | Workers 10, 11, 12, 13, 14 | MEDIUM |
+| EM-1 | Worker 2 | Tier 0: Quality & Stability | Workers 2, 3, 4, 5, 6, 7 | HIGHEST |
+| EM-2 | Worker 8 | Tier 1: Parser Accuracy | Workers 8, 9, 10, 11 | HIGH |
+| EM-3 | Worker 12 | Tier 2-3: Type Checker & Symbol Resolution | Workers 12, 13, 14 | MEDIUM |
 
 **Note:** EMs are individual contributors who also manage their team's work.
 
@@ -104,7 +104,33 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ---
 
-#### Worker 5: Solver Test Coverage Restoration
+#### Worker 5: Panic Hardening
+**Task:** Replace `panic!/unwrap` with error recovery in non-test paths
+
+**Key Files:**
+- `wasm/src/thin_checker.rs`
+- `wasm/src/cli/driver.rs`
+- `wasm/src/interner.rs`
+
+**Details:**
+- Production code paths still use `panic!`, `unwrap()`, `expect()` instead of graceful error recovery
+- Panics cause crashes in conformance tests
+- Need to audit all panic-prone calls and replace with proper error handling
+
+**Tasks:**
+1. Audit all `panic!`, `unwrap()`, `expect()` calls in production code
+2. Replace with graceful error recovery or diagnostic emission
+3. Ensure no panics occur during conformance tests
+4. Document error recovery strategy
+
+**Acceptance Criteria:**
+- [ ] No panics in production code paths
+- [ ] Error recovery strategy documented
+- [ ] Conformance tests run with 0 crashes
+
+---
+
+#### Worker 6: Solver Test Coverage Restoration
 **Task:** Re-enable commented out solver tests (infer/subtype/evaluate) due to API drift
 
 **Key Files:**
@@ -118,6 +144,7 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 - Tests cover critical type inference, subtyping, and evaluation logic
 - Need to update test code to match current solver API
 - These tests are essential for validating solver correctness
+- **Dependencies:** Worker 2 (Application type expansion must be complete first)
 
 **Tasks:**
 1. Identify all commented-out solver tests
@@ -134,13 +161,47 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ---
 
+#### Worker 7: Definite Assignment Analysis (TS2565)
+**Task:** Implement TS2565 and complete interface type parameters
+
+**Key Files:**
+- `wasm/src/thin_checker.rs`
+- `wasm/src/checker/types/diagnostics.rs`
+
+**Details:**
+- TS2565 "Variable is used before being assigned" not implemented
+- Interface type parameters have TODO comments
+- Need to track control flow for definite assignment analysis
+- Must handle block-scoped variables, function parameters, and class properties
+
+**Tasks:**
+1. Implement TS2565 diagnostic code and message
+2. Build control flow analysis for definite assignment
+3. Track variable assignments across branches
+4. Complete interface type parameter checking
+5. Add unit tests for definite assignment scenarios
+
+**Test Cases:**
+- Variables used before initialization
+- Conditional assignment paths
+- Nested block scopes
+- Interface type parameters
+
+**Acceptance Criteria:**
+- [ ] TS2565 emitted for variables used before assignment
+- [ ] Interface type parameters fully validated
+- [ ] Control flow analysis correctly tracks assignments
+- [ ] Matches TSC behavior
+
+---
+
 ### Team 2: Parser Accuracy (Tier 1)
 
-**Engineering Manager:** Worker 6 (EM-2)
+**Engineering Manager:** Worker 8 (EM-2)
 **Priority:** HIGH - Parser errors poison downstream analysis
 **Tier:** 1 - Parser Accuracy
 
-#### Worker 6 (EM-2): ASI Handling & EM Coordination
+#### Worker 8 (EM-2): ASI Handling & EM Coordination
 **Management Responsibilities:**
 - Coordinate Team 2 parser work
 - Run parser-specific conformance tests
@@ -173,7 +234,7 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ---
 
-#### Worker 7: TS1109 Parser Fix (Expression Expected)
+#### Worker 9: TS1109 Parser Fix (Expression Expected)
 **Task:** Fix parser emitting "Expression expected" for valid syntax
 
 **Key Files:**
@@ -196,7 +257,7 @@ node wasm/differential-test/find-ts1109.mjs
 
 ---
 
-#### Worker 8: TS1005 Parser Fix (X Expected)
+#### Worker 10: TS1005 Parser Fix (X Expected)
 **Task:** Fix parser emitting "X expected" for valid constructs
 
 **Key Files:**
@@ -218,7 +279,7 @@ node wasm/differential-test/find-ts1005.mjs
 
 ---
 
-#### Worker 9: Parser Conformance Testing & Analysis
+#### Worker 11: Parser Conformance Testing & Analysis
 **Task:** Analyze parser errors and create comprehensive test cases
 
 **Management Support Tasks:**
@@ -242,13 +303,13 @@ node wasm/differential-test/find-ts1005.mjs
 
 ### Team 3: Type Checker & Symbol Resolution (Tiers 2-3)
 
-**Engineering Manager:** Worker 10 (EM-3)
+**Engineering Manager:** Worker 12 (EM-3)
 **Priority:** MEDIUM - Core type checking accuracy
 **Tier:** 2-3 - Type Checker & Symbol Resolution
 
-#### Worker 10 (EM-3): Type Checker Coordination & TS2322
+#### Worker 12 (EM-3): Type Checker Coordination & TS2322
 **Management Responsibilities:**
-- Coordinate Tier 2 and Tier 3 work across 5 team members
+- Coordinate Tier 2 and Tier 3 work across 3 team members
 - Manage dependencies between type checker and symbol resolution
 - Run semantic error conformance tests
 - Focus on TS2xxx and TS23xx/TS25xx error codes
@@ -281,7 +342,7 @@ node wasm/differential-test/find-ts1005.mjs
 
 ---
 
-#### Worker 11: TS2683 This Type Handling
+#### Worker 13: TS2683 This Type Handling
 **Task:** Fix "'this' implicitly has type 'any'" not being emitted (TS2683)
 
 **Key Files:**
@@ -310,8 +371,8 @@ function foo() {
 
 ---
 
-#### Worker 12: TS2348 Callable Expression Fix
-**Task:** Fix "Cannot invoke expression" (TS2348) being over-reported
+#### Worker 14: TS2348 Callable Expression & TS2507 Constructor Checking
+**Primary Task 1:** Fix "Cannot invoke expression" (TS2348) being over-reported
 
 **Key Files:**
 - `wasm/src/thin_checker.rs`
@@ -322,15 +383,7 @@ function foo() {
 - Root cause likely in callable type resolution
 - Need to properly check call signatures before emitting
 
-**Acceptance Criteria:**
-- [ ] TS2348 only emitted for genuinely non-callable expressions
-- [ ] Callable type resolution correctly identifies callable types
-- [ ] No regressions in call expression type checking
-
----
-
-#### Worker 13: TS2507 Constructor Checking
-**Task:** Non-constructor extends not fully checked
+**Primary Task 2:** Non-constructor extends not fully checked (TS2507)
 
 **Key Files:**
 - `wasm/src/thin_checker.rs` - class declaration checking
@@ -348,14 +401,19 @@ function foo() {
 - Mixin patterns
 
 **Acceptance Criteria:**
-- [ ] All invalid extends emit TS2507
-- [ ] Valid extends patterns work correctly
+- [ ] TS2348 only emitted for genuinely non-callable expressions
+- [ ] TS2507 emitted for all invalid extends
+- [ ] Valid callable expressions and extends patterns work correctly
 - [ ] Error messages match TSC
 
 ---
 
-#### Worker 14: TS2304 Symbol Resolution Gaps
-**Task:** Fix "Cannot find name" (TS2304) for valid symbols
+## Additional Tier 3 Tasks (Symbol Resolution)
+
+The following Tier 3 tasks are unassigned and should be picked up by Team 3 after completing initial assignments:
+
+### TS2304 Symbol Resolution Gaps
+**Issue:** "Cannot find name" for valid symbols
 
 **Key Files:**
 - `wasm/src/binder/`
@@ -371,6 +429,29 @@ function foo() {
 - [ ] All valid symbols in scope are resolvable
 - [ ] Global/lib.d.ts symbols accessible where expected
 - [ ] No false TS2304 errors for valid identifiers
+
+### TS2524 Module Member Resolution
+**Issue:** Module member resolution failures not detected
+
+**Key Files:**
+- `wasm/src/binder/`
+- `wasm/src/thin_checker.rs`
+
+**Acceptance Criteria:**
+- [ ] TS2524 emitted for inaccessible module members
+- [ ] Module resolution matches TSC behavior
+
+### Global Merging Across Files
+**Issue:** Interface/namespace merging across files
+
+**Key Files:**
+- `wasm/src/binder/`
+- `wasm/src/thin_checker.rs`
+
+**Acceptance Criteria:**
+- [ ] Global symbols correctly merged across files
+- [ ] Interface declarations properly augmented
+- [ ] Namespace merging works correctly
 
 ---
 
@@ -404,17 +485,17 @@ These tasks are explicitly deferred until Tier 0, 1, 2, and 3 stabilize:
 ## Priority Order Summary
 
 ```
-1. Workers 2-5 (Tier 0): Quality & Stability Foundations
+1. Workers 2-7 (Tier 0): Quality & Stability Foundations
    └─ Blocks: All downstream accuracy
    └─ Team 1 (EM-1: Worker 2)
 
-2. Workers 6-9 (Tier 1): Parser Accuracy
+2. Workers 8-11 (Tier 1): Parser Accuracy
    └─ Blocks: Accurate AST for type checking
-   └─ Team 2 (EM-2: Worker 6)
+   └─ Team 2 (EM-2: Worker 8)
 
-3. Workers 10-14 (Tier 2-3): Type Checker & Symbol Resolution
+3. Workers 12-14 (Tier 2-3): Type Checker & Symbol Resolution
    └─ Core type checking and symbol accuracy
-   └─ Team 3 (EM-3: Worker 10)
+   └─ Team 3 (EM-3: Worker 12)
 
 Deferred: Tier 4 (Implicit Any), Tier 5 (Async), LSP features
 ```
@@ -424,7 +505,7 @@ Deferred: Tier 4 (Implicit Any), Tier 5 (Async), LSP features
 ## Coordination Guidelines
 
 ### Engineering Manager Responsibilities
-Each EM (Workers 2, 6, 10) should:
+Each EM (Workers 2, 8, 12) should:
 1. Run conformance tests to establish team baseline
 2. Review all code changes from team members
 3. Handle escalations and coordinate cross-team dependencies
@@ -479,9 +560,9 @@ cd wasm/differential-test && bash run-conformance.sh --max=200 --workers=4
 
 ### Escalation Path
 ```
-Individual Contributor (Workers 3-5, 7-9, 11-14)
+Individual Contributor (Workers 3-7, 9-11, 13-14)
     ↓ (blocked for >30 minutes)
-Engineering Manager (Workers 2, 6, 10)
+Engineering Manager (Workers 2, 8, 12)
     ↓ (cross-team issues)
 Director (Worker 1)
 ```
@@ -512,4 +593,4 @@ Each team member should report:
 ---
 
 *Generated by Director (Worker 1) at 2026-01-16*
-*Mode: hierarchical - 3 Engineering Managers managing 11 Engineers*
+*Mode: hierarchical - 3 Engineering Managers managing 11 Engineers (Workers 2-14)*
