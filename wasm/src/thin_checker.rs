@@ -14085,6 +14085,25 @@ impl<'a> ThinCheckerState<'a> {
         }
     }
 
+    /// Report TS2803: Cannot assign to private method. Private methods are not writable.
+    pub fn error_private_method_not_writable(&mut self, prop_name: &str, idx: NodeIndex) {
+        use crate::checker::types::diagnostics::{
+            diagnostic_codes, diagnostic_messages, format_message,
+        };
+
+        if let Some(loc) = self.get_source_location(idx) {
+            let message = format_message(diagnostic_messages::CANNOT_ASSIGN_PRIVATE_METHOD, &[prop_name]);
+            let diag = Diagnostic::error(
+                self.ctx.file_name.clone(),
+                loc.start,
+                loc.length(),
+                message,
+                diagnostic_codes::CANNOT_ASSIGN_TO_PRIVATE_METHOD,
+            );
+            self.ctx.diagnostics.push(diag);
+        }
+    }
+
     /// Report TS2694: Namespace has no exported member.
     pub fn error_namespace_no_export(
         &mut self,
@@ -15550,7 +15569,7 @@ impl<'a> ThinCheckerState<'a> {
                 });
 
                 if is_method {
-                    self.error_readonly_property_at(&prop_name, target_idx);
+                    self.error_private_method_not_writable(&prop_name, target_idx);
                     return;
                 }
             }

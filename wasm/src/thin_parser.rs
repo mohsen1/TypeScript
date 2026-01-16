@@ -458,6 +458,13 @@ impl ThinParserState {
             | SyntaxKind::YieldKeyword => true,
             // Open angle bracket for type arguments or JSX
             SyntaxKind::LessThanToken => true,
+            // Colon for type annotations, object literal properties, or conditional operator
+            // This handles cases like `const x` followed by `: string` where we've moved on
+            SyntaxKind::ColonToken => true,
+            // Arrow function operator - indicates we're in an arrow function
+            SyntaxKind::EqualsGreaterThanToken => true,
+            // Type assertion keyword - indicates we're in a type context
+            SyntaxKind::AsKeyword => true,
             _ => false,
         }
     }
@@ -565,6 +572,14 @@ impl ThinParserState {
             // If we're at a position where parsing can reasonably continue, suppress the error
             // This reduces false-positive TS1005 errors in complex expressions
             if self.can_recover_from_error() {
+                return;
+            }
+
+            // Suppress TS1005 if we're at a closing delimiter or EOF
+            // If we're at a position that naturally ends expressions (closing brace, paren, bracket, EOF),
+            // suppress the TS1005 error because we've clearly moved on to the next construct.
+            // This was previously only used for TS1109 suppression but is also applicable to TS1005.
+            if self.is_at_expression_end() {
                 return;
             }
 
