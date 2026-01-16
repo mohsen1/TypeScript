@@ -859,12 +859,32 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             }
             // Note: KeyOf vs Union is handled by the general Union target case above
 
-            // Readonly types - readonly T[] <: readonly U[] if T <: U
+            // Readonly types handling
+            // For readonly vs mutable, we need to check if the inner type is an array/tuple
+            (TypeKey::ReadonlyType(_), TypeKey::Array(_)) => {
+                // Readonly arrays are NOT assignable to mutable arrays
+                SubtypeResult::False
+            }
+            (TypeKey::ReadonlyType(_), TypeKey::Tuple(_)) => {
+                // Readonly tuples are NOT assignable to mutable tuples
+                SubtypeResult::False
+            }
+            // Readonly types to readonly types - check inner types
             (TypeKey::ReadonlyType(s_inner), TypeKey::ReadonlyType(t_inner)) => {
                 self.check_subtype(*s_inner, *t_inner)
             }
-            // Mutable arrays/tuples are assignable to readonly versions
-            (_, TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
+            // Readonly to non-readonly (non-array/tuple) - unwrap and check inner
+            (TypeKey::ReadonlyType(s_inner), _) => {
+                // For other types (not Array/Tuple), unwrap the readonly wrapper
+                // This allows readonly types to work with any, unknown, etc.
+                self.check_subtype(*s_inner, target)
+            }
+            // Mutable arrays/tuples to readonly versions - unwrap readonly wrapper and check
+            (_, TypeKey::ReadonlyType(t_inner)) => {
+                // Check if source is assignable to the inner type of the readonly wrapper
+                // This allows mutable arrays/tuples to be assigned to readonly versions
+                self.check_subtype(source, *t_inner)
+            }
 
             // Unique symbol - only equal to itself
             (TypeKey::UniqueSymbol(s_sym), TypeKey::UniqueSymbol(t_sym)) => {
