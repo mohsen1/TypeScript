@@ -501,7 +501,7 @@ impl ThinBinderState {
         if let Some(file_reexports) = self.reexports.get(module_specifier) {
             // Check for named re-export: `export { foo } from 'bar'`
             if let Some((source_module, original_name)) = file_reexports.get(export_name) {
-                let name_to_lookup = original_name.as_deref().unwrap_or(export_name);
+                let name_to_lookup = original_name.as_ref().map(|s| s.as_str()).unwrap_or(export_name);
                 if debug_enabled {
                     eprintln!(
                         "[RESOLVE_IMPORT] '{}' from module '{}' -> following named re-export from '{}', original name='{}'",
@@ -3235,42 +3235,43 @@ impl ThinBinderState {
                         // Check if this is a re-export: export { foo } from 'module'
                         if !export.module_specifier.is_none() {
                             // Get the module name from module_specifier
-                            let module_name = if export.module_specifier.is_some() {
-                                arena.get(export.module_specifier).and_then(|node| arena.get_literal(node))
-                                    .map(|lit| lit.text.clone())
-                            } else {
-                                None
-                            };
+                            let module_name = arena.get(export.module_specifier)
+                                .and_then(|node| arena.get_literal(node))
+                                .map(|lit| lit.text.clone());
 
                             if let Some(source_module) = module_name {
                                 let current_file = self.debugger.current_file.clone();
 
-                                // Track each named re-export
+                                // Collect all identifier names first (before mutable borrow)
+                                let mut reexport_info: Vec<(Option<String>, Option<String>)> = Vec::new();
                                 for &spec_idx in &named.elements.nodes {
                                     if let Some(spec_node) = arena.get(spec_idx) {
                                         if let Some(spec) = arena.get_specifier(spec_node) {
                                             // Get the original name (property_name) and exported name (name)
-                                            let original_name = if spec.property_name.is_some() {
-                                                self.get_identifier_name(arena, spec.property_name)
+                                            let original_name = if !spec.property_name.is_none() {
+                                                self.get_identifier_name(arena, spec.property_name).map(|s| s.to_string())
                                             } else {
                                                 None
                                             };
-                                            let exported_name = if spec.name.is_some() {
-                                                self.get_identifier_name(arena, spec.name)
+                                            let exported_name = if !spec.name.is_none() {
+                                                self.get_identifier_name(arena, spec.name).map(|s| s.to_string())
                                             } else {
                                                 None
                                             };
-
-                                            if let Some(exported) = exported_name.or(original_name) {
-                                                // Store: exported_name -> (source_module, original_name)
-                                                let original_name_str: Option<String> = original_name.map(|s| s.to_string());
-                                                let file_reexports = self.reexports.entry(current_file.clone()).or_default();
-                                                file_reexports.insert(
-                                                    exported.to_string(),
-                                                    (source_module.clone(), original_name_str),
-                                                );
-                                            }
+                                            reexport_info.push((original_name, exported_name));
                                         }
+                                    }
+                                }
+
+                                // Now insert into reexports (with mutable borrow)
+                                let file_reexports = self.reexports.entry(current_file).or_default();
+                                for (original_name, exported_name) in reexport_info {
+                                    if let Some(exported) = exported_name.as_ref().or(original_name.as_ref()) {
+                                        // Store: exported_name -> (source_module, original_name)
+                                        file_reexports.insert(
+                                            exported.to_string(),
+                                            (source_module.clone(), original_name.map(|s| s.to_string())),
+                                        );
                                     }
                                 }
                             }
@@ -3341,12 +3342,9 @@ impl ThinBinderState {
             // Handle `export * from 'module'` (wildcard re-exports)
             // This is when export_clause is None but module_specifier is not None
             if export.export_clause.is_none() && !export.module_specifier.is_none() {
-                let module_name = if export.module_specifier.is_some() {
-                    arena.get(export.module_specifier).and_then(|node| arena.get_literal(node))
-                        .map(|lit| lit.text.clone())
-                } else {
-                    None
-                };
+                let module_name = arena.get(export.module_specifier)
+                    .and_then(|node| arena.get_literal(node))
+                    .map(|lit| lit.text.clone());
 
                 if let Some(source_module) = module_name {
                     let current_file = self.debugger.current_file.clone();
