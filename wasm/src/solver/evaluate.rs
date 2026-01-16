@@ -296,7 +296,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                         resolved
                     } else {
-                        TypeId::ERROR
+                        // Pass through unchanged if not resolved
+                        type_id
                     };
                 self.visiting.borrow_mut().remove(&type_id);
                 self.cache.borrow_mut().insert(type_id, result);
@@ -500,10 +501,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         };
         match key {
             TypeKey::TypeQuery(sym_ref) => {
-                // Resolve the TypeQuery to get the actual type
+                // Resolve the TypeQuery to get the actual type, or pass through if unresolved
                 self.resolver
                     .resolve_ref(sym_ref, self.interner)
-                    .unwrap_or(TypeId::ERROR)
+                    .unwrap_or(arg)
             }
             TypeKey::Application(app_id) => {
                 // Recursively evaluate the nested Application
