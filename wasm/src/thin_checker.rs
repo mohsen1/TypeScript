@@ -10030,9 +10030,24 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // Push this_type to the stack before checking the body
+            // This ensures this references inside the function have the proper type context
+            // For functions with explicit this parameter: use that type
+            // For arrow functions: use outer this type (already captured in this_type)
+            // For regular functions without explicit this: this_type is None, which triggers TS2683 when this is used
+            let mut pushed_this_type = false;
+            if let Some(this_type) = this_type {
+                self.ctx.this_type_stack.push(this_type);
+                pushed_this_type = true;
+            }
+
             self.push_return_type(return_type);
             self.check_statement(body);
             self.pop_return_type();
+
+            if pushed_this_type {
+                self.ctx.this_type_stack.pop();
+            }
         }
 
         // Create function type using TypeInterner
