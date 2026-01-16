@@ -10020,7 +10020,7 @@ impl<'a> ThinCheckerState<'a> {
 
             // TS2366 (not all code paths return value) for function expressions and arrow functions
             // Check if all code paths return a value when return type requires it
-            if !is_function_declaration && !body.is_none() {
+            if !is_function_declaration {
                 let check_return_type = return_type;
                 let requires_return = self.requires_return_value(check_return_type);
                 let has_return = self.body_has_return_with_value(body);
