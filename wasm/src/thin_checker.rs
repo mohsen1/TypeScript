@@ -26,7 +26,7 @@ use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::solver::{ContextualTypeContext, TypeId, TypeInterner};
 use crate::thin_binder::ThinBinderState;
-use rustc_hash::{FxHashMap, FxHashSet};
+use rustc_hash::FxHashSet;
 use std::sync::Arc;
 
 // =============================================================================
@@ -2138,17 +2138,7 @@ impl<'a> ThinCheckerState<'a> {
                         continue;
                     }
 
-                    let mut props = match common_props.take() {
-                        Some(p) => p,
-                        None => {
-                            // This shouldn't happen due to the continue statement above
-                            // but handle gracefully to avoid panic
-                            common_props = Some(member_props);
-                            common_string_index = member_string_index;
-                            common_number_index = member_number_index;
-                            continue;
-                        }
-                    };
+                    let mut props = common_props.take().unwrap();
                     props.retain(|name, prop| {
                         let Some(member_prop) = member_props.get(name) else {
                             return false;
@@ -5559,20 +5549,19 @@ impl<'a> ThinCheckerState<'a> {
             .unwrap_or_else(|| "<unknown>".to_string());
 
         // Get the location for error reporting
-        let (start, length) = match self.ctx.arena.get(idx) {
-            Some(node) => (node.pos, node.end - node.pos),
-            None => {
-                // Missing node - use default position and emit minimal diagnostic
-                self.ctx.diagnostics.push(Diagnostic::error(
-                    "".to_string(),
-                    0,
-                    0,
-                    format!("Variable '{}' is used before being assigned", name),
-                    2454, // TS2454
-                ));
-                return;
-            }
+        let Some(node) = self.ctx.arena.get(idx) else {
+            // If the node doesn't exist in the arena, emit error with position 0
+            self.ctx.diagnostics.push(Diagnostic::error(
+                "file".to_string(), // TODO: Get actual file name
+                0,
+                0,
+                format!("Variable '{}' is used before being assigned", name),
+                2454, // TS2454
+            ));
+            return;
         };
+        let start = node.pos;
+        let length = node.end - node.pos;
 
         self.ctx.diagnostics.push(Diagnostic::error(
             "file".to_string(), // TODO: Get actual file name
@@ -10041,7 +10030,7 @@ impl<'a> ThinCheckerState<'a> {
 
             // TS2366 (not all code paths return value) for function expressions and arrow functions
             // Check if all code paths return a value when return type requires it
-            if !is_function_declaration {
+            if !is_function_declaration && !body.is_none() {
                 let check_return_type = return_type;
                 let requires_return = self.requires_return_value(check_return_type);
                 let has_return = self.body_has_return_with_value(body);
@@ -16985,402 +16974,9 @@ impl<'a> ThinCheckerState<'a> {
             );
         }
 
-        // Check for TS2565 (Property used before being assigned in constructor)
-        // Analyze the constructor body for `this.X` accesses that occur before X is assigned
-        if let Some(body_idx) = constructor_body {
-            self.check_property_usage_before_assignment(
-                body_idx,
-                &tracked,
-                &assigned,
-                &parameter_properties,
-                requires_super,
-            );
-        }
-    }
-
-    /// Check for property accesses before assignment in constructor (TS2565).
-    /// Emits errors when `this.property` is accessed before the property is definitely assigned.
-    fn check_property_usage_before_assignment(
-        &mut self,
-        body_idx: NodeIndex,
-        tracked: &FxHashSet<PropertyKey>,
-        assigned: &FxHashSet<PropertyKey>,
-        parameter_properties: &FxHashSet<PropertyKey>,
-        requires_super: bool,
-    ) {
-        use crate::checker::types::diagnostics::{diagnostic_codes, diagnostic_messages, format_message};
-
-        // Find all `this.property` accesses and check if they happen before assignment
-        let mut assigned_at_start = parameter_properties.clone();
-        let access_info = self.collect_property_accesses_with_assignments(
-            body_idx,
-            tracked,
-            &assigned_at_start,
-            requires_super,
-        );
-
-        // For each tracked property, check if it's accessed before being assigned
-        for key in tracked {
-            // Skip if already assigned at start (parameter property)
-            if assigned_at_start.contains(key) {
-                continue;
-            }
-
-            // Skip if property is never accessed before assignment
-            if let Some(accesses) = access_info.get(key) {
-                for (access_node, assigned_before) in accesses {
-                    if !*assigned_before {
-                        // Property accessed before being assigned
-                        let name = match key {
-                            PropertyKey::Ident(s) => s.clone(),
-                            PropertyKey::Computed(ComputedKey::Ident(s)) => s.clone(),
-                            PropertyKey::Computed(ComputedKey::String(s)) => format!("[\"{}\"]", s),
-                            PropertyKey::Computed(ComputedKey::Number(n)) => format!("[{}]", n),
-                            PropertyKey::Computed(ComputedKey::Qualified(q)) => format!("[{}]", q),
-                            PropertyKey::Computed(ComputedKey::Symbol(Some(s))) => format!("[Symbol({})]", s),
-                            PropertyKey::Computed(ComputedKey::Symbol(None)) => "[Symbol()]".to_string(),
-                            PropertyKey::Private(s) => format!("#{}", s),
-                        };
-
-                        self.error_at_node(
-                            *access_node,
-                            &format_message(diagnostic_messages::PROPERTY_USED_BEFORE_BEING_ASSIGNED, &[&name]),
-                            diagnostic_codes::PROPERTY_USED_BEFORE_BEING_ASSIGNED,
-                        );
-                        break; // Only report once per property
-                    }
-                }
-            }
-        }
-    }
-
-    /// Collect all property accesses in constructor along with assignment state at each access point.
-    /// Returns a map: PropertyKey -> Vec<(access_node, was_assigned_before_access)>
-    fn collect_property_accesses_with_assignments(
-        &self,
-        body_idx: NodeIndex,
-        tracked: &FxHashSet<PropertyKey>,
-        assigned_in: &FxHashSet<PropertyKey>,
-        require_super: bool,
-    ) -> FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>> {
-        use rustc_hash::FxHashMap;
-
-        let mut result: FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>> = FxHashMap::default();
-        let mut assigned = assigned_in.clone();
-
-        // Analyze the constructor body
-        let flow_result = if require_super {
-            self.analyze_constructor_body_after_super(body_idx, tracked)
-        } else {
-            self.analyze_statement(body_idx, &assigned, tracked)
-        };
-
-        // Collect accesses and assignment state through the constructor body
-        self.collect_accesses_in_node(body_idx, &mut assigned, tracked, &mut result, require_super);
-
-        result
-    }
-
-    /// Recursively collect property accesses in a node, tracking assignment state.
-    fn collect_accesses_in_node(
-        &self,
-        node_idx: NodeIndex,
-        assigned: &mut FxHashSet<PropertyKey>,
-        tracked: &FxHashSet<PropertyKey>,
-        accesses: &mut rustc_hash::FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>>,
-        require_super: bool,
-    ) {
-        if node_idx.is_none() {
-            return;
-        }
-
-        let Some(node) = self.ctx.arena.get(node_idx) else {
-            return;
-        };
-
-        // Handle different node types
-        match node.kind {
-            k if k == syntax_kind_ext::BLOCK => {
-                if let Some(block) = self.ctx.arena.get_block(node) {
-                    for &stmt_idx in &block.statements.nodes {
-                        self.collect_accesses_in_statement(stmt_idx, assigned, tracked, accesses, require_super);
-                    }
-                }
-            }
-            _ => {
-                // For other node types, treat as a statement
-                self.collect_accesses_in_statement(node_idx, assigned, tracked, accesses, require_super);
-            }
-        }
-    }
-
-    /// Collect property accesses in a statement, updating assignment state.
-    fn collect_accesses_in_statement(
-        &self,
-        stmt_idx: NodeIndex,
-        assigned: &mut FxHashSet<PropertyKey>,
-        tracked: &FxHashSet<PropertyKey>,
-        accesses: &mut rustc_hash::FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>>,
-        require_super: bool,
-    ) {
-        if stmt_idx.is_none() {
-            return;
-        }
-
-        let Some(node) = self.ctx.arena.get(stmt_idx) else {
-            return;
-        };
-
-        match node.kind {
-            k if k == syntax_kind_ext::BLOCK => {
-                if let Some(block) = self.ctx.arena.get_block(node) {
-                    for &stmt_idx in &block.statements.nodes {
-                        self.collect_accesses_in_statement(stmt_idx, assigned, tracked, accesses, require_super);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::EXPRESSION_STATEMENT => {
-                if let Some(expr) = self.ctx.arena.get_expression_statement(node) {
-                    self.collect_accesses_in_expression(expr.expression, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::IF_STATEMENT => {
-                if let Some(if_stmt) = self.ctx.arena.get_if_statement(node) {
-                    // Check condition
-                    self.collect_accesses_in_expression(if_stmt.expression, assigned, tracked, accesses);
-
-                    // Analyze branches with current assigned state
-                    let mut then_assigned = assigned.clone();
-                    let mut else_assigned = assigned.clone();
-
-                    self.collect_accesses_in_statement(if_stmt.then_statement, &mut then_assigned, tracked, accesses, require_super);
-                    if !if_stmt.else_statement.is_none() {
-                        self.collect_accesses_in_statement(if_stmt.else_statement, &mut else_assigned, tracked, accesses, require_super);
-                    }
-
-                    // Merge: a property is assigned after if it's assigned in both branches
-                    for prop in tracked.iter() {
-                        if then_assigned.contains(prop) && else_assigned.contains(prop) {
-                            assigned.insert(prop.clone());
-                        }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::RETURN_STATEMENT => {
-                if let Some(ret) = self.ctx.arena.get_return_statement(node) {
-                    if !ret.expression.is_none() {
-                        self.collect_accesses_in_expression(ret.expression, assigned, tracked, accesses);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
-                if let Some(var_stmt) = self.ctx.arena.get_variable(node) {
-                    if let Some(&decl_list_idx) = var_stmt.declarations.nodes.first() {
-                        self.collect_accesses_in_variable_decl_list(decl_list_idx, assigned, tracked, accesses);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::FOR_STATEMENT
-                || k == syntax_kind_ext::FOR_OF_STATEMENT
-                || k == syntax_kind_ext::FOR_IN_STATEMENT
-                || k == syntax_kind_ext::WHILE_STATEMENT
-                || k == syntax_kind_ext::DO_STATEMENT
-                || k == syntax_kind_ext::TRY_STATEMENT => {
-                // For loops and try statements, we conservatively skip detailed analysis
-                // to avoid false positives. These are complex cases that could be
-                // improved in future iterations.
-            }
-            _ => {}
-        }
-    }
-
-    /// Collect property accesses in an expression, tracking assignments.
-    fn collect_accesses_in_expression(
-        &self,
-        expr_idx: NodeIndex,
-        assigned: &mut FxHashSet<PropertyKey>,
-        tracked: &FxHashSet<PropertyKey>,
-        accesses: &mut rustc_hash::FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>>,
-    ) {
-        if expr_idx.is_none() {
-            return;
-        }
-
-        let Some(node) = self.ctx.arena.get(expr_idx) else {
-            return;
-        };
-
-        match node.kind {
-            // Skip nested functions/closures
-            k if k == syntax_kind_ext::FUNCTION_DECLARATION
-                || k == syntax_kind_ext::FUNCTION_EXPRESSION
-                || k == syntax_kind_ext::ARROW_FUNCTION
-                || k == syntax_kind_ext::METHOD_DECLARATION
-                || k == syntax_kind_ext::CLASS_DECLARATION
-                || k == syntax_kind_ext::CLASS_EXPRESSION
-                || k == syntax_kind_ext::GET_ACCESSOR
-                || k == syntax_kind_ext::SET_ACCESSOR => {
-                return;
-            }
-            // Property access - check if it's `this.property`
-            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
-                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
-                // First, recursively check the expression and name (both might have nested accesses)
-                if let Some(access) = self.ctx.arena.get_access_expr(node) {
-                    self.collect_accesses_in_expression(access.expression, assigned, tracked, accesses);
-                    self.collect_accesses_in_expression(access.name_or_argument, assigned, tracked, accesses);
-
-                    // Check if this is a `this.property` access
-                    if let Some(key) = self.property_key_from_access(expr_idx) {
-                        if tracked.contains(&key) {
-                            let was_assigned = assigned.contains(&key);
-                            accesses.entry(key).or_insert_with(Vec::new).push((expr_idx, was_assigned));
-                        }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::BINARY_EXPRESSION => {
-                if let Some(bin) = self.ctx.arena.get_binary_expr(node) {
-                    // Check right side first (value), then left side (target)
-                    self.collect_accesses_in_expression(bin.right, assigned, tracked, accesses);
-
-                    // If this is an assignment, update assigned set before checking left side
-                    if self.is_assignment_operator(bin.operator_token) {
-                        self.collect_assignment_target_for_access(bin.left, assigned, tracked);
-                    }
-
-                    self.collect_accesses_in_expression(bin.left, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::PREFIX_UNARY_EXPRESSION
-                || k == syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
-                if let Some(unary) = self.ctx.arena.get_unary_expr(node) {
-                    // If ++ or --, update assigned set
-                    if unary.operator == SyntaxKind::PlusPlusToken as u16
-                        || unary.operator == SyntaxKind::MinusMinusToken as u16
-                    {
-                        self.collect_assignment_target_for_access(unary.operand, assigned, tracked);
-                    }
-                    self.collect_accesses_in_expression(unary.operand, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::CALL_EXPRESSION
-                || k == syntax_kind_ext::NEW_EXPRESSION => {
-                if let Some(call) = self.ctx.arena.get_call_expr(node) {
-                    self.collect_accesses_in_expression(call.expression, assigned, tracked, accesses);
-                    if let Some(ref args) = call.arguments {
-                        for &arg in &args.nodes {
-                            self.collect_accesses_in_expression(arg, assigned, tracked, accesses);
-                        }
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
-                if let Some(paren) = self.ctx.arena.get_parenthesized(node) {
-                    self.collect_accesses_in_expression(paren.expression, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::CONDITIONAL_EXPRESSION => {
-                if let Some(cond) = self.ctx.arena.get_conditional_expr(node) {
-                    self.collect_accesses_in_expression(cond.condition, assigned, tracked, accesses);
-                    self.collect_accesses_in_expression(cond.when_true, assigned, tracked, accesses);
-                    self.collect_accesses_in_expression(cond.when_false, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::ARRAY_LITERAL_EXPRESSION
-                || k == syntax_kind_ext::OBJECT_LITERAL_EXPRESSION => {
-                if let Some(literal) = self.ctx.arena.get_literal_expr(node) {
-                    for &elem in &literal.elements.nodes {
-                        self.collect_accesses_in_expression(elem, assigned, tracked, accesses);
-                    }
-                }
-            }
-            k if k == syntax_kind_ext::PROPERTY_ASSIGNMENT => {
-                if let Some(prop) = self.ctx.arena.get_property_assignment(node) {
-                    self.collect_accesses_in_expression(prop.initializer, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::SPREAD_ELEMENT
-                || k == syntax_kind_ext::SPREAD_ASSIGNMENT => {
-                if let Some(spread) = self.ctx.arena.get_spread(node) {
-                    self.collect_accesses_in_expression(spread.expression, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::AS_EXPRESSION
-                || k == syntax_kind_ext::SATISFIES_EXPRESSION
-                || k == syntax_kind_ext::TYPE_ASSERTION => {
-                if let Some(assertion) = self.ctx.arena.get_type_assertion(node) {
-                    self.collect_accesses_in_expression(assertion.expression, assigned, tracked, accesses);
-                }
-            }
-            k if k == syntax_kind_ext::NON_NULL_EXPRESSION
-                || k == syntax_kind_ext::AWAIT_EXPRESSION
-                || k == syntax_kind_ext::YIELD_EXPRESSION => {
-                if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
-                    self.collect_accesses_in_expression(unary.expression, assigned, tracked, accesses);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    /// Collect assignments in variable declaration lists (e.g., `let x = this.a`).
-    fn collect_accesses_in_variable_decl_list(
-        &self,
-        decl_list_idx: NodeIndex,
-        assigned: &mut FxHashSet<PropertyKey>,
-        tracked: &FxHashSet<PropertyKey>,
-        accesses: &mut rustc_hash::FxHashMap<PropertyKey, Vec<(NodeIndex, bool)>>,
-    ) {
-        if decl_list_idx.is_none() {
-            return;
-        }
-
-        let Some(node) = self.ctx.arena.get(decl_list_idx) else {
-            return;
-        };
-
-        // The node itself might be a variable declaration or a list
-        // Try to get it as a variable declaration first
-        if let Some(decl) = self.ctx.arena.get_variable_declaration(node) {
-            if !decl.initializer.is_none() {
-                self.collect_accesses_in_expression(decl.initializer, assigned, tracked, accesses);
-            }
-        }
-        // If it's a variable statement, iterate through its declarations
-        else if let Some(var_stmt) = self.ctx.arena.get_variable(node) {
-            for &decl_idx in &var_stmt.declarations.nodes {
-                self.collect_accesses_in_variable_decl_list(decl_idx, assigned, tracked, accesses);
-            }
-        }
-    }
-
-    /// Update assigned set when property is assigned (for access tracking).
-    fn collect_assignment_target_for_access(
-        &self,
-        target_idx: NodeIndex,
-        assigned: &mut FxHashSet<PropertyKey>,
-        tracked: &FxHashSet<PropertyKey>,
-    ) {
-        if target_idx.is_none() {
-            return;
-        }
-
-        let Some(node) = self.ctx.arena.get(target_idx) else {
-            return;
-        };
-
-        match node.kind {
-            k if k == syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION
-                || k == syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
-                if let Some(key) = self.property_key_from_access(target_idx) {
-                    if tracked.contains(&key) {
-                        assigned.insert(key);
-                    }
-                }
-            }
-            _ => {}
-        }
+        // TODO: Check for TS2565 (Property used before being assigned in constructor)
+        // This requires analyzing the constructor body for `this.X` accesses that occur
+        // before X is assigned. Implementation needs further debugging.
     }
 
     fn property_requires_initialization(
@@ -22720,19 +22316,17 @@ impl<'a> ThinCheckerState<'a> {
 
         // If symbol doesn't exist, we can still check if we have type arguments to extract
         // This handles cases like `MyPromise<void>` where MyPromise is imported from a missing module
-        let symbol = match symbol {
-            Some(s) => s,
-            None => {
-                // For unresolved Promise-like types, assume the inner type is the first type argument
-                // This allows async functions with unresolved Promise return types to be handled gracefully
-                if let Some(&first_arg) = args.first() {
-                    return Some(first_arg);
-                }
-                // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
-                return Some(TypeId::UNKNOWN);
+        if symbol.is_none() {
+            // For unresolved Promise-like types, assume the inner type is the first type argument
+            // This allows async functions with unresolved Promise return types to be handled gracefully
+            if let Some(&first_arg) = args.first() {
+                return Some(first_arg);
             }
-        };
+            // Return UNKNOWN instead of ANY when there are no type arguments (consistent with Task 4-6)
+            return Some(TypeId::UNKNOWN);
+        }
 
+        let symbol = symbol.unwrap();
         let name = symbol.escaped_name.as_str();
 
         if self.is_promise_like_name(name) {
