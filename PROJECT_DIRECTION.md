@@ -11,6 +11,7 @@ Project Zang is a complete rewrite of the TypeScript compiler and type checker i
 
 ### Never Break The Build
 
+- No commit should break the build or cause test failures
 - All changes must pass the unit tests 
 - No change should reduce conformance test accuracy
 
