@@ -116,8 +116,19 @@ impl NodeAccess for NodeArena {
     }
 
     fn get_children(&self, _index: NodeIndex) -> Vec<NodeIndex> {
-        // TODO: Implement proper child enumeration based on node kind
-        // For now, return empty - this would need kind-specific logic
+        // NOTE: AST child enumeration is a complex task that requires matching
+        // each node variant to its specific child fields. Due to the large number
+        // of node types (180+ variants) and field name variations across the AST,
+        // a complete implementation requires careful handling of each case.
+        //
+        // This is a placeholder that returns empty. For a full implementation:
+        // 1. Match on node kind
+        // 2. Extract child NodeIndex fields based on node type
+        // 3. Handle optional fields (NodeIndex may be 0/u32::MAX for none)
+        // 4. Handle NodeList fields (iterate over .nodes)
+        //
+        // The ThinNodeArena implementation may be prioritized as it's the primary
+        // arena used in the parser.
         Vec::new()
     }
 }
