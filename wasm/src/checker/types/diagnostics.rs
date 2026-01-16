@@ -130,6 +130,8 @@ pub mod diagnostic_messages {
         "Type '{0}' is not a constructor function type.";
     pub const PROPERTY_HAS_NO_INITIALIZER: &str =
         "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
+    pub const PROPERTY_USED_BEFORE_BEING_ASSIGNED: &str =
+        "Property '{0}' is used before being assigned in the constructor.";
     pub const CANNOT_ASSIGN_READONLY: &str =
         "Cannot assign to '{0}' because it is a read-only property.";
     pub const CANNOT_ASSIGN_PRIVATE_METHOD: &str =
@@ -312,6 +314,7 @@ pub mod diagnostic_codes {
     pub const THIS_CANNOT_BE_REFERENCED: u32 = 2332;
     pub const THIS_IMPLICITLY_HAS_TYPE_ANY: u32 = 2683; // 'this' implicitly has type 'any' because it does not have a type annotation.
     pub const PROPERTY_HAS_NO_INITIALIZER: u32 = 2564;
+    pub const PROPERTY_USED_BEFORE_BEING_ASSIGNED: u32 = 2565;
     pub const ABSTRACT_PROPERTY_IN_NON_ABSTRACT_CLASS: u32 = 2515;
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515; // Same code for methods
     pub const NON_ABSTRACT_CLASS_MISSING_IMPLEMENTATIONS: u32 = 2654; // Non-abstract class '{0}' is missing implementations for the following members of '{1}': {2}.

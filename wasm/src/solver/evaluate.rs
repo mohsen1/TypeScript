@@ -531,18 +531,9 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
 
         if check_type == TypeId::ANY {
             // For distributive `any extends X ? T : F`:
-            // - Check if branches contain infer types
-            // - If yes, evaluate union of branches to preserve infer types
-            // - If no, short-circuit to any (any poisons the result)
-            if cond.is_distributive {
-                let has_infer = self.type_contains_infer(cond.true_type) || self.type_contains_infer(cond.false_type);
-                if !has_infer {
-                    return TypeId::ANY;
-                }
-            }
-
-            // For non-distributive or when infer types are present, return union of both branches
-            // This allows error poisoning to work correctly and preserves infer types
+            // - Distributive: return union of both branches (any distributes over the conditional)
+            // - Non-distributive: return union of both branches (any poisons the result)
+            // In both cases, we evaluate and union the branches to handle infer types correctly
             let true_eval = self.evaluate(cond.true_type);
             let false_eval = self.evaluate(cond.false_type);
             return self.interner.union2(true_eval, false_eval);
