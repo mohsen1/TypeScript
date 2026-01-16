@@ -296,9 +296,7 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     if let Some(resolved) = self.resolver.resolve_ref(*symbol, self.interner) {
                         resolved
                     } else {
-                        // When the resolver doesn't know the symbol, pass through TypeQuery unchanged
-                        // This allows deferred evaluation in contexts where the symbol may be known later
-                        type_id
+                        TypeId::ERROR
                     };
                 self.visiting.borrow_mut().remove(&type_id);
                 self.cache.borrow_mut().insert(type_id, result);
@@ -4663,6 +4661,6 @@ pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     evaluator.evaluate_keyof(operand)
 }
 
-// Tests are included in mod.rs as evaluate_tests
-// This module was previously commented out due to outdated API usage
-// Re-enabled to verify compilation and identify any remaining issues
+#[cfg(test)]
+#[path = "evaluate_tests.rs"]
+mod tests;
