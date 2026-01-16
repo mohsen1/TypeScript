@@ -1330,6 +1330,16 @@ impl<'a> ThinCheckerState<'a> {
         if let Some(type_id) = self.lookup_type_parameter(name) {
             return Some(type_id);
         }
+        // Check if this is a global augmentation (interface declared in `declare global` block)
+        // If so, use resolve_lib_type_by_name to merge with lib.d.ts declarations
+        let is_global_augmentation = self.ctx.binder.global_augmentations.contains_key(name);
+        if is_global_augmentation {
+            // For global augmentations, we must use resolve_lib_type_by_name to get
+            // the proper merge of lib.d.ts + user augmentation
+            if let Some(type_id) = self.resolve_lib_type_by_name(name) {
+                return Some(type_id);
+            }
+        }
         if let Some(sym_id) = self.resolve_identifier_symbol(name_idx) {
             return Some(self.type_reference_symbol_type(sym_id));
         }
@@ -10918,9 +10928,11 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(env) = env {
                     let mut checker =
                         crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    checker.set_strict_null_checks(self.ctx.strict_null_checks);
                     return Some(checker.is_assignable(TypeId::NUMBER, target));
                 }
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                checker.set_strict_null_checks(self.ctx.strict_null_checks);
                 return Some(checker.is_assignable(TypeId::NUMBER, target));
             }
         }
@@ -10930,9 +10942,11 @@ impl<'a> ThinCheckerState<'a> {
                 if let Some(env) = env {
                     let mut checker =
                         crate::solver::CompatChecker::with_resolver(self.ctx.types, env);
+                    checker.set_strict_null_checks(self.ctx.strict_null_checks);
                     return Some(checker.is_assignable(source, TypeId::NUMBER));
                 }
                 let mut checker = crate::solver::CompatChecker::new(self.ctx.types);
+                checker.set_strict_null_checks(self.ctx.strict_null_checks);
                 return Some(checker.is_assignable(source, TypeId::NUMBER));
             }
         }
@@ -11697,7 +11711,8 @@ impl<'a> ThinCheckerState<'a> {
         }
 
         let env = self.ctx.type_env.borrow();
-        let checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        let mut checker = CompatChecker::with_resolver(self.ctx.types, &*env);
+        checker.set_strict_null_checks(self.ctx.strict_null_checks);
         checker.is_weak_union_violation(source, target)
     }
 

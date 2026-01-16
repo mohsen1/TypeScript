@@ -143,19 +143,151 @@ Record:
 ## Merge Summary (2026-01-15)
 
 **EM-3 Manager:** worker-9 merged into em-team-3
-**Date:** 2026-01-15 17:30
-**Method:** Direct merge (no conflicts)
+**Method:** Via rust branch sync (no conflicts)
 **Status:** ✅ Complete
 
-**Files Changed:**
-- WORKER_9_TASK_LIST.md - Updated with merge status
-- wasm/src/thin_checker.rs - TS2571/TS2683 fixes
-- wasm/src/thin_checker_tests.rs - Test updates
-
 **Results:**
-- Clean merge with no conflicts
-- 146 lines added
-- All TS2571 over-reporting fixes included
-- Ready for director review
+- Worker-9 was already up to date with rust branch
+- All TS2571 over-reporting fixes included in rust
+- No additional commits needed
+- Clean merge to em-team-3
 
-**Next Assignment:** worker-9 will be assigned TS2322 categorization task (Priority 1) after director review.
+**Note:** Worker-10 (commit 2a18abc48) implemented the actual TS2571→TS2683 fix which was merged via rust sync.
+
+---
+
+## Assignment: Strict Null Checks Implementation (Priority 1)
+
+**Assigned:** 2026-01-15
+**Priority:** 1 (Critical)
+**Status:** 🟡 In Progress
+
+---
+
+## Mission
+
+Implement strict null checks in the WASM type checker to match TypeScript's `strictNullChecks` compiler option behavior.
+
+**Problem Context:**
+- TypeScript's `strictNullChecks` option catches potential null/undefined errors
+- WASM checker currently lacks this enforcement
+- Reference commit: `75eca5072` - "feat: add support for strict null checks in type checker"
+
+**Key Files:**
+- `wasm/src/checker/` - Type checking logic
+- `wasm/src/thin_checker.rs` - Main checker entry point
+- Null/undefined type handling modules
+
+**Expected Behavior:**
+- `null` and `undefined` should not be assignable to non-nullable types
+- Optional parameters should be typed as `T | undefined`
+- Object property access should check for null/undefined
+- Nullish coalescing and optional chaining should be supported
+
+---
+
+## Tasks
+
+### Task 1: Investigate Current Null Handling
+- [ ] Search for existing null/undefined type definitions in WASM codebase
+- [ ] Document how null/undefined are currently handled
+- [ ] Find TypeScript source code for `strictNullChecks` implementation
+- [ ] Identify gaps between current WASM and TypeScript behavior
+
+**Output:** Documentation of current state and required changes
+
+---
+
+### Task 2: Implement Nullable Type Tracking
+- [ ] Add nullable type flag to type representation
+- [ ] Implement union types for `T | null` and `T | undefined`
+- [ ] Add type narrowing for null checks (if statements, nullish coalescing)
+- [ ] Track nullable state through control flow
+
+**Output:** Type system extensions for nullability
+
+---
+
+### Task 3: Add Strict Null Checking Rules
+- [ ] Implement assignment checks for null/undefined
+- [ ] Add property access validation (check for null/undefined before access)
+- [ ] Enforce non-null assertions operator (`!`)
+- [ ] Add optional chaining (`?.`) support
+- [ ] Add nullish coalescing (`??`) support
+
+**Output:** Checker rules for strict null checks
+
+---
+
+### Task 4: Create Test Cases
+- [ ] Test file for null assignment errors
+- [ ] Test file for undefined assignment errors
+- [ ] Test file for optional parameters
+- [ ] Test file for type narrowing with null checks
+- [ ] Test file for optional chaining and nullish coalescing
+- [ ] Test file for non-null assertion operator
+
+**Output:** Comprehensive test suite
+
+---
+
+### Task 5: Validate with Conformance Tests
+- [ ] Run: `./wasm/differential-test/run-conformance.sh --max=500`
+- [ ] Focus on tests involving null/undefined
+- [ ] Verify error emissions match TypeScript
+- [ ] Fix any mismatches or regressions
+
+**Target Metrics:**
+| Test Category | Target |
+|---------------|--------|
+| Null assignment errors | Match TS |
+| Undefined errors | Match TS |
+| Type narrowing | Match TS |
+| Overall match rate | >95% |
+
+---
+
+## Workflow
+
+1. Sync with rust branch: `git fetch origin && git merge origin/rust`
+2. Execute tasks sequentially
+3. Commit after each task: `git add -A && git commit -m "[wasm] checker: strict null checks - <description>"`
+4. Push: `git push origin worker-9`
+5. Update task list with status
+6. Report completion to EM-3
+
+---
+
+## Notes
+
+- **DO NOT** modify TypeScript source files in `src/compiler/`
+- **ONLY** modify files in `wasm/` directory
+- Reference commit `75eca5072` may already have partial implementation
+- Coordinate with EM-3 if blocking issues arise
+
+---
+
+## Status Log
+
+| Date | Task | Status | Notes |
+|------|------|--------|-------|
+| 2026-01-15 | Task 1 | 🟡 Pending | Starting investigation |
+| 2026-01-15 | Task 2 | ⏸️ Not Started | Awaiting Task 1 |
+| 2026-01-15 | Task 3 | ⏸️ Not Started | Awaiting Task 2 |
+| 2026-01-15 | Task 4 | ⏸️ Not Started | Awaiting Task 3 |
+| 2026-01-15 | Task 5 | ⏸️ Not Started | Awaiting Task 4 |
+
+---
+
+## Completion Criteria
+
+- [ ] All 5 tasks completed
+- [ ] Null assignment errors match TypeScript
+- [ ] Undefined assignment errors match TypeScript
+- [ ] Type narrowing works correctly
+- [ ] Optional chaining and nullish coalescing supported
+- [ ] No regressions in existing tests
+- [ ] Code committed and pushed to worker-9
+- [ ] Ready for merge to rust branch
+
+---

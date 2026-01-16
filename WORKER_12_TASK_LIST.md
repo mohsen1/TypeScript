@@ -8,81 +8,61 @@
 
 ---
 
-## Assignment: TS1109/TS1005 Parser Fixes
+## Assignment: Application Type Expansion
 
-**Priority:** EM-4 Tier 1 (Parser Accuracy)
-**Status:** ✅ Complete
+**Priority:** 🔴 CRITICAL (Tier 0 - Quality & Stability)
+**Status:** 🔵 Active
 **Started:** 2026-01-15
-**Completed:** 2026-01-15
 
 ---
 
 ## Mission
 
-Fix TS2571 ("Object is of type 'unknown'") false positives that should instead be TS2683 ("'this' implicitly has type 'any'"). These errors represent the same underlying type checking issue in different contexts.
+Fix `TypeKey::Application` type expansion. Application types are not being expanded, leading to incorrect diagnostics and assignability results. This is a foundational issue that affects type checking correctness across multiple tiers.
 
 ---
 
 ## Problem Analysis
 
 **Current Behavior:**
-- WASM emits TS2571 when `this` is typed as `unknown` in non-method functions
-- TypeScript correctly emits TS2683 for implicit `this` in regular functions
-- Both errors indicate the same problem: `this` lacks explicit typing
+- `TypeKey::Application` types are stored but not expanded during type checking
+- This leads to incorrect type comparisons and diagnostics
+- Affects assignability checks, subtype relationships, and error reporting
 
 **Why This Matters:**
-- TS2683 is more specific and actionable for users
-- TS2571 is a generic "unknown" error that doesn't convey the real issue
-- Consistency with TypeScript's error messages is critical for user trust
+- Application types (e.g., `Promise<T>`, `Array<T>`) need expansion to check their actual type arguments
+- Without expansion, `Promise<string>` and `Promise<number>` might be considered equal
+- Foundational to correct type checking behavior
 
 ---
 
 ## Task Breakdown
 
-### Phase 1: Investigation (DO THIS FIRST)
-- [ ] Run conformance tests to capture TS2571 errors
-  ```bash
-  ./wasm/differential-test/run-conformance.sh --max=100 --workers=4
-  ```
-- [ ] Analyze TS2571 emissions: categorize by context
-  - Arrow functions
-  - Regular functions
-  - Callbacks
-  - Event handlers
-  - Object methods
-- [ ] Identify which should be TS2683 instead
+### Phase 1: Investigation
+- [ ] Study existing instantiation logic in `wasm/src/solver/instantiate.rs`
+- [ ] Understand how `TypeKey::Application` is currently stored
+- [ ] Find where type expansion should occur but doesn't
+- [ ] Identify test cases showing incorrect behavior
 
 ### Phase 2: Code Analysis
-- [ ] Review `current_this_type()` in `wasm/src/thin_checker.rs`
-  - This is where Worker 1 fixed TS2683
-  - Understand the logic for detecting non-method functions
-- [ ] Find all locations where TS2571 is emitted
-  ```bash
-  grep -r "TS2571" wasm/src/
-  ```
-- [ ] Map TS2571 emissions to their use cases
+- [ ] Review `wasm/src/solver/intern.rs` - type interning logic
+- [ ] Review `wasm/src/solver/subtype.rs` - subtype checking
+- [ ] Find where Application types should be expanded
+- [ ] Map the expansion flow from instantiation to comparison
 
 ### Phase 3: Implementation
-- [ ] Modify type inference for `this` in non-class contexts:
-  - When `this` would be `unknown`, check if function is a method
-  - If NOT a method, emit TS2683 instead of TS2571
-  - Ensure arrow functions capture `this` correctly from enclosing scope
-- [ ] Test with edge cases:
-  - Nested functions
-  - Callbacks passed to higher-order functions
-  - Event listeners
-  - Object property functions
+- [ ] Implement type expansion for Application types:
+  - When comparing Application types, expand both to their actual types
+  - Use existing instantiation logic from `instantiate.rs`
+  - Ensure recursive expansion for nested Applications
+- [ ] Add expansion calls at key comparison points
+- [ ] Test with generic types: `Promise<T>`, `Array<T>`, `Map<K,V>`
 
 ### Phase 4: Validation
 - [ ] Run Rust tests: `./wasm/test.sh` (Docker required)
-- [ ] Run conformance tests:
-  ```bash
-  ./wasm/differential-test/run-conformance.sh --max=500 --workers=4
-  ```
-- [ ] Verify metrics improvement:
-  - TS2571 should decrease significantly
-  - TS2683 should increase (filling gaps)
-  - Overall error count should stay similar (reclassification)
+- [ ] Re-enable solver tests once API is updated
+- [ ] Run conformance tests to verify no regression
+- [ ] Create test cases for Application type comparisons
 
 ---
 
@@ -90,59 +70,64 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should instead b
 
 | File | Purpose |
 |------|---------|
-| `wasm/src/thin_checker.rs` | Main type checking logic, `current_this_type()` function |
-| `wasm/src/checker/` | Checker subsystem (if exists) |
+| `wasm/src/solver/instantiate.rs` | Existing instantiation logic to reuse |
+| `wasm/src/solver/intern.rs` | Type interning and TypeKey definitions |
+| `wasm/src/solver/subtype.rs` | Subtype checking where expansion is needed |
+| `wasm/src/solver/evaluate.rs` | Type evaluation logic |
 | `wasm/differential-test/` | Conformance test suite |
 
 ---
 
 ## Success Criteria
 
-| Metric | Before | Target |
-|--------|--------|--------|
-| TS2571 extra errors | Unknown | <50 |
-| TS2683 missing | Unknown | Fill gaps |
-| Error reclassification | N/A | TS2571→TS2683 for non-method `this` |
+| Metric | Target |
+|--------|--------|
+| Application types expand correctly | ✅ |
+| Generic type comparisons work | ✅ |
+| Solver tests re-enabled | ✅ |
+| No regression in conformance tests | ✅ |
 
 ---
 
 ## Workflow
 
-1. **Sync with EM-3:**
+1. **Sync with EM-4:**
    ```bash
    git fetch origin
-   git pull origin em-team-3 --rebase
+   git pull origin rust --rebase
    ```
 
 2. **Work on task:**
-   - Make changes in `wasm/` directory only
-   - Commit frequently: `git commit -m "[wasm] checker: <description>"`
+   - Make changes in `wasm/src/solver/` directory
+   - Commit frequently: `git commit -m "[wasm] solver: <description>"`
    - Push to worker-12: `git push origin worker-12`
 
 3. **Validation:**
-   - Run `./wasm/test.sh` before pushing
+   - Run Rust tests before pushing
    - Document test results in commit messages
 
 4. **When complete:**
    - Update this task list with completion status
-   - Notify EM-3 for merge review
+   - Notify EM-4 for merge review
 
 ---
 
 ## Progress Log
 
-### 2026-01-15 - Task Completed ✅
-- **Transfer:** Reassigned from EM-3 to EM-4
-- **New Assignment:** TS1109/TS1005 Parser Fixes
-- **Implementation:** Fixed parser false positives for await in default parameters
-- **File Changed:** `wasm/src/thin_parser.rs`
-- **Merge:** Merged to em-team-4 (rebased on rust branch)
-- **Validation:** 44.4% exact match (20/45 tests)
-- **Status:** Ready for Director review
+### 2026-01-15 - Sync Complete ✅
+- **Status:** Branch synced with rust, no new code to merge
+- **Current Assignment:** Application Type Expansion (Tier 0)
+- **Phase:** Investigation - worker-12 working on task
+- **Validation:** 44.4% exact match (baseline maintained)
 
-### Previous Assignment (EM-3)
-- ✅ Assigned to EM-3, Priority 2 (TS2571 Over-reporting)
-- 🔵 Transferred to EM-4 before completion
+### 2026-01-15 - New Assignment 🔵
+- **Previous:** Completed TS1109/TS1005 Parser Fixes
+- **New:** Application Type Expansion (Tier 0)
+- **Status:** Starting investigation phase
+
+### Previous Completed Tasks
+- ✅ TS1109/TS1005 Parser Fixes (2026-01-15)
+- ✅ TS2571/TS2683 (transferred from EM-3, incomplete)
 
 ---
 

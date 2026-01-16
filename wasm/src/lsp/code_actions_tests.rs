@@ -1,6 +1,6 @@
 use super::*;
 use crate::checker::types::diagnostics::diagnostic_codes::{
-    CANNOT_FIND_NAME, PROPERTY_DOES_NOT_EXIST_ON_TYPE, UNUSED_IMPORT,
+    CANNOT_FIND_NAME, PROPERTY_DOES_NOT_EXIST_ON_TYPE, UNUSED_IMPORT, UNUSED_VARIABLE,
 };
 use crate::lsp::position::LineMap;
 use crate::thin_binder::ThinBinderState;
@@ -1774,4 +1774,174 @@ fn test_quickfix_add_missing_import_class_implements_uses_import_type() {
         updated,
         "import type { Foo } from \"./foo\";\nclass Bar implements Foo {}\n"
     );
+}
+
+#[test]
+fn test_quickfix_remove_unused_variable_let() {
+    let source = "let x = 1;\nlet y = 2;\nconsole.log(y);\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "x");
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(UNUSED_VARIABLE),
+        source: None,
+        message: "'x' is declared but its value is never read.".to_string(),
+        related_information: None,
+    };
+
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "");
+}
+
+#[test]
+fn test_quickfix_remove_unused_variable_const() {
+    let source = "const unused = 1;\nconst used = 2;\nconsole.log(used);\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "unused");
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(UNUSED_VARIABLE),
+        source: None,
+        message: "'unused' is declared but its value is never read.".to_string(),
+        related_information: None,
+    };
+
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "");
+}
+
+#[test]
+fn test_quickfix_remove_unused_function() {
+    let source = "function unused() {}\nfunction used() {}\nused();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "unused");
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(UNUSED_VARIABLE),
+        source: None,
+        message: "'unused' is declared but its value is never read.".to_string(),
+        related_information: None,
+    };
+
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0].title, "Remove unused declaration 'unused'");
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "");
+}
+
+#[test]
+fn test_quickfix_remove_unused_class() {
+    let source = "class Unused {}\nclass Used {}\nnew Used();\n";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+    let arena = parser.get_arena();
+
+    let mut binder = ThinBinderState::new();
+    binder.bind_source_file(arena, root);
+
+    let line_map = LineMap::build(source);
+    let range = range_for_substring(source, &line_map, "Unused");
+    let diag = LspDiagnostic {
+        range,
+        severity: Some(DiagnosticSeverity::Warning),
+        code: Some(UNUSED_VARIABLE),
+        source: None,
+        message: "'Unused' is declared but its value is never read.".to_string(),
+        related_information: None,
+    };
+
+    let provider =
+        CodeActionProvider::new(arena, &binder, &line_map, "test.ts".to_string(), source);
+
+    let empty_range = Range::new(Position::new(0, 0), Position::new(0, 0));
+    let actions = provider.provide_code_actions(
+        root,
+        empty_range,
+        CodeActionContext {
+            diagnostics: vec![diag],
+            only: Some(vec![CodeActionKind::QuickFix]),
+            import_candidates: Vec::new(),
+        },
+    );
+
+    assert_eq!(actions.len(), 1);
+    assert_eq!(actions[0].title, "Remove unused declaration 'Unused'");
+    let edit = actions[0].edit.as_ref().unwrap();
+    let edits = edit.changes.get("test.ts").unwrap();
+    assert_eq!(edits.len(), 1);
+    assert_eq!(edits[0].new_text, "");
 }
