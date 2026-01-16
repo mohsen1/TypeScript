@@ -2,7 +2,7 @@
 
 **Maintained by**: EM-4
 **Worker**: Worker 14
-**Worktree**: /var/folders/57/xp3brw212ygckhkk_ml783fr0000gn/T/cco-workspace-TypeScript-1768508073410/worktrees/worker-14
+**Worktree:** /var/folders/57/xp3brw212ygckhkk_ml783fr0000gn/T/cco-workspace-TypeScript-1768516891306/worktrees/worker-14
 **Target Branch**: rust
 **Squad**: Quality & Stability Squad (EM-4)
 
@@ -10,159 +10,140 @@
 
 ## Current Task
 
-### [ ] Task: Fix Symbol Resolution Errors (TS2304)
+### [ ] Task: AST Child Enumeration
 
-**Priority:** 🟡 HIGH (Tier 3 - Symbol Resolution)
+**Priority:** 🔴 CRITICAL (Tier 0 - Quality & Stability)
 **Assigned:** 2026-01-15
-**Status:** 🔄 IN PROGRESS
+**Status:** 🔵 Active
 
 ### Problem
 
-The thin checker has issues with symbol resolution:
-- **TS2304:** "Cannot find name 'X'" - 7 missing, 5 extra errors
+The `get_children` function returns empty in parser arenas, breaking traversal-based features like:
+- AST walking algorithms
+- Code transformation tools
+- Static analysis tools
+- Refactoring operations
 
 **Current Impact:**
-- 7 missing TS2304 errors (global/local symbol lookup gaps)
-- 5 extra TS2304 errors (false positives)
-
-**Note:** EM-4 task description mentioned TS2524, but TS2524 is about "'await' expressions cannot be used in a parameter initializer" (async/await issue), not module exports. TS2524 should be handled by Worker 13 (async/await) or as part of TS1109 fixes. My scope is TS2304 only.
+- Cannot traverse AST nodes systematically
+- Blocks implementation of many language features
+- Prevents proper AST-based analysis
 
 ### Root Cause
 
-1. **TS2304 Missing:** Symbol table lookup may not be checking all scopes correctly
-2. **TS2304 Extra:** Symbols being found when they shouldn't be (scope leakage)
+1. **Parser arena structure:** AST nodes stored in arenas don't have built-in child traversal
+2. **Missing `get_children` implementation:** Function exists but returns empty
+3. **No child metadata:** Node types don't declare their children systematically
 
 ### Action Items
 
 #### Phase 1: Investigation
 
-1. **Examine test failures**
+1. **Examine current implementation**
    ```bash
-   # Find symbol-related test failures
-   cd wasm/differential-test
-   grep -r "TS2304" output/ --include="*.json" | head -50
+   # Find get_children in parser code
+   grep -rn "get_children" wasm/src/parser/
    ```
 
-2. **Study symbol resolution code**
-   - `wasm/src/binder/` - symbol table and scope management
-   - `wasm/src/thin_checker.rs` - symbol resolution logic (line 16198+)
-   - `wasm/src/parallel.rs` - module handling
+2. **Study parser arena structure**
+   - `wasm/src/parser/arena.rs` - Arena storage
+   - `wasm/src/parser/thin_node.rs` - Node definitions
+   - Understand how nodes are stored and accessed
 
-3. **Find missing diagnostics**
-   - Check TS2304 code exists in `diagnostic_codes` ✓ (confirmed: code 2304)
-   - Identify where these should be emitted
-   - Find specific test cases showing missing/extra errors
+3. **Identify node types**
+   - List all AST node types that need child enumeration
+   - Map parent-child relationships for each node type
 
 #### Phase 2: Implementation
 
-1. **Fix TS2304 missing errors**
-   - Ensure global symbols are checked
-   - Ensure local symbols are in correct scope
-   - Fix scope chain traversal
+1. **Implement `get_children` for each node type:**
+   - Add per-node-kind child enumeration
+   - Return references to child nodes (not copies - avoid large allocations)
+   - Handle optional children (e.g., optional type annotations)
 
-2. **Fix TS2304 extra errors**
-   - Identify why extra TS2304s are emitted
-   - Fix scope boundaries to prevent leakage
+2. **Add child metadata:**
+   - Define child relationships per node type
+   - Support both owned and borrowed child references
+   - Ensure deterministic traversal order
+
+3. **Test traversal:**
+   - Create test cases that walk AST
+   - Verify all nodes are reachable
+   - Check that no cycles are introduced
 
 #### Phase 3: Validation
 
-1. **Run targeted tests**
+1. **Unit tests:**
    ```bash
-   cd wasm/differential-test
-   # Test symbol resolution specifically
-   bash run-conformance.sh --category="Symbols" --max=100
-   bash run-conformance.sh --category="ambient" --max=100
+   cd wasm
+   cargo test get_children
    ```
 
-2. **Run conformance suite**
-   ```bash
-   cd wasm/differential-test
-   bash run-conformance.sh --max=500 --workers=4
-   ```
-   - Track TS2304 count (target: reduce missing to <3)
-   - Track TS2304 extra count (target: reduce to <2)
-   - Ensure no regression
+2. **Integration tests:**
+   - Test AST walking algorithms
+   - Verify refactoring tools can traverse
+   - Check static analysis tools work
 
-3. **Compare with tsc output**
-   ```bash
-   # Verify our errors match TypeScript compiler
-   ```
+3. **Conformance tests:**
+   - Run existing test suite to ensure no regression
 
 ### Files to Work On
 
-- **Primary:** `wasm/src/binder/` - Symbol table management
-- **Primary:** `wasm/src/thin_checker.rs` - Symbol resolution logic (line 16198+ for `emit_cannot_find_name`)
-- **Tests:** Create test cases for symbol resolution edge cases
+- **Primary:** `wasm/src/parser/arena.rs` - Arena implementation
+- **Primary:** `wasm/src/parser/thin_node.rs` - Node definitions
+- **Tests:** Create AST traversal tests
 
 ### Success Criteria
 
-| Metric | Current | Target |
-|--------|---------|--------|
-| TS2304 missing errors | 7 | <3 |
-| TS2304 extra errors | 5 | <2 |
-
-### Reference
-
-- **EM_4_TASKS.md:** Tier 3 Symbol Resolution priorities
-- **PROJECT_DIRECTION.md:** Symbol resolution guidelines
-- **wasm/src/checker/types/diagnostics.rs:** Diagnostic code definitions
-- **TS2524_ANALYSIS.md:** TS2524 is async/await issue, not module exports (out of scope)
-
-### Instructions
-
-1. Sync with rust branch: `git fetch origin && git pull origin rust`
-2. Work on TS2304 symbol resolution ONLY
-3. Commit frequently with descriptive messages:
-   - `fix(wasm): add TS2304 for undefined global symbols`
-   - `fix(wasm): fix TS2304 for scope lookup gaps`
-   - `fix(wasm): remove TS2304 false positives from scope leakage`
-4. Push to worker-14 branch: `git push origin worker-14`
-5. Run tests locally before considering complete
-6. Update this task list with status
-7. Notify EM-4 when ready for review
-
-### Validation Checklist Before Merge
-
-- [ ] TS2304 missing errors reduced to target (<3)
-- [ ] TS2304 extra errors reduced to target (<2)
-- [ ] Global symbol lookup working
-- [ ] Local symbol lookup working
-- [ ] No regression in valid error detection
-- [ ] Test cases added for new functionality
+| Metric | Target |
+|--------|--------|
+| `get_children` implemented | ✅ All node types |
+| Returns correct children | ✅ No empty results |
+| No allocations during traversal | ✅ Returns references |
+| Deterministic order | ✅ Consistent traversal |
 
 ---
 
 ## Completed Tasks
 
-### ✅ Task 1: Fix TS2322 False Positives in Union Type Assignability (2026-01-15)
+### ✅ Task 1: TS2322 Union Type Assignability Investigation (2026-01-15)
 **Status:** Merged to em-team-4
-**Result:** Investigation found union type logic is correct - 548 extra TS2322s are legitimate errors from Worker 7's "Invert Solver Defaults" fix
+**Result:** Investigation complete - union type logic is correct
 
-**Created:**
-- UNION_ASSIGNABILITY_ANALYSIS.md - Deep dive into union type checking
-- test_union_assignability.rs - Unit tests for union types
-- test_union_assignability.ts - TypeScript test cases
-
-**Key Finding:** No implementation needed in subtype checker - logic already correct
+### ✅ Task 2: TS2304 Symbol Resolution Investigation (2026-01-15)
+**Status:** Merged to em-team-4
+**Result:** Created TS2304_INVESTIGATION.md with deep analysis
 
 ---
 
 ## Progress Log
 
-**2026-01-15:**
-- ✅ Previous task (TS2322 union types) investigation complete
-- ✅ Merged to em-team-4
-- 🔄 Reassigned to Symbol Resolution (TS2304)
-- ✅ Created TS2304_INVESTIGATION.md - Deep analysis of symbol resolution issues
-- ✅ Merged to em-team-4
-- ✅ Validation: 44.4% exact match (20/45 tests)
-- ✅ Status: Ready for EM-4 escalation
+**2026-01-15 - New Assignment:**
+- **Previous:** Completed TS2304 symbol resolution investigation
+- **New:** AST Child Enumeration (Tier 0)
+- **Status:** Starting investigation phase
 
----
+**Previous Completed Tasks:**
+- ✅ TS2322 union type investigation
+- ✅ TS2304 symbol resolution investigation
 
-## Notes
+## Workflow
 
-- **EM-4 Status:** Active - worker-14 reassigned to Symbol Resolution
-- **Team Alignment:** Tier 3 Symbol Resolution focus
-- **Next Steps:** Investigate TS2304/TS2524 failures and implement fixes
-- **Priority:** Symbol resolution is critical for accurate error reporting
+1. **Sync with EM-4:**
+   ```bash
+   git fetch origin
+   git pull origin rust --rebase
+   ```
+
+2. **Work on task:**
+   - Focus on `wasm/src/parser/` directory
+   - Commit frequently: `git commit -m "[wasm] parser: <description>"`
+   - Push to worker-14: `git push origin worker-14`
+
+3. **Validation:**
+   - Run `cargo test` for parser tests
+   - Verify AST traversal works correctly
+
+4. **When complete:**
+   - Update this task list
+   - Notify EM-4 for merge review
