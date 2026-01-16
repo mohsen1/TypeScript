@@ -6522,6 +6522,20 @@ impl<'a> ThinCheckerState<'a> {
         // Interface - return interface type with call signatures
         if flags & symbol_flags::INTERFACE != 0 {
             if !symbol.declarations.is_empty() {
+                // Get type parameters from the first interface declaration
+                let mut params = Vec::new();
+                let mut updates = Vec::new();
+
+                // Try to get type parameters from the interface declaration
+                let first_decl = symbol.declarations.first().copied().unwrap_or(NodeIndex::NONE);
+                if !first_decl.is_none() {
+                    if let Some(node) = self.ctx.arena.get(first_decl) {
+                        if let Some(interface) = self.ctx.arena.get_interface(node) {
+                            (params, updates) = self.push_type_parameters(&interface.type_parameters);
+                        }
+                    }
+                }
+
                 let type_param_bindings = self.get_type_param_bindings();
                 let type_resolver =
                     |node_idx: NodeIndex| self.resolve_type_symbol_for_lowering(node_idx);
@@ -6535,10 +6549,14 @@ impl<'a> ThinCheckerState<'a> {
                 )
                 .with_type_param_bindings(type_param_bindings);
                 let interface_type = lowering.lower_interface_declarations(&symbol.declarations);
-                // TODO: interfaces can have type parameters too - handle them properly
+
+                // Restore the type parameter scope
+                self.pop_type_parameters(updates);
+
+                // Return the interface type along with the type parameters that were used
                 return (
                     self.merge_interface_heritage_types(&symbol.declarations, interface_type),
-                    Vec::new(),
+                    params,
                 );
             }
             if !value_decl.is_none() {

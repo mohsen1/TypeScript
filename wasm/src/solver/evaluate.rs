@@ -181,24 +181,40 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Evaluate a type, resolving any meta-types if possible.
     /// Returns the evaluated type (may be the same if no evaluation needed).
     ///
-    /// # Application Type Expansion
+    /// # TODO: Application Type Expansion (Worker 2 - Redux test fix)
     ///
-    /// `Application(Ref(sym), args)` types (like `Reducer<S, A>`) are expanded
-    /// to their instantiated form by calling `evaluate_application()` at line 305.
-    /// This resolves the base symbol, gets type parameters, and instantiates the
-    /// resolved type body with the provided type arguments.
+    /// **Problem**: `Application(Ref(sym), args)` types (like `Reducer<S, A>`) are not
+    /// being expanded to their instantiated form. This causes diagnostics to show
+    /// `Ref(5)<error>` instead of the actual type.
+    ///
+    /// **Current Behavior**: Application types pass through unchanged at line ~202.
+    /// This means when comparing a function type against `Reducer<S, A>`, the
+    /// Application type is not expanded to its underlying function type.
+    ///
+    /// **Observed Diagnostics in redux test**:
+    /// - `Type '(state: undefined | Ref(5)<error>, action: Ref(6)<error>) => any'
+    ///    is not assignable to type 'Ref(1)<Ref(5)<error>, Ref(6)<error>>'`
+    /// - `Ref(5)`, `Ref(6)`, `Ref(7)` etc. should be expanded to actual types
+    ///
+    /// **Fix Approach**: Add a case for `TypeKey::Application(app_id)`:
+    /// 1. Get the base type from the Application
+    /// 2. If base is a `Ref(sym)`, resolve it using `self.resolver.resolve_ref(sym, ...)`
+    /// 3. Get the type parameters from the resolved type (type alias or interface)
+    /// 4. Create a substitution map: type_params[i] -> args[i]
+    /// 5. Instantiate the resolved type body with the substitution
+    /// 6. Return the instantiated type
     ///
     /// **Example**:
     /// ```text
     /// // Given: type Reducer<S, A> = (state: S | undefined, action: A) => S
     /// // And: Application(Ref(Reducer), [number, AnyAction])
-    /// // Expands to: (state: number | undefined, action: AnyAction) => number
+    /// // Should expand to: (state: number | undefined, action: AnyAction) => number
     /// ```
     ///
     /// **Related Files**:
     /// - `instantiate.rs` - Has substitution logic for type parameters
-    /// - `thin_checker.rs:11708` - Application expansion in assignability checking
-    /// - `subtype.rs:910` - Application expansion in subtype checking
+    /// - `thin_checker.rs:2900-2918` - Type alias resolution with type params
+    /// - `lower.rs:856-868` - `lower_type_alias_declaration` with params
     pub fn evaluate(&self, type_id: TypeId) -> TypeId {
         // Fast path for intrinsics
         if type_id.is_intrinsic() {
@@ -378,37 +394,6 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
-        // Handle cases where the base is not a Ref but still needs expansion
-        // This handles nested Applications and other complex base types
-        // First, evaluate the base to expand it if needed
-        let evaluated_base = self.evaluate(app.base);
-
-        // If the base changed during evaluation, we may need to instantiate
-        if evaluated_base != app.base {
-            // Try to extract type params from the evaluated base
-            let extracted_params = self.extract_type_params_from_type(evaluated_base);
-            if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
-                // Pre-expand type arguments
-                let expanded_args: Vec<TypeId> = app
-                    .args
-                    .iter()
-                    .map(|&arg| self.try_expand_type_arg(arg))
-                    .collect();
-
-                let instantiated = instantiate_generic(
-                    self.interner,
-                    evaluated_base,
-                    &extracted_params,
-                    &expanded_args,
-                );
-                return self.evaluate(instantiated);
-            }
-
-            // If we couldn't extract params but base changed, try to create a new application
-            // with the evaluated base
-            return self.interner.application(evaluated_base, app.args.clone());
-        }
-
         // If we can't expand, return the original application
         self.interner.application(app.base, app.args.clone())
     }
@@ -547,19 +532,8 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
 
         if check_type == TypeId::ANY {
-            // For distributive `any extends X ? T : F`:
-            // - Check if branches contain infer types
-            // - If yes, evaluate union of branches to preserve infer types
-            // - If no, short-circuit to any (any poisons the result)
-            if cond.is_distributive {
-                let has_infer = self.type_contains_infer(cond.true_type) || self.type_contains_infer(cond.false_type);
-                if !has_infer {
-                    return TypeId::ANY;
-                }
-            }
-
-            // For non-distributive or when infer types are present, return union of both branches
-            // This allows error poisoning to work correctly and preserves infer types
+            // For `any extends X ? T : F`, return union of both branches
+            // This allows error poisoning to work correctly
             let true_eval = self.evaluate(cond.true_type);
             let false_eval = self.evaluate(cond.false_type);
             return self.interner.union2(true_eval, false_eval);
@@ -4689,7 +4663,6 @@ pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     evaluator.evaluate_keyof(operand)
 }
 
-// Re-enabled solver tests after TypeKey::Application expansion implementation
-#[cfg(test)]
-#[path = "evaluate_tests.rs"]
-mod tests;
+// Tests are included in mod.rs as evaluate_tests
+// This module was previously commented out due to outdated API usage
+// Re-enabled to verify compilation and identify any remaining issues
