@@ -143,13 +143,19 @@ Record:
 ## Merge Summary (2026-01-15)
 
 **EM-3 Manager:** worker-9 merged into em-team-3
-**Method:** Via rust branch sync (no conflicts)
+**Date:** 2026-01-15 17:30
+**Method:** Direct merge (no conflicts)
 **Status:** ✅ Complete
 
-**Results:**
-- Worker-9 was already up to date with rust branch
-- All TS2571 over-reporting fixes included in rust
-- No additional commits needed
-- Clean merge to em-team-3
+**Files Changed:**
+- WORKER_9_TASK_LIST.md - Updated with merge status
+- wasm/src/thin_checker.rs - TS2571/TS2683 fixes
+- wasm/src/thin_checker_tests.rs - Test updates
 
-**Note:** Worker-10 (commit 2a18abc48) implemented the actual TS2571→TS2683 fix which was merged via rust sync.
+**Results:**
+- Clean merge with no conflicts
+- 146 lines added
+- All TS2571 over-reporting fixes included
+- Ready for director review
+
+**Next Assignment:** worker-9 will be assigned TS2322 categorization task (Priority 1) after director review.
