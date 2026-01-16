@@ -11705,6 +11705,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         match key {
+            TypeKey::Application(_) => self.evaluate_type_with_resolution(type_id),
             TypeKey::IndexAccess(_, _)
             | TypeKey::KeyOf(_)
             | TypeKey::Mapped(_)
