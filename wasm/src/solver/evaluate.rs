@@ -376,6 +376,37 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
             }
         }
 
+        // Handle cases where the base is not a Ref but still needs expansion
+        // This handles nested Applications and other complex base types
+        // First, evaluate the base to expand it if needed
+        let evaluated_base = self.evaluate(app.base);
+
+        // If the base changed during evaluation, we may need to instantiate
+        if evaluated_base != app.base {
+            // Try to extract type params from the evaluated base
+            let extracted_params = self.extract_type_params_from_type(evaluated_base);
+            if !extracted_params.is_empty() && extracted_params.len() == app.args.len() {
+                // Pre-expand type arguments
+                let expanded_args: Vec<TypeId> = app
+                    .args
+                    .iter()
+                    .map(|&arg| self.try_expand_type_arg(arg))
+                    .collect();
+
+                let instantiated = instantiate_generic(
+                    self.interner,
+                    evaluated_base,
+                    &extracted_params,
+                    &expanded_args,
+                );
+                return self.evaluate(instantiated);
+            }
+
+            // If we couldn't extract params but base changed, try to create a new application
+            // with the evaluated base
+            return self.interner.application(evaluated_base, app.args.clone());
+        }
+
         // If we can't expand, return the original application
         self.interner.application(app.base, app.args.clone())
     }
