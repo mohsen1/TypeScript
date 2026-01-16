@@ -10077,7 +10077,6 @@ impl<'a> ThinCheckerState<'a> {
             if is_async_for_context {
                 self.ctx.enter_async_context();
             }
-
             // Push this_type to the stack before checking the body
             // This ensures this references inside the function have the proper type context
             // For functions with explicit this parameter: use that type
@@ -10097,7 +10096,6 @@ impl<'a> ThinCheckerState<'a> {
             if is_async_for_context {
                 self.ctx.exit_async_context();
             }
-
             if pushed_this_type {
                 self.ctx.this_type_stack.pop();
             }
