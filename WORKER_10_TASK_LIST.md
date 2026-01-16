@@ -51,6 +51,40 @@ Investigate and fix cases where TypeScript emits TS2571 ("Object is of type 'unk
 
 ---
 
+### [ ] Task 2: Reduce TS2322 Extra Errors (Type Assignability)
+Investigate and reduce TS2322 ("Type X is not assignable to type Y") extra errors in WASM type checking.
+
+**Problem**:
+- TS2322 is over-reported (~548 extra errors)
+- WASM type checker is stricter than TypeScript in some cases
+- Need to reduce from ~548 to <200 extra errors
+
+**Action**:
+1. Run baseline conformance test: `./wasm/differential-test/run-conformance.sh --max=500 --workers=4`
+2. Analyze TS2322 extra errors - categorize by pattern:
+   - Union type assignability issues
+   - Generic type constraint issues
+   - Structural vs nominal typing differences
+   - Literal type widening issues
+3. Identify top 3-5 most common TS2322 error patterns
+4. Focus on one pattern at a time:
+   - Reproduce the issue with a minimal test case
+   - Find the type checking logic in `wasm/src/thin_checker.rs` or `wasm/src/checker/`
+   - Fix the assignability check
+   - Verify fix doesn't introduce missing errors
+5. Test each fix with conformance tests
+6. Commit with descriptive message for each fix
+7. Push to origin worker-10 after each fix
+8. Update this task with progress
+
+**Target Metrics**:
+- TS2322 extra errors: reduce from ~548 to <200
+- Exact Match Rate: improve from ~30% to 40%+
+
+**Status**: In Progress
+
+---
+
 ## Notes
 
 **Key Files**:
