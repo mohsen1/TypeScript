@@ -648,6 +648,19 @@ impl TypeInterner {
             return flat[0];
         }
 
+        // Absorb literal types into their corresponding primitive types
+        // e.g., "a" | string | number => string | number
+        // e.g., 1 | 2 | number => number
+        // e.g., true | boolean => boolean
+        self.absorb_literals_into_primitives(&mut flat);
+
+        if flat.is_empty() {
+            return TypeId::NEVER;
+        }
+        if flat.len() == 1 {
+            return flat[0];
+        }
+
         let list_id = self.intern_type_list(flat.into_vec());
         self.intern(TypeKey::Union(list_id))
     }
@@ -1027,6 +1040,60 @@ impl TypeInterner {
             TypeKey::TemplateLiteral(_) => Some(PrimitiveClass::String),
             _ => None,
         }
+    }
+
+    /// Absorb literal types into their corresponding primitive types.
+    /// e.g., "a" | string | number => string | number
+    /// e.g., 1 | 2 | number => number
+    /// e.g., true | boolean => boolean
+    ///
+    /// This is called after deduplication and before creating the union.
+    fn absorb_literals_into_primitives(&self, flat: &mut TypeListBuffer) {
+        // Group types by primitive class
+        let mut has_string = false;
+        let mut has_number = false;
+        let mut has_boolean = false;
+        let mut has_bigint = false;
+        let mut has_symbol = false;
+
+        // First pass: identify which primitive types are present
+        for &type_id in flat.iter() {
+            match type_id {
+                TypeId::STRING => has_string = true,
+                TypeId::NUMBER => has_number = true,
+                TypeId::BOOLEAN => has_boolean = true,
+                TypeId::BIGINT => has_bigint = true,
+                TypeId::SYMBOL => has_symbol = true,
+                _ => {
+                    if let Some(TypeKey::Intrinsic(kind)) = self.lookup(type_id) {
+                        match kind {
+                            IntrinsicKind::String => has_string = true,
+                            IntrinsicKind::Number => has_number = true,
+                            IntrinsicKind::Boolean => has_boolean = true,
+                            IntrinsicKind::Bigint => has_bigint = true,
+                            IntrinsicKind::Symbol => has_symbol = true,
+                            _ => {}
+                        }
+                    }
+                }
+            }
+        }
+
+        // Second pass: remove literal types that have a corresponding primitive
+        flat.retain(|type_id| {
+            // Keep if it's not a literal type
+            let Some(TypeKey::Literal(literal)) = self.lookup(*type_id) else {
+                return true;
+            };
+
+            // Remove literal if the corresponding primitive is present
+            match literal {
+                LiteralValue::String(_) => !has_string,
+                LiteralValue::Number(_) => !has_number,
+                LiteralValue::Boolean(_) => !has_boolean,
+                LiteralValue::BigInt(_) => !has_bigint,
+            }
+        });
     }
 
     /// Intern an array type

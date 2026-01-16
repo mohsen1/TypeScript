@@ -4663,7 +4663,6 @@ pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     evaluator.evaluate_keyof(operand)
 }
 
-// FIXME: Disabled due to outdated API usage - needs migration to new TypeKey::Application etc.
-// #[cfg(test)]
-// #[path = "evaluate_tests.rs"]
-// mod tests;
+// Tests are included in mod.rs as evaluate_tests
+// This module was previously commented out due to outdated API usage
+// Re-enabled to verify compilation and identify any remaining issues
