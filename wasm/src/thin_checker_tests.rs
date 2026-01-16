@@ -17658,7 +17658,7 @@ const str: string = null;
         &binder,
         &types,
         "test.ts".to_string(),
-        false,
+        true,  // strict mode to enable strictNullChecks
     );
     checker.check_source_file(root);
 
@@ -17698,7 +17698,7 @@ const num: number = undefined;
         &binder,
         &types,
         "test.ts".to_string(),
-        false,
+        true,  // strict mode to enable strictNullChecks
     );
     checker.check_source_file(root);
 
