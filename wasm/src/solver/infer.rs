@@ -2279,7 +2279,7 @@ impl<'a> InferenceContext<'a> {
     }
 }
 
-// FIXME: Disabled due to outdated API usage - needs migration to new TypeKey::Application etc.
+// Re-enabled solver tests after TypeKey::Application expansion implementation
 #[cfg(test)]
 #[path = "infer_tests.rs"]
 mod tests;

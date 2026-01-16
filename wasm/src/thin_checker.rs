@@ -10093,7 +10093,6 @@ impl<'a> ThinCheckerState<'a> {
                 self.ctx.this_type_stack.push(this_type);
                 pushed_this_type = true;
             }
-            }
 
             self.push_return_type(return_type);
             self.check_statement(body);
@@ -10106,7 +10105,6 @@ impl<'a> ThinCheckerState<'a> {
             // Exit async context
             if is_async_for_context {
                 self.ctx.exit_async_context();
-            }
             }
         }
 
@@ -11707,6 +11705,7 @@ impl<'a> ThinCheckerState<'a> {
         };
 
         match key {
+            TypeKey::Application(_) => self.evaluate_type_with_resolution(type_id),
             TypeKey::IndexAccess(_, _)
             | TypeKey::KeyOf(_)
             | TypeKey::Mapped(_)

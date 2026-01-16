@@ -863,8 +863,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::ReadonlyType(s_inner), TypeKey::ReadonlyType(t_inner)) => {
                 self.check_subtype(*s_inner, *t_inner)
             }
+            // Readonly array/tuple is NOT assignable to mutable version
+            // This must come after the ReadonlyType-ReadonlyType case above
+            (TypeKey::ReadonlyType(_), TypeKey::Array(_)) => SubtypeResult::False,
+            (TypeKey::ReadonlyType(_), TypeKey::Tuple(_)) => SubtypeResult::False,
             // Mutable arrays/tuples are assignable to readonly versions
-            (_, TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
+            (TypeKey::Array(_), TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
+            (TypeKey::Tuple(_), TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
 
             // Unique symbol - only equal to itself
             (TypeKey::UniqueSymbol(s_sym), TypeKey::UniqueSymbol(t_sym)) => {
@@ -3953,10 +3958,10 @@ pub fn is_subtype_of_with_resolver<R: TypeResolver>(
     checker.is_subtype_of(source, target)
 }
 
-// FIXME: Disabled due to outdated API usage - needs migration to new TypeKey::Application etc.
-// #[cfg(test)]
-// #[path = "subtype_tests.rs"]
-// mod tests;
+// Re-enabled solver tests after TypeKey::Application expansion implementation
+#[cfg(test)]
+#[path = "subtype_tests.rs"]
+mod tests;
 
 #[cfg(test)]
 #[path = "index_signature_tests.rs"]
