@@ -135,7 +135,8 @@ Fix TS2571 ("Object is of type 'unknown'") false positives that should instead b
 - **Transfer:** Reassigned from EM-3 to EM-4
 - **New Assignment:** TS1109/TS1005 Parser Fixes
 - **Implementation:** Fixed parser false positives for await in default parameters
-- **Merge:** Merged to em-team-4
+- **File Changed:** `wasm/src/thin_parser.rs`
+- **Merge:** Merged to em-team-4 (rebased on rust branch)
 - **Validation:** 44.4% exact match (20/45 tests)
 - **Status:** Ready for Director review
 

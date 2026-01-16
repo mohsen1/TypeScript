@@ -767,6 +767,18 @@ impl<'a> ThinCheckerState<'a> {
 
             // await expression - unwrap Promise<T> to get T
             k if k == syntax_kind_ext::AWAIT_EXPRESSION => {
+                // TS1359: Check if await is within an async function
+                if !self.ctx.in_async_context() {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages,
+                    };
+                    self.error_at_node(
+                        idx,
+                        diagnostic_messages::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
+                        diagnostic_codes::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
+                    );
+                }
+
                 if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
                     let expr_type = self.get_type_of_node(unary.expression);
                     // If the awaited type is Promise-like, extract the type argument
@@ -9977,6 +9989,18 @@ impl<'a> ThinCheckerState<'a> {
                         diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
                     );
                 }
+
+                // TS2705: Async function requires Promise constructor when Promise is not in lib
+                if is_async && !is_generator && !self.ctx.has_promise_in_lib() {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages,
+                    };
+                    self.error_at_node(
+                        idx,
+                        diagnostic_messages::ASYNC_FUNCTION_REQUIRES_PROMISE_CONSTRUCTOR,
+                        diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                    );
+                }
             }
 
             // TS2366 (not all code paths return value) for function expressions and arrow functions
@@ -10030,9 +10054,28 @@ impl<'a> ThinCheckerState<'a> {
                 }
             }
 
+            // Determine if this is an async function for context tracking
+            let is_async_for_context = if let Some(func) = self.ctx.arena.get_function(node) {
+                func.is_async
+            } else if let Some(method) = self.ctx.arena.get_method_decl(node) {
+                self.has_async_modifier(&method.modifiers)
+            } else {
+                false
+            };
+
+            // Enter async context if applicable
+            if is_async_for_context {
+                self.ctx.enter_async_context();
+            }
+
             self.push_return_type(return_type);
             self.check_statement(body);
             self.pop_return_type();
+
+            // Exit async context
+            if is_async_for_context {
+                self.ctx.exit_async_context();
+            }
         }
 
         // Create function type using TypeInterner
@@ -14919,6 +14962,25 @@ impl<'a> ThinCheckerState<'a> {
                             );
                         }
 
+                        // TS2705: Async function requires Promise constructor when Promise is not in lib
+                        // This is a different check from the return type check above
+                        // Check if function is async and Promise is not available in lib
+                        if func.is_async && !func.asterisk_token && !self.ctx.has_promise_in_lib() {
+                            use crate::checker::types::diagnostics::{
+                                diagnostic_codes, diagnostic_messages,
+                            };
+                            self.error_at_node(
+                                stmt_idx,
+                                diagnostic_messages::ASYNC_FUNCTION_REQUIRES_PROMISE_CONSTRUCTOR,
+                                diagnostic_codes::ASYNC_FUNCTION_RETURNS_PROMISE,
+                            );
+                        }
+
+                        // Enter async context for await expression checking
+                        if func.is_async {
+                            self.ctx.enter_async_context();
+                        }
+
                         self.push_return_type(return_type);
                         self.check_statement(func.body);
 
@@ -14972,6 +15034,11 @@ impl<'a> ThinCheckerState<'a> {
                         }
 
                         self.pop_return_type();
+
+                        // Exit async context
+                        if func.is_async {
+                            self.ctx.exit_async_context();
+                        }
                     } else if self.ctx.no_implicit_any && !has_type_annotation {
                         let is_ambient = self.has_declare_modifier(&func.modifiers)
                             || self.ctx.file_name.ends_with(".d.ts");
