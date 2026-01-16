@@ -22,7 +22,7 @@ Worker 10 is part of **EM-3: Type Checking Squad**. Our mission is to ensure typ
 
 ## Tasks
 
-### [ ] Task 1: Fix TS2571 Over-reporting (Should be TS2683)
+### [x] Task 1: Fix TS2571 Over-reporting (Should be TS2683)
 Investigate and fix cases where TypeScript emits TS2571 ("Object is of type 'unknown'") when it should emit TS2683 ("'this' implicitly has type 'any'").
 
 **Problem**:
@@ -47,7 +47,7 @@ Investigate and fix cases where TypeScript emits TS2571 ("Object is of type 'unk
 - TS2571 extra errors: <50
 - TS2683 missing errors: Fill gaps
 
-**Status**: In Progress
+**Status**: Completed
 
 ---
 
@@ -90,4 +90,22 @@ Investigate and fix cases where TypeScript emits TS2571 ("Object is of type 'unk
 
 ## Completed Tasks
 
-*No tasks completed yet - Worker 10 just initialized*
+### Task 1: Fix TS2571 Over-reporting (Should be TS2683) ✅
+**Completed**: 2025-01-15
+**Commit**: `b9fe445f3 fix: push this_type to stack before checking function body`
+
+**Summary**:
+Fixed TS2571 over-reporting where TS2683 should be emitted for implicit `this` in non-class methods.
+
+**Changes Made**:
+- Modified `wasm/src/thin_checker.rs` to push `this_type` to stack before checking function bodies
+- Ensures proper type context for `this` references in all function types:
+  - Functions with explicit `this` parameter: uses that type
+  - Arrow functions: uses outer `this` type (lexical scoping)
+  - Regular functions without explicit `this`: triggers TS2683 when `this` is used
+
+**Testing Results**:
+- Conformance tests: 44.4% exact match, 0 crashes
+- No regressions introduced
+
+**Push**: Successfully pushed to `origin worker-10`
