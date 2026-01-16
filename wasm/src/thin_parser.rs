@@ -2315,7 +2315,13 @@ impl ThinParserState {
         };
 
         let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
-            self.parse_assignment_expression()
+            // Default parameter values are evaluated in the parent scope, not in the function body.
+            // Temporarily disable async context to allow 'await' as an identifier in default values.
+            let saved_flags = self.context_flags;
+            self.context_flags &= !CONTEXT_FLAG_ASYNC;
+            let initializer = self.parse_assignment_expression();
+            self.context_flags = saved_flags;
+            initializer
         } else {
             NodeIndex::NONE
         };
@@ -6747,9 +6753,10 @@ impl ThinParserState {
                     // Examples where await is a reserved identifier but invalid as expression:
                     //   await;  // Error: Expression expected (in static blocks)
                     //   await (1);  // Error: Expression expected (in static blocks)
-                    //   async (a = await) => {}  // Error: Expression expected (parameter default)
                     //   async (a = await => x) => {}  // Error: Expression expected (before arrow)
-                    // But allow: let await = 1;  (declaration)
+                    // But allow:
+                    //   let await = 1;  (declaration)
+                    //   async (a = await) => {}  (default parameter value)
 
                     // Look ahead to see what token comes after 'await'
                     let snapshot = self.scanner.save_state();
@@ -6762,7 +6769,6 @@ impl ThinParserState {
                     let has_following_expression = !matches!(
                         next_token,
                         SyntaxKind::SemicolonToken
-                            | SyntaxKind::CloseParenToken
                             | SyntaxKind::CloseBracketToken
                             | SyntaxKind::CommaToken
                             | SyntaxKind::ColonToken
