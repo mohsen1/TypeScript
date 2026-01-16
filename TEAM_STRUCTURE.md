@@ -12,7 +12,7 @@
 |--------|-------|--------|--------------|
 | Worker 5 | Syntax Squad | Active | Statement-Level Error Recovery Enhancement |
 | Worker 6 | Binder Squad | Active | TS2304 Global Scope / Lib Injection (ongoing) |
-| Worker 7 | Semantics Squad | Ready for Assignment | Module Symbol Resolution (TS7005, TS7008, TS2792) |
+| Worker 7 | Semantics Squad | Approved | Module Symbol Resolution (TS7005, TS7008, TS2792) |
 | Worker 8 | LSP Squad | Approved | LSP TypeScript Config Integration |
 
 ---
