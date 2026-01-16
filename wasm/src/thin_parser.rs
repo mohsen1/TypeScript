@@ -39,6 +39,8 @@ const CONTEXT_FLAG_ASYNC: u32 = 1;
 const CONTEXT_FLAG_GENERATOR: u32 = 2;
 /// Context flag: inside a static block (where 'await' is reserved)
 const CONTEXT_FLAG_STATIC_BLOCK: u32 = 4;
+/// Context flag: parsing a parameter default (where 'await' is not allowed)
+const CONTEXT_FLAG_PARAMETER_DEFAULT: u32 = 8;
 
 // =============================================================================
 // Parse Diagnostic
@@ -256,6 +258,12 @@ impl ThinParserState {
     #[inline]
     fn in_static_block_context(&self) -> bool {
         (self.context_flags & CONTEXT_FLAG_STATIC_BLOCK) != 0
+    }
+
+    /// Check if we're parsing a parameter default (where 'await' is not allowed)
+    #[inline]
+    fn in_parameter_default_context(&self) -> bool {
+        (self.context_flags & CONTEXT_FLAG_PARAMETER_DEFAULT) != 0
     }
 
     /// Set context flags and return the old value (for restoring later)
@@ -2331,8 +2339,10 @@ impl ThinParserState {
 
         let initializer = if self.parse_optional(SyntaxKind::EqualsToken) {
             // Default parameter values are evaluated in the parent scope, not in the function body.
-            // Temporarily disable async context to allow 'await' as an identifier in default values.
+            // Set parameter default context flag to detect 'await' usage (TS1109).
             let saved_flags = self.context_flags;
+            self.context_flags |= CONTEXT_FLAG_PARAMETER_DEFAULT;
+            // Also temporarily disable async context so 'await' is not treated as an await expression
             self.context_flags &= !CONTEXT_FLAG_ASYNC;
             let initializer = self.parse_assignment_expression();
             self.context_flags = saved_flags;
@@ -6794,17 +6804,19 @@ impl ThinParserState {
                 )
             }
             SyntaxKind::AwaitKeyword => {
-                // Only parse as await expression if we're in an async context
-                if !self.in_async_context() {
-                    // Outside async context, check if await is used as a bare expression
+                // Only parse as await expression if we're in an async context AND NOT in a parameter default
+                // Parameter defaults are evaluated in the parent scope, not the async function body
+                if !self.in_async_context() || self.in_parameter_default_context() {
+                    // Outside async context or in parameter default context, check if await is used as a bare expression
                     // If followed by tokens that can't start an expression, report "Expression expected"
                     // Examples where await is a reserved identifier but invalid as expression:
                     //   await;  // Error: Expression expected (in static blocks)
                     //   await (1);  // Error: Expression expected (in static blocks)
                     //   async (a = await => x) => {}  // Error: Expression expected (before arrow)
+                    //   async (a = await 42) => {}  // Error in parameter default
                     // But allow:
                     //   let await = 1;  (declaration)
-                    //   async (a = await) => {}  (default parameter value)
+                    //   async (a = await) => {}  (default parameter value, as identifier reference)
 
                     // Look ahead to see what token comes after 'await'
                     let snapshot = self.scanner.save_state();
@@ -8486,12 +8498,9 @@ impl ThinParserState {
                 let start_pos = self.token_pos();
                 self.next_token();
 
-                // TS1109: await in computed property name is invalid when in async context
-                // { [await]: foo } should report "Expression expected"
-                if self.in_async_context() && self.is_token(SyntaxKind::AwaitKeyword) {
-                    use crate::checker::types::diagnostics::diagnostic_codes;
-                    self.error_expression_expected();
-                }
+                // Note: await in computed property name is NOT a parser error
+                // The type checker will emit TS2304 if 'await' is not in scope
+                // Example: { [await]: foo } should only emit TS2304, not TS1109
 
                 let expression = self.parse_expression();
                 self.parse_expected(SyntaxKind::CloseBracketToken);

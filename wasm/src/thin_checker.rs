@@ -857,6 +857,9 @@ impl<'a> ThinCheckerState<'a> {
             // Array type (T[])
             k if k == syntax_kind_ext::ARRAY_TYPE => self.get_type_from_array_type(idx),
 
+            // Type operator (readonly, unique, etc.)
+            k if k == syntax_kind_ext::TYPE_OPERATOR => self.get_type_from_type_operator(idx),
+
             // Function type (e.g., () => number, (x: string) => void)
             k if k == syntax_kind_ext::FUNCTION_TYPE => self.get_type_from_function_type(idx),
 
@@ -2536,6 +2539,38 @@ impl<'a> ThinCheckerState<'a> {
         TypeId::ERROR // Missing array type data - propagate error
     }
 
+    /// Get type from a type operator node (readonly T[], readonly [T, U], unique symbol).
+    fn get_type_from_type_operator(&mut self, idx: NodeIndex) -> TypeId {
+        use crate::scanner::SyntaxKind;
+
+        let Some(node) = self.ctx.arena.get(idx) else {
+            return TypeId::ERROR; // Missing node - propagate error
+        };
+
+        if let Some(type_op) = self.ctx.arena.get_type_operator(node) {
+            let operator = type_op.operator;
+            let inner_type = self.get_type_from_type_node(type_op.type_node);
+
+            // Handle readonly operator
+            if operator == SyntaxKind::ReadonlyKeyword as u16 {
+                // Wrap the inner type in ReadonlyType
+                return self.ctx.types.intern(crate::solver::TypeKey::ReadonlyType(inner_type));
+            }
+
+            // Handle unique operator
+            if operator == SyntaxKind::UniqueKeyword as u16 {
+                // unique is handled differently - it's a type modifier for symbols
+                // For now, just return the inner type
+                return inner_type;
+            }
+
+            // Unknown operator - return inner type
+            inner_type
+        } else {
+            TypeId::ERROR // Missing type operator data - propagate error
+        }
+    }
+
     /// Get type from a function type node (e.g., () => number, (x: string) => void).
     fn get_type_from_function_type(&mut self, idx: NodeIndex) -> TypeId {
         use crate::solver::TypeLowering;
@@ -2584,6 +2619,10 @@ impl<'a> ThinCheckerState<'a> {
                 return self.ctx.types.array(elem_type);
             }
             return TypeId::ERROR; // Missing array type data - propagate error
+        }
+        if node.kind == syntax_kind_ext::TYPE_OPERATOR {
+            // Handle readonly and other type operators in type literals
+            return self.get_type_from_type_operator(idx);
         }
         if node.kind == syntax_kind_ext::TYPE_LITERAL {
             return self.get_type_from_type_literal(idx);
