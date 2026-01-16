@@ -6,6 +6,84 @@
 
 ---
 
+## ✅ APPROVED: Remove Unused Declarations Code Action (2026-01-15)
+
+**Status:** 🟢 APPROVED BY EM-2
+**Priority:** 🟡 ENHANCEMENT (Developer Experience)
+**Assigned:** 2026-01-15
+
+---
+
+## Primary Task: Remove Unused Declarations Code Action
+
+**Priority:** 🟡 ENHANCEMENT (Developer Experience)
+
+### Problem
+
+TypeScript's tsc emits TS6133 "'{0}' is declared but its value is never read" for variables, functions, classes, and other declarations that are declared but never used. Currently, this project:
+
+1. ✅ Has `UNUSED_VARIABLE` diagnostic code defined (`diagnostic_codes::UNUSED_VARIABLE = 6133`)
+2. ❌ Does NOT emit diagnostics for unused declarations
+3. ❌ Does NOT provide code actions to remove unused declarations
+4. ✅ Has "Remove Unused Declarations" listed as a future feature in `code_actions.rs:17`
+
+This means users don't get helpful warnings about unused code, and miss out on automated cleanup.
+
+### Solution
+
+**Phase 1: Add Diagnostic Emission**
+- Detect unused variables in the checker
+- Detect unused functions
+- Detect unused classes
+- Emit TS6133 diagnostics with appropriate locations
+
+**Phase 2: Add Code Action**
+- Implement `unused_declaration_quickfix()` in `code_actions.rs`
+- Provide code action to remove unused declarations
+- Handle various declaration types (variables, functions, classes, interfaces, type aliases)
+- Update tests
+
+### Infrastructure Already Exists
+- ✅ `UNUSED_VARIABLE` code defined in `diagnostics.rs:410`
+- ✅ Pattern exists: `unused_import_quickfix()` can be adapted
+- ✅ Symbol tracking in `ThinBinderState`
+- ✅ Usage analysis capabilities in the checker
+
+### Files to Modify
+- `wasm/src/thin_checker.rs` - Add unused declaration detection
+- `wasm/src/lsp/code_actions.rs` - Add `unused_declaration_quickfix()` method
+- `wasm/src/lsp/code_actions_tests.rs` - Add tests for the code action
+
+### Success Criteria
+- Emit TS6133 for unused variables, functions, classes
+- Provide "Remove unused declaration" code action
+- Code action correctly removes the declaration
+- No false positives (exports are not flagged)
+- Tests cover all declaration types
+
+### Testing
+- Test unused variable detection (let, const, var)
+- Test unused function detection
+- Test unused class/interface detection
+- Test code action removes declaration correctly
+- Test exports are not flagged as unused
+- Test declarations used in other files are not flagged
+
+### Estimated Effort
+- **Medium complexity** - Requires usage analysis across scopes
+- **2-3 hours** diagnostic emission
+- **1-2 hours** code action implementation
+- **1 hour** testing
+
+### Risk Assessment
+- **Medium risk** - Need to avoid false positives
+- **Careful handling** of:
+  - Exported declarations (should not be flagged)
+  - Declarations used in other files (project-level analysis)
+  - Declarations with side effects (e.g., function calls at module level)
+
+---
+
 ## ✅ APPROVED: LSP TypeScript Config Integration (2026-01-14 23:25)
 
 **Status:** 🟢 APPROVED BY EM-2
