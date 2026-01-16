@@ -67,6 +67,14 @@ Re-enable solver tests that are currently commented out due to API drift. This w
 
 ## Progress Log
 
+### 2026-01-15 - Tier 0 Progress 🔵
+- **Current Assignment:** Solver Test Coverage (Tier 0)
+- **Side Contribution:** Improved TS1359 await expression checking (80 lines)
+- **Files Changed:** `wasm/src/thin_checker.rs`
+- **Merge:** Successfully merged to em-team-4
+- **Validation:** 44.4% exact match (baseline maintained)
+- **Status:** Continuing Tier 0 solver test work
+
 ### 2026-01-15 - New Assignment 🔵
 - **Previous:** Completed Async/Await checks (TS2705/TS1359)
 - **New:** Solver Test Coverage (Tier 0)
