@@ -1035,6 +1035,7 @@ impl TypeInterner {
 
     /// Intern a readonly array type
     pub fn readonly_array(&self, element: TypeId) -> TypeId {
+        // Wrap array type in ReadonlyType to enforce readonly semantics
         let array_type = self.array(element);
         self.intern(TypeKey::ReadonlyType(array_type))
     }
@@ -1047,6 +1048,7 @@ impl TypeInterner {
 
     /// Intern a readonly tuple type
     pub fn readonly_tuple(&self, elements: Vec<TupleElement>) -> TypeId {
+        // Wrap tuple type in ReadonlyType to enforce readonly semantics
         let tuple_type = self.tuple(elements);
         self.intern(TypeKey::ReadonlyType(tuple_type))
     }
