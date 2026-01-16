@@ -429,6 +429,15 @@ impl<'a> TypeInstantiator<'a> {
                     {
                         if !self.is_shadowed(info.name) {
                             if let Some(substituted) = self.substitution.get(info.name) {
+                                // When substituting a type parameter with `any` in a distributive conditional,
+                                // the result is `any` (not a union of branches)
+                                if substituted == crate::solver::types::TypeId::ANY {
+                                    return substituted;
+                                }
+                                // When substituting with `never`, the result is `never`
+                                if substituted == crate::solver::types::TypeId::NEVER {
+                                    return substituted;
+                                }
                                 if let Some(TypeKey::Union(members)) =
                                     self.interner.lookup(substituted)
                                 {
