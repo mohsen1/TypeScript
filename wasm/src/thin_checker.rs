@@ -767,6 +767,18 @@ impl<'a> ThinCheckerState<'a> {
 
             // await expression - unwrap Promise<T> to get T
             k if k == syntax_kind_ext::AWAIT_EXPRESSION => {
+                // TS1359: Check if await is within an async function
+                if !self.ctx.in_async_context() {
+                    use crate::checker::types::diagnostics::{
+                        diagnostic_codes, diagnostic_messages,
+                    };
+                    self.error_at_node(
+                        idx,
+                        diagnostic_messages::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
+                        diagnostic_codes::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
+                    );
+                }
+
                 if let Some(unary) = self.ctx.arena.get_unary_expr_ex(node) {
                     let expr_type = self.get_type_of_node(unary.expression);
                     // If the awaited type is Promise-like, extract the type argument
@@ -14766,16 +14778,12 @@ impl<'a> ThinCheckerState<'a> {
             syntax_kind_ext::EXPRESSION_STATEMENT => {
                 // ExpressionStatement stores expression index in data_index
                 if let Some(expr_stmt) = self.ctx.arena.get_expression_statement(node) {
-                    // TS1359: Check for await expressions outside async function
-                    self.check_await_expression(expr_stmt.expression);
-                    // Then get the type for normal type checking
                     self.get_type_of_node(expr_stmt.expression);
                 }
             }
             syntax_kind_ext::IF_STATEMENT => {
                 if let Some(if_data) = self.ctx.arena.get_if_statement(node) {
                     // Check condition
-                    self.check_await_expression(if_data.expression);
                     self.get_type_of_node(if_data.expression);
                     // Check then branch
                     self.check_statement(if_data.then_statement);
@@ -16084,9 +16092,6 @@ impl<'a> ThinCheckerState<'a> {
 
         // Get the type of the return expression (if any)
         let return_type = if !return_data.expression.is_none() {
-            // TS1359: Check for await expressions outside async function
-            self.check_await_expression(return_data.expression);
-
             let prev_context = self.ctx.contextual_type;
             if expected_type != TypeId::ANY && !self.type_contains_error(expected_type) {
                 self.ctx.contextual_type = Some(expected_type);
@@ -20939,79 +20944,6 @@ impl<'a> ThinCheckerState<'a> {
         } else {
             // No current node - emit at start of file
             self.error_at_position(0, 0, message, code);
-        }
-    }
-
-    /// Check an expression node for TS1359: await outside async function.
-    /// Recursively checks the expression tree for await expressions.
-    fn check_await_expression(&mut self, expr_idx: NodeIndex) {
-        let Some(node) = self.ctx.arena.get(expr_idx) else {
-            return;
-        };
-
-        // If this is an await expression, check if we're in async context
-        if node.kind == syntax_kind_ext::AWAIT_EXPRESSION {
-            if !self.ctx.in_async_context() {
-                use crate::checker::types::diagnostics::{
-                    diagnostic_codes, diagnostic_messages,
-                };
-                self.error_at_node(
-                    expr_idx,
-                    diagnostic_messages::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
-                    diagnostic_codes::AWAIT_EXPRESSION_ONLY_IN_ASYNC_FUNCTION,
-                );
-            }
-        }
-
-        // Recursively check child expressions
-        match node.kind {
-            syntax_kind_ext::BINARY_EXPRESSION => {
-                if let Some(bin_expr) = self.ctx.arena.get_binary_expr(node) {
-                    self.check_await_expression(bin_expr.left);
-                    self.check_await_expression(bin_expr.right);
-                }
-            }
-            syntax_kind_ext::PREFIX_UNARY_EXPRESSION | syntax_kind_ext::POSTFIX_UNARY_EXPRESSION => {
-                if let Some(unary_expr) = self.ctx.arena.get_unary_expr_ex(node) {
-                    self.check_await_expression(unary_expr.expression);
-                }
-            }
-            syntax_kind_ext::AWAIT_EXPRESSION => {
-                // Already checked above
-                if let Some(unary_expr) = self.ctx.arena.get_unary_expr_ex(node) {
-                    self.check_await_expression(unary_expr.expression);
-                }
-            }
-            syntax_kind_ext::CALL_EXPRESSION => {
-                if let Some(call_expr) = self.ctx.arena.get_call_expr(node) {
-                    self.check_await_expression(call_expr.expression);
-                    // Check arguments
-                    if let Some(ref args) = call_expr.arguments {
-                        for &arg in &args.nodes {
-                            self.check_await_expression(arg);
-                        }
-                    }
-                }
-            }
-            syntax_kind_ext::PROPERTY_ACCESS_EXPRESSION => {
-                if let Some(access_expr) = self.ctx.arena.get_access_expr(node) {
-                    self.check_await_expression(access_expr.expression);
-                }
-            }
-            syntax_kind_ext::ELEMENT_ACCESS_EXPRESSION => {
-                // Element access is stored differently - need to check the actual structure
-                // The expression and argument are stored in specific data_index positions
-                // For now, skip this to avoid breaking the build
-            }
-            syntax_kind_ext::PARENTHESIZED_EXPRESSION => {
-                if let Some(paren_expr) = self.ctx.arena.get_parenthesized(node) {
-                    self.check_await_expression(paren_expr.expression);
-                }
-            }
-            _ => {
-                // For other expression types, don't recurse into children
-                // to avoid infinite recursion or performance issues
-            }
         }
     }
 
