@@ -376,12 +376,12 @@ fn compile_inner(
         let compile_inputs: Vec<(String, String)> = sources
             .into_iter()
             .map(|source| {
-                let text = source
-                    .text
-                    .unwrap_or_else(|| panic!("missing source text for {}", source.path.display()));
-                (source.path.to_string_lossy().into_owned(), text)
+                let text = source.text.ok_or_else(|| {
+                    anyhow::anyhow!("missing source text for {}", source.path.display())
+                })?;
+                Ok::<(String, String), anyhow::Error>((source.path.to_string_lossy().into_owned(), text))
             })
-            .collect();
+            .collect::<Result<Vec<_>, _>>()?;
         (parallel::compile_files(compile_inputs), None)
     };
     if let Some(cache) = cache.as_deref_mut() {
@@ -471,9 +471,11 @@ fn build_program_with_cache(
                 (hash, cached_ok)
             }
             None => {
-                let cached = cache.bind_cache.get(&source.path).unwrap_or_else(|| {
-                    panic!("missing cached bind result for {}", source.path.display());
-                });
+                // Source text not available - should be cached
+                let Some(cached) = cache.bind_cache.get(&source.path) else {
+                    eprintln!("Warning: missing cached bind result for {}, skipping", source.path.display());
+                    continue;
+                };
                 (cached.hash, true)
             }
         };
@@ -502,9 +504,10 @@ fn build_program_with_cache(
             continue;
         }
 
-        let result = parsed_map.remove(&entry.file_name).unwrap_or_else(|| {
-            panic!("missing parse result for {}", entry.file_name);
-        });
+        let Some(result) = parsed_map.remove(&entry.file_name) else {
+            eprintln!("Warning: missing parse result for {}, skipping cache update", entry.file_name);
+            continue;
+        };
         cache.bind_cache.insert(
             entry.path.clone(),
             BindCacheEntry {
