@@ -15418,23 +15418,34 @@ impl<'a> ThinCheckerState<'a> {
             // TS7005: Variable implicitly has an 'any' type
             // Report this error when noImplicitAny is enabled and the variable has no type annotation
             // and the inferred type is 'any'
+            // Skip destructuring patterns - TypeScript doesn't emit TS7005 for them
+            // because binding elements with default values can infer their types
             if self.ctx.no_implicit_any
                 && var_decl.type_annotation.is_none()
                 && final_type == TypeId::ANY
             {
-                if let Some(ref name) = var_name {
-                    use crate::checker::types::diagnostics::{
-                        diagnostic_codes, diagnostic_messages, format_message,
-                    };
-                    let message = format_message(
-                        diagnostic_messages::VARIABLE_IMPLICIT_ANY,
-                        &[name, "any"],
-                    );
-                    self.error_at_node(
-                        var_decl.name,
-                        &message,
-                        diagnostic_codes::IMPLICIT_ANY,
-                    );
+                // Check if the variable name is a destructuring pattern
+                let is_destructuring_pattern = self.ctx.arena.get(var_decl.name)
+                    .map_or(false, |name_node| {
+                        name_node.kind == syntax_kind_ext::OBJECT_BINDING_PATTERN
+                            || name_node.kind == syntax_kind_ext::ARRAY_BINDING_PATTERN
+                    });
+
+                if !is_destructuring_pattern {
+                    if let Some(ref name) = var_name {
+                        use crate::checker::types::diagnostics::{
+                            diagnostic_codes, diagnostic_messages, format_message,
+                        };
+                        let message = format_message(
+                            diagnostic_messages::VARIABLE_IMPLICIT_ANY,
+                            &[name, "any"],
+                        );
+                        self.error_at_node(
+                            var_decl.name,
+                            &message,
+                            diagnostic_codes::IMPLICIT_ANY,
+                        );
+                    }
                 }
             }
 

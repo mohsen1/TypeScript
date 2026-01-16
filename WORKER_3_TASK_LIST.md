@@ -317,3 +317,78 @@ if !param.initializer.is_none() {
 
 **Files Modified:** None (already implemented)
 - `wasm/src/thin_checker.rs`: Contains all TS7006 suppression logic for parameters
+
+---
+
+## Current Task: Fix TS7005 Variable Implicit Any Over-Reporting
+
+**Priority:** 🔴 CRITICAL (Tier 4 - Implicit Any Checks)
+
+**Status:** 🟢 IN PROGRESS
+
+**Assigned:** 2026-01-15
+
+### Problem
+
+The type checker emits **TS7005 "Variable 'x' implicitly has an 'any' type"** errors even when the type can be inferred from:
+- Variable initializers
+- Usage context
+
+**Current Impact:** ~150 extra TS7005 errors in conformance tests
+
+### Root Cause
+
+The implicit any check for variables doesn't verify if the type can actually be inferred before emitting the error. This creates false positives for:
+
+```typescript
+// Should NOT error - type inferred from initializer
+const x = 5;  // Currently may emit TS7005, should not
+
+// Should NOT error - type is number
+let y = 10;   // Should not emit TS7005
+
+// SHOULD error - no type inference possible
+let z;        // Should emit TS7005 (or TS7005 variant)
+```
+
+### Action Items
+
+1. **Locate TS7005 emission code** in `wasm/src/thin_checker.rs`
+   - Search for TS7005 error code (around line 15123 based on earlier investigation)
+   - Find variable declaration checking logic
+
+2. **Add initializer check before emitting TS7005:**
+   - Check if variable has an initializer
+   - Check if the inferred type is still `any` (not `number`, `string`, etc.)
+   - Only emit TS7005 if: no initializer AND inferred type is `any`
+
+3. **Test cases to verify:**
+   ```typescript
+   // Should NOT emit TS7005
+   const a = 5;       // Type: number (literal widened)
+   let b = "hello";   // Type: string
+   const c = [1, 2];  // Type: number[]
+
+   // Should emit TS7005 (noImplicitAny)
+   let d;            // No initializer, type is any
+   var e;            // No initializer, type is any
+   ```
+
+4. **Run conformance tests:**
+   ```bash
+   cd wasm/differential-test
+   bash run-conformance.sh --max=500 --workers=4
+   ```
+   - Track TS7005 count (target: reduce from ~150 to <75)
+   - Ensure no regression - valid errors still emitted
+
+**Target Metrics:**
+| Error Code | Current | Target |
+|------------|---------|--------|
+| TS7005 extra | ~150 | <75 |
+
+**Key Files:**
+- `wasm/src/thin_checker.rs` - variable declaration checking (around line 15123)
+- `wasm/src/checker/types/diagnostics.rs` - error code definitions
+
+**Reference:** See `PROJECT_DIRECTION.md` Tier 4 section for rules on when to skip implicit any errors.
