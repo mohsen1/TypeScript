@@ -6302,7 +6302,17 @@ impl ThinParserState {
     }
 
     /// Look ahead after async to see if it's an arrow function: async (x) => or async x => or async <T>(x) =>
+    ///
+    /// ASI Rule: If there's a line break after 'async', it's NOT an async arrow function.
+    /// The line break prevents 'async' from being treated as a modifier.
+    /// Example: `async\nx => x` parses as `async; (x => x);` not as an async arrow function.
     fn look_ahead_is_arrow_function_after_async(&mut self) -> bool {
+        // IMPORTANT: Check for line break BEFORE consuming 'async'
+        // If there's a line break after 'async', it cannot be an async arrow function
+        if self.scanner.has_preceding_line_break() {
+            return false;
+        }
+
         let snapshot = self.scanner.save_state();
         let current = self.current_token;
 
@@ -6325,6 +6335,9 @@ impl ThinParserState {
     }
 
     /// Look ahead to see if ( starts an arrow function: () => or (x) => or (x, y) =>
+    ///
+    /// ASI Rule: If there's a line break between ) and =>, it's NOT an arrow function.
+    /// Example: `(x)\n=> y` should NOT be parsed as an arrow function.
     fn look_ahead_is_arrow_function(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
         let current = self.current_token;
@@ -6335,13 +6348,19 @@ impl ThinParserState {
         // Empty params: () => or (): type =>
         if self.is_token(SyntaxKind::CloseParenToken) {
             self.next_token();
-            let is_arrow = if self.is_token(SyntaxKind::ColonToken) {
+            // Check for line break before =>
+            let has_line_break = self.scanner.has_preceding_line_break();
+            let is_arrow = if has_line_break {
+                // Line break before => means this is not an arrow function (ASI applies)
+                false
+            } else if self.is_token(SyntaxKind::ColonToken) {
                 let saved_arena_len = self.arena.nodes.len();
                 let saved_diagnostics_len = self.parse_diagnostics.len();
 
                 self.next_token();
                 let _ = self.parse_return_type();
-                let result = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+                let result = !self.scanner.has_preceding_line_break()
+                    && self.is_token(SyntaxKind::EqualsGreaterThanToken);
 
                 self.arena.nodes.truncate(saved_arena_len);
                 self.parse_diagnostics.truncate(saved_diagnostics_len);
@@ -6366,14 +6385,21 @@ impl ThinParserState {
             self.next_token();
         }
 
+        // Check for line break before =>
+        let has_line_break = self.scanner.has_preceding_line_break();
+
         // Check for optional return type annotation
-        let is_arrow = if self.is_token(SyntaxKind::ColonToken) {
+        let is_arrow = if has_line_break {
+            // Line break before => means this is not an arrow function (ASI applies)
+            false
+        } else if self.is_token(SyntaxKind::ColonToken) {
             let saved_arena_len = self.arena.nodes.len();
             let saved_diagnostics_len = self.parse_diagnostics.len();
 
             self.next_token();
             let _ = self.parse_return_type();
-            let result = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+            let result = !self.scanner.has_preceding_line_break()
+                && self.is_token(SyntaxKind::EqualsGreaterThanToken);
 
             self.arena.nodes.truncate(saved_arena_len);
             self.parse_diagnostics.truncate(saved_diagnostics_len);
@@ -6388,13 +6414,20 @@ impl ThinParserState {
     }
 
     /// Look ahead to see if identifier is followed by => (simple arrow function)
+    ///
+    /// ASI Rule: If there's a line break between the identifier and =>, it's NOT an arrow function.
+    /// Example: `x\n=> y` should NOT be parsed as an arrow function.
     fn look_ahead_is_simple_arrow_function(&mut self) -> bool {
         let snapshot = self.scanner.save_state();
         let current = self.current_token;
 
         // Skip identifier
         self.next_token();
-        let is_arrow = self.is_token(SyntaxKind::EqualsGreaterThanToken);
+
+        // Check if => is immediately after identifier (no line break)
+        // If there's a line break, ASI applies and this is not an arrow function
+        let is_arrow = !self.scanner.has_preceding_line_break()
+            && self.is_token(SyntaxKind::EqualsGreaterThanToken);
 
         self.scanner.restore_state(snapshot);
         self.current_token = current;
