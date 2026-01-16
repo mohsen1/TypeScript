@@ -863,31 +863,8 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             (TypeKey::ReadonlyType(s_inner), TypeKey::ReadonlyType(t_inner)) => {
                 self.check_subtype(*s_inner, *t_inner)
             }
-            // Readonly array/tuple is NOT assignable to mutable version
-            // This must come after the ReadonlyType-ReadonlyType case above
-            (TypeKey::ReadonlyType(_), TypeKey::Array(_)) => SubtypeResult::False,
-            (TypeKey::ReadonlyType(_), TypeKey::Tuple(_)) => SubtypeResult::False,
             // Mutable arrays/tuples are assignable to readonly versions
-            // Array<T> <: readonly Array<U> if T <: U (covariant)
-            (TypeKey::Array(s_elem), TypeKey::ReadonlyType(t_inner)) => {
-                // t_inner should be an Array type
-                match self.interner.lookup(*t_inner) {
-                    Some(TypeKey::Array(t_elem)) => self.check_subtype(*s_elem, t_elem),
-                    _ => SubtypeResult::False,
-                }
-            }
-            // Tuple<T> <: readonly Tuple<U> if element types match
-            (TypeKey::Tuple(s_elems), TypeKey::ReadonlyType(t_inner)) => {
-                // t_inner should be a Tuple type
-                match self.interner.lookup(*t_inner) {
-                    Some(TypeKey::Tuple(t_elems)) => {
-                        let s_elems = self.interner.tuple_list(*s_elems);
-                        let t_elems = self.interner.tuple_list(t_elems);
-                        self.check_tuple_subtype(&s_elems, &t_elems)
-                    }
-                    _ => SubtypeResult::False,
-                }
-            }
+            (_, TypeKey::ReadonlyType(t_inner)) => self.check_subtype(source, *t_inner),
 
             // Unique symbol - only equal to itself
             (TypeKey::UniqueSymbol(s_sym), TypeKey::UniqueSymbol(t_sym)) => {
@@ -3976,7 +3953,6 @@ pub fn is_subtype_of_with_resolver<R: TypeResolver>(
     checker.is_subtype_of(source, target)
 }
 
-// Re-enabled solver tests after TypeKey::Application expansion implementation
 #[cfg(test)]
 #[path = "subtype_tests.rs"]
 mod tests;
