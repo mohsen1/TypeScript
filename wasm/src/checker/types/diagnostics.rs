@@ -132,6 +132,8 @@ pub mod diagnostic_messages {
         "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
     pub const CANNOT_ASSIGN_READONLY: &str =
         "Cannot assign to '{0}' because it is a read-only property.";
+    pub const CANNOT_ASSIGN_PRIVATE_METHOD: &str =
+        "Cannot assign to private method '{0}'. Private methods are not writable.";
     pub const MEMBER_NOT_ACCESSIBLE: &str =
         "Property '{0}' is {1} and only accessible within class '{2}'.";
     pub const PRIVATE_IDENTIFIER_IN_AMBIENT_CONTEXT: &str =
@@ -309,6 +311,7 @@ pub mod diagnostic_codes {
     pub const ABSTRACT_MEMBER_IN_NON_ABSTRACT_CLASS: u32 = 2515; // Same code for methods
     pub const NON_ABSTRACT_CLASS_MISSING_IMPLEMENTATIONS: u32 = 2654; // Non-abstract class '{0}' is missing implementations for the following members of '{1}': {2}.
     pub const CANNOT_ASSIGN_TO_READONLY_PROPERTY: u32 = 2540;
+    pub const CANNOT_ASSIGN_TO_PRIVATE_METHOD: u32 = 2803; // Cannot assign to private method 'X'. Private methods are not writable.
     pub const ACCESSORS_MUST_BOTH_BE_ABSTRACT_OR_NOT: u32 = 2676; // Accessors must both be abstract or non-abstract.
     pub const CLASS_INCORRECTLY_IMPLEMENTS_INTERFACE: u32 = 2420;
     pub const CLASS_INCORRECTLY_EXTENDS_BASE_CLASS: u32 = 2415;
