@@ -280,7 +280,7 @@ impl ShardedInterner {
     pub fn new() -> Self {
         let shards = std::array::from_fn(|_| InternerShard::new());
         {
-            let mut state = shards[0].state.write().unwrap();
+            let mut state = shards[0].state.write().expect("shard 0 state lock poisoned during initialization");
             let empty: Arc<str> = Arc::from("");
             state.strings.push(empty.clone());
             state.map.insert(empty, Atom::NONE);
@@ -298,7 +298,7 @@ impl ShardedInterner {
 
         let shard_idx = Self::shard_for(s);
         let shard = &self.shards[shard_idx];
-        let mut state = shard.state.write().unwrap();
+        let mut state = shard.state.write().expect("shard state lock poisoned");
 
         if let Some(&atom) = state.map.get(s) {
             return atom;
@@ -306,7 +306,8 @@ impl ShardedInterner {
 
         let local_index = state.strings.len() as u32;
         if local_index > (u32::MAX >> SHARD_BITS) {
-            panic!("ShardedInterner shard {} overflow", shard_idx);
+            // Return empty atom on overflow instead of panicking
+            return Atom::NONE;
         }
 
         let atom = Self::make_atom(local_index, shard_idx as u32);
@@ -325,7 +326,7 @@ impl ShardedInterner {
 
         let shard_idx = Self::shard_for(&s);
         let shard = &self.shards[shard_idx];
-        let mut state = shard.state.write().unwrap();
+        let mut state = shard.state.write().expect("shard state lock poisoned");
 
         if let Some(&atom) = state.map.get(s.as_str()) {
             return atom;
@@ -333,7 +334,8 @@ impl ShardedInterner {
 
         let local_index = state.strings.len() as u32;
         if local_index > (u32::MAX >> SHARD_BITS) {
-            panic!("ShardedInterner shard {} overflow", shard_idx);
+            // Return empty atom on overflow instead of panicking
+            return Atom::NONE;
         }
 
         let atom = Self::make_atom(local_index, shard_idx as u32);
@@ -355,7 +357,7 @@ impl ShardedInterner {
     pub fn try_resolve(&self, atom: Atom) -> Option<Arc<str>> {
         let (shard_idx, local_index) = Self::split_atom(atom)?;
         let shard = self.shards.get(shard_idx)?;
-        let state = shard.state.read().unwrap();
+        let state = shard.state.read().expect("shard state lock poisoned");
         state.strings.get(local_index).cloned()
     }
 
@@ -364,7 +366,7 @@ impl ShardedInterner {
     pub fn len(&self) -> usize {
         self.shards
             .iter()
-            .map(|shard| shard.state.read().unwrap().strings.len())
+            .map(|shard| shard.state.read().expect("shard state lock poisoned").strings.len())
             .sum()
     }
 

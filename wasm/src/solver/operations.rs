@@ -200,7 +200,9 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
         } else if !failures.is_empty() {
             // At least one member failed with a non-NotCallable error
             // Return the first failure (similar to how overloads are handled)
-            failures.into_iter().next().unwrap()
+            failures.into_iter().next().unwrap_or_else(|| {
+                CallResult::NotCallable { type_id: union_type }
+            })
         } else {
             // Should not reach here, but handle gracefully
             CallResult::NotCallable { type_id: union_type }
@@ -1044,8 +1046,10 @@ impl<'a, C: AssignabilityChecker> CallEvaluator<'a, C> {
                     }
                 }
                 if count == 1 {
-                    self.constrain_types(ctx, var_map, source, non_nullable.unwrap());
-                    return;
+                    if let Some(member) = non_nullable {
+                        self.constrain_types(ctx, var_map, source, member);
+                        return;
+                    }
                 }
 
                 let mut placeholder_member = None;

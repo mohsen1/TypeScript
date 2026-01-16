@@ -219,24 +219,24 @@ impl TypeInterner {
     }
 
     pub fn type_list(&self, id: TypeListId) -> Arc<[TypeId]> {
-        let lists = self.type_lists.read().unwrap();
+        let lists = self.type_lists.read().expect("type_lists lock poisoned");
         lists.get(id.0).unwrap_or_else(|| lists.empty())
     }
 
     pub fn tuple_list(&self, id: TupleListId) -> Arc<[TupleElement]> {
-        let lists = self.tuple_lists.read().unwrap();
+        let lists = self.tuple_lists.read().expect("tuple_lists lock poisoned");
         lists.get(id.0).unwrap_or_else(|| lists.empty())
     }
 
     pub fn template_list(&self, id: TemplateLiteralId) -> Arc<[TemplateSpan]> {
-        let lists = self.template_lists.read().unwrap();
+        let lists = self.template_lists.read().expect("template_lists lock poisoned");
         lists.get(id.0).unwrap_or_else(|| lists.empty())
     }
 
     pub fn object_shape(&self, id: ObjectShapeId) -> Arc<ObjectShape> {
         self.object_shapes
             .read()
-            .unwrap()
+            .expect("object_shapes lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(ObjectShape {
@@ -273,7 +273,7 @@ impl TypeInterner {
         }
 
         {
-            let maps = self.object_property_maps.read().unwrap();
+            let maps = self.object_property_maps.read().expect("object_property_maps lock poisoned");
             if let Some(Some(map)) = maps.get(shape_id.0 as usize) {
                 return Some(map.clone());
             }
@@ -285,7 +285,7 @@ impl TypeInterner {
         }
         let map = Arc::new(map);
 
-        let mut maps = self.object_property_maps.write().unwrap();
+        let mut maps = self.object_property_maps.write().expect("object_property_maps lock poisoned");
         if maps.len() <= shape_id.0 as usize {
             maps.resize_with(shape_id.0 as usize + 1, || None);
         }
@@ -299,7 +299,7 @@ impl TypeInterner {
     pub fn function_shape(&self, id: FunctionShapeId) -> Arc<FunctionShape> {
         self.function_shapes
             .read()
-            .unwrap()
+            .expect("function_shapes lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(FunctionShape {
@@ -317,7 +317,7 @@ impl TypeInterner {
     pub fn callable_shape(&self, id: CallableShapeId) -> Arc<CallableShape> {
         self.callable_shapes
             .read()
-            .unwrap()
+            .expect("callable_shapes lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(CallableShape {
@@ -332,7 +332,7 @@ impl TypeInterner {
     pub fn conditional_type(&self, id: ConditionalTypeId) -> Arc<ConditionalType> {
         self.conditional_types
             .read()
-            .unwrap()
+            .expect("conditional_types lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(ConditionalType {
@@ -348,7 +348,7 @@ impl TypeInterner {
     pub fn mapped_type(&self, id: MappedTypeId) -> Arc<MappedType> {
         self.mapped_types
             .read()
-            .unwrap()
+            .expect("mapped_types lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(MappedType {
@@ -369,7 +369,7 @@ impl TypeInterner {
     pub fn type_application(&self, id: TypeApplicationId) -> Arc<TypeApplication> {
         self.applications
             .read()
-            .unwrap()
+            .expect("applications lock poisoned")
             .get(id.0)
             .unwrap_or_else(|| {
                 Arc::new(TypeApplication {
@@ -393,14 +393,14 @@ impl TypeInterner {
         let shard = &self.shards[shard_idx];
 
         {
-            let map = shard.key_to_index.read().unwrap();
+            let map = shard.key_to_index.read().expect("shard key_to_index lock poisoned");
             if let Some(&local_index) = map.get(&key) {
                 return self.make_id(local_index, shard_idx as u32);
             }
         }
 
-        let mut map = shard.key_to_index.write().unwrap();
-        let mut storage = shard.index_to_key.write().unwrap();
+        let mut map = shard.key_to_index.write().expect("shard key_to_index lock poisoned");
+        let mut storage = shard.index_to_key.write().expect("shard index_to_key lock poisoned");
 
         if let Some(&local_index) = map.get(&key) {
             return self.make_id(local_index, shard_idx as u32);
@@ -408,7 +408,8 @@ impl TypeInterner {
 
         let local_index = storage.len() as u32;
         if local_index > (u32::MAX >> SHARD_BITS) {
-            panic!("TypeInterner shard {} overflow", shard_idx);
+            // Return error type instead of panicking
+            return TypeId::ERROR;
         }
 
         storage.push(key.clone());
@@ -428,52 +429,52 @@ impl TypeInterner {
         let local_index = raw_val >> SHARD_BITS;
 
         let shard = self.shards.get(shard_idx)?;
-        let storage = shard.index_to_key.read().unwrap();
+        let storage = shard.index_to_key.read().expect("shard index_to_key lock poisoned");
         storage.get(local_index as usize).cloned()
     }
 
     fn intern_type_list(&self, members: Vec<TypeId>) -> TypeListId {
-        let mut lists = self.type_lists.write().unwrap();
+        let mut lists = self.type_lists.write().expect("type_lists lock poisoned");
         TypeListId(lists.intern(members))
     }
 
     fn intern_tuple_list(&self, elements: Vec<TupleElement>) -> TupleListId {
-        let mut lists = self.tuple_lists.write().unwrap();
+        let mut lists = self.tuple_lists.write().expect("tuple_lists lock poisoned");
         TupleListId(lists.intern(elements))
     }
 
     fn intern_template_list(&self, spans: Vec<TemplateSpan>) -> TemplateLiteralId {
-        let mut lists = self.template_lists.write().unwrap();
+        let mut lists = self.template_lists.write().expect("template_lists lock poisoned");
         TemplateLiteralId(lists.intern(spans))
     }
 
     fn intern_object_shape(&self, shape: ObjectShape) -> ObjectShapeId {
-        let mut shapes = self.object_shapes.write().unwrap();
+        let mut shapes = self.object_shapes.write().expect("object_shapes lock poisoned");
         ObjectShapeId(shapes.intern(shape))
     }
 
     fn intern_function_shape(&self, shape: FunctionShape) -> FunctionShapeId {
-        let mut shapes = self.function_shapes.write().unwrap();
+        let mut shapes = self.function_shapes.write().expect("function_shapes lock poisoned");
         FunctionShapeId(shapes.intern(shape))
     }
 
     fn intern_callable_shape(&self, shape: CallableShape) -> CallableShapeId {
-        let mut shapes = self.callable_shapes.write().unwrap();
+        let mut shapes = self.callable_shapes.write().expect("callable_shapes lock poisoned");
         CallableShapeId(shapes.intern(shape))
     }
 
     fn intern_conditional_type(&self, conditional: ConditionalType) -> ConditionalTypeId {
-        let mut types = self.conditional_types.write().unwrap();
+        let mut types = self.conditional_types.write().expect("conditional_types lock poisoned");
         ConditionalTypeId(types.intern(conditional))
     }
 
     fn intern_mapped_type(&self, mapped: MappedType) -> MappedTypeId {
-        let mut types = self.mapped_types.write().unwrap();
+        let mut types = self.mapped_types.write().expect("mapped_types lock poisoned");
         MappedTypeId(types.intern(mapped))
     }
 
     fn intern_application(&self, application: TypeApplication) -> TypeApplicationId {
-        let mut apps = self.applications.write().unwrap();
+        let mut apps = self.applications.write().expect("applications lock poisoned");
         TypeApplicationId(apps.intern(application))
     }
 
@@ -481,7 +482,7 @@ impl TypeInterner {
     pub fn len(&self) -> usize {
         let mut total = TypeId::FIRST_USER as usize;
         for shard in &self.shards {
-            total += shard.index_to_key.read().unwrap().len();
+            total += shard.index_to_key.read().expect("shard index_to_key lock poisoned").len();
         }
         total
     }
