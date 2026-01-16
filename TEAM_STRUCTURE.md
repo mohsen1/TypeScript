@@ -8,14 +8,22 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ## Team Organization
 
-### Engineering Managers
+### Leadership Structure
 
-| EM | Team Focus | Workers |
-|----|------------|---------|
-| EM-1 | Tier 0: Quality & Stability | Workers 2, 3, 4 |
-| EM-2 | Tier 1-2: Parser & Checker | Workers 5, 6, 7, 8 |
-| EM-3 | Tier 3-4: Symbol Resolution & Implicit Any | Workers 9, 10, 11 |
-| EM-4 | Tier 5: Async/Await & Infrastructure | Workers 12, 13, 14 |
+**Director:** Worker 1
+- Created work distribution plan
+- Coordinates across all Engineering Managers
+- Handles escalations and cross-team dependencies
+
+### Engineering Managers & Teams
+
+| EM | Worker # | Team Focus | Team Members | Priority |
+|----|----------|------------|--------------|----------|
+| EM-1 | Worker 2 | Tier 0: Quality & Stability | Workers 2, 3, 4 | HIGHEST |
+| EM-2 | Worker 6 | Tier 1: Parser Accuracy | Workers 6, 7, 8, 9 | HIGH |
+| EM-3 | Worker 10 | Tier 2-3: Type Checker & Symbol Resolution | Workers 10, 11, 12, 13, 14 | MEDIUM |
+
+**Note:** EMs are individual contributors who also manage their team's work.
 
 ---
 
@@ -23,10 +31,11 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ### Team 1: Quality & Stability Foundations (Tier 0)
 
-**Engineering Manager:** EM-1
-**Priority:** Highest - These issues block correctness across all tiers
+**Engineering Manager:** Worker 2 (EM-1)
+**Priority:** HIGHEST - These issues block correctness across all tiers
+**Tier:** 0 - Quality & Stability
 
-#### Worker 2: Application Type Expansion
+#### Worker 2 (EM-1): Application Type Expansion
 **Task:** Fix `TypeKey::Application` not being expanded, causing incorrect diagnostics/assignability
 
 **Key Files:**
@@ -86,12 +95,46 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 ---
 
-### Team 2: Parser & Type Checker Accuracy (Tiers 1-2)
+### Team 2: Parser Accuracy (Tier 1)
 
-**Engineering Manager:** EM-2
-**Priority:** High - Parser errors poison downstream analysis
+**Engineering Manager:** Worker 6 (EM-2)
+**Priority:** HIGH - Parser errors poison downstream analysis
+**Tier:** 1 - Parser Accuracy
 
-#### Worker 5: TS1109 Parser Fix (Expression Expected)
+#### Worker 6 (EM-2): ASI Handling & EM Coordination
+**Management Responsibilities:**
+- Coordinate Team 2 parser work
+- Run parser-specific conformance tests
+- Focus on TS1xxx error codes
+- Handle ASI issues as primary individual contributor work
+
+**Individual Task:** ASI Specialist
+**Issue:** Automatic Semicolon Insertion edge cases
+
+**Key Files:**
+- `wasm/src/thin_parser.rs`
+
+**Tasks:**
+1. Study TypeScript ASI rules
+2. Identify current ASI failures
+3. Implement proper ASI detection
+4. Handle edge cases (return statements, postfix operators, etc.)
+5. Add comprehensive ASI tests
+
+**ASI Edge Cases:**
+- `return\n{}` vs `return {};`
+- Postfix `++`/`--`
+- Anonymous function expressions
+- `break`/`continue` without labels
+
+**Acceptance Criteria:**
+- [ ] ASI matches TypeScript behavior
+- [ ] No extra TS1005 errors due to missing ASI
+- [ ] Team coordination complete
+
+---
+
+#### Worker 7: TS1109 Parser Fix (Expression Expected)
 **Task:** Fix parser emitting "Expression expected" for valid syntax
 
 **Key Files:**
@@ -114,7 +157,7 @@ node wasm/differential-test/find-ts1109.mjs
 
 ---
 
-#### Worker 6: TS1005 Parser Fix (X Expected)
+#### Worker 8: TS1005 Parser Fix (X Expected)
 **Task:** Fix parser emitting "X expected" for valid constructs
 
 **Key Files:**
@@ -133,6 +176,69 @@ node wasm/differential-test/find-ts1005.mjs
 - [ ] TS1005 only emitted for genuinely missing tokens
 - [ ] Valid syntax no longer triggers false TS1005 errors
 - [ ] No regressions in other parser diagnostics
+
+---
+
+#### Worker 9: Parser Conformance Testing & Analysis
+**Task:** Analyze parser errors and create comprehensive test cases
+
+**Management Support Tasks:**
+1. Run conformance tests filtered for TS1xxx errors
+2. Categorize parser errors by type and frequency
+3. Create parser error priority list for EM
+4. Validate fixes from Workers 7 and 8
+5. Document parser behavior edge cases
+
+**Key Files:**
+- `wasm/src/thin_parser.rs`
+- `wasm/differential-test/run-conformance.sh`
+
+**Acceptance Criteria:**
+- [ ] Complete parser error categorization
+- [ ] Priority list created for team
+- [ ] Test cases documented for all parser issues
+- [ ] Validation framework established
+
+---
+
+### Team 3: Type Checker & Symbol Resolution (Tiers 2-3)
+
+**Engineering Manager:** Worker 10 (EM-3)
+**Priority:** MEDIUM - Core type checking accuracy
+**Tier:** 2-3 - Type Checker & Symbol Resolution
+
+#### Worker 10 (EM-3): Type Checker Coordination & TS2322
+**Management Responsibilities:**
+- Coordinate Tier 2 and Tier 3 work across 5 team members
+- Manage dependencies between type checker and symbol resolution
+- Run semantic error conformance tests
+- Focus on TS2xxx and TS23xx/TS25xx error codes
+
+**Individual Task:** Assignability Specialist
+**Issue:** TS2322 accuracy - Type assignability false positives
+
+**Key Files:**
+- `wasm/src/solver/subtype.rs`
+- `wasm/src/thin_checker.rs`
+
+**Tasks:**
+1. Study assignability logic in solver
+2. Identify false positive TS2322 cases
+3. Fix assignability checking
+4. Handle edge cases (any, unknown, never, generics)
+5. Verify subtype relationships
+
+**Assignability Edge Cases:**
+- Generic type compatibility
+- Union/intersection types
+- Structural vs nominal typing
+- Literal types
+- Discriminated unions
+
+**Acceptance Criteria:**
+- [ ] No TS2322 on valid assignments
+- [ ] TS2322 still emitted for actual mismatches
+- [ ] Team coordination complete
 
 ---
 
@@ -159,7 +265,30 @@ function foo() {
 
 ---
 
-#### Worker 8: TS2348 Callable Expression Fix
+#### Worker 11: TS2571/TS2683 This Type Fix
+**Task:** Fix "'this' implicitly has type 'any'" not being emitted (TS2683), instead incorrectly emitting TS2571
+
+**Key Files:**
+- `wasm/src/thin_checker.rs` (around line 629, `current_this_type()` handling)
+
+**Details:**
+When `this` is used inside a regular function (not a method), it should emit TS2683 but instead types as `unknown` and emits TS2571 on property access.
+
+**Example:**
+```typescript
+function foo() {
+    this.x = 1;  // Should: TS2683, Currently: TS2571
+}
+```
+
+**Acceptance Criteria:**
+- [ ] TS2683 emitted for `this` in non-method functions
+- [ ] TS2571 no longer incorrectly emitted for `this` access
+- [ ] Proper `this` type inference in all function contexts
+
+---
+
+#### Worker 12: TS2348 Callable Expression Fix
 **Task:** Fix "Cannot invoke expression" (TS2348) being over-reported
 
 **Key Files:**
@@ -178,12 +307,32 @@ function foo() {
 
 ---
 
-### Team 3: Symbol Resolution & Implicit Any (Tiers 3-4)
+#### Worker 13: TS2507 Constructor Checking
+**Task:** Non-constructor extends not fully checked
 
-**Engineering Manager:** EM-3
-**Priority:** Medium - Required for accurate type checking
+**Key Files:**
+- `wasm/src/thin_checker.rs` - class declaration checking
+- `wasm/src/checker/types/diagnostics.rs`
 
-#### Worker 9: TS2304 Symbol Resolution Gaps
+**Details:**
+- Constructor inheritance rules need validation
+- Identify gaps in non-constructor extends checking
+- Implement proper constructor validation
+
+**Test Cases:**
+- Extending non-constructor values
+- Extending built-in types
+- Extending null/undefined
+- Mixin patterns
+
+**Acceptance Criteria:**
+- [ ] All invalid extends emit TS2507
+- [ ] Valid extends patterns work correctly
+- [ ] Error messages match TSC
+
+---
+
+#### Worker 14: TS2304 Symbol Resolution Gaps
 **Task:** Fix "Cannot find name" (TS2304) for valid symbols
 
 **Key Files:**
@@ -203,104 +352,30 @@ function foo() {
 
 ---
 
-#### Worker 10: TS2524 Module Member Resolution
-**Task:** Fix module member resolution failures (TS2524)
+## Deferred Work (Post-Tier 0/1/2/3)
 
-**Key Files:**
-- `wasm/src/binder/`
-- `wasm/src/thin_checker.rs`
+These tasks are explicitly deferred until Tier 0, 1, 2, and 3 stabilize:
 
-**Details:**
-- Module exports not being properly resolved
-- May involve namespace/module merging issues
-- Check re-export handling
+### Tier 4: Implicit Any Checks (Deferred)
+- TS7006 extra - Parameter implicit any over-reported
+- TS7005 extra - Variable implicit any over-reported
 
-**Acceptance Criteria:**
-- [ ] Module members correctly resolved
-- [ ] Re-exports work correctly
-- [ ] Namespace merging functions properly
+**Deferred Until:** Tier 0, 1, 2, and 3 are stable
 
----
+### Tier 5: Async/Await (Deferred)
+- TS2705 gaps - Async function return type checking
+- TS1359 missing - 'await' reserved word detection
+- Async generators - AsyncGenerator vs Promise return types
 
-#### Worker 11: Implicit Any Over-reporting (TS7006/TS7005)
-**Task:** Fix implicit any errors being over-reported
+**Deferred Until:** All other tiers are stable
 
-**Key Files:**
-- `wasm/src/thin_checker.rs` (implicit any checking functions)
+### LSP Strictness from tsconfig (Deferred)
+- Hover information accuracy
+- Completion suggestions
+- Signature help
+- Diagnostics filtering
 
-**Details:**
-Skip implicit any errors when:
-- Parameter has default value (`param.initializer.is_some()`)
-- Property has initializer (`prop.initializer.is_some()`)
-- Type can be inferred from usage
-
-**Acceptance Criteria:**
-- [ ] Parameters with default values don't trigger TS7006
-- [ ] Properties with initializers don't trigger TS7005
-- [ ] Contextually typed parameters don't trigger TS7006
-
----
-
-### Team 4: Async/Await & Infrastructure (Tier 5)
-
-**Engineering Manager:** EM-4
-**Priority:** Lower - Focus after core accuracy
-
-#### Worker 12: Async Function Return Types (TS2705)
-**Task:** Fix async function return type checking gaps
-
-**Key Files:**
-- `wasm/src/thin_checker.rs` (async-related functions)
-- `wasm/src/solver/evaluate.rs`
-
-**Details:**
-- Async function return types need to be wrapped in Promise
-- Generator return types need special handling
-- `AsyncGenerator` vs `Promise` return type disambiguation
-
-**Acceptance Criteria:**
-- [ ] Async functions correctly typed with Promise wrapper
-- [ ] Return type checking works for async functions
-- [ ] No false positives on valid async returns
-
----
-
-#### Worker 13: Await Reserved Word Detection (TS1359)
-**Task:** Implement 'await' reserved word detection
-
-**Key Files:**
-- `wasm/src/thin_parser.rs`
-- `wasm/src/thin_checker.rs`
-
-**Details:**
-- `await` is a reserved word in certain contexts
-- Must detect invalid use of `await` as identifier
-- Context-sensitive based on module type and function context
-
-**Acceptance Criteria:**
-- [ ] TS1359 emitted for invalid `await` usage
-- [ ] No false positives in valid async contexts
-- [ ] Module/function context correctly considered
-
----
-
-#### Worker 14: Solver Test Coverage Restoration
-**Task:** Re-enable solver tests that are commented out due to API drift
-
-**Key Files:**
-- `wasm/src/solver/infer.rs` (tests)
-- `wasm/src/solver/subtype.rs` (tests)
-- `wasm/src/solver/evaluate.rs` (tests)
-
-**Details:**
-- Tests are commented out because APIs have changed
-- Update test code to match current APIs
-- Ensure tests pass and provide coverage
-
-**Acceptance Criteria:**
-- [ ] All commented-out solver tests re-enabled
-- [ ] Tests updated to match current API
-- [ ] All solver tests pass
+**Deferred Until:** Tier 0 and Tier 1 are stable
 
 ---
 
@@ -309,34 +384,43 @@ Skip implicit any errors when:
 ```
 1. Workers 2-4 (Tier 0): Quality & Stability Foundations
    └─ Blocks: All downstream accuracy
+   └─ Team 1 (EM-1: Worker 2)
 
-2. Workers 5-6 (Tier 1): Parser Accuracy
+2. Workers 6-9 (Tier 1): Parser Accuracy
    └─ Blocks: Accurate AST for type checking
+   └─ Team 2 (EM-2: Worker 6)
 
-3. Workers 9-10 (Tier 3): Symbol Resolution
-   └─ Blocks: Accurate type references
+3. Workers 10-14 (Tier 2-3): Type Checker & Symbol Resolution
+   └─ Core type checking and symbol accuracy
+   └─ Team 3 (EM-3: Worker 10)
 
-4. Workers 7-8, 11 (Tier 2, 4): Type Checker & Implicit Any
-   └─ Core type checking accuracy
-
-5. Workers 12-14 (Tier 5): Async/Await & Infrastructure
-   └─ Feature completeness
+Deferred: Tier 4 (Implicit Any), Tier 5 (Async), LSP features
 ```
 
 ---
 
 ## Coordination Guidelines
 
+### Engineering Manager Responsibilities
+Each EM (Workers 2, 6, 10) should:
+1. Run conformance tests to establish team baseline
+2. Review all code changes from team members
+3. Handle escalations and coordinate cross-team dependencies
+4. Report team progress to Director (Worker 1)
+5. Ensure no build breaks or test regressions
+
 ### Before Starting Work
 1. Run `wasm-pack build --target web --out-dir pkg` to ensure WASM builds
 2. Run conformance tests to establish baseline: `bash run-conformance.sh --max=200 --workers=4`
 3. Read relevant spec documents in `wasm/specs/`
+4. (EMs only) Review team task assignments and dependencies
 
 ### During Development
 1. Make incremental commits with clear messages
 2. Run unit tests after each change: `cd wasm && bash test.sh`
 3. Do not modify files outside your task scope
 4. Document any API changes that affect other workers
+5. (EMs only) Conduct daily standup with team members
 
 ### Debugging Workflow
 1. Find failing test case from conformance output
@@ -371,10 +455,39 @@ cd wasm/differential-test && bash run-conformance.sh --max=200 --workers=4
 
 ## Communication Protocol
 
-- **Escalations:** Contact EM if blocked for >30 minutes
-- **Dependencies:** Coordinate with other workers if your changes affect shared files
-- **Merges:** All changes merge to `rust` branch after review
+### Escalation Path
+```
+Individual Contributor (Workers 3-5, 7-9, 11-14)
+    ↓ (blocked for >30 minutes)
+Engineering Manager (Workers 2, 6, 10)
+    ↓ (cross-team issues)
+Director (Worker 1)
+```
+
+### Commit Message Format
+```
+[Tier X] Brief description of change
+
+- Details of what was changed
+- Why it was necessary
+- Related issue number (if applicable)
+
+Co-Authored-By: Claude Sonnet 4.5 <noreply@anthropic.com>
+```
+
+### Dependencies
+- Coordinate with other workers if your changes affect shared files
+- EMs should manage cross-team dependencies
+- All changes merge to `rust` branch after review
+
+### Daily Standup Format (EMs)
+Each team member should report:
+1. Tasks completed yesterday
+2. Tasks planned for today
+3. Blockers or dependencies
+4. Conformance test results (if applicable)
 
 ---
 
 *Generated by Director (Worker 1) at 2026-01-16*
+*Mode: hierarchical - 3 Engineering Managers managing 11 Engineers*
