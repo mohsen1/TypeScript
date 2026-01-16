@@ -96,6 +96,13 @@ pub struct ThinBinderState {
     /// Module exports: maps file names to their exported symbols for cross-file module resolution
     /// This enables resolving imports like `import { X } from './file'` where './file' is another file
     pub module_exports: FxHashMap<String, SymbolTable>,
+
+    /// Re-exports: tracks `export * from 'module'` and `export { x } from 'module'` declarations
+    /// Maps (current_file, exported_name) -> (source_module, original_name)
+    /// For wildcard re-exports, exported_name is "*" to indicate all exports
+    /// Example: ("./a.ts", "*", "./b.ts") means a.ts re-exports everything from b.ts
+    /// Example: ("./a.ts", "foo", "./b.ts") means a.ts re-exports "foo" from b.ts
+    pub reexports: FxHashMap<String, FxHashMap<String, (String, Option<String>)>>,
 }
 
 /// Validation result describing issues found in the symbol table
@@ -156,6 +163,7 @@ impl ThinBinderState {
             in_global_augmentation: false,
             lib_binders: Vec::new(),
             module_exports: FxHashMap::default(),
+            reexports: FxHashMap::default(),
         }
     }
 
@@ -186,6 +194,7 @@ impl ThinBinderState {
         self.in_global_augmentation = false;
         self.lib_binders.clear();
         self.module_exports.clear();
+        self.reexports.clear();
     }
 
     /// Set the current file name for debugging purposes.
@@ -239,6 +248,7 @@ impl ThinBinderState {
             in_global_augmentation: false,
             lib_binders: Vec::new(),
             module_exports: FxHashMap::default(),
+            reexports: FxHashMap::default(),
         }
     }
 
@@ -258,6 +268,7 @@ impl ThinBinderState {
             node_scope_ids,
             FxHashMap::default(),
             FxHashMap::default(),
+            FxHashMap::default(),
         )
     }
 
@@ -274,6 +285,7 @@ impl ThinBinderState {
         node_scope_ids: FxHashMap<u32, ScopeId>,
         global_augmentations: FxHashMap<String, Vec<crate::parser::NodeIndex>>,
         module_exports: FxHashMap<String, SymbolTable>,
+        reexports: FxHashMap<String, FxHashMap<String, (String, Option<String>)>>,
     ) -> Self {
         let mut flow_nodes = FlowNodeArena::new();
         let unreachable_flow = flow_nodes.alloc(flow_flags::UNREACHABLE);
@@ -305,6 +317,7 @@ impl ThinBinderState {
             in_global_augmentation: false,
             lib_binders: Vec::new(),
             module_exports,
+            reexports,
         }
     }
 
@@ -440,7 +453,8 @@ impl ThinBinderState {
     ///
     /// When a symbol is imported (e.g., `import { foo } from './file'`), the binder creates
     /// a local ALIAS symbol with `import_module` set to './file'. This method resolves that
-    /// alias to the actual exported symbol from the source module by looking up `module_exports`.
+    /// alias to the actual exported symbol from the source module by looking up `module_exports`
+    /// and following re-export chains.
     ///
     /// Returns the resolved SymbolId, or the original sym_id if it's not an import or resolution fails.
     fn resolve_import_if_needed(&self, sym_id: SymbolId) -> Option<SymbolId> {
@@ -453,21 +467,70 @@ impl ThinBinderState {
         // - Otherwise use the symbol's escaped_name
         let export_name = sym.import_name.as_ref().unwrap_or(&sym.escaped_name);
 
-        // Look up the module's exports in module_exports
-        let module_table = self.module_exports.get(module_specifier)?;
+        // Try to resolve the import, following re-export chains
+        self.resolve_import_with_reexports(module_specifier, export_name)
+    }
 
-        // Find the exported symbol with the matching name
-        let exported_sym_id = module_table.get(export_name)?;
-
+    /// Resolve an import by name from a module, following re-export chains.
+    ///
+    /// This function handles:
+    /// - Direct exports: `export { foo }` - looks up in module_exports
+    /// - Named re-exports: `export { foo } from 'bar'` - follows the re-export mapping
+    /// - Wildcard re-exports: `export * from 'bar'` - searches the re-exported module
+    fn resolve_import_with_reexports(
+        &self,
+        module_specifier: &str,
+        export_name: &str,
+    ) -> Option<SymbolId> {
         let debug_enabled = crate::module_resolution_debug::is_debug_enabled();
-        if debug_enabled {
-            eprintln!(
-                "[RESOLVE_IMPORT] '{}' from module '{}' -> exported symbol id={}",
-                export_name, module_specifier, exported_sym_id.0
-            );
+
+        // First, check if it's a direct export from this module
+        if let Some(module_table) = self.module_exports.get(module_specifier) {
+            if let Some(&sym_id) = module_table.get(export_name) {
+                if debug_enabled {
+                    eprintln!(
+                        "[RESOLVE_IMPORT] '{}' from module '{}' -> direct export symbol id={}",
+                        export_name, module_specifier, sym_id.0
+                    );
+                }
+                return Some(sym_id);
+            }
         }
 
-        Some(exported_sym_id)
+        // Not found in direct exports, check for re-exports
+        if let Some(file_reexports) = self.reexports.get(module_specifier) {
+            // Check for named re-export: `export { foo } from 'bar'`
+            if let Some((source_module, original_name)) = file_reexports.get(export_name) {
+                let name_to_lookup = original_name.as_ref().unwrap_or(export_name);
+                if debug_enabled {
+                    eprintln!(
+                        "[RESOLVE_IMPORT] '{}' from module '{}' -> following named re-export from '{}', original name='{}'",
+                        export_name, module_specifier, source_module, name_to_lookup
+                    );
+                }
+                return self.resolve_import_with_reexports(source_module, name_to_lookup);
+            }
+
+            // Check for wildcard re-export: `export * from 'bar'`
+            if let Some((source_module, _)) = file_reexports.get("*") {
+                if debug_enabled {
+                    eprintln!(
+                        "[RESOLVE_IMPORT] '{}' from module '{}' -> following wildcard re-export from '{}'",
+                        export_name, module_specifier, source_module
+                    );
+                }
+                return self.resolve_import_with_reexports(source_module, export_name);
+            }
+        }
+
+        // Export not found
+        if debug_enabled {
+            eprintln!(
+                "[RESOLVE_IMPORT] '{}' from module '{}' -> NOT FOUND",
+                export_name, module_specifier
+            );
+        }
+        None
     }
 
     /// Find the enclosing scope for a given node by walking up the AST.
@@ -3169,34 +3232,72 @@ impl ThinBinderState {
                 if let Some(clause_node) = arena.get(export.export_clause) {
                     // Check if it's named exports { foo, bar }
                     if let Some(named) = arena.get_named_imports(clause_node) {
-                        // Bind each export specifier as an EXPORT_VALUE
-                        for &spec_idx in &named.elements.nodes {
-                            if let Some(spec_node) = arena.get(spec_idx) {
-                                if let Some(spec) = arena.get_specifier(spec_node) {
-                                    // Determine if this specifier is type-only
-                                    // (either from export type { ... } or export { type foo })
-                                    let spec_type_only = export_type_only || spec.is_type_only;
+                        // Check if this is a re-export: export { foo } from 'module'
+                        if !export.module_specifier.is_none() {
+                            // Get the module name from module_specifier
+                            let module_name = export.module_specifier.and_then(|idx| {
+                                arena.get(idx).and_then(|node| arena.get_literal(node))
+                                    .map(|lit| lit.text.clone())
+                            });
 
-                                    // For export { foo }, property_name is NONE, name is "foo"
-                                    // For export { foo as bar }, property_name is "foo", name is "bar"
-                                    let exported_name = if !spec.name.is_none() {
-                                        self.get_identifier_name(arena, spec.name)
-                                    } else {
-                                        self.get_identifier_name(arena, spec.property_name)
-                                    };
+                            if let Some(source_module) = module_name {
+                                let current_file = self.debugger.current_file.clone();
+                                let file_reexports = self.reexports.entry(current_file).or_default();
 
-                                    if let Some(name) = exported_name {
-                                        // Create export symbol (EXPORT_VALUE for value exports)
-                                        // This marks the name as exported from this module
-                                        let sym_id = self
-                                            .symbols
-                                            .alloc(symbol_flags::EXPORT_VALUE, name.to_string());
-                                        // Set is_type_only and is_exported on the symbol
-                                        if let Some(sym) = self.symbols.get_mut(sym_id) {
-                                            sym.is_exported = true;
-                                            sym.is_type_only = spec_type_only;
+                                // Track each named re-export
+                                for &spec_idx in &named.elements.nodes {
+                                    if let Some(spec_node) = arena.get(spec_idx) {
+                                        if let Some(spec) = arena.get_specifier(spec_node) {
+                                            // Get the original name (property_name) and exported name (name)
+                                            let original_name = spec.property_name.and_then(|idx| {
+                                                self.get_identifier_name(arena, idx)
+                                            });
+                                            let exported_name = spec.name.and_then(|idx| {
+                                                self.get_identifier_name(arena, idx)
+                                            });
+
+                                            if let Some(exported) = exported_name.or(original_name) {
+                                                // Store: exported_name -> (source_module, original_name)
+                                                file_reexports.insert(
+                                                    exported.to_string(),
+                                                    (source_module.clone(), original_name.map(|s| s.to_string())),
+                                                );
+                                            }
                                         }
-                                        self.node_symbols.insert(spec_idx.0, sym_id);
+                                    }
+                                }
+                            }
+                        } else {
+                            // Regular export { foo, bar } without 'from' clause
+                            // Bind each export specifier as an EXPORT_VALUE
+                            for &spec_idx in &named.elements.nodes {
+                                if let Some(spec_node) = arena.get(spec_idx) {
+                                    if let Some(spec) = arena.get_specifier(spec_node) {
+                                        // Determine if this specifier is type-only
+                                        // (either from export type { ... } or export { type foo })
+                                        let spec_type_only = export_type_only || spec.is_type_only;
+
+                                        // For export { foo }, property_name is NONE, name is "foo"
+                                        // For export { foo as bar }, property_name is "foo", name is "bar"
+                                        let exported_name = if !spec.name.is_none() {
+                                            self.get_identifier_name(arena, spec.name)
+                                        } else {
+                                            self.get_identifier_name(arena, spec.property_name)
+                                        };
+
+                                        if let Some(name) = exported_name {
+                                            // Create export symbol (EXPORT_VALUE for value exports)
+                                            // This marks the name as exported from this module
+                                            let sym_id = self
+                                                .symbols
+                                                .alloc(symbol_flags::EXPORT_VALUE, name.to_string());
+                                            // Set is_type_only and is_exported on the symbol
+                                            if let Some(sym) = self.symbols.get_mut(sym_id) {
+                                                sym.is_exported = true;
+                                                sym.is_type_only = spec_type_only;
+                                            }
+                                            self.node_symbols.insert(spec_idx.0, sym_id);
+                                        }
                                     }
                                 }
                             }
@@ -3229,7 +3330,23 @@ impl ThinBinderState {
                     }
                 }
             }
-            // export * from 'mod' - no binding needed, just re-exports
+
+            // Handle `export * from 'module'` (wildcard re-exports)
+            // This is when export_clause is None but module_specifier is not None
+            if export.export_clause.is_none() && !export.module_specifier.is_none() {
+                let module_name = export.module_specifier.and_then(|idx| {
+                    arena.get(idx).and_then(|node| arena.get_literal(node))
+                        .map(|lit| lit.text.clone())
+                });
+
+                if let Some(source_module) = module_name {
+                    let current_file = self.debugger.current_file.clone();
+                    let file_reexports = self.reexports.entry(current_file).or_default();
+
+                    // Use "*" to indicate wildcard re-export
+                    file_reexports.insert("*".to_string(), (source_module, None));
+                }
+            }
         }
     }
 

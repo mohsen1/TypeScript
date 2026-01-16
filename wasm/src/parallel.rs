@@ -417,6 +417,9 @@ pub struct MergedProgram {
     /// Module exports: maps file name (or module specifier) to its exported symbols
     /// This enables cross-file module resolution: import { X } from './file' can find X's symbol
     pub module_exports: FxHashMap<String, SymbolTable>,
+    /// Re-exports: tracks `export * from 'module'` and `export { x } from 'module'` declarations
+    /// Maps (current_file, exported_name) -> (source_module, original_name)
+    pub reexports: FxHashMap<String, FxHashMap<String, (String, Option<String>)>>,
     /// Global type interner - shared across all threads for type deduplication
     pub type_interner: TypeInterner,
 }
@@ -715,6 +718,7 @@ pub fn merge_bind_results_ref(results: &[&BindResult]) -> MergedProgram {
         file_locals: file_locals_list,
         declared_modules,
         module_exports,
+        reexports: FxHashMap::default(),
         type_interner: TypeInterner::new(),
     }
 }
@@ -992,6 +996,7 @@ fn create_binder_from_bound_file(
         file.node_scope_ids.clone(),
         file.global_augmentations.clone(),
         program.module_exports.clone(),
+        program.reexports.clone(),
     );
 
     binder.declared_modules = program.declared_modules.clone();

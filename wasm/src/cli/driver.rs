@@ -3025,6 +3025,7 @@ fn create_binder_from_bound_file(
         file.node_scope_ids.clone(),
         file.global_augmentations.clone(),
         program.module_exports.clone(),
+        program.reexports.clone(),
     );
 
     binder.declared_modules = program.declared_modules.clone();
