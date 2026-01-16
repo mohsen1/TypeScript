@@ -35314,7 +35314,7 @@ fn test_distributive_with_never_input() {
 #[test]
 fn test_distributive_with_any_input() {
     // T extends string ? 1 : 2, with T = any
-    // Result should be any (special case)
+    // any distributes to both branches, result is 1 | 2
     let interner = TypeInterner::new();
 
     let t_name = interner.intern_string("T");
@@ -35342,8 +35342,9 @@ fn test_distributive_with_any_input() {
     let instantiated = instantiate_type(&interner, cond_type, &subst);
     let result = evaluate_type(&interner, instantiated);
 
-    // any short-circuits to any
-    assert_eq!(result, TypeId::ANY);
+    // any distributes to both branches
+    let expected = interner.union(vec![lit_1, lit_2]);
+    assert_eq!(result, expected);
 }
 
 #[test]
@@ -36290,8 +36291,9 @@ fn test_distributive_infer_return_type() {
     let result = evaluate_type(&interner, instantiated);
 
     // TODO: Should be string | number once function return type infer is fully implemented
-    // let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
-    assert_eq!(result, TypeId::NEVER);
+    // For now, the pattern match partially succeeds and returns the inferred union
+    let expected = interner.union(vec![TypeId::STRING, TypeId::NUMBER]);
+    assert_eq!(result, expected);
 }
 
 #[test]

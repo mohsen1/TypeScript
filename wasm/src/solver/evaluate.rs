@@ -530,8 +530,10 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
 
         if check_type == TypeId::ANY {
-            // For `any extends X ? T : F`, return union of both branches
-            // This allows error poisoning to work correctly
+            // For distributive `any extends X ? T : F`:
+            // - Distributive: return union of both branches (any distributes over the conditional)
+            // - Non-distributive: return union of both branches (any poisons the result)
+            // In both cases, we evaluate and union the branches to handle infer types correctly
             let true_eval = self.evaluate(cond.true_type);
             let false_eval = self.evaluate(cond.false_type);
             return self.interner.union2(true_eval, false_eval);
@@ -4661,6 +4663,7 @@ pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     evaluator.evaluate_keyof(operand)
 }
 
+// Re-enabled evaluate tests - verifying API compatibility
 #[cfg(test)]
 #[path = "evaluate_tests.rs"]
 mod tests;

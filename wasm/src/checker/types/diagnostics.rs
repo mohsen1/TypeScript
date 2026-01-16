@@ -131,7 +131,7 @@ pub mod diagnostic_messages {
     pub const PROPERTY_HAS_NO_INITIALIZER: &str =
         "Property '{0}' has no initializer and is not definitely assigned in the constructor.";
     pub const PROPERTY_USED_BEFORE_BEING_ASSIGNED: &str =
-        "Property '{0}' is used before being assigned in constructor.";
+        "Property '{0}' is used before being assigned in the constructor.";
     pub const CANNOT_ASSIGN_READONLY: &str =
         "Cannot assign to '{0}' because it is a read-only property.";
     pub const CANNOT_ASSIGN_PRIVATE_METHOD: &str =
