@@ -2367,6 +2367,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
+
+        // For extra required params in source beyond target's required count:
+        // 1. If target has rest param: check if source params accept undefined
+        // 2. If target has optional params: handled in per-param loop below
+        // 3. Otherwise: reject if source has more required than target total params
         let extra_required_ok = target_has_rest
             && source_required > target_required
             && self.extra_required_accepts_undefined(
@@ -2374,9 +2379,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 target_required,
                 source_required,
             );
+
+        // Reject if source has more required params than target has total params
+        // (unless rest param handles it)
+        let target_total_params = target.params.len();
         if !self.allow_bivariant_param_count
             && !rest_is_top
-            && source_required > target_required
+            && source_required > target_total_params
             && (!target_has_rest || !extra_required_ok)
         {
             return SubtypeResult::False;
@@ -2401,12 +2410,22 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
             let t_param = &target.params[i];
 
             // Check optional compatibility:
-            // - Required param can substitute for optional param (if types match)
+            // - Required param can substitute for optional param IF the required param accepts undefined
             // - Optional param CANNOT substitute for required param (unless type accepts undefined)
             if s_param.optional && !t_param.optional {
                 // Source is optional, target is required
                 // Optional param can only substitute for required if the type accepts undefined
                 if !self.check_subtype(TypeId::UNDEFINED, t_param.type_id).is_true() {
+                    return SubtypeResult::False;
+                }
+            }
+
+            // If source has required param but target has optional param:
+            // Source param type MUST accept undefined because caller might not provide it
+            if !s_param.optional && t_param.optional {
+                // Source is required, target is optional
+                // The source param must accept undefined since the target allows omission
+                if !self.check_subtype(TypeId::UNDEFINED, s_param.type_id).is_true() {
                     return SubtypeResult::False;
                 }
             }
@@ -2607,6 +2626,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
+
+        // For extra required params in source beyond target's required count:
+        // 1. If target has rest param: check if source params accept undefined
+        // 2. If target has optional params: handled in per-param loop below
+        // 3. Otherwise: reject if source has more required than target total params
         let extra_required_ok = target_has_rest
             && source_required > target_required
             && self.extra_required_accepts_undefined(
@@ -2614,9 +2638,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 target_required,
                 source_required,
             );
+
+        // Reject if source has more required params than target has total params
+        // (unless rest param handles it)
+        let target_total_params = target.params.len();
         if !self.allow_bivariant_param_count
             && !rest_is_top
-            && source_required > target_required
+            && source_required > target_total_params
             && (!target_has_rest || !extra_required_ok)
         {
             return SubtypeResult::False;
@@ -2719,6 +2747,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
+
+        // For extra required params in source beyond target's required count:
+        // 1. If target has rest param: check if source params accept undefined
+        // 2. If target has optional params: handled in per-param loop below
+        // 3. Otherwise: reject if source has more required than target total params
         let extra_required_ok = target_has_rest
             && source_required > target_required
             && self.extra_required_accepts_undefined(
@@ -2726,9 +2759,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 target_required,
                 source_required,
             );
+
+        // Reject if source has more required params than target has total params
+        // (unless rest param handles it)
+        let target_total_params = target.params.len();
         if !self.allow_bivariant_param_count
             && !rest_is_top
-            && source_required > target_required
+            && source_required > target_total_params
             && (!target_has_rest || !extra_required_ok)
         {
             return SubtypeResult::False;
@@ -2831,6 +2868,11 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
 
         let source_required = self.required_param_count(&source.params);
         let target_required = self.required_param_count(&target.params);
+
+        // For extra required params in source beyond target's required count:
+        // 1. If target has rest param: check if source params accept undefined
+        // 2. If target has optional params: handled in per-param loop below
+        // 3. Otherwise: reject if source has more required than target total params
         let extra_required_ok = target_has_rest
             && source_required > target_required
             && self.extra_required_accepts_undefined(
@@ -2838,9 +2880,13 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 target_required,
                 source_required,
             );
+
+        // Reject if source has more required params than target has total params
+        // (unless rest param handles it)
+        let target_total_params = target.params.len();
         if !self.allow_bivariant_param_count
             && !rest_is_top
-            && source_required > target_required
+            && source_required > target_total_params
             && (!target_has_rest || !extra_required_ok)
         {
             return SubtypeResult::False;
