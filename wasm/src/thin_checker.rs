@@ -617,6 +617,14 @@ impl<'a> ThinCheckerState<'a> {
             return TypeId::ERROR;
         }
 
+        // Prevent stack overflow from deeply nested expressions
+        // Limit recursion depth to prevent crashes on pathological inputs
+        const MAX_NODE_RESOLUTION_DEPTH: usize = 1000;
+        if self.ctx.node_resolution_stack.len() >= MAX_NODE_RESOLUTION_DEPTH {
+            // Return UNKNOWN instead of crashing - allows compilation to continue
+            return TypeId::UNKNOWN;
+        }
+
         // Push onto resolution stack
         self.ctx.node_resolution_stack.push(idx);
         self.ctx.node_resolution_set.insert(idx);
@@ -14510,8 +14518,10 @@ impl<'a> ThinCheckerState<'a> {
             // Check for duplicate identifiers (2300)
             self.check_duplicate_identifiers();
 
-            // Check for unused declarations (6133)
-            self.check_unused_declarations();
+            // Check for unused declarations (6133) if noUnusedLocals is enabled
+            if self.ctx.no_unused_locals {
+                self.check_unused_declarations();
+            }
         }
     }
 

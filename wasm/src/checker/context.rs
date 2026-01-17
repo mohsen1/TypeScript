@@ -150,6 +150,12 @@ pub struct CheckerContext<'a> {
     /// This is enabled by strict mode in TypeScript.
     pub strict_null_checks: bool,
 
+    /// Whether unused local variable checking is enabled (noUnusedLocals).
+    /// When true, reports errors for variables, functions, and classes that are declared but never used.
+    /// When false, does not report unused declaration errors (TS6133).
+    /// This defaults to false to match TypeScript's default behavior.
+    pub no_unused_locals: bool,
+
     // --- Caches ---
     /// Cached types for symbols.
     pub symbol_types: FxHashMap<SymbolId, TypeId>,
@@ -295,6 +301,7 @@ impl<'a> CheckerContext<'a> {
             strict_function_types: strict,
             strict_property_initialization: strict,
             strict_null_checks: strict,
+            no_unused_locals: false, // Default to false to match TypeScript
             symbol_types: FxHashMap::default(),
             var_decl_types: FxHashMap::default(),
             node_types: FxHashMap::default(),
@@ -358,6 +365,7 @@ impl<'a> CheckerContext<'a> {
             strict_function_types: strict,
             strict_property_initialization: strict,
             strict_null_checks: strict,
+            no_unused_locals: false, // Default to false to match TypeScript
             symbol_types: cache.symbol_types,
             var_decl_types: FxHashMap::default(),
             node_types: cache.node_types,
