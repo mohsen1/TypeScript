@@ -2228,6 +2228,25 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    /// Checks if a function shape has a "catch-all" rest parameter pattern.
+    /// This is true when the function has a single rest parameter of type `any[]`,
+    /// which is the pattern used by TypeScript's `ReturnType<T>`: `(...args: any[]) => infer R`.
+    /// Such patterns should match any function regardless of its parameter structure.
+    fn has_any_rest_params(&self, params: &[ParamInfo]) -> bool {
+        if params.len() != 1 {
+            return false;
+        }
+        let param = &params[0];
+        if !param.rest {
+            return false;
+        }
+        // Check if the parameter type is any[] (Array<any>)
+        match self.interner.lookup(param.type_id) {
+            Some(TypeKey::Array(elem)) => elem == TypeId::ANY,
+            _ => false,
+        }
+    }
+
     fn substitute_infer(&self, type_id: TypeId, bindings: &FxHashMap<Atom, TypeId>) -> TypeId {
         if bindings.is_empty() {
             return type_id;
@@ -3187,6 +3206,11 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                     };
                 }
                 if pattern_fn.this_type.is_none() && !has_param_infer && has_return_infer {
+                    // Check if pattern has catch-all rest params like (...args: any[])
+                    // This is the pattern for ReturnType<T>: `T extends (...args: any[]) => infer R ? R : any`
+                    // Any function should match this pattern since ...args: any[] can accept anything.
+                    let is_catch_all_params = self.has_any_rest_params(&pattern_fn.params);
+
                     let mut match_function_return = |source_type: TypeId,
                                                      source_fn_id: FunctionShapeId,
                                                      bindings: &mut FxHashMap<Atom, TypeId>|
@@ -3201,6 +3225,12 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                             checker,
                         ) {
                             return false;
+                        }
+                        // If the pattern has catch-all rest params (...args: any[]),
+                        // skip the subtype check since any function matches this pattern.
+                        // This enables ReturnType<T> to work with generic functions like <U>(x: U) => U.
+                        if is_catch_all_params {
+                            return true;
                         }
                         let substituted = self.substitute_infer(pattern, bindings);
                         checker.is_subtype_of(source_type, substituted)

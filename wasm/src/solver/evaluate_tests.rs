@@ -20543,10 +20543,9 @@ fn test_return_type_generic_function() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    // TODO: Generic function ReturnType extraction not fully implemented.
-    // Expected: U (the type parameter) for ReturnType of <U>(x: U) => U
-    // Current: returns never because fixed-param functions don't match rest-param pattern.
-    assert_eq!(result, TypeId::NEVER);
+    // ReturnType<typeof <U>(x: U) => U> should extract U (the type parameter)
+    // This works because (...args: any[]) => infer R matches any function signature.
+    assert_eq!(result, u_param);
 }
 
 /// Test ReturnType<T> with an overloaded function (Callable type with multiple signatures).
