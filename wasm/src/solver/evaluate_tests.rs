@@ -20820,10 +20820,29 @@ fn test_parameters_optional_and_rest_combination() {
 
     let result = evaluate_conditional(&interner, &cond);
 
-    // TODO: Parameters extraction for mixed optional/rest params not fully implemented.
-    // Expected: [string, number?, ...boolean[]] tuple
-    // Current: returns never because mixed params don't match rest pattern directly.
-    assert_eq!(result, TypeId::NEVER);
+    // Parameters<(a: string, b?: number, ...rest: boolean[]) => void> should be:
+    // [string, number?, ...boolean[]]
+    let expected = interner.tuple(vec![
+        TupleElement {
+            type_id: TypeId::STRING,
+            name: Some(interner.intern_string("a")),
+            optional: false,
+            rest: false,
+        },
+        TupleElement {
+            type_id: TypeId::NUMBER,
+            name: Some(interner.intern_string("b")),
+            optional: true,
+            rest: false,
+        },
+        TupleElement {
+            type_id: interner.array(TypeId::BOOLEAN),
+            name: Some(interner.intern_string("rest")),
+            optional: false,
+            rest: true,
+        },
+    ]);
+    assert_eq!(result, expected);
 }
 
 /// Test ConstructorParameters<T> with a class constructor.

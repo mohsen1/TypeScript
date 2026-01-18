@@ -2247,6 +2247,39 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
         }
     }
 
+    /// Checks if a function pattern has the Parameters<T> pattern: a single rest param with infer type.
+    /// Pattern: `(...args: infer P) => any`
+    /// Returns the infer type info if this is the Parameters pattern, None otherwise.
+    fn get_parameters_infer_pattern(&self, params: &[ParamInfo]) -> Option<TypeParamInfo> {
+        if params.len() != 1 {
+            return None;
+        }
+        let param = &params[0];
+        if !param.rest {
+            return None;
+        }
+        // Check if the parameter type is an infer type
+        match self.interner.lookup(param.type_id) {
+            Some(TypeKey::Infer(info)) => Some(info),
+            _ => None,
+        }
+    }
+
+    /// Converts function parameters to a tuple type for Parameters<T> extraction.
+    /// Creates tuple elements preserving optional and rest flags.
+    fn params_to_tuple(&self, params: &[ParamInfo]) -> TypeId {
+        let elements: Vec<TupleElement> = params
+            .iter()
+            .map(|param| TupleElement {
+                type_id: param.type_id,
+                name: param.name,
+                optional: param.optional,
+                rest: param.rest,
+            })
+            .collect();
+        self.interner.tuple(elements)
+    }
+
     fn substitute_infer(&self, type_id: TypeId, bindings: &FxHashMap<Atom, TypeId>) -> TypeId {
         if bindings.is_empty() {
             return type_id;
@@ -3130,6 +3163,55 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
                 }
 
                 if pattern_fn.this_type.is_none() && has_param_infer && !has_return_infer {
+                    // Check if this is the Parameters<T> pattern: (...args: infer P) => any
+                    // If so, we need to convert source params to a tuple type.
+                    if let Some(infer_info) = self.get_parameters_infer_pattern(&pattern_fn.params)
+                    {
+                        let match_parameters_pattern = |source_fn_id: FunctionShapeId,
+                                                        bindings: &mut FxHashMap<Atom, TypeId>|
+                         -> bool {
+                            let source_fn = self.interner.function_shape(source_fn_id);
+                            let tuple_type = self.params_to_tuple(&source_fn.params);
+                            bindings.insert(infer_info.name, tuple_type);
+                            true
+                        };
+
+                        return match self.interner.lookup(source) {
+                            Some(TypeKey::Function(source_fn_id)) => {
+                                match_parameters_pattern(source_fn_id, bindings)
+                            }
+                            Some(TypeKey::Union(members)) => {
+                                let members = self.interner.type_list(members);
+                                let mut combined = FxHashMap::default();
+                                for &member in members.iter() {
+                                    let Some(TypeKey::Function(source_fn_id)) =
+                                        self.interner.lookup(member)
+                                    else {
+                                        return false;
+                                    };
+                                    let mut member_bindings = FxHashMap::default();
+                                    if !match_parameters_pattern(
+                                        source_fn_id,
+                                        &mut member_bindings,
+                                    ) {
+                                        return false;
+                                    }
+                                    for (name, ty) in member_bindings {
+                                        combined
+                                            .entry(name)
+                                            .and_modify(|existing| {
+                                                *existing = self.interner.union2(*existing, ty);
+                                            })
+                                            .or_insert(ty);
+                                    }
+                                }
+                                bindings.extend(combined);
+                                true
+                            }
+                            _ => false,
+                        };
+                    }
+
                     let mut match_function_params = |_source_type: TypeId,
                                                      source_fn_id: FunctionShapeId,
                                                      bindings: &mut FxHashMap<Atom, TypeId>|
