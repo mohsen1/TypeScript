@@ -25,15 +25,6 @@ This document outlines the work distribution plan for 14 workers on Project Zang
 
 **Note:** EMs are individual contributors who also manage their team's work.
 
-### Worker Status Table
-
-| Worker | Squad | Status | Current Task |
-|--------|-------|--------|--------------|
-| Worker 5 | Syntax Squad | Active | Statement-Level Error Recovery Enhancement |
-| Worker 6 | Binder Squad | Active | TS2304 Global Scope / Lib Injection (ongoing) |
-| Worker 7 | Semantics Squad | Approved | Module Symbol Resolution (TS7005, TS7008, TS2792) |
-| Worker 8 | LSP Squad | Approved | LSP TypeScript Config Integration |
-
 ---
 
 ## Worker Assignments
