@@ -21981,10 +21981,8 @@ fn test_tuple_spread_infer_first_rest() {
     };
     let result = evaluate_conditional(&interner, &cond);
 
-    // F should be string
-    // TODO: Currently returns never - tuple spread inference not fully implemented
-    // Update assertion when implemented
-    assert!(result == TypeId::STRING || result == TypeId::NEVER);
+    // F should be string - tuple spread inference extracts the first element
+    assert_eq!(result, TypeId::STRING);
 }
 
 #[test]
