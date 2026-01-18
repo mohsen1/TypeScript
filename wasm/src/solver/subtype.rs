@@ -1590,8 +1590,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 Some(sp) => {
                     // Check optional compatibility
                     // Optional in source can't satisfy required in target
+                    // Exception: when exact_optional_property_types=false, optional properties
+                    // implicitly include undefined, so { x?: T } is assignable to { x: T | undefined }
                     if sp.optional && !t_prop.optional {
-                        return SubtypeResult::False;
+                        if self.exact_optional_property_types
+                            || !self.type_includes_undefined(t_prop.type_id)
+                        {
+                            return SubtypeResult::False;
+                        }
                     }
                     // Readonly in source can't satisfy mutable target
                     if sp.readonly && !t_prop.readonly {
@@ -1746,8 +1752,14 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 self.lookup_property(&source.properties, Some(source_shape_id), t_prop.name)
             {
                 // Check optional compatibility
+                // Exception: when exact_optional_property_types=false, optional properties
+                // implicitly include undefined, so { x?: T } is assignable to { x: T | undefined }
                 if sp.optional && !t_prop.optional {
-                    return SubtypeResult::False;
+                    if self.exact_optional_property_types
+                        || !self.type_includes_undefined(t_prop.type_id)
+                    {
+                        return SubtypeResult::False;
+                    }
                 }
                 // Readonly in source can't satisfy mutable target
                 if sp.readonly && !t_prop.readonly {
@@ -2316,6 +2328,19 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
         } else {
             prop.write_type
         }
+    }
+
+    /// Check if a type includes undefined in its type.
+    /// Used for exact_optional_property_types handling.
+    fn type_includes_undefined(&self, type_id: TypeId) -> bool {
+        if type_id == TypeId::UNDEFINED {
+            return true;
+        }
+        if let Some(TypeKey::Union(members)) = self.interner.lookup(type_id) {
+            let members = self.interner.type_list(members);
+            return members.iter().any(|&m| m == TypeId::UNDEFINED);
+        }
+        false
     }
 
     fn is_numeric_property_name(&self, name: Atom) -> bool {

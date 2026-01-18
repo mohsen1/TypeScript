@@ -523,21 +523,68 @@ fn test_optional_property_includes_undefined() {
     }]);
 
     // With exact_optional_property_types=false, optional properties implicitly
-    // include undefined, so type A (optional string) should ideally be assignable to type B
+    // include undefined, so type A (optional string) should be assignable to type B
     // (explicit string | undefined) and vice versa.
-    //
-    // TODO: Current implementation may not fully support this quirk.
-    // This test documents the expected behavior; assertions disabled pending implementation.
-    //
-    // Expected behavior (when implemented):
-    // assert!(
-    //     checker.is_subtype_of(type_a, type_b),
-    //     "Optional string should be subtype of string|undefined when exact_optional_property_types=false"
-    // );
-    // assert!(
-    //     checker.is_subtype_of(type_b, type_a),
-    //     "string|undefined should be subtype of optional string when exact_optional_property_types=false"
-    // );
+    assert!(
+        checker.is_subtype_of(type_a, type_b),
+        "Optional string should be subtype of string|undefined when exact_optional_property_types=false"
+    );
+    assert!(
+        checker.is_subtype_of(type_b, type_a),
+        "string|undefined should be subtype of optional string when exact_optional_property_types=false"
+    );
+}
+
+#[test]
+fn test_exact_optional_property_types_true() {
+    // When exact_optional_property_types=true, optional properties do NOT implicitly
+    // include undefined. This is a stricter mode.
+    let interner = TypeInterner::new();
+    let mut checker = SubtypeChecker::new(&interner);
+    checker.exact_optional_property_types = true; // Strict mode
+
+    // type A = { x?: string }
+    // type B = { x: string | undefined }
+    // A should NOT be assignable to B (optional != required)
+    // B should still be assignable to A (required satisfies optional if types match)
+
+    let prop_name = interner.intern_string("x");
+
+    // { x?: string }
+    let type_a = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: true,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // { x: string | undefined }
+    let undefined_union = interner.union(vec![TypeId::STRING, TypeId::UNDEFINED]);
+    let type_b = interner.object(vec![PropertyInfo {
+        name: prop_name,
+        type_id: undefined_union,
+        write_type: undefined_union,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // With exact_optional_property_types=true:
+    // - { x?: string } is NOT assignable to { x: string | undefined } (optional can't satisfy required)
+    // - { x: string | undefined } is NOT assignable to { x?: string } (types don't match, string|undefined != string)
+    assert!(
+        !checker.is_subtype_of(type_a, type_b),
+        "Optional string should NOT be subtype of string|undefined when exact_optional_property_types=true"
+    );
+    // The second check: { x: string | undefined } -> { x?: string }
+    // source type: string | undefined, target type: string (not string | undefined since exact_optional=true)
+    // string | undefined is NOT a subtype of string
+    assert!(
+        !checker.is_subtype_of(type_b, type_a),
+        "string|undefined should NOT be subtype of optional string when exact_optional_property_types=true"
+    );
 }
 
 // =============================================================================
