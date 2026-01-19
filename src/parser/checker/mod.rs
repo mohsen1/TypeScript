@@ -48,6 +48,8 @@ pub mod signatures;
 pub mod functions;
 pub mod calls;
 pub mod overloads;
+pub mod satisfies;
+pub mod assertions;
 
 // Re-export commonly used types
 pub use signatures::{
@@ -75,6 +77,19 @@ pub use overloads::{
     OverloadResolver, OverloadContext, OverloadResolutionResult,
     OverloadMatchError, OverloadMismatchReason,
     collect_overload_signatures, check_overload_order,
+};
+
+pub use satisfies::{
+    SatisfiesChecker, SatisfiesContext, SatisfiesCheckResult,
+    SatisfiesError, SatisfiesErrorCode,
+    compare_satisfies_vs_annotation, preserves_literal_type,
+};
+
+pub use assertions::{
+    AssertionChecker, AssertionContext, AssertionCheckResult,
+    AssertionError, AssertionErrorCode, AssertionKind,
+    assert_to_unknown, assert_to_any, assert_from_unknown, assert_from_any,
+    double_assertion,
 };
 
 /// Compiler options that affect type checking
@@ -185,6 +200,26 @@ impl TypeChecker {
     /// Create an overload resolver with current options
     pub fn overload_resolver(&self) -> OverloadResolver<'_> {
         OverloadResolver::new(&self.signatures)
+    }
+
+    /// Create a satisfies checker with current options
+    pub fn satisfies_checker(&self) -> SatisfiesChecker {
+        let context = SatisfiesContext {
+            strict_null_checks: self.options.strict_null_checks,
+            check_excess_properties: true,
+            is_const_context: false,
+        };
+        SatisfiesChecker::new().with_context(context)
+    }
+
+    /// Create an assertion checker with current options
+    pub fn assertion_checker(&self) -> AssertionChecker {
+        let context = AssertionContext {
+            strict_null_checks: self.options.strict_null_checks,
+            is_tsx: false,
+            warn_redundant: false,
+        };
+        AssertionChecker::new().with_context(context)
     }
 
     /// Get a signature by ID
@@ -398,5 +433,125 @@ mod tests {
             e.code == FunctionErrorCode::ImplicitAnyParameter ||
             e.code == FunctionErrorCode::ImplicitAnyReturn
         ));
+    }
+
+    #[test]
+    fn test_satisfies_checker_integration() {
+        let checker = TypeChecker::new();
+        let mut satisfies_checker = checker.satisfies_checker();
+
+        // Test satisfies with compatible types
+        let result = satisfies_checker.check_satisfies(
+            TypeId::STRING,
+            TypeId::STRING,
+            NodeId::new(0),
+            Span::new(0, 10),
+        );
+
+        assert!(result.is_ok());
+        // Satisfies preserves the expression type
+        assert_eq!(result.result_type, TypeId::STRING);
+    }
+
+    #[test]
+    fn test_satisfies_preserves_narrower_type() {
+        let checker = TypeChecker::new();
+        let mut satisfies_checker = checker.satisfies_checker();
+
+        // A specific type satisfies a broader type
+        let specific_type = TypeId::new(100); // e.g., { a: "hello" }
+        let broad_type = TypeId::OBJECT;       // e.g., { a: string }
+
+        let result = satisfies_checker.check_satisfies(
+            specific_type,
+            broad_type,
+            NodeId::new(0),
+            Span::new(0, 10),
+        );
+
+        assert!(result.is_ok());
+        // Should preserve the specific type, not widen to broad type
+        assert_eq!(result.result_type, specific_type);
+        assert_ne!(result.result_type, broad_type);
+    }
+
+    #[test]
+    fn test_assertion_checker_integration() {
+        let checker = TypeChecker::new();
+        let mut assertion_checker = checker.assertion_checker();
+
+        // Test as assertion to unknown
+        let result = assertion_checker.check_as_assertion(
+            TypeId::STRING,
+            TypeId::UNKNOWN,
+            NodeId::new(0),
+            Span::new(0, 10),
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(result.result_type, TypeId::UNKNOWN);
+        assert_eq!(result.kind, AssertionKind::As);
+    }
+
+    #[test]
+    fn test_non_null_assertion_integration() {
+        let checker = TypeChecker::with_options(CheckerOptions {
+            strict_null_checks: true,
+            ..Default::default()
+        });
+        let mut assertion_checker = checker.assertion_checker();
+
+        // Test non-null assertion
+        let result = assertion_checker.check_non_null_assertion(
+            TypeId::STRING,
+            TypeFlags::STRING | TypeFlags::NULL,
+            NodeId::new(0),
+            Span::new(0, 10),
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(result.kind, AssertionKind::NonNull);
+    }
+
+    #[test]
+    fn test_const_assertion_integration() {
+        let checker = TypeChecker::new();
+        let mut assertion_checker = checker.assertion_checker();
+
+        // Test const assertion on literal
+        let result = assertion_checker.check_const_assertion(
+            TypeId::new(100),
+            TypeFlags::STRING_LITERAL,
+            NodeId::new(0),
+            Span::new(0, 10),
+        );
+
+        assert!(result.is_ok());
+        assert_eq!(result.kind, AssertionKind::Const);
+    }
+
+    #[test]
+    fn test_double_assertion_escape_hatch() {
+        // Demonstrate the double assertion pattern
+        // expr as unknown as TargetType
+        let (intermediate, final_type) = double_assertion(TypeId::STRING, TypeId::NUMBER);
+
+        assert_eq!(intermediate, TypeId::UNKNOWN);
+        assert_eq!(final_type, TypeId::NUMBER);
+    }
+
+    #[test]
+    fn test_satisfies_vs_annotation_difference() {
+        // This demonstrates the key difference
+        let expression_type = TypeId::new(100); // Narrow type (e.g., "hello")
+        let annotation_type = TypeId::STRING;   // Wider type
+
+        let (annotation_result, satisfies_result) =
+            compare_satisfies_vs_annotation(expression_type, annotation_type);
+
+        // Type annotation widens to the annotation type
+        assert_eq!(annotation_result, annotation_type);
+        // Satisfies preserves the expression type
+        assert_eq!(satisfies_result, expression_type);
     }
 }

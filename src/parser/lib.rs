@@ -55,6 +55,10 @@ pub use checker::{
     FunctionChecker, FunctionContext, FunctionCheckResult, FunctionError,
     CallChecker, CallContext, CallCheckResult, CallError, Argument,
     OverloadResolver, OverloadResolutionResult,
+    // Satisfies operator
+    SatisfiesChecker, SatisfiesContext, SatisfiesCheckResult, SatisfiesError,
+    // Type assertions
+    AssertionChecker, AssertionContext, AssertionCheckResult, AssertionError, AssertionKind,
 };
 
 /// Parser configuration options.
