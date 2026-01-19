@@ -7,6 +7,7 @@
 //! - Type predicates and discriminated union narrowing
 //! - Control flow analysis for type narrowing
 //! - Const assertions and literal widening
+//! - Infer keyword and conditional type inference
 //!
 //! # Type Guards
 //!
@@ -82,16 +83,39 @@
 //! // Literals don't widen in const contexts
 //! const obj = { x: 10 } as const; // x stays as 10, not number
 //! ```
+//!
+//! # Infer Keyword
+//!
+//! The `infer` keyword extracts types in conditional type clauses:
+//!
+//! ```ignore
+//! // Extract return type from function
+//! type ReturnType<T> = T extends (...args: any[]) => infer R ? R : never;
+//!
+//! // Extract first element of tuple
+//! type First<T> = T extends [infer F, ...any[]] ? F : never;
+//!
+//! // Infer with constraint
+//! type GetString<T> = T extends { value: infer V extends string } ? V : never;
+//!
+//! // Multiple infer with same name (creates intersection in contravariant positions)
+//! type UnionToIntersection<U> = (U extends any ? (x: U) => void : never) extends
+//!   (x: infer I) => void ? I : never;
+//! ```
 
 pub mod assertions;
+pub mod conditional_infer;
 pub mod const_assertions;
+pub mod infer;
 pub mod predicates;
 pub mod type_defs;
 pub mod type_guards;
 pub mod widening;
 
 pub use assertions::*;
+pub use conditional_infer::*;
 pub use const_assertions::*;
+pub use infer::*;
 pub use predicates::*;
 pub use type_defs::*;
 pub use type_guards::*;
