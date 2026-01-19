@@ -11,13 +11,15 @@ export function f() {
 
 //// [f1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.f = f;
+exports.__esModule = true;
+exports.f = void 0;
 function f() {
 }
+exports.f = f;
 //// [f2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.f = f;
+exports.__esModule = true;
+exports.f = void 0;
 function f() {
 }
+exports.f = f;

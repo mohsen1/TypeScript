@@ -8,20 +8,20 @@ export const enum C { One, Two }
 
 //// [b.ts]
 import { A, B } from './a'; // Error
-declare let a: A;
-declare let b: B;
+let a: A;
+let b: B;
 console.log(a, b);
 
 //// [c.ts]
 import Default, * as named from './a'; // Error
-declare let a: Default;
-declare let b: named.B;
+let a: Default;
+let b: named.B;
 console.log(a, b);
 
 //// [d.ts]
 import Default, { A } from './a';
 const a = A;
-declare let b: Default;
+let b: Default;
 console.log(a, b);
 
 //// [e.ts]
@@ -37,8 +37,8 @@ console.log(c, d);
 
 //// [g.ts]
 import { C } from './a';
-declare let c: C;
-declare let d: C.Two;
+let c: C;
+let d: C.Two;
 console.log(c, d);
 
 //// [h.ts]
@@ -66,14 +66,14 @@ K.One;
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A = void 0;
 var default_1 = /** @class */ (function () {
     function default_1() {
     }
     return default_1;
 }());
-exports.default = default_1;
+exports["default"] = default_1;
 var A = /** @class */ (function () {
     function A() {
     }
@@ -82,31 +82,43 @@ var A = /** @class */ (function () {
 exports.A = A;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+require("./a"); // Error
+var a;
+var b;
 console.log(a, b);
 //// [c.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+require("./a"); // Error
+var a;
+var b;
 console.log(a, b);
 //// [d.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var a_1 = require("./a");
 var a = a_1.A;
+var b;
 console.log(a, b);
 //// [e.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+require("./a"); // noUnusedLocals error only
 //// [f.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-0 /* C.One */;
-var c = 1 /* C.Two */;
-var d = 1 /* C.Two */;
+exports.__esModule = true;
+require("./a");
+0 /* One */;
+var c = 1 /* Two */;
+var d = 1 /* Two */;
 console.log(c, d);
 //// [g.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+require("./a");
+var c;
+var d;
 console.log(c, d);
 //// [h.js]
 "use strict";
@@ -118,15 +130,15 @@ var H = /** @class */ (function () {
 module.exports = H;
 //// [i.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var h = {};
 console.log(h);
 //// [j.js]
 // Sad face https://github.com/microsoft/TypeScript/blob/6b04f5039429b9d412696fe2febe39ecc69ad365/src/testRunner/compilerRunner.ts#L207
 //// [k.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [l.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-0 /* K.One */;
+exports.__esModule = true;
+0 /* One */;

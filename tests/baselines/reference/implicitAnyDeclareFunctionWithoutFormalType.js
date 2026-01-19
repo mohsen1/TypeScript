@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyDeclareFunctionWithoutFormalType.ts] ////
-
 //// [implicitAnyDeclareFunctionWithoutFormalType.ts]
 // these should be errors
 function foo(x) { };

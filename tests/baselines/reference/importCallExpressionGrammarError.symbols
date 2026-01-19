@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/dynamicImport/importCallExpressionGrammarError.ts] ////
-
-=== importCallExpressionGrammarError.ts ===
+=== tests/cases/conformance/dynamicImport/importCallExpressionGrammarError.ts ===
 declare function getSpecifier(): string;
 >getSpecifier : Symbol(getSpecifier, Decl(importCallExpressionGrammarError.ts, 0, 0))
 

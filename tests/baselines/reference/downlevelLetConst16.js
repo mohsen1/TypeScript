@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/downlevelLetConst16.ts] ////
-
 //// [downlevelLetConst16.ts]
 'use strict'
 
@@ -101,7 +99,7 @@ function bar2() {
     use(x);
 }
 
-namespace M1 {
+module M1 {
     let x = 1;
     use(x);
     let [y] = [1];
@@ -110,7 +108,7 @@ namespace M1 {
     use(z);
 }
 
-namespace M2 {
+module M2 {
     {
         let x = 1;
         use(x);
@@ -122,7 +120,7 @@ namespace M2 {
     use(x);
 }
 
-namespace M3 {
+module M3 {
     const x = 1;
     use(x);
     const [y] = [1];
@@ -132,7 +130,7 @@ namespace M3 {
 
 }
 
-namespace M4 {
+module M4 {
     {
         const x = 1;
         use(x);

@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/classExtendsClauseClassMergedWithModuleNotReferingConstructor.ts] ////
-
 //// [classExtendsClauseClassMergedWithModuleNotReferingConstructor.ts]
 class A {
     a: number;
 }
-namespace A {
+module A {
     export var v: string;
 }
 
-namespace Foo {
+module Foo {
     var A = 1;
     class B extends A {
         b: string;

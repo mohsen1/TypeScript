@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/exportEqualMemberMissing.ts] ////
 
 //// [exportEqualMemberMissing_0.ts]
-namespace server {
+module server {
     export interface connectModule {
         (res, req, next): void;
     }
@@ -9,7 +9,7 @@ namespace server {
         use: (mod: connectModule) => connectExport;
     }
 }
-declare var server: {
+var server: {
     (): server.connectExport;
     foo: Date;
 };
@@ -23,10 +23,11 @@ connect().use(connect.static('foo')); // Error	1	The property 'static' does not 
 
 //// [exportEqualMemberMissing_0.js]
 "use strict";
+var server;
 module.exports = server;
 //// [exportEqualMemberMissing_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 ///<reference path='exportEqualMemberMissing_0.ts'/>
 var connect = require("./exportEqualMemberMissing_0");
 connect().use(connect.static('foo')); // Error	1	The property 'static' does not exist on value of type ''.

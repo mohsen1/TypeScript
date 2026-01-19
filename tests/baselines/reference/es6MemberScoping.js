@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6MemberScoping.ts] ////
-
 //// [es6MemberScoping.ts]
 class Foo {
     constructor(store: string) { }

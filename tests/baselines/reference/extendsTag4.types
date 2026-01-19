@@ -1,12 +1,9 @@
-//// [tests/cases/conformance/jsdoc/extendsTag4.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/foo.js ===
 /**
  * @constructor
  */
 class A {
 >A : A
->  : ^
 
     constructor() {}
 }

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/dottedModuleName2.ts] ////
-
 //// [dottedModuleName2.ts]
-namespace A.B {
+module A.B {
  
   export var x = 1;
  
@@ -9,7 +7,7 @@ namespace A.B {
  
  
  
-namespace AA { export namespace B {
+module AA { export module B {
  
   export var x = 1;
  
@@ -22,7 +20,7 @@ var tmpOK = AA.B.x;
 var tmpError = A.B.x;
 
 
-namespace A.B.C
+module A.B.C
  
 {
  
@@ -32,7 +30,7 @@ namespace A.B.C
  
  
  
-namespace M
+module M
  
 {
  

@@ -1,83 +1,68 @@
-//// [tests/cases/compiler/duplicateAnonymousModuleClasses.ts] ////
-
-=== duplicateAnonymousModuleClasses.ts ===
-namespace F {
+=== tests/cases/compiler/duplicateAnonymousModuleClasses.ts ===
+module F {
 >F : typeof F
->  : ^^^^^^^^
 
     class Helper {
 >Helper : Helper
->       : ^^^^^^
 
     }
 
 }
 
 
-namespace F {
+module F {
 >F : typeof F
->  : ^^^^^^^^
     
     // Should not be an error
     class Helper {
 >Helper : Helper
->       : ^^^^^^
 
     }
 
 }
 
-namespace Foo {
+module Foo {
 >Foo : typeof Foo
->    : ^^^^^^^^^^
 
     class Helper {
 >Helper : Helper
->       : ^^^^^^
 
     }
 
 }
 
 
-namespace Foo {
+module Foo {
 >Foo : typeof Foo
->    : ^^^^^^^^^^
     
     // Should not be an error
     class Helper {
 >Helper : Helper
->       : ^^^^^^
 
     }
 
 }
 
-namespace Gar {
+module Gar {
 >Gar : typeof Gar
->    : ^^^^^^^^^^
 
-    namespace Foo {
+    module Foo {
 >Foo : typeof Foo
->    : ^^^^^^^^^^
 
         class Helper {
 >Helper : Helper
->       : ^^^^^^
 
         }
 
     }
 
 
-    namespace Foo {
+    module Foo {
 >Foo : typeof Foo
->    : ^^^^^^^^^^
     
         // Should not be an error
         class Helper {
 >Helper : Helper
->       : ^^^^^^
 
         }
 

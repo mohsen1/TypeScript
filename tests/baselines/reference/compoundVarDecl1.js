@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/compoundVarDecl1.ts] ////
-
 //// [compoundVarDecl1.ts]
-namespace Foo { var a = 1, b = 1; a = b + 2; }
+module Foo { var a = 1, b = 1; a = b + 2; }
 
 var foo = 4, bar = 5;
 

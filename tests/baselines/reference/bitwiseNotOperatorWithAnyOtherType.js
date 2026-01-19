@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/expressions/unaryOperators/bitwiseNotOperator/bitwiseNotOperatorWithAnyOtherType.ts] ////
-
 //// [bitwiseNotOperatorWithAnyOtherType.ts]
 // ~ operator on any type
 
-declare var ANY: any;
-declare var ANY1;
-declare var ANY2: any[];
-declare var obj: () => {};
-declare var obj1: { x:"", y: () => { }};
+var ANY: any;
+var ANY1;
+var ANY2: any[] = ["", ""];
+var obj: () => {}
+var obj1 = { x:"", y: () => { }};
 
 function foo(): any {
     var a;
@@ -20,10 +18,10 @@ class A {
         return a;
     }
 }
-namespace M {
-    export declare var n: any;
+module M {
+    export var n: any;
 }
-declare var objA: A;
+var objA = new A();
 
 // any other type var
 var ResultIsNumber = ~ANY1;
@@ -66,6 +64,11 @@ var ResultIsNumber20 = ~~~(ANY + ANY1);
 
 //// [bitwiseNotOperatorWithAnyOtherType.js]
 // ~ operator on any type
+var ANY;
+var ANY1;
+var ANY2 = ["", ""];
+var obj;
+var obj1 = { x: "", y: function () { } };
 function foo() {
     var a;
     return a;
@@ -82,6 +85,7 @@ var A = /** @class */ (function () {
 var M;
 (function (M) {
 })(M || (M = {}));
+var objA = new A();
 // any other type var
 var ResultIsNumber = ~ANY1;
 var ResultIsNumber1 = ~ANY2;

@@ -36,7 +36,7 @@ var SomeClass = /** @class */ (function () {
 module.exports = SomeClass;
 //// [c.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var type = require("./b"); // Ok
 A.prototype; // Error
 var a = { a: 'a' }; // Ok

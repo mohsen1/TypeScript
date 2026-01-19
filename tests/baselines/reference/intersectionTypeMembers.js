@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionTypeMembers.ts] ////
-
 //// [intersectionTypeMembers.ts]
 // An intersection type has those members that are present in any of its constituent types,
 // with types that are intersections of the respective members in the constituent types

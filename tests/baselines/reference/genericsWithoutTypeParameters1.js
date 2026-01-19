@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericsWithoutTypeParameters1.ts] ////
-
 //// [genericsWithoutTypeParameters1.ts]
 class C<T> {
     foo(): T { return null }

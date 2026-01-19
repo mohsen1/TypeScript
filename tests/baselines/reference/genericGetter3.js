@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericGetter3.ts] ////
-
 //// [genericGetter3.ts]
 class A<T> { }
 

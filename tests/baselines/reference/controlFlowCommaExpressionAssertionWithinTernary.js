@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowCommaExpressionAssertionWithinTernary.ts] ////
-
 //// [controlFlowCommaExpressionAssertionWithinTernary.ts]
 declare function assert(value: any): asserts value;
 

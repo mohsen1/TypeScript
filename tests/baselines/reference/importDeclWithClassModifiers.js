@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/importDeclWithClassModifiers.ts] ////
-
 //// [importDeclWithClassModifiers.ts]
-namespace x {
+module x {
     interface c {
     }
 }
@@ -12,10 +10,12 @@ var b: a;
 
 
 //// [importDeclWithClassModifiers.js]
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.c = exports.b = exports.a = void 0;
-exports.a = x.c;
-exports.b = x.c;
-exports.c = x.c;
-var b;
+define(["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    exports.c = exports.b = exports.a = void 0;
+    exports.a = x.c;
+    exports.b = x.c;
+    exports.c = x.c;
+    var b;
+});

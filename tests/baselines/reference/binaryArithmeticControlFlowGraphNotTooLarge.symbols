@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/binaryArithmeticControlFlowGraphNotTooLarge.ts] ////
-
-=== binaryArithmeticControlFlowGraphNotTooLarge.ts ===
+=== tests/cases/compiler/binaryArithmeticControlFlowGraphNotTooLarge.ts ===
 // Repro from #29926 (expanded 10x for good measure)
 
 const foo = function (this: any) {

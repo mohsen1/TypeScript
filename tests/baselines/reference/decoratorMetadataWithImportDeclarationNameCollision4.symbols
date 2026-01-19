@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/decoratorMetadataWithImportDeclarationNameCollision4.ts] ////
-
-=== db.ts ===
+=== tests/cases/compiler/db.ts ===
 export class db {
 >db : Symbol(db, Decl(db.ts, 0, 0))
 
@@ -9,7 +7,7 @@ export class db {
     }
 }
 
-=== service.ts ===
+=== tests/cases/compiler/service.ts ===
 import db from './db'; // error no default export
 >db : Symbol(db, Decl(service.ts, 0, 6))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsReferenceInConstructor3_Js.ts] ////
-
 //// [a.js]
 class A {
 	get arguments() {

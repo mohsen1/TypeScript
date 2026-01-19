@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classHeritageSpecification/derivedTypeDoesNotRequireExtendsClause.ts] ////
-
 //// [derivedTypeDoesNotRequireExtendsClause.ts]
 class Base {
     foo: string;

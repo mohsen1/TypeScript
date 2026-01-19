@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/boolean/assignFromBooleanInterface2.ts] ////
-
 //// [assignFromBooleanInterface2.ts]
 interface Boolean {
     doStuff(): string;
@@ -10,8 +8,8 @@ interface NotBoolean {
 }
 
 var x = true;
-declare var a: Boolean;
-declare var b: NotBoolean;
+var a: Boolean;
+var b: NotBoolean;
 
 a = x;
 a = b;
@@ -26,6 +24,8 @@ x = b; // expected error
 
 //// [assignFromBooleanInterface2.js]
 var x = true;
+var a;
+var b;
 a = x;
 a = b;
 b = a;

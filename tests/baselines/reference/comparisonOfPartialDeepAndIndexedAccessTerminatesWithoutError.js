@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/comparisonOfPartialDeepAndIndexedAccessTerminatesWithoutError.ts] ////
-
 //// [comparisonOfPartialDeepAndIndexedAccessTerminatesWithoutError.ts]
 type PartialDeep<T> = {[K in keyof T]?: PartialDeep<T[K]>};
 type Many<T> = T | readonly T[];
@@ -15,5 +13,5 @@ export {};
 
 //// [comparisonOfPartialDeepAndIndexedAccessTerminatesWithoutError.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x = null;

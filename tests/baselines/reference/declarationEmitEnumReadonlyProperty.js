@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitEnumReadonlyProperty.ts] ////
-
 //// [declarationEmitEnumReadonlyProperty.ts]
 enum E {
     A = 'a',

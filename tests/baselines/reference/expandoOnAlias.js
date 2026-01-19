@@ -27,7 +27,7 @@ config.y;
 export class Vue {
 }
 export namespace config {
-    let x: number;
+    const x: number;
 }
 //// [test.d.ts]
 export {};

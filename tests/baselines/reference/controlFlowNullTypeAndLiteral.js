@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowNullTypeAndLiteral.ts] ////
-
 //// [controlFlowNullTypeAndLiteral.ts]
 // Repros from #23771
 

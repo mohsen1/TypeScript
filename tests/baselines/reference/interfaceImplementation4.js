@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceImplementation4.ts] ////
-
 //// [interfaceImplementation4.ts]
 interface I1 {
     iObj:{ };

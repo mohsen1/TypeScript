@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/instanceOfAssignability.ts] ////
-
 //// [instanceOfAssignability.ts]
 interface Base {
 	foo: string|number;

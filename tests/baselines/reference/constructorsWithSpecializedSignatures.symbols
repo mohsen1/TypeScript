@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/constructorsWithSpecializedSignatures.ts] ////
-
-=== constructorsWithSpecializedSignatures.ts ===
+=== tests/cases/compiler/constructorsWithSpecializedSignatures.ts ===
 // errors
 declare class C {
 >C : Symbol(C, Decl(constructorsWithSpecializedSignatures.ts, 0, 0))

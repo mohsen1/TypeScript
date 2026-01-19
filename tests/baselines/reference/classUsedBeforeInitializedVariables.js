@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classUsedBeforeInitializedVariables.ts] ////
-
 //// [classUsedBeforeInitializedVariables.ts]
 class Test {
     p1 = 0;

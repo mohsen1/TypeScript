@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6-sourcemap-amd.ts] ////
-
 //// [es6-sourcemap-amd.ts]
 class A
 {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithNoRelationshipObjectsOnIndexSignature.ts] ////
-
 //// [comparisonOperatorWithNoRelationshipObjectsOnIndexSignature.ts]
 class Base {
     public a: string;
@@ -13,17 +11,17 @@ class C {
     public c: string;
 }
 
-declare var a1: { [a: string]: string };
-declare var b1: { [b: string]: number };
+var a1: { [a: string]: string };
+var b1: { [b: string]: number };
 
-declare var a2: { [index: string]: Base };
-declare var b2: { [index: string]: C };
+var a2: { [index: string]: Base };
+var b2: { [index: string]: C };
 
-declare var a3: { [index: number]: Base };
-declare var b3: { [index: number]: C };
+var a3: { [index: number]: Base };
+var b3: { [index: number]: C };
 
-declare var a4: { [index: number]: Derived };
-declare var b4: { [index: string]: Base };
+var a4: { [index: number]: Derived };
+var b4: { [index: string]: Base };
 
 // operator <
 var r1a1 = a1 < b1;
@@ -146,6 +144,14 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var a1;
+var b1;
+var a2;
+var b2;
+var a3;
+var b3;
+var a4;
+var b4;
 // operator <
 var r1a1 = a1 < b1;
 var r1a2 = a2 < b2;

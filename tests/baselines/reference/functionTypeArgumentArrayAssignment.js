@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/functionTypeArgumentArrayAssignment.ts] ////
-
 //// [functionTypeArgumentArrayAssignment.ts]
-namespace test {
+module test {
     interface Array<T> {
         foo: T;
         length: number;

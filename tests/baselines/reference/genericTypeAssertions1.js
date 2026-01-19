@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeAssertions1.ts] ////
-
 //// [genericTypeAssertions1.ts]
 class A<T> { foo(x: T) { }}
 var foo = new A<number>();

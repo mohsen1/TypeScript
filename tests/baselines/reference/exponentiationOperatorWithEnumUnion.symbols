@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithEnumUnion.ts] ////
-
-=== exponentiationOperatorWithEnumUnion.ts ===
+=== tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithEnumUnion.ts ===
 // operands of an enum type are treated as having the primitive type Number.
 
 enum E {

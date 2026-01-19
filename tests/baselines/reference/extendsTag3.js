@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/extendsTag3.ts] ////
-
 //// [foo.js]
 /**
  * @constructor
@@ -18,16 +16,6 @@ class B extends A {
     }
 }
 
-/**
- * @extends { A }
- * @constructor
- */
-class C extends A {
-    constructor() {
-        super();
-    }
-}
-
 
 //// [foo.js]
 /**
@@ -41,15 +29,6 @@ class A {
  * @constructor
  */
 class B extends A {
-    constructor() {
-        super();
-    }
-}
-/**
- * @extends { A }
- * @constructor
- */
-class C extends A {
     constructor() {
         super();
     }

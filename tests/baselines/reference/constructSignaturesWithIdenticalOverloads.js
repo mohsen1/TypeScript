@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/constructSignatures/constructSignaturesWithIdenticalOverloads.ts] ////
-
 //// [constructSignaturesWithIdenticalOverloads.ts]
 // Duplicate overloads of construct signatures should generate errors
 

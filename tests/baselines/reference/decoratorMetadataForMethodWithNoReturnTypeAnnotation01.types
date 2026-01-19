@@ -1,18 +1,13 @@
-//// [tests/cases/compiler/decoratorMetadataForMethodWithNoReturnTypeAnnotation01.ts] ////
-
-=== decoratorMetadataForMethodWithNoReturnTypeAnnotation01.ts ===
+=== tests/cases/compiler/decoratorMetadataForMethodWithNoReturnTypeAnnotation01.ts ===
 declare var decorator: any;
 >decorator : any
 
 class MyClass {
 >MyClass : MyClass
->        : ^^^^^^^
 
     constructor(test: string, test2: number) {
 >test : string
->     : ^^^^^^
 >test2 : number
->      : ^^^^^^
 
     }
 
@@ -21,7 +16,6 @@ class MyClass {
 
     doSomething() {
 >doSomething : () => void
->            : ^^^^^^^^^^
 
     }
 }

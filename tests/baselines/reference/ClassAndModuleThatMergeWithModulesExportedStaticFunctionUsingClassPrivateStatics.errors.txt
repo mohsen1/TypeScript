@@ -1,7 +1,7 @@
-ClassAndModuleThatMergeWithModulesExportedStaticFunctionUsingClassPrivateStatics.ts(11,24): error TS2341: Property 'sfn' is private and only accessible within class 'clodule<T>'.
+tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithModulesExportedStaticFunctionUsingClassPrivateStatics.ts(11,24): error TS2341: Property 'sfn' is private and only accessible within class 'clodule<T>'.
 
 
-==== ClassAndModuleThatMergeWithModulesExportedStaticFunctionUsingClassPrivateStatics.ts (1 errors) ====
+==== tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithModulesExportedStaticFunctionUsingClassPrivateStatics.ts (1 errors) ====
     class clodule<T> {
         id: string;
         value: T;
@@ -9,7 +9,7 @@ ClassAndModuleThatMergeWithModulesExportedStaticFunctionUsingClassPrivateStatics
         private static sfn(id: string) { return 42; }
     }
     
-    namespace clodule {
+    module clodule {
         // error: duplicate identifier expected
         export function fn<T>(x: T, y: T): number {
             return clodule.sfn('a');

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfacedecl.ts] ////
-
 //// [interfacedecl.ts]
 interface a0 {
     (): string;

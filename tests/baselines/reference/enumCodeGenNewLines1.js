@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumCodeGenNewLines1.ts] ////
-
 //// [enumCodeGenNewLines1.ts]
 enum foo {
   b = 1,

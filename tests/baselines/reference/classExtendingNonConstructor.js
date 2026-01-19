@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classExtendingNonConstructor.ts] ////
-
 //// [classExtendingNonConstructor.ts]
 var x: {};
 

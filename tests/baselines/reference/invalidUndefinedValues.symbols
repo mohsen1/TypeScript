@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/primitives/undefined/invalidUndefinedValues.ts] ////
-
-=== invalidUndefinedValues.ts ===
+=== tests/cases/conformance/types/primitives/undefined/invalidUndefinedValues.ts ===
 var x: typeof undefined;
 >x : Symbol(x, Decl(invalidUndefinedValues.ts, 0, 3))
 >undefined : Symbol(undefined)
@@ -52,9 +50,9 @@ x = c;
 >x : Symbol(x, Decl(invalidUndefinedValues.ts, 0, 3))
 >c : Symbol(c, Decl(invalidUndefinedValues.ts, 15, 3))
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 >M : Symbol(M, Decl(invalidUndefinedValues.ts, 16, 6))
->x : Symbol(x, Decl(invalidUndefinedValues.ts, 18, 24))
+>x : Symbol(x, Decl(invalidUndefinedValues.ts, 18, 21))
 
 x = M;
 >x : Symbol(x, Decl(invalidUndefinedValues.ts, 0, 3))

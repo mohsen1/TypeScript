@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/cacheResolutions.ts] ////
-
 === /a/b/c/app.ts ===
 export let x = 1;
 >x : Symbol(x, Decl(app.ts, 0, 10))

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/any/assignAnyToEveryType.ts] ////
-
 //// [assignAnyToEveryType.ts]
 // all of these are valid
 
@@ -37,7 +35,7 @@ var i: I = x;
 var j: { (): string } = x;
 var j2: { <T>(x: T): string } = x;
 
-namespace M {
+module M {
     export var foo = 1;
 }
 

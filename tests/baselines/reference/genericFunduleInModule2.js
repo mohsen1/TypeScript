@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/genericFunduleInModule2.ts] ////
-
 //// [genericFunduleInModule2.ts]
-namespace A {
+module A {
     export function B<T>(x: T) { return x; }
 }
 
-namespace A {
-    export namespace B {
+module A {
+    export module B {
         export var x = 1;
     }
 }

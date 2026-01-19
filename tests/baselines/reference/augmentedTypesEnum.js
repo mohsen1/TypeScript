@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/augmentedTypesEnum.ts] ////
-
 //// [augmentedTypesEnum.ts]
 // enum then var
 enum e1111 { One } // error
@@ -25,13 +23,13 @@ enum e5a { One } // error
 
 // enum then internal module
 enum e6 { One } 
-namespace e6 { } // ok
+module e6 { } // ok
 
 enum e6a { One }
-namespace e6a { var y = 2; } // should be error
+module e6a { var y = 2; } // should be error
 
 enum e6b { One }
-namespace e6b { export var y = 2; } // should be error
+module e6b { export var y = 2; } // should be error
 
 // enum then import, messes with error reporting
 //enum e7 { One }

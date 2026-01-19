@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexerSignatureWithRestParam.ts] ////
-
 //// [indexerSignatureWithRestParam.ts]
 interface I {
     [...x]: string;

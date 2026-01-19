@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringArrayBindingPatternAndAssignment3.ts] ////
-
 //// [destructuringArrayBindingPatternAndAssignment3.ts]
 const [a, b = a] = [1]; // ok
 const [c, d = c, e = e] = [1]; // error for e = e

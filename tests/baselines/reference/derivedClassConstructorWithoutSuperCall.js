@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassConstructorWithoutSuperCall.ts] ////
-
 //// [derivedClassConstructorWithoutSuperCall.ts]
 // derived class constructors must contain a super call
 

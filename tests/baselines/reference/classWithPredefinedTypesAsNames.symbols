@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/classDeclarations/classWithPredefinedTypesAsNames.ts] ////
-
-=== classWithPredefinedTypesAsNames.ts ===
+=== tests/cases/conformance/classes/classDeclarations/classWithPredefinedTypesAsNames.ts ===
 // classes cannot use predefined types as names
 
 class any { }

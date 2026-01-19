@@ -25,4 +25,4 @@ export {};
 //// [file2.js]
 "use strict";
 /// <reference path="./file1" />
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

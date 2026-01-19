@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowSuperPropertyAccess.ts] ////
-
 //// [controlFlowSuperPropertyAccess.ts]
 class B {
     protected m?(): void;

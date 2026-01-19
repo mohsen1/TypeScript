@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarations-useBeforeDefinition.ts] ////
-
 //// [constDeclarations-useBeforeDefinition.ts]
 {
     c1;

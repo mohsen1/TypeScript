@@ -1,15 +1,15 @@
-exportConsts.ts(3,16): error TS2448: Block-scoped variable 'x' used before its declaration.
-exportConsts.ts(3,16): error TS2454: Variable 'x' is used before being assigned.
-exportVars.ts(3,16): error TS2454: Variable 'y' is used before being assigned.
+tests/cases/conformance/es6/modules/exportConsts.ts(3,16): error TS2448: Block-scoped variable 'x' used before its declaration.
+tests/cases/conformance/es6/modules/exportConsts.ts(3,16): error TS2454: Variable 'x' is used before being assigned.
+tests/cases/conformance/es6/modules/exportVars.ts(3,16): error TS2454: Variable 'y' is used before being assigned.
 
 
-==== exportConsts.ts (2 errors) ====
+==== tests/cases/conformance/es6/modules/exportConsts.ts (2 errors) ====
     export { x }
     export { x as xx }
     export default x;
                    ~
 !!! error TS2448: Block-scoped variable 'x' used before its declaration.
-!!! related TS2728 exportConsts.ts:5:7: 'x' is declared here.
+!!! related TS2728 tests/cases/conformance/es6/modules/exportConsts.ts:5:7: 'x' is declared here.
                    ~
 !!! error TS2454: Variable 'x' is used before being assigned.
     
@@ -18,7 +18,7 @@ exportVars.ts(3,16): error TS2454: Variable 'y' is used before being assigned.
     export { Y as Z }
     class Y {}
     
-==== exportVars.ts (1 errors) ====
+==== tests/cases/conformance/es6/modules/exportVars.ts (1 errors) ====
     export { y }
     export { y as yy }
     export default y;

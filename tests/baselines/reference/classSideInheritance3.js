@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classSideInheritance3.ts] ////
-
 //// [classSideInheritance3.ts]
 class A {
     constructor(public x: string) {

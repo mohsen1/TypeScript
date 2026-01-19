@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloads5.ts] ////
-
 //// [functionOverloads5.ts]
 class baz { 
   public foo();

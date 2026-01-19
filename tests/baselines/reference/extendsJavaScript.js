@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendsJavaScript.ts] ////
-
 //// [extendsJavaScript.js]
 /**
  * @extends {SomeBase}

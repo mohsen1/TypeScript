@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuringArrayPattern4.ts] ////
-
 //// [declarationEmitDestructuringArrayPattern4.ts]
 var [...a5] = [1, 2, 3];
 var [x14, ...a6] = [1, 2, 3];

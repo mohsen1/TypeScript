@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/bom-utf16le.ts] ////
-
 //// [bom-utf16le.ts]
 var x=10;
 

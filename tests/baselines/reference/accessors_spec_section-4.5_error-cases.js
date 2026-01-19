@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/accessors_spec_section-4.5_error-cases.ts] ////
-
 //// [accessors_spec_section-4.5_error-cases.ts]
 class LanguageSpec_section_4_5_error_cases {
     public set AnnotatedSetter_SetterFirst(a: number) { }

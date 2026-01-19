@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractInstantiations2.ts] ////
-
 //// [classAbstractInstantiations2.ts]
 class A {
     // ...

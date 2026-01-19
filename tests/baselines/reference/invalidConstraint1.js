@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/invalidConstraint1.ts] ////
-
 //// [invalidConstraint1.ts]
 function f<T, U extends { a: T }>() {
     return undefined;

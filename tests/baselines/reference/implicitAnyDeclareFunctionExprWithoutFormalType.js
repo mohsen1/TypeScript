@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyDeclareFunctionExprWithoutFormalType.ts] ////
-
 //// [implicitAnyDeclareFunctionExprWithoutFormalType.ts]
 // these should be errors for implicit any parameter
 var lambda = (l1) => { };       // Error at "l1"

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileForClassWithMultipleBaseClasses.ts] ////
-
 //// [declFileForClassWithMultipleBaseClasses.ts]
 class A {
     foo() { }

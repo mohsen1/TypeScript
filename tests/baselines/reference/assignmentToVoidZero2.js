@@ -35,12 +35,12 @@ var c = new C();
 c.p + c.q;
 //// [importer.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var assignmentToVoidZero2_1 = require("./assignmentToVoidZero2");
 assignmentToVoidZero2_1.j + assignmentToVoidZero2_1.k;
 
 
 //// [assignmentToVoidZero2.d.ts]
-export const j: 1;
+export var j: number;
 //// [importer.d.ts]
 export {};

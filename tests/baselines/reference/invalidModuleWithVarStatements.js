@@ -1,30 +1,28 @@
-//// [tests/cases/conformance/internalModules/moduleBody/invalidModuleWithVarStatements.ts] ////
-
 //// [invalidModuleWithVarStatements.ts]
 // All of these should be an error
 
-namespace Y {
+module Y {
     public var x: number = 0;
 }
 
-namespace Y2 {
+module Y2 {
     public function fn(x: string) { }
 }
 
-namespace Y4 {
+module Y4 {
     static var x: number = 0;
 }
 
-namespace YY {
+module YY {
     static function fn(x: string) { }
 }
 
-namespace YY2 {
+module YY2 {
     private var x: number = 0;
 }
 
 
-namespace YY3 {
+module YY3 {
     private function fn(x: string) { }
 }
 

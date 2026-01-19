@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/compoundExponentiationAssignmentLHSIsReference.ts] ////
-
 //// [compoundExponentiationAssignmentLHSIsReference.ts]
 var value: any;
 

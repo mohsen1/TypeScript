@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/accessorParameterAccessibilityModifier.ts] ////
-
-=== accessorParameterAccessibilityModifier.ts ===
+=== tests/cases/compiler/accessorParameterAccessibilityModifier.ts ===
 class C {
 >C : Symbol(C, Decl(accessorParameterAccessibilityModifier.ts, 0, 0))
 

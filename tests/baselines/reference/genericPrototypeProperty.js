@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericPrototypeProperty.ts] ////
-
 //// [genericPrototypeProperty.ts]
 class C<T> {
     x: T;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doesNotNarrowUnionOfConstructorsWithInstanceof.ts] ////
-
 //// [doesNotNarrowUnionOfConstructorsWithInstanceof.ts]
 class A {
     length: 1

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypeAny.ts] ////
-
 //// [contextualTypeAny.ts]
 var x: any;
 

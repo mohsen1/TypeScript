@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileForInterfaceWithOptionalFunction.ts] ////
-
 //// [declFileForInterfaceWithOptionalFunction.ts]
 interface I {
     foo? (x?);

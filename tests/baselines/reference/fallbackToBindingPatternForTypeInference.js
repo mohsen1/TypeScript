@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/fallbackToBindingPatternForTypeInference.ts] ////
-
 //// [fallbackToBindingPatternForTypeInference.ts]
 declare function trans<T>(f: (x: T) => string): number;
 trans(({a}) => a);

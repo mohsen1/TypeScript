@@ -1,10 +1,8 @@
-//// [tests/cases/conformance/functions/functionNameConflicts.ts] ////
-
 //// [functionNameConflicts.ts]
 //Function and variable of the same name in same declaration space
 //Function overload with different name from implementation signature 
 
-namespace M {
+module M {
     function fn1() { }
     var fn1;
 

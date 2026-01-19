@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/extendArray.ts] ////
-
 //// [extendArray.ts]
 var a = [1,2];
 a.forEach(function (v,i,a) {});
 
 
-declare namespace _Core {
+declare module _Core {
   interface Array {
     collect(fn:(e:_element) => _element[]) : any[];
   }

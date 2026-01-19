@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/blockScopedBindingCaptureThisInFunction.ts] ////
-
 //// [blockScopedBindingCaptureThisInFunction.ts]
 // https://github.com/Microsoft/TypeScript/issues/11038
 () => function () {

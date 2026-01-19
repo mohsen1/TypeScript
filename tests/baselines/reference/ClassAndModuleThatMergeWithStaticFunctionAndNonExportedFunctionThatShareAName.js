@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticFunctionAndNonExportedFunctionThatShareAName.ts] ////
-
 //// [ClassAndModuleThatMergeWithStaticFunctionAndNonExportedFunctionThatShareAName.ts]
 class Point {
     constructor(public x: number, public y: number) { }
@@ -7,19 +5,19 @@ class Point {
     static Origin(): Point { return { x: 0, y: 0 }; }
 }
 
-namespace Point {
+module Point {
     function Origin() { return ""; }// not an error, since not exported
 }
 
 
-namespace A {
+module A {
     export class Point {
         constructor(public x: number, public y: number) { }
 
         static Origin(): Point { return { x: 0, y: 0 }; }
     }
 
-    export namespace Point {
+    export module Point {
         function Origin() { return ""; }// not an error since not exported
     }
 }

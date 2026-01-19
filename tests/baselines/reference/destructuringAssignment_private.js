@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringAssignment_private.ts] ////
-
 //// [destructuringAssignment_private.ts]
 class C {
     private x = 0;

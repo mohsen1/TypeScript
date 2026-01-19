@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/booleanFilterAnyArray.ts] ////
-
 //// [booleanFilterAnyArray.ts]
 interface Bullean { }
 interface BulleanConstructor {

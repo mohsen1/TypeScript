@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock26.ts] ////
-
 //// [classStaticBlock26.ts]
 class C {
     static {

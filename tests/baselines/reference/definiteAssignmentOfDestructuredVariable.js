@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/definiteAssignmentOfDestructuredVariable.ts] ////
-
 //// [definiteAssignmentOfDestructuredVariable.ts]
 // https://github.com/Microsoft/TypeScript/issues/20994
 interface Options {

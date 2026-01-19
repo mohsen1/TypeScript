@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithIdenticalObjects.ts] ////
-
 //// [comparisonOperatorWithIdenticalObjects.ts]
 class A1 {
     public a: string;

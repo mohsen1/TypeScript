@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/internalImportInstantiatedModuleMergedWithClassNotReferencingInstanceNoConflict.ts] ////
-
 //// [internalImportInstantiatedModuleMergedWithClassNotReferencingInstanceNoConflict.ts]
 class A {
     aProp: string;
 }
-namespace A {
+module A {
     export interface X { s: string }
     export var a = 10;
 }
 
-namespace B {
+module B {
     import Y = A;
 }
 

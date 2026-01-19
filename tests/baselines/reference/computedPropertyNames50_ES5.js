@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames50_ES5.ts] ////
-
 //// [computedPropertyNames50_ES5.ts]
 var x = {
     p1: 10,

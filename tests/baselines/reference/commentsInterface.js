@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsInterface.ts] ////
-
 //// [commentsInterface.ts]
 /** this is interface 1*/
 interface i1 {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfLambdaWithMultipleSignatures.ts] ////
-
 //// [contextualTypingOfLambdaWithMultipleSignatures.ts]
 interface Foo {
     getFoo(n: number): void;

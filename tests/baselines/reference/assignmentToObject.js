@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentToObject.ts] ////
-
 //// [assignmentToObject.ts]
 var a = { toString: 5 };
 var b: {} = a;  // ok

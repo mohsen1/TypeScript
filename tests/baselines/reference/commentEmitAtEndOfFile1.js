@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/commentEmitAtEndOfFile1.ts] ////
-
 //// [commentEmitAtEndOfFile1.ts]
 // test
 var f = ''
 // test #2
-namespace foo {
+module foo {
         function bar() { }
 }
 // test #3
-namespace empty {
+module empty {
 }
 // test #4
 

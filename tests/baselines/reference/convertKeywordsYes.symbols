@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/convertKeywordsYes.ts] ////
-
-=== convertKeywordsYes.ts ===
+=== tests/cases/compiler/convertKeywordsYes.ts ===
 // reserved ES5 future in strict mode
 
 var constructor = 0;
@@ -835,11 +833,11 @@ enum bigEnum {
 >with : Symbol(bigEnum.with, Decl(convertKeywordsYes.ts, 285, 10))
 }
 
-namespace bigModule {
+module bigModule {
 >bigModule : Symbol(bigModule, Decl(convertKeywordsYes.ts, 287, 1))
 
     class constructor { }
->constructor : Symbol(constructor, Decl(convertKeywordsYes.ts, 289, 21))
+>constructor : Symbol(constructor, Decl(convertKeywordsYes.ts, 289, 18))
 
     class implements { }
 >implements : Symbol(implements, Decl(convertKeywordsYes.ts, 290, 25))

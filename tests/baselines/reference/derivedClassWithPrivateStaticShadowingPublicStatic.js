@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassWithPrivateStaticShadowingPublicStatic.ts] ////
-
 //// [derivedClassWithPrivateStaticShadowingPublicStatic.ts]
 class Base {
     public static x: string;

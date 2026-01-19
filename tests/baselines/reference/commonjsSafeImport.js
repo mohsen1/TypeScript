@@ -12,8 +12,9 @@ Foo();
 //// [10_lib.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.Foo = Foo;
+exports.Foo = void 0;
 function Foo() { }
+exports.Foo = Foo;
 //// [main.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsEnums.ts] ////
-
 //// [commentsEnums.ts]
 /** Enum of colors*/
 enum Colors {

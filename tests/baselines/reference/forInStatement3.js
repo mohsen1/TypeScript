@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forInStatement3.ts] ////
-
 //// [forInStatement3.ts]
 function F<T>() {
   var expr: T;

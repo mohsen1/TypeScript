@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassOverridesWithoutSubtype.ts] ////
-
 //// [derivedClassOverridesWithoutSubtype.ts]
 class Base {
     x: {

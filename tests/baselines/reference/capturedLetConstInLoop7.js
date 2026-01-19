@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop7.ts] ////
-
 //// [capturedLetConstInLoop7.ts]
 //===let
 l0:

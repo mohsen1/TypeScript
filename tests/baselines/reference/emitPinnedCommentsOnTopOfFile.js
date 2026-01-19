@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitPinnedCommentsOnTopOfFile.ts] ////
-
 //// [emitPinnedCommentsOnTopOfFile.ts]
 /*!
 

@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/cloduleAcrossModuleDefinitions.ts] ////
-
 //// [cloduleAcrossModuleDefinitions.ts]
-namespace A {
+module A {
     export class B {
         foo() { }
         static bar() { }
     }
 }
 
-namespace A {
-    export namespace B {
+module A {
+    export module B {
         export var x = 1;
     }
 }

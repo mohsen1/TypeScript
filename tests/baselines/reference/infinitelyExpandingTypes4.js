@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infinitelyExpandingTypes4.ts] ////
-
 //// [infinitelyExpandingTypes4.ts]
 interface Query<T> {
     // ...

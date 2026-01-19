@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/es5-asyncFunctionIfStatements.ts] ////
-
-=== es5-asyncFunctionIfStatements.ts ===
+=== tests/cases/compiler/es5-asyncFunctionIfStatements.ts ===
 declare var x, y, z, a, b, c;
 >x : any
 >y : any
@@ -11,7 +9,6 @@ declare var x, y, z, a, b, c;
 
 async function ifStatement1() {
 >ifStatement1 : () => Promise<void>
->             : ^^^^^^^^^^^^^^^^^^^
 
     if (await x) { y; } else { z; }
 >await x : any
@@ -22,7 +19,6 @@ async function ifStatement1() {
 
 async function ifStatement2() {
 >ifStatement2 : () => Promise<void>
->             : ^^^^^^^^^^^^^^^^^^^
 
     if (x) { await y; } else { z; }
 >x : any
@@ -33,7 +29,6 @@ async function ifStatement2() {
 
 async function ifStatement3() {
 >ifStatement3 : () => Promise<void>
->             : ^^^^^^^^^^^^^^^^^^^
 
     if (x) { y; } else { await z; }
 >x : any

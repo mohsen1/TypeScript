@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndLocalVarInAccessors.ts] ////
-
 //// [collisionSuperAndLocalVarInAccessors.ts]
 var _super = 10; // No Error
 class Foo {

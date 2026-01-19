@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnParameter3.ts] ////
-
 //// [commentOnParameter3.ts]
 function commentedParameters(
 a /* parameter a */, 

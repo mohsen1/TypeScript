@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/asiPreventsParsingAsInterface05.ts] ////
-
-=== asiPreventsParsingAsInterface05.ts ===
+=== tests/cases/conformance/interfaces/interfaceDeclarations/asiPreventsParsingAsInterface05.ts ===
 "use strict"
 
-var interface: number = 123;
+var interface: number;
 >interface : Symbol(interface, Decl(asiPreventsParsingAsInterface05.ts, 2, 3))
 
 // 'interface' is a strict mode reserved word, and so it would be permissible

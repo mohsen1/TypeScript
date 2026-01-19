@@ -1,10 +1,7 @@
-//// [tests/cases/conformance/statements/for-ofStatements/ES5For-of15.ts] ////
-
-=== ES5For-of15.ts ===
+=== tests/cases/conformance/statements/for-ofStatements/ES5For-of15.ts ===
 for (let v of []) {
 >v : any
 >[] : undefined[]
->   : ^^^^^^^^^^^
 
     v;
 >v : any
@@ -12,7 +9,6 @@ for (let v of []) {
     for (const v of []) {
 >v : any
 >[] : undefined[]
->   : ^^^^^^^^^^^
 
         var x = v;
 >x : any

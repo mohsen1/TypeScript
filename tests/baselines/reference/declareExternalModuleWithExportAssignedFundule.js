@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declareExternalModuleWithExportAssignedFundule.ts] ////
-
 //// [declareExternalModuleWithExportAssignedFundule.ts]
 declare module "express" {
 
@@ -7,7 +5,7 @@ declare module "express" {
 
     function express(): express.ExpressServer;
 
-    namespace express {
+    module express {
 
         export interface ExpressServer {
 

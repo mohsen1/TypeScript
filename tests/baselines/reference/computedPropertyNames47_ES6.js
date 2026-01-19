@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames47_ES6.ts] ////
-
 //// [computedPropertyNames47_ES6.ts]
 enum E1 { x }
 enum E2 { x }

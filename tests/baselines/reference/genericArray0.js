@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericArray0.ts] ////
-
 //// [genericArray0.ts]
 
 var x:number[];

@@ -1,7 +1,7 @@
-es6MemberScoping.ts(7,21): error TS2301: Initializer of instance member variable '_store' cannot reference identifier 'store' declared in the constructor.
+tests/cases/compiler/es6MemberScoping.ts(7,21): error TS2304: Cannot find name 'store'.
 
 
-==== es6MemberScoping.ts (1 errors) ====
+==== tests/cases/compiler/es6MemberScoping.ts (1 errors) ====
     class Foo {
         constructor(store: string) { }
     
@@ -10,7 +10,7 @@ es6MemberScoping.ts(7,21): error TS2301: Initializer of instance member variable
         }
         public _store = store; // should be an error.
                         ~~~~~
-!!! error TS2301: Initializer of instance member variable '_store' cannot reference identifier 'store' declared in the constructor.
+!!! error TS2304: Cannot find name 'store'.
     }
     
     class Foo2 {

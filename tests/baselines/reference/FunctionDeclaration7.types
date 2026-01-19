@@ -1,11 +1,7 @@
-//// [tests/cases/compiler/FunctionDeclaration7.ts] ////
-
-=== FunctionDeclaration7.ts ===
-namespace M {
+=== tests/cases/compiler/FunctionDeclaration7.ts ===
+module M {
 >M : typeof M
->  : ^^^^^^^^
 
    function foo();
 >foo : () => any
->    : ^^^^^^^^^
 }

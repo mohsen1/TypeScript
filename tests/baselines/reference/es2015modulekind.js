@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es2015modulekind.ts] ////
-
 //// [es2015modulekind.ts]
 export default class A
 {

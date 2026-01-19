@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithOnlyNullValueOrUndefinedValue.ts] ////
-
 //// [exponentiationOperatorWithOnlyNullValueOrUndefinedValue.ts]
 // operator **
 var r1 = null ** null;

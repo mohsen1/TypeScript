@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/genericCallWithObjectTypeArgsAndInitializers.ts] ////
-
 //// [genericCallWithObjectTypeArgsAndInitializers.ts]
 // Generic typed parameters with initializers
 

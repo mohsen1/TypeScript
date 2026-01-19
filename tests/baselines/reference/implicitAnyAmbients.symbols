@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/implicitAnyAmbients.ts] ////
-
-=== implicitAnyAmbients.ts ===
-declare namespace m {
+=== tests/cases/compiler/implicitAnyAmbients.ts ===
+declare module m {
 >m : Symbol(m, Decl(implicitAnyAmbients.ts, 0, 0))
 
     var x; // error
@@ -52,7 +50,7 @@ declare namespace m {
 >x : Symbol(x, Decl(implicitAnyAmbients.ts, 17, 13))
     }
 
-    namespace n {
+    module n {
 >n : Symbol(n, Decl(implicitAnyAmbients.ts, 18, 5))
 
         var y; // error

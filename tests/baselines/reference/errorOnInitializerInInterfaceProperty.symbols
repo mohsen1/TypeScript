@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/errorOnInitializerInInterfaceProperty.ts] ////
-
-=== errorOnInitializerInInterfaceProperty.ts ===
+=== tests/cases/compiler/errorOnInitializerInInterfaceProperty.ts ===
 interface Foo {
 >Foo : Symbol(Foo, Decl(errorOnInitializerInInterfaceProperty.ts, 0, 0))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayFilter.ts] ////
-
 //// [arrayFilter.ts]
 var foo = [
     { name: 'bar' },

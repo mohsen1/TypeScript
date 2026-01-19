@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/declarationEmit/typePredicates/declarationEmitThisPredicates01.ts] ////
-
 //// [declarationEmitThisPredicates01.ts]
 export class C {
     m(): this is D {
@@ -27,7 +25,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.D = exports.C = void 0;
 var C = /** @class */ (function () {
     function C() {

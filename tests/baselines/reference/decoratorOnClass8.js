@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/class/decoratorOnClass8.ts] ////
-
 //// [decoratorOnClass8.ts]
 declare function dec(): (target: Function, paramIndex: number) => void;
 

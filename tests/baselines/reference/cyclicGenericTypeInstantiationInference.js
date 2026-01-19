@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/cyclicGenericTypeInstantiationInference.ts] ////
-
 //// [cyclicGenericTypeInstantiationInference.ts]
 function foo<T>() {
     var z = foo<typeof y>();

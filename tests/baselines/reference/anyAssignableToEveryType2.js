@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/anyAssignableToEveryType2.ts] ////
-
 //// [anyAssignableToEveryType2.ts]
 // any is not a subtype of any other types, but is assignable, all the below should work
 
@@ -89,7 +87,7 @@ interface I14 {
 
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 interface I15 {
@@ -99,7 +97,7 @@ interface I15 {
 
 
 class c { baz: string }
-namespace c {
+module c {
     export var bar = 1;
 }
 interface I16 {

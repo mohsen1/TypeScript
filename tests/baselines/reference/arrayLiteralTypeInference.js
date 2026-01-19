@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayLiteralTypeInference.ts] ////
-
 //// [arrayLiteralTypeInference.ts]
 class Action {
     id: number;

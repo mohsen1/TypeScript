@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithoutReturnTypeAnnotationInference.ts] ////
-
-=== callSignatureWithoutReturnTypeAnnotationInference.ts ===
+=== tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithoutReturnTypeAnnotationInference.ts ===
 // Call signatures without a return type should infer one from the function body (if present)
 
 // Simple types
@@ -148,7 +146,7 @@ var r10 = foo10(1);
 >r10 : Symbol(r10, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 71, 3))
 >foo10 : Symbol(foo10, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 66, 1))
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 71, 19))
 
     export var x = 1;
@@ -198,19 +196,19 @@ var r12 = foo12();
 function m1() { return 1; }
 >m1 : Symbol(m1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 93, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 95, 27))
 
-namespace m1 { export var y = 2; }
+module m1 { export var y = 2; }
 >m1 : Symbol(m1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 93, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 95, 27))
->y : Symbol(y, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 25))
+>y : Symbol(y, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 22))
 
 function foo13() {
->foo13 : Symbol(foo13, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 34))
+>foo13 : Symbol(foo13, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 31))
 
     return m1;
 >m1 : Symbol(m1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 93, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 95, 27))
 }
 var r13 = foo13();
 >r13 : Symbol(r13, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 100, 3))
->foo13 : Symbol(foo13, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 34))
+>foo13 : Symbol(foo13, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 96, 31))
 
 class c1 {
 >c1 : Symbol(c1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 100, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 105, 1))
@@ -221,7 +219,7 @@ class c1 {
     constructor(x) { }
 >x : Symbol(x, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 104, 16))
 }
-namespace c1 {
+module c1 {
 >c1 : Symbol(c1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 100, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 105, 1))
 
     export var x = 1;
@@ -241,17 +239,17 @@ enum e1 { A }
 >e1 : Symbol(e1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 112, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 114, 13))
 >A : Symbol(e1.A, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 114, 9))
 
-namespace e1 { export var y = 1; }
+module e1 { export var y = 1; }
 >e1 : Symbol(e1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 112, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 114, 13))
->y : Symbol(y, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 25))
+>y : Symbol(y, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 22))
 
 function foo15() {
->foo15 : Symbol(foo15, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 34))
+>foo15 : Symbol(foo15, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 31))
 
     return e1;
 >e1 : Symbol(e1, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 112, 18), Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 114, 13))
 }
 var r15 = foo15();
 >r15 : Symbol(r15, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 119, 3))
->foo15 : Symbol(foo15, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 34))
+>foo15 : Symbol(foo15, Decl(callSignatureWithoutReturnTypeAnnotationInference.ts, 115, 31))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceMemberAccessorOverridingMethod.ts] ////
-
 //// [inheritanceMemberAccessorOverridingMethod.ts]
 class a {
     x() {

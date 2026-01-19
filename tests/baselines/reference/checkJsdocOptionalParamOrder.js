@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocOptionalParamOrder.ts] ////
-
 //// [0.js]
 // @ts-check
 /**

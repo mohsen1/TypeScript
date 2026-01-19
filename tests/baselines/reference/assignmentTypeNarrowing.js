@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/assignmentOperator/assignmentTypeNarrowing.ts] ////
-
 //// [assignmentTypeNarrowing.ts]
 let x: string | number | boolean | RegExp;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-amd.ts] ////
-
 //// [es5-amd.ts]
 class A
 {

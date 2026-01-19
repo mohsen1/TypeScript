@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/decorators/class/method/decoratorOnClassMethod12.ts] ////
-
 //// [decoratorOnClassMethod12.ts]
-namespace M {
+module M {
     class S {
         decorator(target: Object, key: string): void { }
     }
     class C extends S {
-        @(super.decorator)
+        @super.decorator
         method() { }
     }
 }
@@ -48,7 +46,7 @@ var M;
         }
         C.prototype.method = function () { };
         __decorate([
-            (_super.decorator)
+            _super.decorator
         ], C.prototype, "method", null);
         return C;
     }(S));

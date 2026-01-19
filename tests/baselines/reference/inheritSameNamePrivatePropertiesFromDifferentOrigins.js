@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritSameNamePrivatePropertiesFromDifferentOrigins.ts] ////
-
 //// [inheritSameNamePrivatePropertiesFromDifferentOrigins.ts]
 class C {
     private x: number;

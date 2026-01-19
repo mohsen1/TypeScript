@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericObjectLitReturnType.ts] ////
-
 //// [genericObjectLitReturnType.ts]
 class X<T>
 {

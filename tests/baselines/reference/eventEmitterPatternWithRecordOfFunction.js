@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/eventEmitterPatternWithRecordOfFunction.ts] ////
-
 //// [eventEmitterPatternWithRecordOfFunction.ts]
 interface A {
     emit(event: string, ...args: any[]): boolean;

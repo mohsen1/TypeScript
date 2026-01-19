@@ -13,10 +13,10 @@ export enum E {
 export const enum D {
     A, B, C
 }
-export namespace M {
+export module M {
     export var x;
 }
-export namespace N {
+export module N {
     export interface I {
     }
 }
@@ -37,12 +37,12 @@ export { v, f, C, I, E, D, M, N, T, a };
 define(["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.a1 = exports.M1 = exports.E1 = exports.C1 = exports.v1 = exports.a = exports.M = exports.E = exports.C = exports.v = void 0;
-    exports.f = f;
-    exports.f1 = f;
+    exports.a1 = exports.M1 = exports.E1 = exports.C1 = exports.f1 = exports.v1 = exports.a = exports.M = exports.E = exports.C = exports.f = exports.v = void 0;
     exports.v = 1;
     exports.v1 = exports.v;
     function f() { }
+    exports.f = f;
+    exports.f1 = f;
     var C = /** @class */ (function () {
         function C() {
         }
@@ -55,10 +55,12 @@ define(["require", "exports"], function (require, exports) {
         E[E["A"] = 0] = "A";
         E[E["B"] = 1] = "B";
         E[E["C"] = 2] = "C";
-    })(E || (exports.E1 = exports.E = E = {}));
+    })(E = exports.E || (exports.E = {}));
+    exports.E1 = E;
     var M;
     (function (M) {
-    })(M || (exports.M1 = exports.M = M = {}));
+    })(M = exports.M || (exports.M = {}));
+    exports.M1 = M;
     exports.a = M.x;
     exports.a1 = exports.a;
 });

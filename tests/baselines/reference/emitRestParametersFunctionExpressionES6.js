@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/restParameters/emitRestParametersFunctionExpressionES6.ts] ////
-
 //// [emitRestParametersFunctionExpressionES6.ts]
 var funcExp = (...rest) => { }
 var funcExp1 = (X: number, ...rest) => { }

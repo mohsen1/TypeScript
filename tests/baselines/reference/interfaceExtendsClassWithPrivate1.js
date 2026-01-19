@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceExtendsClassWithPrivate1.ts] ////
-
 //// [interfaceExtendsClassWithPrivate1.ts]
 class C {
     public foo(x: any) { return x; }
@@ -17,8 +15,8 @@ class D extends C implements I {
 } 
 
 var c: C;
-declare var i: I;
-declare var d: D;
+var i: I;
+var d: D;
 
 c = i;
 i = c; // error
@@ -63,6 +61,8 @@ var D = /** @class */ (function (_super) {
     return D;
 }(C));
 var c;
+var i;
+var d;
 c = i;
 i = c; // error
 i = d;

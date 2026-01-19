@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericSignatureInheritance2.ts] ////
-
 //// [genericSignatureInheritance2.ts]
 interface I {
     <T>(x: T): string;

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/derivedInterfaceCallSignature.ts] ////
-
-=== derivedInterfaceCallSignature.ts ===
+=== tests/cases/compiler/derivedInterfaceCallSignature.ts ===
 interface D3SvgPath {
 >D3SvgPath : Symbol(D3SvgPath, Decl(derivedInterfaceCallSignature.ts, 0, 0))
 
@@ -100,12 +98,12 @@ interface D3SvgArea extends D3SvgPath {
 >D3SvgArea : Symbol(D3SvgArea, Decl(derivedInterfaceCallSignature.ts, 8, 1))
 }
 
-declare var area: D3SvgArea;
->area : Symbol(area, Decl(derivedInterfaceCallSignature.ts, 25, 11))
+var area: D3SvgArea;
+>area : Symbol(area, Decl(derivedInterfaceCallSignature.ts, 25, 3))
 >D3SvgArea : Symbol(D3SvgArea, Decl(derivedInterfaceCallSignature.ts, 8, 1))
 
 area.interpolate('two')('one');
 >area.interpolate : Symbol(D3SvgArea.interpolate, Decl(derivedInterfaceCallSignature.ts, 18, 60))
->area : Symbol(area, Decl(derivedInterfaceCallSignature.ts, 25, 11))
+>area : Symbol(area, Decl(derivedInterfaceCallSignature.ts, 25, 3))
 >interpolate : Symbol(D3SvgArea.interpolate, Decl(derivedInterfaceCallSignature.ts, 18, 60))
 

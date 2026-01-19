@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-asyncFunctionNewExpressions.ts] ////
-
 //// [es5-asyncFunctionNewExpressions.ts]
 declare var x, y, z, a, b, c;
 

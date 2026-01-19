@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/incorrectNumberOfTypeArgumentsDuringErrorReporting.ts] ////
-
-=== incorrectNumberOfTypeArgumentsDuringErrorReporting.ts ===
+=== tests/cases/compiler/incorrectNumberOfTypeArgumentsDuringErrorReporting.ts ===
 interface ObjA {
 >ObjA : Symbol(ObjA, Decl(incorrectNumberOfTypeArgumentsDuringErrorReporting.ts, 0, 0))
 

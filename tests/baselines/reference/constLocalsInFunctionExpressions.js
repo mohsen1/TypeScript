@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/constLocalsInFunctionExpressions.ts] ////
-
 //// [constLocalsInFunctionExpressions.ts]
 declare function getStringOrNumber(): string | number;
 

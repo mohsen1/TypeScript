@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/differentTypesWithSameName.ts] ////
-
 //// [differentTypesWithSameName.ts]
-namespace m {
+module m {
   export class variable{
     s: string;
   }

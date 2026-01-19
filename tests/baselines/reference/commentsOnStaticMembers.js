@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsOnStaticMembers.ts] ////
-
 //// [commentsOnStaticMembers.ts]
 class test {
     /**

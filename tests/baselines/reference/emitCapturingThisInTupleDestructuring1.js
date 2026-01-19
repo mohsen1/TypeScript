@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitCapturingThisInTupleDestructuring1.ts] ////
-
 //// [emitCapturingThisInTupleDestructuring1.ts]
 declare function wrapper(x: any);
 wrapper((array: [any]) => {

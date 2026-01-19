@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionCall11.ts] ////
-
 //// [functionCall11.ts]
 function foo(a:string, b?:number){} 
 foo('foo', 1); 

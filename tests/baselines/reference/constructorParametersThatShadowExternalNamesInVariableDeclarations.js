@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorParametersThatShadowExternalNamesInVariableDeclarations.ts] ////
-
 //// [constructorParametersThatShadowExternalNamesInVariableDeclarations.ts]
 var x = 1;
 class A {

@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/es6ImportNamedImportInIndirectExportAssignment.ts] ////
 
 //// [es6ImportNamedImportInIndirectExportAssignment_0.ts]
-export namespace a {
+export module a {
     export class c {
     }
 }
@@ -13,7 +13,7 @@ export = x;
 
 //// [es6ImportNamedImportInIndirectExportAssignment_0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a = void 0;
 var a;
 (function (a) {
@@ -23,7 +23,7 @@ var a;
         return c;
     }());
     a.c = c;
-})(a || (exports.a = a = {}));
+})(a = exports.a || (exports.a = {}));
 //// [es6ImportNamedImportInIndirectExportAssignment_1.js]
 "use strict";
 var es6ImportNamedImportInIndirectExportAssignment_0_1 = require("./es6ImportNamedImportInIndirectExportAssignment_0");
@@ -32,7 +32,7 @@ module.exports = x;
 
 
 //// [es6ImportNamedImportInIndirectExportAssignment_0.d.ts]
-export declare namespace a {
+export declare module a {
     class c {
     }
 }

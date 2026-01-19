@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualSignatureInstantiation4.ts] ////
-
 //// [contextualSignatureInstantiation4.ts]
 // Repros from #32976
 

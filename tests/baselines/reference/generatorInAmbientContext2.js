@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/es6/yieldExpressions/generatorInAmbientContext2.ts] ////
-
 //// [generatorInAmbientContext2.ts]
-declare namespace M {
+declare module M {
     function *generator(): any;
 }
 

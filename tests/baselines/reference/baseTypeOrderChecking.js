@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/baseTypeOrderChecking.ts] ////
-
 //// [baseTypeOrderChecking.ts]
 var someVariable: Class4<Class2>;
 

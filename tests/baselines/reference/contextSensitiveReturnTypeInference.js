@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextSensitiveReturnTypeInference.ts] ////
-
 //// [contextSensitiveReturnTypeInference.ts]
 // Repro from #34849
 

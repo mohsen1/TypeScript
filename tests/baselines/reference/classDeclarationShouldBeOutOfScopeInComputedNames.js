@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classDeclarationShouldBeOutOfScopeInComputedNames.ts] ////
-
 //// [classDeclarationShouldBeOutOfScopeInComputedNames.ts]
 class A {
     static readonly p1 = Symbol();

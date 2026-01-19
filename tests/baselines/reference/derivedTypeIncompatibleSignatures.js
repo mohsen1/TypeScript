@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/derivedTypeIncompatibleSignatures.ts] ////
-
 //// [derivedTypeIncompatibleSignatures.ts]
 interface A {
     (a: string): string;

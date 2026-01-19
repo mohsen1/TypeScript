@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/baseTypePrivateMemberClash.ts] ////
-
-=== baseTypePrivateMemberClash.ts ===
+=== tests/cases/compiler/baseTypePrivateMemberClash.ts ===
 class X {
 >X : Symbol(X, Decl(baseTypePrivateMemberClash.ts, 0, 0))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferentialTypingWithFunctionType2.ts] ////
-
 //// [inferentialTypingWithFunctionType2.ts]
 function identity<A>(a: A): A {
     return a;

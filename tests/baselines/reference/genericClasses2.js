@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericClasses2.ts] ////
-
 //// [genericClasses2.ts]
 interface Foo<T> {
 	a: T;

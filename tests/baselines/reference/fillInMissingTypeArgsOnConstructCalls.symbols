@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/fillInMissingTypeArgsOnConstructCalls.ts] ////
-
-=== fillInMissingTypeArgsOnConstructCalls.ts ===
+=== tests/cases/compiler/fillInMissingTypeArgsOnConstructCalls.ts ===
 class A<T extends Object>{
 >A : Symbol(A, Decl(fillInMissingTypeArgsOnConstructCalls.ts, 0, 0))
 >T : Symbol(T, Decl(fillInMissingTypeArgsOnConstructCalls.ts, 0, 8))

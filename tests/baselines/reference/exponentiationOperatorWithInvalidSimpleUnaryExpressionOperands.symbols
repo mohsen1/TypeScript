@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithInvalidSimpleUnaryExpressionOperands.ts] ////
-
-=== exponentiationOperatorWithInvalidSimpleUnaryExpressionOperands.ts ===
+=== tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithInvalidSimpleUnaryExpressionOperands.ts ===
 var temp: any;
 >temp : Symbol(temp, Decl(exponentiationOperatorWithInvalidSimpleUnaryExpressionOperands.ts, 0, 3))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emptyThenWarning.ts] ////
-
 //// [emptyThenWarning.ts]
 if(1);
 

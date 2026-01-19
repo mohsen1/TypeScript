@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularTypeofWithFunctionModule.ts] ////
-
 //// [circularTypeofWithFunctionModule.ts]
 // Repro from #6072
 

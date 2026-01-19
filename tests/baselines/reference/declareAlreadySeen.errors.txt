@@ -1,11 +1,11 @@
-declareAlreadySeen.ts(2,13): error TS1030: 'declare' modifier already seen.
-declareAlreadySeen.ts(3,13): error TS1030: 'declare' modifier already seen.
-declareAlreadySeen.ts(5,13): error TS1030: 'declare' modifier already seen.
-declareAlreadySeen.ts(7,13): error TS1030: 'declare' modifier already seen.
+tests/cases/compiler/declareAlreadySeen.ts(2,13): error TS1030: 'declare' modifier already seen.
+tests/cases/compiler/declareAlreadySeen.ts(3,13): error TS1030: 'declare' modifier already seen.
+tests/cases/compiler/declareAlreadySeen.ts(5,13): error TS1030: 'declare' modifier already seen.
+tests/cases/compiler/declareAlreadySeen.ts(7,13): error TS1030: 'declare' modifier already seen.
 
 
-==== declareAlreadySeen.ts (4 errors) ====
-    namespace M {
+==== tests/cases/compiler/declareAlreadySeen.ts (4 errors) ====
+    module M {
         declare declare var x;
                 ~~~~~~~
 !!! error TS1030: 'declare' modifier already seen.
@@ -13,7 +13,7 @@ declareAlreadySeen.ts(7,13): error TS1030: 'declare' modifier already seen.
                 ~~~~~~~
 !!! error TS1030: 'declare' modifier already seen.
     
-        declare declare namespace N { }  
+        declare declare module N { }  
                 ~~~~~~~
 !!! error TS1030: 'declare' modifier already seen.
     

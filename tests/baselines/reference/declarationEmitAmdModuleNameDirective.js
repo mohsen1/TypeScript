@@ -19,7 +19,7 @@ void foo;
     }
 })(function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.foo = void 0;
     /// <amd-module name="name_of_foo"/>
     exports.foo = 1;
@@ -35,7 +35,7 @@ void foo;
     }
 })(function (require, exports, name_of_foo) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     /// <amd-dependency name="name_of_foo" path="./foo" />
     var foo_1 = require("name_of_foo");
     void foo_1.foo;

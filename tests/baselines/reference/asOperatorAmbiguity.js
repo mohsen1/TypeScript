@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/asOperator/asOperatorAmbiguity.ts] ////
-
 //// [asOperatorAmbiguity.ts]
 interface A<T> { x: T; }
 interface B { m: string; }

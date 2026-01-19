@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/accessibility/classPropertyAsProtected.ts] ////
-
-=== classPropertyAsProtected.ts ===
+=== tests/cases/conformance/classes/members/accessibility/classPropertyAsProtected.ts ===
 class C {
 >C : Symbol(C, Decl(classPropertyAsProtected.ts, 0, 0))
 
@@ -31,29 +29,29 @@ class C {
 >foo : Symbol(C.foo, Decl(classPropertyAsProtected.ts, 8, 33))
 }
 
-declare var c: C;
->c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 11))
+var c: C;
+>c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 3))
 >C : Symbol(C, Decl(classPropertyAsProtected.ts, 0, 0))
 
 // all errors
 c.x;
 >c.x : Symbol(C.x, Decl(classPropertyAsProtected.ts, 0, 9))
->c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 11))
+>c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 3))
 >x : Symbol(C.x, Decl(classPropertyAsProtected.ts, 0, 9))
 
 c.y;
 >c.y : Symbol(C.y, Decl(classPropertyAsProtected.ts, 1, 24), Decl(classPropertyAsProtected.ts, 2, 38))
->c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 11))
+>c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 3))
 >y : Symbol(C.y, Decl(classPropertyAsProtected.ts, 1, 24), Decl(classPropertyAsProtected.ts, 2, 38))
 
 c.y = 1;
 >c.y : Symbol(C.y, Decl(classPropertyAsProtected.ts, 1, 24), Decl(classPropertyAsProtected.ts, 2, 38))
->c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 11))
+>c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 3))
 >y : Symbol(C.y, Decl(classPropertyAsProtected.ts, 1, 24), Decl(classPropertyAsProtected.ts, 2, 38))
 
 c.foo();
 >c.foo : Symbol(C.foo, Decl(classPropertyAsProtected.ts, 3, 26))
->c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 11))
+>c : Symbol(c, Decl(classPropertyAsProtected.ts, 12, 3))
 >foo : Symbol(C.foo, Decl(classPropertyAsProtected.ts, 3, 26))
 
 C.a;

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/exportDefaultForNonInstantiatedModule.ts] ////
-
 //// [exportDefaultForNonInstantiatedModule.ts]
-namespace m {
+module m {
     export interface foo {
     }
 }

@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/innerFunc.ts] ////
-
 //// [innerFunc.ts]
 function salt() {
   function pepper() { return 5;}
   return pepper();  
 }
 
-namespace M {
+module M {
     export function tungsten() {
         function oxygen() { return 6; };
         return oxygen();

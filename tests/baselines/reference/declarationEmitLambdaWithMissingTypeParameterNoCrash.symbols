@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declarationEmitLambdaWithMissingTypeParameterNoCrash.ts] ////
-
-=== declarationEmitLambdaWithMissingTypeParameterNoCrash.ts ===
+=== tests/cases/compiler/declarationEmitLambdaWithMissingTypeParameterNoCrash.ts ===
 export interface Foo {
 >Foo : Symbol(Foo, Decl(declarationEmitLambdaWithMissingTypeParameterNoCrash.ts, 0, 0))
 

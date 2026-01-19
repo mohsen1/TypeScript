@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnBlock1.ts] ////
-
 //// [commentOnBlock1.ts]
 // asdf
 function f() {

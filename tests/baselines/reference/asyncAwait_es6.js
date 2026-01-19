@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es6/asyncAwait_es6.ts] ////
-
 //// [asyncAwait_es6.ts]
 type MyPromise<T> = Promise<T>;
 declare var MyPromise: typeof Promise;
@@ -37,7 +35,7 @@ class C {
 	static async m6(): MyPromise<void> { }
 }
 
-namespace M {
+module M {
 	export async function f1() { }
 }
 

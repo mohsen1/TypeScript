@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/assignmentOperator/compoundAssignmentLHSIsValue.ts] ////
-
 //// [compoundAssignmentLHSIsValue.ts]
 // expected error for all the LHS of compound assignments (arithmetic and addition)
 var value: any;
@@ -29,7 +27,7 @@ this *= value;
 this += value;
 
 // identifiers: module, class, enum, function
-namespace M { export var a; }
+module M { export var a; }
 M *= value;
 M += value;
 

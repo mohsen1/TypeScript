@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/assignmentRestElementWithErrorSourceType.ts] ////
-
-=== assignmentRestElementWithErrorSourceType.ts ===
+=== tests/cases/compiler/assignmentRestElementWithErrorSourceType.ts ===
 var tuple: [string, number];
 >tuple : Symbol(tuple, Decl(assignmentRestElementWithErrorSourceType.ts, 0, 3))
 

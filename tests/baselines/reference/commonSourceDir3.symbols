@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commonSourceDir3.ts] ////
-
 === A:/foo/bar.ts ===
 var x: number;
 >x : Symbol(x, Decl(bar.ts, 0, 3))

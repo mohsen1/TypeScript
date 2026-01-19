@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/interfaceNameAsIdentifier.ts] ////
-
 //// [interfaceNameAsIdentifier.ts]
 interface C {
     (): void;
 }
 C();
 
-namespace m2 {
+module m2 {
     export interface C {
         (): void;
     }

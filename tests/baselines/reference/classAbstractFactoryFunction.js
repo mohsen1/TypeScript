@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractFactoryFunction.ts] ////
-
 //// [classAbstractFactoryFunction.ts]
 class A {}
 abstract class B extends A {}

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/es6ImportEqualsDeclaration2.ts] ////
-
-=== server.d.ts ===
+=== tests/cases/compiler/server.d.ts ===
 declare module "other" {
 >"other" : Symbol("other", Decl(server.d.ts, 0, 0))
 
@@ -14,7 +12,7 @@ declare module "server" {
     import events = require("other"); // Ambient declaration, no error expected.
 >events : Symbol(events, Decl(server.d.ts, 4, 25))
 
-    namespace S {
+    module S {
 >S : Symbol(S, Decl(server.d.ts, 5, 37))
 
         export var a: number;
@@ -25,7 +23,7 @@ declare module "server" {
 >S : Symbol(S, Decl(server.d.ts, 5, 37))
 }
 
-=== client.ts ===
+=== tests/cases/compiler/client.ts ===
 import {a} from "server";
 >a : Symbol(a, Decl(client.ts, 0, 8))
 

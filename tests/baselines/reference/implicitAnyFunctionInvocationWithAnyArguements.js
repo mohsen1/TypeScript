@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/implicitAnyFunctionInvocationWithAnyArguements.ts] ////
-
 //// [implicitAnyFunctionInvocationWithAnyArguements.ts]
 // this should be errors
 var arg0 = null;  // error at "arg0"
 var anyArray = [null, undefined];  // error at array literal
-declare var objL: { v; w; }             // error at "y,z"
-declare var funcL: (y2) => number;
+var objL: { v; w; }             // error at "y,z"
+var funcL: (y2) => number;
 function temp1(arg1) { }  // error at "temp1"
 function testFunctionExprC(subReplace: (s: string, ...arg: any[]) => string) { }
 function testFunctionExprC2(eq: (v1: any, v2: any) => number) { };
@@ -41,6 +39,8 @@ var newC2 = new C(<any>[], null)
 // this should be errors
 var arg0 = null; // error at "arg0"
 var anyArray = [null, undefined]; // error at array literal
+var objL; // error at "y,z"
+var funcL;
 function temp1(arg1) { } // error at "temp1"
 function testFunctionExprC(subReplace) { }
 function testFunctionExprC2(eq) { }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowCaching.ts] ////
-
 //// [controlFlowCaching.ts]
 // Repro for #8401
 

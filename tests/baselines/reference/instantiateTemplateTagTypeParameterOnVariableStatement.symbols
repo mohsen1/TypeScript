@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/instantiateTemplateTagTypeParameterOnVariableStatement.ts] ////
-
-=== instantiateTemplateTagTypeParameterOnVariableStatement.js ===
+=== tests/cases/conformance/jsdoc/instantiateTemplateTagTypeParameterOnVariableStatement.js ===
 /**
  * @template T
  * @param {T} a

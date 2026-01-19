@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/genericClassesInModule.ts] ////
-
 //// [genericClassesInModule.ts]
-namespace Foo {
+module Foo {
 
     export class B<T>{ }
 
@@ -30,7 +28,7 @@ var a = new Foo.B();
 
 
 //// [genericClassesInModule.d.ts]
-declare namespace Foo {
+declare module Foo {
     class B<T> {
     }
     class A {

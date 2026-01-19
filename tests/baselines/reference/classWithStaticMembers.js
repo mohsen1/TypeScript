@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/constructorFunctionTypes/classWithStaticMembers.ts] ////
-
 //// [classWithStaticMembers.ts]
 class C {
     static fn() { return this; }

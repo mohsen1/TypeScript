@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/cloduleWithDuplicateMember1.ts] ////
-
 //// [cloduleWithDuplicateMember1.ts]
 class C {
     get x() { return 1; }
@@ -9,10 +7,10 @@ class C {
     static foo() { }
 }
 
-namespace C {
+module C {
     export var x = 1;
 }
-namespace C {
+module C {
     export function foo() { }
     export function x() { }
 }

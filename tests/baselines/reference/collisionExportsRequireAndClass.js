@@ -5,13 +5,13 @@ export class require {
 }
 export class exports {
 }
-namespace m1 {
+module m1 {
     class require {
     }
     class exports {
     }
 }
-namespace m2 {
+module m2 {
     export class require {
     }
     export class exports {
@@ -23,13 +23,13 @@ class require {
 }
 class exports {
 }
-namespace m3 {
+module m3 {
     class require {
     }
     class exports {
     }
 }
-namespace m4 {
+module m4 {
     export class require {
     }
     export class exports {
@@ -39,7 +39,7 @@ namespace m4 {
 //// [collisionExportsRequireAndClass_externalmodule.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.exports = exports.require = void 0;
     var require = /** @class */ (function () {
         function require() {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendGlobalThis2.ts] ////
-
 //// [extendGlobalThis2.ts]
 namespace globalThis {
     export function foo() { console.log("x"); }

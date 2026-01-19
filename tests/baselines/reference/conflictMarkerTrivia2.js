@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conflictMarkerTrivia2.ts] ////
-
 //// [conflictMarkerTrivia2.ts]
 class C {
   foo() {

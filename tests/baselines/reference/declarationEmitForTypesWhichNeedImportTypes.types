@@ -1,26 +1,18 @@
-//// [tests/cases/compiler/declarationEmitForTypesWhichNeedImportTypes.ts] ////
-
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 export interface Named {}
 
 export function createNamed(): Named {
 >createNamed : () => Named
->            : ^^^^^^     
 
   return {};
 >{} : {}
->   : ^^
 }
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 import { createNamed } from "./b";
->createNamed : () => import("b").Named
->            : ^^^^^^       ^^^  ^^^^^
+>createNamed : () => import("tests/cases/compiler/b").Named
 
 export const Value = createNamed();
->Value : import("b").Named
->      : ^^^^^^^^^^^^^^^^^
->createNamed() : import("b").Named
->              : ^^^^^^^^^^^^^^^^^
->createNamed : () => import("b").Named
->            : ^^^^^^       ^^^  ^^^^^
+>Value : import("tests/cases/compiler/b").Named
+>createNamed() : import("tests/cases/compiler/b").Named
+>createNamed : () => import("tests/cases/compiler/b").Named
 

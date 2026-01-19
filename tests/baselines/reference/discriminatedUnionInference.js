@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/discriminatedUnionInference.ts] ////
-
 //// [discriminatedUnionInference.ts]
 // Repro from #28862
 

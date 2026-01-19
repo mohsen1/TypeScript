@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/emptyVariableDeclarationBindingPatterns01_ES6.ts] ////
-
 //// [emptyVariableDeclarationBindingPatterns01_ES6.ts]
 (function () {
     var a: any;

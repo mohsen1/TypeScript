@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/errorWithTruncatedType.ts] ////
-
 //// [errorWithTruncatedType.ts]
-declare var x: {
+var x: {
     propertyWithAnExceedinglyLongName1: string;
     propertyWithAnExceedinglyLongName2: string;
     propertyWithAnExceedinglyLongName3: string;
@@ -14,5 +12,6 @@ var s: string = x;
 
 
 //// [errorWithTruncatedType.js]
+var x;
 // String representation of type of 'x' should be truncated in error message
 var s = x;

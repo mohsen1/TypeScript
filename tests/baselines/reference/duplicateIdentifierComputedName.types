@@ -1,20 +1,13 @@
-//// [tests/cases/compiler/duplicateIdentifierComputedName.ts] ////
-
-=== duplicateIdentifierComputedName.ts ===
+=== tests/cases/compiler/duplicateIdentifierComputedName.ts ===
 class C {
 >C : C
->  : ^
 
     ["a"]: string;
 >["a"] : string
->      : ^^^^^^
 >"a" : "a"
->    : ^^^
 
     ["a"]: string;
 >["a"] : string
->      : ^^^^^^
 >"a" : "a"
->    : ^^^
 }
 

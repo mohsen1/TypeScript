@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithConstructorChildren.ts] ////
-
-=== collisionCodeGenModuleWithConstructorChildren.ts ===
-namespace M {
+=== tests/cases/compiler/collisionCodeGenModuleWithConstructorChildren.ts ===
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 6, 1), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 13, 1))
 
     export var x = 3;
@@ -18,11 +16,11 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 6, 1), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 13, 1))
 
     class d {
->d : Symbol(d, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 8, 13))
+>d : Symbol(d, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 8, 10))
 
         constructor(private M, p = x) {
 >M : Symbol(d.M, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 10, 20))
@@ -32,11 +30,11 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 6, 1), Decl(collisionCodeGenModuleWithConstructorChildren.ts, 13, 1))
 
     class d2 {
->d2 : Symbol(d2, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 15, 13))
+>d2 : Symbol(d2, Decl(collisionCodeGenModuleWithConstructorChildren.ts, 15, 10))
 
         constructor() {
             var M = 10;

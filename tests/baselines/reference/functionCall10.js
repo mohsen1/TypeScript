@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionCall10.ts] ////
-
 //// [functionCall10.ts]
 function foo(...a:number[]){};
 foo(0, 1); 

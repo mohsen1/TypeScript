@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/for.ts] ////
-
 //// [for.ts]
 for (var i = 0; i < 10; i++) { // ok
     var x1 = i;

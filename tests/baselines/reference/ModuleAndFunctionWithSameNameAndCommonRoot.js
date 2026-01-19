@@ -1,14 +1,14 @@
 //// [tests/cases/conformance/internalModules/DeclarationMerging/ModuleAndFunctionWithSameNameAndCommonRoot.ts] ////
 
 //// [module.ts]
-namespace A {
-    export namespace Point {
+module A {
+    export module Point {
         export var Origin = { x: 0, y: 0 };
     }
 }
 
 //// [function.ts]
-namespace A {
+module A {
     // duplicate identifier error
     export function Point() {
         return { x: 0, y: 0 };
@@ -16,9 +16,9 @@ namespace A {
 }
 
 //// [simple.ts]
-namespace B {
+module B {
 
-    export namespace Point {
+    export module Point {
         export var Origin = { x: 0, y: 0 };
     }
 

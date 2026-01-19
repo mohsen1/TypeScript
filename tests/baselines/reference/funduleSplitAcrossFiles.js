@@ -4,7 +4,7 @@
 function D() { }
 
 //// [funduleSplitAcrossFiles_module.ts]
-namespace D {
+module D {
     export var y = "hi";
 }
 D.y;

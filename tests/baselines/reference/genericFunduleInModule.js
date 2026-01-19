@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/genericFunduleInModule.ts] ////
-
 //// [genericFunduleInModule.ts]
-namespace A {
+module A {
     export function B<T>(x: T) { return x; }
-    export namespace B {
+    export module B {
         export var x = 1;
     }
 }

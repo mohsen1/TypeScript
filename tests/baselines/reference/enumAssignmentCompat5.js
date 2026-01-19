@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumAssignmentCompat5.ts] ////
-
 //// [enumAssignmentCompat5.ts]
 enum E {
     A, B, C
@@ -9,7 +7,7 @@ enum Computed {
     B = 1 << 2,
     C = 1 << 3,
 }
-declare let n: number;
+let n: number;
 let e: E = n; // ok because it's too inconvenient otherwise
 e = 0; // ok, in range
 e = 4; // ok, out of range, but allowed computed enums don't have all members
@@ -39,6 +37,7 @@ var Computed;
     Computed[Computed["B"] = 4] = "B";
     Computed[Computed["C"] = 8] = "C";
 })(Computed || (Computed = {}));
+var n;
 var e = n; // ok because it's too inconvenient otherwise
 e = 0; // ok, in range
 e = 4; // ok, out of range, but allowed computed enums don't have all members

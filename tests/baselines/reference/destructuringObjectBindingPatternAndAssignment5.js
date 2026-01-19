@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringObjectBindingPatternAndAssignment5.ts] ////
-
 //// [destructuringObjectBindingPatternAndAssignment5.ts]
 function a () {
     let x: number;

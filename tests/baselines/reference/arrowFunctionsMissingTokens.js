@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/arrowFunctionsMissingTokens.ts] ////
-
 //// [arrowFunctionsMissingTokens.ts]
-namespace missingArrowsWithCurly {
+module missingArrowsWithCurly {
     var a = () { };
 
     var b = (): void { }
@@ -13,8 +11,8 @@ namespace missingArrowsWithCurly {
     var e = (x: number, y: string): void { };
 }
 
-namespace missingCurliesWithArrow {
-    namespace withStatement {
+module missingCurliesWithArrow {
+    module withStatement {
         var a = () => var k = 10;};
 
         var b = (): void => var k = 10;}
@@ -28,7 +26,7 @@ namespace missingCurliesWithArrow {
         var f = () => var k = 10;}
     }
 
-    namespace withoutStatement {
+    module withoutStatement {
         var a = () => };
 
         var b = (): void => }
@@ -43,7 +41,7 @@ namespace missingCurliesWithArrow {
     }
 }
 
-namespace ce_nEst_pas_une_arrow_function {
+module ce_nEst_pas_une_arrow_function {
     var a = ();
 
     var b = (): void;
@@ -55,7 +53,7 @@ namespace ce_nEst_pas_une_arrow_function {
     var e = (x: number, y: string): void;
 }
 
-namespace okay {
+module okay {
     var a = () => { };
 
     var b = (): void => { }

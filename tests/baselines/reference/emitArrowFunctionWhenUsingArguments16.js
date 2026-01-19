@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/arrowFunction/emitArrowFunctionWhenUsingArguments16.ts] ////
-
 //// [emitArrowFunctionWhenUsingArguments16.ts]
 function f() {
     var arguments = "hello";

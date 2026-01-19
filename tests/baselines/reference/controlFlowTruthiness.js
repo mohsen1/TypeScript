@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowTruthiness.ts] ////
-
 //// [controlFlowTruthiness.ts]
 declare function foo(): string | undefined;
 

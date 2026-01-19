@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/accessorsOverrideProperty3.ts] ////
-
 //// [accessorsOverrideProperty3.ts]
 declare class Animal {
     sound: string

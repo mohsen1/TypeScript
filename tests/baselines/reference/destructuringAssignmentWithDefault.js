@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringAssignmentWithDefault.ts] ////
-
 //// [destructuringAssignmentWithDefault.ts]
 const a: { x?: number } = { };
 let x = 0;

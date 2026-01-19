@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/checkJsFiles5.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 // @ts-nocheck
 var x = "string";
 >x : Symbol(x, Decl(a.js, 1, 3))

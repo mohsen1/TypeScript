@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericMethodOverspecialization.ts] ////
-
 //// [genericMethodOverspecialization.ts]
 var names = ["list", "table1", "table2", "table3", "summary"];
 

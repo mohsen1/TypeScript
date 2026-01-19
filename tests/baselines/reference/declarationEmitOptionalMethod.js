@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitOptionalMethod.ts] ////
-
 //// [declarationEmitOptionalMethod.ts]
 export const Foo = (opts: {
     a?(): void,
@@ -11,7 +9,7 @@ export const Foo = (opts: {
 
 //// [declarationEmitOptionalMethod.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Foo = void 0;
 var Foo = function (opts) { return ({}); };
 exports.Foo = Foo;

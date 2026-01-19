@@ -1,13 +1,11 @@
-//// [tests/cases/compiler/esModuleInteropNamedDefaultImports.ts] ////
-
-=== mod.ts ===
+=== tests/cases/compiler/mod.ts ===
 export default class Foo {}
 >Foo : Symbol(Foo, Decl(mod.ts, 0, 0))
 
 export class Bar {}
 >Bar : Symbol(Bar, Decl(mod.ts, 0, 27))
 
-=== idx.ts ===
+=== tests/cases/compiler/idx.ts ===
 import Foo from "./mod";
 >Foo : Symbol(Foo, Decl(idx.ts, 0, 6))
 

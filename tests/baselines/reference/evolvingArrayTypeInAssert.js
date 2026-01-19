@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/evolvingArrayTypeInAssert.ts] ////
-
 //// [evolvingArrayTypeInAssert.ts]
 export function unsafeCast<T>(_value: unknown): asserts _value is T { }
 
@@ -13,9 +11,10 @@ function yadda() {
 
 //// [evolvingArrayTypeInAssert.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.unsafeCast = unsafeCast;
+exports.__esModule = true;
+exports.unsafeCast = void 0;
 function unsafeCast(_value) { }
+exports.unsafeCast = unsafeCast;
 function yadda() {
     var out = [];
     out.push(100);

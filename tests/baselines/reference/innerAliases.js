@@ -1,20 +1,18 @@
-//// [tests/cases/compiler/innerAliases.ts] ////
-
 //// [innerAliases.ts]
-namespace A {
-    export namespace B {
-        export namespace C {
+module A {
+    export module B {
+        export module C {
             export class Class1 {}
         }
     }
 }
 
-namespace D {
+module D {
     import inner = A.B.C; 
    
     var c1 = new inner.Class1(); 
 
-    export namespace E { 
+    export module E { 
         export class Class2 {}
     }
 }

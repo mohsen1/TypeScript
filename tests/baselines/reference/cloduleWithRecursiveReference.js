@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/cloduleWithRecursiveReference.ts] ////
-
 //// [cloduleWithRecursiveReference.ts]
-namespace M
+module M
 {
   export class C {  }
-  export namespace C {
+  export module C {
     export var C = M.C
   }
 }

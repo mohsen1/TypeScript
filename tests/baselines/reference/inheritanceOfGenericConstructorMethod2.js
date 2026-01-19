@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/inheritanceOfGenericConstructorMethod2.ts] ////
-
 //// [inheritanceOfGenericConstructorMethod2.ts]
-namespace M {
+module M {
    export class C1 { }
    export class C2<T> { }
 }
-namespace N {
+module N {
    export class D1 extends M.C1 { }
    export class D2<T> extends M.C2<T> { }
 }

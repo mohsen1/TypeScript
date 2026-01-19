@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/assignmentToReferenceTypes.ts] ////
-
 //// [assignmentToReferenceTypes.ts]
 // Should all be allowed
 
-namespace M {
+module M {
 }
 M = null;
 

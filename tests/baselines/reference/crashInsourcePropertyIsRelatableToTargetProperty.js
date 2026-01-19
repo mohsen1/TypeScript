@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/crashInsourcePropertyIsRelatableToTargetProperty.ts] ////
-
 //// [crashInsourcePropertyIsRelatableToTargetProperty.ts]
 class C {
     private x = 1;

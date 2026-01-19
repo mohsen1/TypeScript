@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringTuple.ts] ////
-
 //// [destructuringTuple.ts]
 declare var tuple: [boolean, number, ...string[]];
 

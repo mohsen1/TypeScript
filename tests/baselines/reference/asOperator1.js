@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/asOperator/asOperator1.ts] ////
-
 //// [asOperator1.ts]
 var as = 43;
 var x = undefined as number;

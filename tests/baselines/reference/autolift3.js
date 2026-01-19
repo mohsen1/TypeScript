@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/autolift3.ts] ////
-
 //// [autolift3.ts]
 class B {
 

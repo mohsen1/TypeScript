@@ -1,21 +1,19 @@
-//// [tests/cases/compiler/internalAliasInitializedModuleInsideLocalModuleWithoutExport.ts] ////
-
 //// [internalAliasInitializedModuleInsideLocalModuleWithoutExport.ts]
-export namespace a {
-    export namespace b {
+export module a {
+    export module b {
         export class c {
         }
     }
 }
 
-export namespace c {
+export module c {
     import b = a.b;
     export var x: b.c = new b.c();
 }
 
 //// [internalAliasInitializedModuleInsideLocalModuleWithoutExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.c = exports.a = void 0;
 var a;
 (function (a) {
@@ -28,22 +26,22 @@ var a;
         }());
         b.c = c;
     })(b = a.b || (a.b = {}));
-})(a || (exports.a = a = {}));
+})(a = exports.a || (exports.a = {}));
 var c;
 (function (c) {
     var b = a.b;
     c.x = new b.c();
-})(c || (exports.c = c = {}));
+})(c = exports.c || (exports.c = {}));
 
 
 //// [internalAliasInitializedModuleInsideLocalModuleWithoutExport.d.ts]
-export declare namespace a {
-    namespace b {
+export declare module a {
+    module b {
         class c {
         }
     }
 }
-export declare namespace c {
+export declare module c {
     import b = a.b;
     var x: b.c;
 }

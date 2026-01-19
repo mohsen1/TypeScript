@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deeplyNestedAssignabilityIssue.ts] ////
-
 //// [deeplyNestedAssignabilityIssue.ts]
 interface A {
     a: number;

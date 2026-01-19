@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithTwoOperandsAreAny.ts] ////
-
 //// [comparisonOperatorWithTwoOperandsAreAny.ts]
 var a: any;
 

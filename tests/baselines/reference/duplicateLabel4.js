@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateLabel4.ts] ////
-
 //// [duplicateLabel4.ts]
 target:
 while (true) {

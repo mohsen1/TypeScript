@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsx/checkJsxIntersectionElementPropsType.tsx] ////
-
-=== checkJsxIntersectionElementPropsType.tsx ===
+=== tests/cases/conformance/jsx/checkJsxIntersectionElementPropsType.tsx ===
 declare namespace JSX {
 >JSX : Symbol(JSX, Decl(checkJsxIntersectionElementPropsType.tsx, 0, 0))
 

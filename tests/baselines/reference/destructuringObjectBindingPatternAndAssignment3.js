@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringObjectBindingPatternAndAssignment3.ts] ////
-
 //// [destructuringObjectBindingPatternAndAssignment3.ts]
 // Error
 var {h?} = { h?: 1 };

@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/interMixingModulesInterfaces2.ts] ////
-
-=== interMixingModulesInterfaces2.ts ===
-namespace A {
+=== tests/cases/compiler/interMixingModulesInterfaces2.ts ===
+module A {
 >A : Symbol(A, Decl(interMixingModulesInterfaces2.ts, 0, 0))
 
     export interface B {
->B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 13))
+>B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 10))
 
         name: string;
 >name : Symbol(A.B.name, Decl(interMixingModulesInterfaces2.ts, 2, 24))
@@ -14,12 +12,12 @@ namespace A {
 >value : Symbol(A.B.value, Decl(interMixingModulesInterfaces2.ts, 3, 21))
     }
 
-    namespace B {
->B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 13), Decl(interMixingModulesInterfaces2.ts, 5, 5))
+    module B {
+>B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 10), Decl(interMixingModulesInterfaces2.ts, 5, 5))
 
         export function createB(): B {
->createB : Symbol(createB, Decl(interMixingModulesInterfaces2.ts, 7, 17))
->B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 13))
+>createB : Symbol(createB, Decl(interMixingModulesInterfaces2.ts, 7, 14))
+>B : Symbol(B, Decl(interMixingModulesInterfaces2.ts, 0, 10))
 
             return null;
         }
@@ -29,5 +27,5 @@ namespace A {
 var x: A.B = null;
 >x : Symbol(x, Decl(interMixingModulesInterfaces2.ts, 14, 3))
 >A : Symbol(A, Decl(interMixingModulesInterfaces2.ts, 0, 0))
->B : Symbol(A.B, Decl(interMixingModulesInterfaces2.ts, 0, 13))
+>B : Symbol(A.B, Decl(interMixingModulesInterfaces2.ts, 0, 10))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumGenericTypeClash.ts] ////
-
 //// [enumGenericTypeClash.ts]
 class X<A,B,C> { }
 enum X { MyVal }

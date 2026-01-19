@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/breakStatements/invalidForBreakStatements.ts] ////
-
 //// [invalidForBreakStatements.ts]
 // All errors
 

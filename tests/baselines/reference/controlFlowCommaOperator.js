@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowCommaOperator.ts] ////
-
 //// [controlFlowCommaOperator.ts]
 function f(x: string | number | boolean) {
     let y: string | number | boolean = false;

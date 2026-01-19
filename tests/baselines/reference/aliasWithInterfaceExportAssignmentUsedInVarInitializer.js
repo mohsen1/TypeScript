@@ -12,8 +12,8 @@ var d = b.q3;
 
 //// [aliasWithInterfaceExportAssignmentUsedInVarInitializer_0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [aliasWithInterfaceExportAssignmentUsedInVarInitializer_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var d = b.q3;

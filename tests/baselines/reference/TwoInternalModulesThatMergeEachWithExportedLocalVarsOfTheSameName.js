@@ -1,13 +1,13 @@
 //// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedLocalVarsOfTheSameName.ts] ////
 
 //// [part1.ts]
-export namespace A {
+export module A {
     export interface Point {
         x: number;
         y: number;
     }
 
-    export namespace Utils {
+    export module Utils {
         export function mirror<T extends Point>(p: T) {
             return { x: p.y, y: p.x };
         }
@@ -17,11 +17,11 @@ export namespace A {
 }
 
 //// [part2.ts]
-export namespace A {
+export module A {
     // collision with 'Origin' var in other part of merged module
     export var Origin: Point = { x: 0, y: 0 };
 
-    export namespace Utils {
+    export module Utils {
         export class Plane {
             constructor(public tl: Point, public br: Point) { }
         }
@@ -31,7 +31,7 @@ export namespace A {
 
 //// [part1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A = void 0;
 var A;
 (function (A) {
@@ -43,10 +43,10 @@ var A;
         Utils.mirror = mirror;
     })(Utils = A.Utils || (A.Utils = {}));
     A.Origin = { x: 0, y: 0 };
-})(A || (exports.A = A = {}));
+})(A = exports.A || (exports.A = {}));
 //// [part2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A = void 0;
 var A;
 (function (A) {
@@ -63,4 +63,4 @@ var A;
         }());
         Utils.Plane = Plane;
     })(Utils = A.Utils || (A.Utils = {}));
-})(A || (exports.A = A = {}));
+})(A = exports.A || (exports.A = {}));

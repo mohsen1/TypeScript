@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericCallWithConstraintsTypeArgumentInference.ts] ////
-
 //// [genericCallWithConstraintsTypeArgumentInference.ts]
 // Basic type inference with generic calls and constraints, no errors expected
 

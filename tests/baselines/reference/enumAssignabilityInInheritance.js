@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/enumAssignabilityInInheritance.ts] ////
-
 //// [enumAssignabilityInInheritance.ts]
 // enum is only a subtype of number, no types are subtypes of enum, all of these except the first are errors
 
@@ -84,7 +82,7 @@ declare function foo13(x: E): E;
 var r4 = foo13(E.A);
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 declare function foo14(x: typeof f): typeof f;
@@ -93,7 +91,7 @@ declare function foo14(x: E): E;
 var r4 = foo14(E.A);
 
 class CC { baz: string }
-namespace CC {
+module CC {
     export var bar = 1;
 }
 declare function foo15(x: CC): CC;

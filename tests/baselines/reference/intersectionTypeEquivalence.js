@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionTypeEquivalence.ts] ////
-
 //// [intersectionTypeEquivalence.ts]
 interface A { a: string }
 interface B { b: string }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/class/constructor/parameter/decoratorOnClassConstructorParameter5.ts] ////
-
 //// [decoratorOnClassConstructorParameter5.ts]
 // https://github.com/microsoft/TypeScript/issues/44931
 interface IFoo { }
@@ -13,14 +11,13 @@ class BulkEditPreviewProvider {
 }
 
 //// [decoratorOnClassConstructorParameter5.js]
-var BulkEditPreviewProvider_1;
-let BulkEditPreviewProvider = BulkEditPreviewProvider_1 = class BulkEditPreviewProvider {
+let BulkEditPreviewProvider = class BulkEditPreviewProvider {
     constructor(_modeService) {
         this._modeService = _modeService;
     }
 };
 BulkEditPreviewProvider.Schema = 'vscode-bulkeditpreview';
-BulkEditPreviewProvider.emptyPreview = { scheme: BulkEditPreviewProvider_1.Schema };
-BulkEditPreviewProvider = BulkEditPreviewProvider_1 = __decorate([
+BulkEditPreviewProvider.emptyPreview = { scheme: BulkEditPreviewProvider.Schema };
+BulkEditPreviewProvider = __decorate([
     __param(0, IFoo)
 ], BulkEditPreviewProvider);

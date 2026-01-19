@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/enumTagUseBeforeDefCrash.ts] ////
-
-=== bug27134.js ===
+=== tests/cases/conformance/jsdoc/bug27134.js ===
 /**
  * @enum {number}
  */

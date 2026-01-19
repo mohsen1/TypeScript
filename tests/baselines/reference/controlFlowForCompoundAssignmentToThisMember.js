@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowForCompoundAssignmentToThisMember.ts] ////
-
 //// [controlFlowForCompoundAssignmentToThisMember.ts]
 class DatasourceCommandWidgetElement {
     _commandBased: boolean;

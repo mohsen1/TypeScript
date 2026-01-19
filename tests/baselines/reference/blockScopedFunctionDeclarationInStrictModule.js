@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/blockScopedFunctionDeclarationInStrictModule.ts] ////
-
 //// [blockScopedFunctionDeclarationInStrictModule.ts]
 if (true) {
     function foo() { }
@@ -9,9 +7,11 @@ if (true) {
 export = foo; // not ok
 
 //// [blockScopedFunctionDeclarationInStrictModule.js]
-"use strict";
-if (true) {
-    function foo() { }
-    foo(); // ok
-}
-module.exports = foo;
+define(["require", "exports"], function (require, exports) {
+    "use strict";
+    if (true) {
+        function foo() { }
+        foo(); // ok
+    }
+    return foo;
+});

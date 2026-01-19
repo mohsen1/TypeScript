@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericParameterAssignability1.ts] ////
-
 //// [genericParameterAssignability1.ts]
 function f<T>(x: T): T { return null; }
 var r = <T>(x: T) => x;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowInstanceOfGuardPrimitives.ts] ////
-
 //// [controlFlowInstanceOfGuardPrimitives.ts]
 function distinguish(thing: string | number | Date) {
     if (thing instanceof Object) {

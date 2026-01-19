@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentCompatForEnums.ts] ////
-
 //// [assignmentCompatForEnums.ts]
 enum TokenType { One, Two };
 

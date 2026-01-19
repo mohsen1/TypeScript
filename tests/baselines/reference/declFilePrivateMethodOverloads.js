@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFilePrivateMethodOverloads.ts] ////
-
 //// [declFilePrivateMethodOverloads.ts]
 interface IContext {
     someMethod();

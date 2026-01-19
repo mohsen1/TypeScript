@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassWithAny.ts] ////
-
 //// [derivedClassWithAny.ts]
 class C {
     x: number;
@@ -52,9 +50,9 @@ class E extends D {
     }
 }
 
-declare var c: C;
-declare var d: D;
-declare var e: E;
+var c: C;
+var d: D;
+var e: E;
 
 c = d;
 c = e;
@@ -153,6 +151,9 @@ var E = /** @class */ (function (_super) {
     };
     return E;
 }(D));
+var c;
+var d;
+var e;
 c = d;
 c = e;
 var r = c.foo(); // e.foo would return string

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/commentsMultiModuleSingleFile.ts] ////
-
 //// [commentsMultiModuleSingleFile.ts]
 /** this is multi declare module*/
-namespace multiM {
+module multiM {
     /** class b*/
     export class b {
     }
@@ -13,7 +11,7 @@ namespace multiM {
 }
 
 /// this is multi module 2
-namespace multiM {
+module multiM {
     /** class c comment*/
     export class c {
     }
@@ -67,14 +65,14 @@ new multiM.c();
 
 //// [commentsMultiModuleSingleFile.d.ts]
 /** this is multi declare module*/
-declare namespace multiM {
+declare module multiM {
     /** class b*/
     class b {
     }
     class d {
     }
 }
-declare namespace multiM {
+declare module multiM {
     /** class c comment*/
     class c {
     }

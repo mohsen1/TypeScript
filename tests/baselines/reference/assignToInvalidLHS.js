@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignToInvalidLHS.ts] ////
-
 //// [assignToInvalidLHS.ts]
 declare var y:any;
 

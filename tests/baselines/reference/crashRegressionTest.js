@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/crashRegressionTest.ts] ////
-
 //// [crashRegressionTest.ts]
-namespace MsPortal.Util.TemplateEngine {
+module MsPortal.Util.TemplateEngine {
     "use strict";
  
     interface TemplateKeyValue {

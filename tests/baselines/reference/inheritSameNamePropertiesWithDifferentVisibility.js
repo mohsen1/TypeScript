@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritSameNamePropertiesWithDifferentVisibility.ts] ////
-
 //// [inheritSameNamePropertiesWithDifferentVisibility.ts]
 class C {
     public x: number;

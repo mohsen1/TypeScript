@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/exportAssignmentInternalModule.ts] ////
-
-=== exportAssignmentInternalModule_B.ts ===
+=== tests/cases/compiler/exportAssignmentInternalModule_B.ts ===
 import modM = require("exportAssignmentInternalModule_A");
 >modM : Symbol(modM, Decl(exportAssignmentInternalModule_B.ts, 0, 0))
 
@@ -10,8 +8,8 @@ var n: number = modM.x;
 >modM : Symbol(modM, Decl(exportAssignmentInternalModule_B.ts, 0, 0))
 >x : Symbol(modM.x, Decl(exportAssignmentInternalModule_A.ts, 1, 11))
 
-=== exportAssignmentInternalModule_A.ts ===
-namespace M {
+=== tests/cases/compiler/exportAssignmentInternalModule_A.ts ===
+module M {
 >M : Symbol(M, Decl(exportAssignmentInternalModule_A.ts, 0, 0))
 
 	export var x;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/abstractPropertyBasics.ts] ////
-
 //// [abstractPropertyBasics.ts]
 interface A {
     prop: string;
@@ -19,7 +17,7 @@ class C extends B {
     set prop(v) { }
     raw = "edge";
     readonly ro = "readonly please";
-    readonlyProp!: string;
+    readonlyProp: string; // don't have to give a value, in fact
     m() { }
 }
 

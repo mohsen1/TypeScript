@@ -1,19 +1,17 @@
-//// [tests/cases/compiler/importedModuleAddToGlobal.ts] ////
-
 //// [importedModuleAddToGlobal.ts]
 // Binding for an import statement in a typeref position is being added to the global scope
 // Shouldn't compile b.B is not defined in C
-namespace A {
+module A {
     import b = B;
     import c = C;
 }
 
-namespace B {
+module B {
     import a = A;
     export class B { }
 }
 
-namespace C {
+module C {
     import a = A;
     function hello(): b.B { return null; }
 }

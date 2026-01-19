@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functions/contextuallyTypedIife.ts] ////
-
 //// [contextuallyTypedIife.ts]
 // arrow
 (jake => { })("build");

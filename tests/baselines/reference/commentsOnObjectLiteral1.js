@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsOnObjectLiteral1.ts] ////
-
 //// [commentsOnObjectLiteral1.ts]
 var Person = makeClass( 
    /** 

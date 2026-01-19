@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentEmitWithCommentOnLastLine.ts] ////
-
 //// [commentEmitWithCommentOnLastLine.ts]
 var x: any;
 /*

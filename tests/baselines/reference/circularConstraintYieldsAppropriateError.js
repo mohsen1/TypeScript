@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularConstraintYieldsAppropriateError.ts] ////
-
 //// [circularConstraintYieldsAppropriateError.ts]
 // https://github.com/Microsoft/TypeScript/issues/16861
 class BaseType<T> {

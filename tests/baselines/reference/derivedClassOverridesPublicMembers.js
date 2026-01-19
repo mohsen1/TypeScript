@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassOverridesPublicMembers.ts] ////
-
 //// [derivedClassOverridesPublicMembers.ts]
 var x: { foo: string; }
 var y: { foo: string; bar: string; }

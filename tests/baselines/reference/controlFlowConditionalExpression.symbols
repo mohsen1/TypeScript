@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/controlFlow/controlFlowConditionalExpression.ts] ////
-
-=== controlFlowConditionalExpression.ts ===
+=== tests/cases/conformance/controlFlow/controlFlowConditionalExpression.ts ===
 let x: string | number | boolean;
 >x : Symbol(x, Decl(controlFlowConditionalExpression.ts, 0, 3))
 

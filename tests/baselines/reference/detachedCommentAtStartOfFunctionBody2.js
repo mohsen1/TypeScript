@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/detachedCommentAtStartOfFunctionBody2.ts] ////
-
 //// [detachedCommentAtStartOfFunctionBody2.ts]
 class TestFile {
     foo(message: string): () => string {

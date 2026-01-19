@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/Symbols/ES5SymbolProperty6.ts] ////
-
 //// [ES5SymbolProperty6.ts]
 class C {
     [Symbol.iterator]() { }

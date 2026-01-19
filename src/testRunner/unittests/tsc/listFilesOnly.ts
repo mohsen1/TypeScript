@@ -1,39 +1,23 @@
-import {
-    noChangeRun,
-    verifyTsc,
-} from "../helpers/tsc.js";
-import { TestServerHost } from "../helpers/virtualFileSystemWithWatch.js";
-
-describe("unittests:: tsc:: listFilesOnly::", () => {
-    verifyTsc({
-        scenario: "listFilesOnly",
-        subScenario: "loose file",
-        sys: () =>
-            TestServerHost.createWatchedSystem({
-                "/home/src/workspaces/project/test.ts": "export const x = 1;",
+namespace ts {
+    describe("unittests:: tsc:: listFilesOnly::", () => {
+        verifyTsc({
+            scenario: "listFilesOnly",
+            subScenario: "combined with watch",
+            fs: () => loadProjectFromFiles({
+                "/src/test.ts": Utils.dedent`
+                        export const x = 1;`,
             }),
-        commandLineArgs: ["test.ts", "--listFilesOnly"],
-    });
+            commandLineArgs: ["/src/test.ts", "--watch", "--listFilesOnly"]
+        });
 
-    verifyTsc({
-        scenario: "listFilesOnly",
-        subScenario: "combined with incremental",
-        sys: () =>
-            TestServerHost.createWatchedSystem({
-                "/home/src/workspaces/project/test.ts": "export const x = 1;",
-                "/home/src/workspaces/project/tsconfig.json": "{}",
+        verifyTsc({
+            scenario: "listFilesOnly",
+            subScenario: "loose file",
+            fs: () => loadProjectFromFiles({
+                "/src/test.ts": Utils.dedent`
+                        export const x = 1;`,
             }),
-        commandLineArgs: ["--incremental", "--listFilesOnly"],
-        edits: [
-            {
-                ...noChangeRun,
-                commandLineArgs: ["--incremental"],
-            },
-            noChangeRun,
-            {
-                ...noChangeRun,
-                commandLineArgs: ["--incremental"],
-            },
-        ],
+            commandLineArgs: ["/src/test.ts", "--listFilesOnly"]
+        });
     });
-});
+}

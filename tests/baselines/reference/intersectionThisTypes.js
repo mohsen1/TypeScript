@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionThisTypes.ts] ////
-
 //// [intersectionThisTypes.ts]
 interface Thing1 {
     a: number;

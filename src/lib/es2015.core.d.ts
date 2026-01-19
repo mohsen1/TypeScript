@@ -8,7 +8,7 @@ interface Array<T> {
      * @param thisArg If provided, it will be used as the this value for each invocation of
      * predicate. If it is not provided, undefined is used instead.
      */
-    find<S extends T>(predicate: (value: T, index: number, obj: T[]) => value is S, thisArg?: any): S | undefined;
+    find<S extends T>(predicate: (this: void, value: T, index: number, obj: T[]) => value is S, thisArg?: any): S | undefined;
     find(predicate: (value: T, index: number, obj: T[]) => unknown, thisArg?: any): T | undefined;
 
     /**
@@ -42,8 +42,6 @@ interface Array<T> {
      * @param end If not specified, length of the this object is used as its default value.
      */
     copyWithin(target: number, start: number, end?: number): this;
-
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string;
 }
 
 interface ArrayConstructor {
@@ -265,7 +263,7 @@ interface ObjectConstructor {
      * @param target The target object to copy to.
      * @param source The source object from which to copy properties.
      */
-    assign<T extends {}, U>(target: T, source: U): T & U;
+    assign<T, U>(target: T, source: U): T & U;
 
     /**
      * Copy the values of all of the enumerable own properties from one or more source objects to a
@@ -274,7 +272,7 @@ interface ObjectConstructor {
      * @param source1 The first source object from which to copy properties.
      * @param source2 The second source object from which to copy properties.
      */
-    assign<T extends {}, U, V>(target: T, source1: U, source2: V): T & U & V;
+    assign<T, U, V>(target: T, source1: U, source2: V): T & U & V;
 
     /**
      * Copy the values of all of the enumerable own properties from one or more source objects to a
@@ -284,7 +282,7 @@ interface ObjectConstructor {
      * @param source2 The second source object from which to copy properties.
      * @param source3 The third source object from which to copy properties.
      */
-    assign<T extends {}, U, V, W>(target: T, source1: U, source2: V, source3: W): T & U & V & W;
+    assign<T, U, V, W>(target: T, source1: U, source2: V, source3: W): T & U & V & W;
 
     /**
      * Copy the values of all of the enumerable own properties from one or more source objects to a
@@ -331,7 +329,7 @@ interface ReadonlyArray<T> {
      * @param thisArg If provided, it will be used as the this value for each invocation of
      * predicate. If it is not provided, undefined is used instead.
      */
-    find<S extends T>(predicate: (value: T, index: number, obj: readonly T[]) => value is S, thisArg?: any): S | undefined;
+    find<S extends T>(predicate: (this: void, value: T, index: number, obj: readonly T[]) => value is S, thisArg?: any): S | undefined;
     find(predicate: (value: T, index: number, obj: readonly T[]) => unknown, thisArg?: any): T | undefined;
 
     /**
@@ -344,8 +342,6 @@ interface ReadonlyArray<T> {
      * predicate. If it is not provided, undefined is used instead.
      */
     findIndex(predicate: (value: T, index: number, obj: readonly T[]) => unknown, thisArg?: any): number;
-
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions & Intl.DateTimeFormatOptions): string;
 }
 
 interface RegExp {
@@ -539,41 +535,5 @@ interface StringConstructor {
      * @param template A well-formed template string call site representation.
      * @param substitutions A set of substitution values.
      */
-    raw(template: { raw: readonly string[] | ArrayLike<string>; }, ...substitutions: any[]): string;
-}
-
-interface Int8Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Uint8Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Uint8ClampedArray<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Int16Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Uint16Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Int32Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Uint32Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Float32Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
-}
-
-interface Float64Array<TArrayBuffer extends ArrayBufferLike> {
-    toLocaleString(locales: string | string[], options?: Intl.NumberFormatOptions): string;
+    raw(template: { raw: readonly string[] | ArrayLike<string>}, ...substitutions: any[]): string;
 }

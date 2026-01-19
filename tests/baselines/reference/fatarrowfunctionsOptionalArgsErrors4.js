@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/fatarrowfunctionsOptionalArgsErrors4.ts] ////
-
 //// [fatarrowfunctionsOptionalArgsErrors4.ts]
     false ? (arg?: number = 0) => 47 : null;
     false ? ((arg?: number = 0) => 57) : null;

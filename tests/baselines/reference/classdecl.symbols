@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/classdecl.ts] ////
-
-=== classdecl.ts ===
+=== tests/cases/compiler/classdecl.ts ===
 class a {
 >a : Symbol(a, Decl(classdecl.ts, 0, 0))
 
@@ -73,11 +71,11 @@ class b extends a {
 >a : Symbol(a, Decl(classdecl.ts, 0, 0))
 }
 
-namespace m1 {
+module m1 {
 >m1 : Symbol(m1, Decl(classdecl.ts, 36, 1))
 
     export class b {
->b : Symbol(b, Decl(classdecl.ts, 38, 14))
+>b : Symbol(b, Decl(classdecl.ts, 38, 11))
     }
     class d {
 >d : Symbol(d, Decl(classdecl.ts, 40, 5))
@@ -89,14 +87,14 @@ namespace m1 {
     }
 }
 
-namespace m2 {
+module m2 {
 >m2 : Symbol(m2, Decl(classdecl.ts, 47, 1))
 
-    export namespace m3 {
->m3 : Symbol(m3, Decl(classdecl.ts, 49, 14))
+    export module m3 {
+>m3 : Symbol(m3, Decl(classdecl.ts, 49, 11))
 
         export class c extends b {
->c : Symbol(c, Decl(classdecl.ts, 51, 25))
+>c : Symbol(c, Decl(classdecl.ts, 51, 22))
 >b : Symbol(b, Decl(classdecl.ts, 33, 1))
         }
         export class ib2 implements m1.ib {
@@ -110,9 +108,9 @@ namespace m2 {
 
 class c extends m1.b {
 >c : Symbol(c, Decl(classdecl.ts, 57, 1))
->m1.b : Symbol(m1.b, Decl(classdecl.ts, 38, 14))
+>m1.b : Symbol(m1.b, Decl(classdecl.ts, 38, 11))
 >m1 : Symbol(m1, Decl(classdecl.ts, 36, 1))
->b : Symbol(m1.b, Decl(classdecl.ts, 38, 14))
+>b : Symbol(m1.b, Decl(classdecl.ts, 38, 11))
 }
 
 class ib2 implements m1.ib {

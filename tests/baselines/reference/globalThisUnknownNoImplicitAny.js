@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es2019/globalThisUnknownNoImplicitAny.ts] ////
-
 //// [globalThisUnknownNoImplicitAny.ts]
 declare let win: Window & typeof globalThis;
 

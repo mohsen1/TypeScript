@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/concatError.ts] ////
-
 //// [concatError.ts]
 var n1: number[];
 /*

@@ -35,11 +35,11 @@ function doSome(arg1: string,
 
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.doSome = doSome;
+exports.__esModule = true;
+exports.doSome = void 0;
 var MAP = {
     a: "a"
 };
@@ -50,6 +50,7 @@ function doSome(arg1, arg2, arg3) {
     if (arg2 === void 0) { arg2 = MAP; }
     if (arg3 === void 0) { arg3 = MAP2; }
 }
+exports.doSome = doSome;
 
 
 //// [b.d.ts]
@@ -57,7 +58,7 @@ export { Hash, StringHash, StringHash2 };
 interface Hash<T> {
     [key: string]: T;
 }
-type StringHash = Hash<string>;
+declare type StringHash = Hash<string>;
 interface StringHash2 extends Hash<string> {
 }
 //// [a.d.ts]

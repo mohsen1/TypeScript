@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/genericInference2.ts] ////
-
 //// [genericInference2.ts]
-    declare namespace ko { 
+    declare module ko { 
        export interface Observable<T> { 
            (): T; 
            (value: T): any; 

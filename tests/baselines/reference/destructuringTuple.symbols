@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/destructuringTuple.ts] ////
-
-=== destructuringTuple.ts ===
+=== tests/cases/compiler/destructuringTuple.ts ===
 declare var tuple: [boolean, number, ...string[]];
 >tuple : Symbol(tuple, Decl(destructuringTuple.ts, 0, 11))
 

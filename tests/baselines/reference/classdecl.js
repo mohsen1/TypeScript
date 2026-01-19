@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classdecl.ts] ////
-
 //// [classdecl.ts]
 class a {
     //constructor ();
@@ -39,7 +37,7 @@ class a {
 class b extends a {
 }
 
-namespace m1 {
+module m1 {
     export class b {
     }
     class d {
@@ -50,9 +48,9 @@ namespace m1 {
     }
 }
 
-namespace m2 {
+module m2 {
 
-    export namespace m3 {
+    export module m3 {
         export class c extends b {
         }
         export class ib2 implements m1.ib {
@@ -235,14 +233,14 @@ declare class a {
 }
 declare class b extends a {
 }
-declare namespace m1 {
+declare module m1 {
     class b {
     }
     interface ib {
     }
 }
-declare namespace m2 {
-    namespace m3 {
+declare module m2 {
+    module m3 {
         class c extends b {
         }
         class ib2 implements m1.ib {

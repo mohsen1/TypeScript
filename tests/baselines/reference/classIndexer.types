@@ -1,13 +1,9 @@
-//// [tests/cases/compiler/classIndexer.ts] ////
-
-=== classIndexer.ts ===
+=== tests/cases/compiler/classIndexer.ts ===
 class C123 {
 >C123 : C123
->     : ^^^^
 
     [s: string]: number;
 >s : string
->  : ^^^^^^
 
     constructor() {
     }

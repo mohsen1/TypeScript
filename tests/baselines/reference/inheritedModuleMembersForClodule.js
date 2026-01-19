@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritedModuleMembersForClodule.ts] ////
-
 //// [inheritedModuleMembersForClodule.ts]
 class C {
     static foo(): string {
@@ -10,7 +8,7 @@ class C {
 class D extends C {
 }
 
-namespace D {
+module D {
     export function foo(): number {
         return 0;
     };

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/commentsDottedModuleName.ts] ////
-
 //// [commentsDottedModuleName.ts]
 /** this is multi declare module*/
-export namespace outerModule.InnerModule {
+export module outerModule.InnerModule {
     /// class b comment
     export class b {
     }
@@ -26,13 +24,13 @@ define(["require", "exports"], function (require, exports) {
             }());
             InnerModule.b = b;
         })(InnerModule = outerModule.InnerModule || (outerModule.InnerModule = {}));
-    })(outerModule || (exports.outerModule = outerModule = {}));
+    })(outerModule = exports.outerModule || (exports.outerModule = {}));
 });
 
 
 //// [commentsDottedModuleName.d.ts]
 /** this is multi declare module*/
-export declare namespace outerModule.InnerModule {
+export declare module outerModule.InnerModule {
     class b {
     }
 }

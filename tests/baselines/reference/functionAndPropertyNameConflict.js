@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionAndPropertyNameConflict.ts] ////
-
 //// [functionAndPropertyNameConflict.ts]
 class C65 {
     public aaaaa() { }

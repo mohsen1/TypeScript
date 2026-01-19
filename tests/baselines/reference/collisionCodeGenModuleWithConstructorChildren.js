@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithConstructorChildren.ts] ////
-
 //// [collisionCodeGenModuleWithConstructorChildren.ts]
-namespace M {
+module M {
     export var x = 3;
     class c {
         constructor(M, p = x) {
@@ -9,14 +7,14 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
     class d {
         constructor(private M, p = x) {
         }
     }
 }
 
-namespace M {
+module M {
     class d2 {
         constructor() {
             var M = 10;

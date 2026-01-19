@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/undefined/invalidUndefinedValues.ts] ////
-
 //// [invalidUndefinedValues.ts]
 var x: typeof undefined;
 
@@ -19,7 +17,7 @@ interface I { foo: string }
 var c: I;
 x = c;
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 x = M;
 
 x = { f() { } }

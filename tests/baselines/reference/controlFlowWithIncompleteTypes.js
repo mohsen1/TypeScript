@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowWithIncompleteTypes.ts] ////
-
 //// [controlFlowWithIncompleteTypes.ts]
 // Repro from #11000
 

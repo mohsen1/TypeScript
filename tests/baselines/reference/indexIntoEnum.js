@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/indexIntoEnum.ts] ////
-
 //// [indexIntoEnum.ts]
-namespace M {
+module M {
 
     enum E { }
 

@@ -1,29 +1,27 @@
-//// [tests/cases/compiler/declFileGenericType2.ts] ////
-
 //// [declFileGenericType2.ts]
-declare namespace templa.mvc {
+declare module templa.mvc {
     interface IModel {
     }
 }
-declare namespace templa.mvc {
+declare module templa.mvc {
     interface IController<ModelType extends templa.mvc.IModel> {
     }
 }
-declare namespace templa.mvc {
+declare module templa.mvc {
     class AbstractController<ModelType extends templa.mvc.IModel> implements mvc.IController<ModelType> {
     }
 }
-declare namespace templa.mvc.composite {
+declare module templa.mvc.composite {
     interface ICompositeControllerModel extends mvc.IModel {
         getControllers(): mvc.IController<mvc.IModel>[];
     }
 }
-namespace templa.dom.mvc {
+module templa.dom.mvc {
     export interface IElementController<ModelType extends templa.mvc.IModel> extends templa.mvc.IController<ModelType> {
     }
 }
 // Module
-namespace templa.dom.mvc {
+module templa.dom.mvc {
 
     export class AbstractElementController<ModelType extends templa.mvc.IModel> extends templa.mvc.AbstractController<ModelType> implements IElementController<ModelType> {
         constructor() {
@@ -32,7 +30,7 @@ namespace templa.dom.mvc {
     }
 }
 // Module
-namespace templa.dom.mvc.composite {
+module templa.dom.mvc.composite {
     export class AbstractCompositeElementController<ModelType extends templa.mvc.composite.ICompositeControllerModel> extends templa.dom.mvc.AbstractElementController<ModelType> {
         public _controllers: templa.mvc.IController<templa.mvc.IModel>[];
         constructor() {
@@ -102,33 +100,33 @@ var templa;
 
 
 //// [declFileGenericType2.d.ts]
-declare namespace templa.mvc {
+declare module templa.mvc {
     interface IModel {
     }
 }
-declare namespace templa.mvc {
+declare module templa.mvc {
     interface IController<ModelType extends templa.mvc.IModel> {
     }
 }
-declare namespace templa.mvc {
+declare module templa.mvc {
     class AbstractController<ModelType extends templa.mvc.IModel> implements mvc.IController<ModelType> {
     }
 }
-declare namespace templa.mvc.composite {
+declare module templa.mvc.composite {
     interface ICompositeControllerModel extends mvc.IModel {
         getControllers(): mvc.IController<mvc.IModel>[];
     }
 }
-declare namespace templa.dom.mvc {
+declare module templa.dom.mvc {
     interface IElementController<ModelType extends templa.mvc.IModel> extends templa.mvc.IController<ModelType> {
     }
 }
-declare namespace templa.dom.mvc {
+declare module templa.dom.mvc {
     class AbstractElementController<ModelType extends templa.mvc.IModel> extends templa.mvc.AbstractController<ModelType> implements IElementController<ModelType> {
         constructor();
     }
 }
-declare namespace templa.dom.mvc.composite {
+declare module templa.dom.mvc.composite {
     class AbstractCompositeElementController<ModelType extends templa.mvc.composite.ICompositeControllerModel> extends templa.dom.mvc.AbstractElementController<ModelType> {
         _controllers: templa.mvc.IController<templa.mvc.IModel>[];
         constructor();

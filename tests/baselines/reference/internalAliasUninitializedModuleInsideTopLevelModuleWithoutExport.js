@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/internalAliasUninitializedModuleInsideTopLevelModuleWithoutExport.ts] ////
-
 //// [internalAliasUninitializedModuleInsideTopLevelModuleWithoutExport.ts]
-export namespace a {
-    export namespace b {
+export module a {
+    export module b {
         export interface I {
             foo();
         }
@@ -16,14 +14,14 @@ x.foo();
 
 //// [internalAliasUninitializedModuleInsideTopLevelModuleWithoutExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 exports.x.foo();
 
 
 //// [internalAliasUninitializedModuleInsideTopLevelModuleWithoutExport.d.ts]
-export declare namespace a {
-    namespace b {
+export declare module a {
+    module b {
         interface I {
             foo(): any;
         }

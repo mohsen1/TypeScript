@@ -2,13 +2,13 @@
 
 //// [commentsMultiModuleMultiFile_0.ts]
 /** this is multi declare module*/
-export namespace multiM {
+export module multiM {
     /// class b comment
     export class b {
     }
 }
 /** thi is multi module 2*/
-export namespace multiM {
+export module multiM {
     /** class c comment*/
     export class c {
     }
@@ -24,7 +24,7 @@ new multiM.c();
 //// [commentsMultiModuleMultiFile_1.ts]
 import m = require('commentsMultiModuleMultiFile_0');
 /** this is multi module 3 comment*/
-export namespace multiM {
+export module multiM {
     /** class d comment*/
     export class d {
     }
@@ -50,7 +50,7 @@ define(["require", "exports"], function (require, exports) {
             return b;
         }());
         multiM.b = b;
-    })(multiM || (exports.multiM = multiM = {}));
+    })(multiM = exports.multiM || (exports.multiM = {}));
     /** thi is multi module 2*/
     (function (multiM) {
         /** class c comment*/
@@ -67,7 +67,7 @@ define(["require", "exports"], function (require, exports) {
             return e;
         }());
         multiM.e = e;
-    })(multiM || (exports.multiM = multiM = {}));
+    })(multiM = exports.multiM || (exports.multiM = {}));
     new multiM.b();
     new multiM.c();
 });
@@ -93,19 +93,19 @@ define(["require", "exports"], function (require, exports) {
             return f;
         }());
         multiM.f = f;
-    })(multiM || (exports.multiM = multiM = {}));
+    })(multiM = exports.multiM || (exports.multiM = {}));
     new multiM.d();
 });
 
 
 //// [commentsMultiModuleMultiFile_0.d.ts]
 /** this is multi declare module*/
-export declare namespace multiM {
+export declare module multiM {
     class b {
     }
 }
 /** thi is multi module 2*/
-export declare namespace multiM {
+export declare module multiM {
     /** class c comment*/
     class c {
     }
@@ -114,7 +114,7 @@ export declare namespace multiM {
 }
 //// [commentsMultiModuleMultiFile_1.d.ts]
 /** this is multi module 3 comment*/
-export declare namespace multiM {
+export declare module multiM {
     /** class d comment*/
     class d {
     }

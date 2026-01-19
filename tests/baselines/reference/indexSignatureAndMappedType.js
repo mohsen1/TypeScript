@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureAndMappedType.ts] ////
-
 //// [indexSignatureAndMappedType.ts]
 // A mapped type { [P in K]: X }, where K is a generic type, is related to
 // { [key: string]: Y } if X is related to Y.
@@ -63,7 +61,7 @@ declare function f2<T>(x: {
 declare function f3<T, U, K extends string>(x: {
     [key: string]: T;
 }, y: Record<K, U>): void;
-type Dictionary = {
+declare type Dictionary = {
     [key: string]: string;
 };
 interface IBaseEntity {

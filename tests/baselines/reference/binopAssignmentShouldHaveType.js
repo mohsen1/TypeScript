@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/binopAssignmentShouldHaveType.ts] ////
-
 //// [binopAssignmentShouldHaveType.ts]
 declare var console;
 "use strict";
-namespace Test {
+module Test {
  export class Bug {
   getName():string {
    return "name";

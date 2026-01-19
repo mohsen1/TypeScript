@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/continueInIterationStatement2.ts] ////
-
 //// [continueInIterationStatement2.ts]
 do {
   continue;

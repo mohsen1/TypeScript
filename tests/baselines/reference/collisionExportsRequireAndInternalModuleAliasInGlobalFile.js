@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionExportsRequireAndInternalModuleAliasInGlobalFile.ts] ////
-
 //// [collisionExportsRequireAndInternalModuleAliasInGlobalFile.ts]
-namespace mOfGloalFile {
+module mOfGloalFile {
     export class c {
     }
 }
@@ -10,14 +8,14 @@ import require = mOfGloalFile.c;
 new exports();
 new require();
 
-namespace m1 {
+module m1 {
     import exports = mOfGloalFile.c;
     import require = mOfGloalFile.c;
     new exports();
     new require();
 }
 
-namespace m2 {
+module m2 {
     export import exports = mOfGloalFile.c;
     export import require = mOfGloalFile.c;
     new exports();

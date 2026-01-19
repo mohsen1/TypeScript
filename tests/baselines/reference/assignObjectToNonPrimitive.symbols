@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/nonPrimitive/assignObjectToNonPrimitive.ts] ////
-
-=== assignObjectToNonPrimitive.ts ===
+=== tests/cases/conformance/types/nonPrimitive/assignObjectToNonPrimitive.ts ===
 var x = {};
 >x : Symbol(x, Decl(assignObjectToNonPrimitive.ts, 0, 3))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateLabel1.ts] ////
-
 //// [duplicateLabel1.ts]
 target:
 target:

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractWithInterface.ts] ////
-
-=== classAbstractWithInterface.ts ===
-
+=== tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractWithInterface.ts ===
 abstract interface I {}
+No type information for this code.

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuring1.ts] ////
-
 //// [declarationEmitDestructuring1.ts]
 function foo([a, b, c]: [string, string, string]): void { }
 function far([a, [b], [[c]]]: [number, boolean[], string[][]]): void { }

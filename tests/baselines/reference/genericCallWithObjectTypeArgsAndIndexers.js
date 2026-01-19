@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericCallWithObjectTypeArgsAndIndexers.ts] ////
-
 //// [genericCallWithObjectTypeArgsAndIndexers.ts]
 // Type inference infers from indexers in target type, no errors expected
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/gettersAndSetters.ts] ////
-
 //// [gettersAndSetters.ts]
 // classes
 class C {

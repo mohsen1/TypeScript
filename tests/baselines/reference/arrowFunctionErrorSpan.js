@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrowFunctionErrorSpan.ts] ////
-
 //// [arrowFunctionErrorSpan.ts]
 function f(a: () => number) { }
 

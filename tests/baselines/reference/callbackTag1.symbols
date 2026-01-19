@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/callbackTag1.ts] ////
-
-=== cb.js ===
+=== tests/cases/conformance/jsdoc/cb.js ===
 /** @callback Sid
  * @param {string} s
  * @returns {string} What were you expecting

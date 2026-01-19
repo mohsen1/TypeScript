@@ -12,7 +12,7 @@ function foo() {
 //// [a.js]
 define("a", ["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.c = void 0;
     var c = /** @class */ (function () {
         function c() {

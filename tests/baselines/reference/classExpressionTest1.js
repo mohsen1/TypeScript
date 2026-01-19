@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExpressionTest1.ts] ////
-
 //// [classExpressionTest1.ts]
 function M() {
     class C<X> {

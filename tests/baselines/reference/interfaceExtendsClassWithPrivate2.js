@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceExtendsClassWithPrivate2.ts] ////
-
 //// [interfaceExtendsClassWithPrivate2.ts]
 class C {
     public foo(x: any) { return x; }

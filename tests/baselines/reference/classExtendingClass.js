@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classHeritageSpecification/classExtendingClass.ts] ////
-
 //// [classExtendingClass.ts]
 class C {
     foo: string;

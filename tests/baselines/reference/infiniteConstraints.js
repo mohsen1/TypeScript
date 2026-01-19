@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infiniteConstraints.ts] ////
-
 //// [infiniteConstraints.ts]
 // Both of the following types trigger the recursion limiter in getImmediateBaseConstraint
 
@@ -54,7 +52,7 @@ type Conv<T, U = T> =
 //// [infiniteConstraints.js]
 "use strict";
 // Both of the following types trigger the recursion limiter in getImmediateBaseConstraint
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var out = myBug({ obj1: { a: "test" } });
 var noError = ensureNoDuplicates({ main: value("test"), alternate: value("test2") });
 var shouldBeNoError = ensureNoDuplicates({ main: value("test") });

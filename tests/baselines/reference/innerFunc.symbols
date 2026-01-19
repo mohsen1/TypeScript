@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/innerFunc.ts] ////
-
-=== innerFunc.ts ===
+=== tests/cases/compiler/innerFunc.ts ===
 function salt() {
 >salt : Symbol(salt, Decl(innerFunc.ts, 0, 0))
 
@@ -11,11 +9,11 @@ function salt() {
 >pepper : Symbol(pepper, Decl(innerFunc.ts, 0, 17))
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(innerFunc.ts, 3, 1))
 
     export function tungsten() {
->tungsten : Symbol(tungsten, Decl(innerFunc.ts, 5, 13))
+>tungsten : Symbol(tungsten, Decl(innerFunc.ts, 5, 10))
 
         function oxygen() { return 6; };
 >oxygen : Symbol(oxygen, Decl(innerFunc.ts, 6, 32))

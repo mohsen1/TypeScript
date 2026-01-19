@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionReturn.ts] ////
-
 //// [functionReturn.ts]
 function f0(): void { }
 function f1() {

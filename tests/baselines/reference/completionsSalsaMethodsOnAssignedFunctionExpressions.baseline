@@ -1,25 +1,3 @@
-// === Completions ===
-=== /tests/cases/fourslash/something.js ===
-// var C = function () { }
-// /**
-//  * The prototype method.
-//  * @param {string} a Parameter definition.
-//  */
-// function f(a) {}
-// C.prototype.m = f;
-// 
-// var x = new C();
-// x.m();
-//   ^
-// | ----------------------------------------------------------------------
-// | (property) C.m: (a: string) => void
-// | (warning) a
-// | (warning) C
-// | (warning) f
-// | (warning) prototype
-// | (warning) x
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -27,8 +5,7 @@
       "position": 156,
       "name": "2"
     },
-    "item": {
-      "flags": 0,
+    "completionList": {
       "isGlobalCompletion": false,
       "isMemberCompletion": true,
       "isNewIdentifierLocation": false,
@@ -150,47 +127,37 @@
           "name": "a",
           "kind": "warning",
           "kindModifiers": "",
-          "sortText": "18",
-          "isFromUncheckedFile": true,
-          "commitCharacters": []
+          "sortText": "17",
+          "isFromUncheckedFile": true
         },
         {
           "name": "C",
           "kind": "warning",
           "kindModifiers": "",
-          "sortText": "18",
-          "isFromUncheckedFile": true,
-          "commitCharacters": []
+          "sortText": "17",
+          "isFromUncheckedFile": true
         },
         {
           "name": "f",
           "kind": "warning",
           "kindModifiers": "",
-          "sortText": "18",
-          "isFromUncheckedFile": true,
-          "commitCharacters": []
+          "sortText": "17",
+          "isFromUncheckedFile": true
         },
         {
           "name": "prototype",
           "kind": "warning",
           "kindModifiers": "",
-          "sortText": "18",
-          "isFromUncheckedFile": true,
-          "commitCharacters": []
+          "sortText": "17",
+          "isFromUncheckedFile": true
         },
         {
           "name": "x",
           "kind": "warning",
           "kindModifiers": "",
-          "sortText": "18",
-          "isFromUncheckedFile": true,
-          "commitCharacters": []
+          "sortText": "17",
+          "isFromUncheckedFile": true
         }
-      ],
-      "defaultCommitCharacters": [
-        ".",
-        ",",
-        ";"
       ]
     }
   }

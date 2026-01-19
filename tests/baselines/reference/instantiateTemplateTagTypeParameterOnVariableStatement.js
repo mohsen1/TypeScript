@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/instantiateTemplateTagTypeParameterOnVariableStatement.ts] ////
-
 //// [instantiateTemplateTagTypeParameterOnVariableStatement.js]
 /**
  * @template T

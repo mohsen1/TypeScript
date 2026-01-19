@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doNotEmitPinnedCommentOnNotEmittedNodets.ts] ////
-
 //// [doNotEmitPinnedCommentOnNotEmittedNodets.ts]
 class C {
     /*! remove pinned comment anywhere else */

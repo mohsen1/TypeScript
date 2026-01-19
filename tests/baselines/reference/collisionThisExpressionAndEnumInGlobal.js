@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionThisExpressionAndEnumInGlobal.ts] ////
-
 //// [collisionThisExpressionAndEnumInGlobal.ts]
 enum _this { // Error
     _thisVal1,

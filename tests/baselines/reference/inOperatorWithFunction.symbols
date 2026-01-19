@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/inOperatorWithFunction.ts] ////
-
-=== inOperatorWithFunction.ts ===
+=== tests/cases/compiler/inOperatorWithFunction.ts ===
 var fn = function (val: boolean) { return val; }
 >fn : Symbol(fn, Decl(inOperatorWithFunction.ts, 0, 3))
 >val : Symbol(val, Decl(inOperatorWithFunction.ts, 0, 19))

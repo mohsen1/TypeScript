@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureWithInitializer.ts] ////
-
 //// [indexSignatureWithInitializer.ts]
 // These used to be indexers, now they are computed properties
 interface I {

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/contextSensitiveReturnTypeInference.ts] ////
-
-=== contextSensitiveReturnTypeInference.ts ===
+=== tests/cases/compiler/contextSensitiveReturnTypeInference.ts ===
 // Repro from #34849
 
 interface IData {

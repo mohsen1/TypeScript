@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/iterableArrayPattern1.ts] ////
-
 //// [iterableArrayPattern1.ts]
 class SymbolIterator {
     next() {

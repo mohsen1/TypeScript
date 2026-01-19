@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/allowJscheckJsTypeParameterNoCrash.ts] ////
-
-=== func.ts ===
+=== tests/cases/compiler/func.ts ===
 interface ComponentOptions<V> {
 >ComponentOptions : Symbol(ComponentOptions, Decl(func.ts, 0, 0))
 >V : Symbol(V, Decl(func.ts, 0, 27))
@@ -25,7 +23,7 @@ export var vextend = extend;
 >vextend : Symbol(vextend, Decl(func.ts, 5, 10))
 >extend : Symbol(extend, Decl(func.ts, 3, 40))
 
-=== app.js ===
+=== tests/cases/compiler/app.js ===
 import {vextend} from './func';
 >vextend : Symbol(vextend, Decl(app.js, 0, 8))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorMessagesIntersectionTypes02.ts] ////
-
 //// [errorMessagesIntersectionTypes02.ts]
 interface Foo {
     fooProp: "hello" | "world";

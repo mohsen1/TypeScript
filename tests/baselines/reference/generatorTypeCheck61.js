@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/yieldExpressions/generatorTypeCheck61.ts] ////
-
 //// [generatorTypeCheck61.ts]
 function * g() {
     @(yield 0)

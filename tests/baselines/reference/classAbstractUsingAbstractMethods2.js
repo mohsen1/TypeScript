@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractUsingAbstractMethods2.ts] ////
-
 //// [classAbstractUsingAbstractMethods2.ts]
 class A {
     abstract foo();

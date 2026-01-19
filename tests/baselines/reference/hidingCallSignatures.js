@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/hidingCallSignatures.ts] ////
-
 //// [hidingCallSignatures.ts]
 interface C {
     new (a: string): string;

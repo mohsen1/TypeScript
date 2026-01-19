@@ -1,4 +1,3 @@
-// === breakpoints ===
 
 1  >declare function ClassDecorator1(target: Function): void;
 

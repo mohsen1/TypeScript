@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorsForCallAndAssignmentAreSimilar.ts] ////
-
 //// [errorsForCallAndAssignmentAreSimilar.ts]
 function minimalExample1() {
     type Disc =
@@ -25,11 +23,11 @@ function minimalExample1() {
     function foo(x) {
     }
     foo([
-        { kind: "bluray", },
-        { kind: "hdpvd", }
+        { kind: "bluray" },
+        { kind: "hdpvd" }
     ]);
     var ds = [
-        { kind: "bluray", },
-        { kind: "hdpvd", }
+        { kind: "bluray" },
+        { kind: "hdpvd" }
     ];
 }

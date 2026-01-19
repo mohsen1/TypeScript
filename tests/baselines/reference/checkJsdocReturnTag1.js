@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocReturnTag1.ts] ////
-
 //// [returns.js]
 // @ts-check
 /**
@@ -22,7 +20,6 @@ function f1() {
 function f2() {
     return 5 || "hello";
 }
-
 
 //// [dummy.js]
 // @ts-check

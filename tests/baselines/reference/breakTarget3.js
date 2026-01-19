@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/breakTarget3.ts] ////
-
 //// [breakTarget3.ts]
 target1:
 target2:

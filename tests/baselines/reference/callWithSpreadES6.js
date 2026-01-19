@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functionCalls/callWithSpreadES6.ts] ////
-
 //// [callWithSpreadES6.ts]
 interface X {
     foo(x: number, y: number, ...z: string[]);

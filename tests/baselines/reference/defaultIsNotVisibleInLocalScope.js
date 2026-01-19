@@ -12,12 +12,12 @@ export type X = typeof default; // expect error
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = default_1;
+exports.__esModule = true;
 function default_1() {
     return true;
 }
+exports["default"] = default_1;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = { a: true };
+exports.__esModule = true;
+exports["default"] = { a: true };

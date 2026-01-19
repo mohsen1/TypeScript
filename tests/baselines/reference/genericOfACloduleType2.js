@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/genericOfACloduleType2.ts] ////
-
 //// [genericOfACloduleType2.ts]
 class G<T>{ bar(x: T) { return x; } }
-namespace M {
+module M {
     export class C { foo() { } }
-    export namespace C {
+    export module C {
         export class X {
         }
     }
@@ -13,7 +11,7 @@ namespace M {
     g1.bar(null).foo(); // no error
 }
 
-namespace N {
+module N {
     var g2 = new G<M.C>()
 }
 

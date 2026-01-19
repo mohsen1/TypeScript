@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/anyAssignabilityInInheritance.ts] ////
-
 //// [anyAssignabilityInInheritance.ts]
 // any is not a subtype of any other types, errors expected on all the below derived classes unless otherwise noted
 
@@ -67,7 +65,7 @@ declare function foo14(x: any): any;
 var r3 = foo3(a); // any
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 declare function foo15(x: typeof f): typeof f;
@@ -75,7 +73,7 @@ declare function foo15(x: any): any;
 var r3 = foo3(a); // any
 
 class CC { baz: string }
-namespace CC {
+module CC {
     export var bar = 1;
 }
 declare function foo16(x: CC): CC;

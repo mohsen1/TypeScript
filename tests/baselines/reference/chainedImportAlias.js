@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/chainedImportAlias.ts] ////
 
 //// [chainedImportAlias_file0.ts]
-export namespace m {
+export module m {
     export function foo() { }
 }
 
@@ -13,16 +13,16 @@ y.m.foo();
 
 //// [chainedImportAlias_file0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.m = void 0;
 var m;
 (function (m) {
     function foo() { }
     m.foo = foo;
-})(m || (exports.m = m = {}));
+})(m = exports.m || (exports.m = {}));
 //// [chainedImportAlias_file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x = require("./chainedImportAlias_file0");
 var y = x;
 y.m.foo();

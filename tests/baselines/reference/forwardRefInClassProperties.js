@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forwardRefInClassProperties.ts] ////
-
 //// [forwardRefInClassProperties.ts]
 class Test
 {

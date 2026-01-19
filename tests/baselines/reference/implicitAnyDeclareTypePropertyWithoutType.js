@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyDeclareTypePropertyWithoutType.ts] ////
-
 //// [implicitAnyDeclareTypePropertyWithoutType.ts]
 class C {
     constructor() { }

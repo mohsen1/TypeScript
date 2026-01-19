@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constantOverloadFunction.ts] ////
-
 //// [constantOverloadFunction.ts]
 class Base { foo() { } }
 class Derived1 extends Base { bar() { } }

@@ -1,14 +1,14 @@
-importStatementsInterfaces.ts(23,19): error TS2708: Cannot use namespace 'a' as a value.
+tests/cases/conformance/internalModules/codeGeneration/importStatementsInterfaces.ts(23,19): error TS2708: Cannot use namespace 'a' as a value.
 
 
-==== importStatementsInterfaces.ts (1 errors) ====
-    namespace A {
+==== tests/cases/conformance/internalModules/codeGeneration/importStatementsInterfaces.ts (1 errors) ====
+    module A {
         export interface Point {
             x: number;
             y: number;
         }
     
-        export namespace inA {
+        export module inA {
             export interface Point3D extends Point {
                 z: number;
             }
@@ -16,12 +16,12 @@ importStatementsInterfaces.ts(23,19): error TS2708: Cannot use namespace 'a' as 
     }
     
     // no code gen expected
-    namespace B {
+    module B {
         import a = A;
     }
     
     // no code gen expected
-    namespace C {
+    module C {
         import a = A;
         import b = a.inA;
         var m: typeof a;
@@ -32,14 +32,14 @@ importStatementsInterfaces.ts(23,19): error TS2708: Cannot use namespace 'a' as 
     }
     
     // no code gen expected
-    namespace D {
+    module D {
         import a = A;
     
         var p : a.Point;
     }
     
     // no code gen expected
-    namespace E {
+    module E {
         import a = A.inA;
         export function xDist(x: a.Point3D) {
             return 0 - x.x;

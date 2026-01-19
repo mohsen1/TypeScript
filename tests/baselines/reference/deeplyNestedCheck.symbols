@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/deeplyNestedCheck.ts] ////
-
-=== deeplyNestedCheck.ts ===
+=== tests/cases/compiler/deeplyNestedCheck.ts ===
 // Repro from #14794
 
 interface DataSnapshot<X = {}> {

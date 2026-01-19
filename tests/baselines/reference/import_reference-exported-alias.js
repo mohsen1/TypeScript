@@ -1,8 +1,8 @@
 //// [tests/cases/compiler/import_reference-exported-alias.ts] ////
 
 //// [file1.ts]
-namespace App {
-    export namespace Services {
+module App {
+    export module Services {
         export class UserServices {
             public getUserName(): string {
                 return "Bill Gates";
@@ -45,7 +45,7 @@ define(["require", "exports"], function (require, exports) {
 //// [file2.js]
 define(["require", "exports", "file1"], function (require, exports, appJs) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var Services = appJs.Services;
     var UserServices = Services.UserServices;
     var x = new UserServices().getUserName();

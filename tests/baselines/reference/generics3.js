@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/generics3.ts] ////
-
 //// [generics3.ts]
 class C<T> { private x: T; }
 interface X { f(): string; }

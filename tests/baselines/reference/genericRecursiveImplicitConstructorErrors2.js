@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/genericRecursiveImplicitConstructorErrors2.ts] ////
-
 //// [genericRecursiveImplicitConstructorErrors2.ts]
-namespace TypeScript2 {
+module TypeScript2 {
   export interface DeclKind { };
   export interface PullTypesymbol { };
   export interface SymbolLinkKind { };

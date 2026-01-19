@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/continueStatements/invalidSwitchContinueStatement.ts] ////
-
 //// [invalidSwitchContinueStatement.ts]
 // continue is not allowed in a switch statement
 

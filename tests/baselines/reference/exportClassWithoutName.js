@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportClassWithoutName.ts] ////
-
 //// [exportClassWithoutName.ts]
 export class {
 }

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/genericRecursiveImplicitConstructorErrors1.ts] ////
-
 //// [genericRecursiveImplicitConstructorErrors1.ts]
-export declare namespace TypeScript {
+export declare module TypeScript {
   class PullSymbol { }
   class PullSignatureSymbol <A,B,C> extends PullSymbol {
   public addSpecialization<A,B,C>(signature: PullSignatureSymbol<A,B,C>, typeArguments: PullTypeSymbol<any,any,any>[]): void;
@@ -18,5 +16,5 @@ export declare namespace TypeScript {
 //// [genericRecursiveImplicitConstructorErrors1.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });

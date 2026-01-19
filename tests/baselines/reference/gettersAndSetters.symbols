@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/gettersAndSetters.ts] ////
-
-=== gettersAndSetters.ts ===
+=== tests/cases/compiler/gettersAndSetters.ts ===
 // classes
 class C {
 >C : Symbol(C, Decl(gettersAndSetters.ts, 0, 0))

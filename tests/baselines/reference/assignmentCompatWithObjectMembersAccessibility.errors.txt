@@ -1,57 +1,51 @@
-assignmentCompatWithObjectMembersAccessibility.ts(31,5): error TS2322: Type 'E' is not assignable to type '{ foo: string; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(31,5): error TS2322: Type 'E' is not assignable to type '{ foo: string; }'.
   Property 'foo' is private in type 'E' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(36,5): error TS2322: Type 'E' is not assignable to type 'Base'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(36,5): error TS2322: Type 'E' is not assignable to type 'Base'.
   Property 'foo' is private in type 'E' but not in type 'Base'.
-assignmentCompatWithObjectMembersAccessibility.ts(41,5): error TS2322: Type 'E' is not assignable to type 'I'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(41,5): error TS2322: Type 'E' is not assignable to type 'I'.
   Property 'foo' is private in type 'E' but not in type 'I'.
-assignmentCompatWithObjectMembersAccessibility.ts(46,5): error TS2322: Type 'E' is not assignable to type 'D'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(46,5): error TS2322: Type 'E' is not assignable to type 'D'.
   Property 'foo' is private in type 'E' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(48,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(48,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(49,5): error TS2322: Type 'Base' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(49,5): error TS2322: Type 'Base' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type 'Base'.
-assignmentCompatWithObjectMembersAccessibility.ts(50,5): error TS2322: Type 'I' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(50,5): error TS2322: Type 'I' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type 'I'.
-assignmentCompatWithObjectMembersAccessibility.ts(51,5): error TS2322: Type 'D' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(51,5): error TS2322: Type 'D' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(81,5): error TS2322: Type 'Base' is not assignable to type '{ foo: string; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(81,5): error TS2322: Type 'Base' is not assignable to type '{ foo: string; }'.
   Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(82,5): error TS2322: Type 'I' is not assignable to type '{ foo: string; }'.
-  Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(84,5): error TS2322: Type 'E' is not assignable to type '{ foo: string; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(82,5): error TS2322: Type 'I' is not assignable to type '{ foo: string; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(84,5): error TS2322: Type 'E' is not assignable to type '{ foo: string; }'.
   Property 'foo' is private in type 'E' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(86,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'Base'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(86,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'Base'.
   Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(88,5): error TS2322: Type 'D' is not assignable to type 'Base'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(88,5): error TS2322: Type 'D' is not assignable to type 'Base'.
   Property 'foo' is private in type 'Base' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(89,5): error TS2322: Type 'E' is not assignable to type 'Base'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(89,5): error TS2322: Type 'E' is not assignable to type 'Base'.
   Types have separate declarations of a private property 'foo'.
-assignmentCompatWithObjectMembersAccessibility.ts(92,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'I'.
-  Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(94,5): error TS2322: Type 'D' is not assignable to type 'I'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(92,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'I'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(94,5): error TS2322: Type 'D' is not assignable to type 'I'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(95,5): error TS2322: Type 'E' is not assignable to type 'I'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(99,5): error TS2322: Type 'Base' is not assignable to type 'D'.
   Property 'foo' is private in type 'Base' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(95,5): error TS2322: Type 'E' is not assignable to type 'I'.
-  Types have separate declarations of a private property 'foo'.
-assignmentCompatWithObjectMembersAccessibility.ts(99,5): error TS2322: Type 'Base' is not assignable to type 'D'.
-  Property 'foo' is private in type 'Base' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(100,5): error TS2322: Type 'I' is not assignable to type 'D'.
-  Property 'foo' is private in type 'Base' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(101,5): error TS2322: Type 'E' is not assignable to type 'D'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(100,5): error TS2322: Type 'I' is not assignable to type 'D'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(101,5): error TS2322: Type 'E' is not assignable to type 'D'.
   Property 'foo' is private in type 'E' but not in type 'D'.
-assignmentCompatWithObjectMembersAccessibility.ts(103,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(103,5): error TS2322: Type '{ foo: string; }' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type '{ foo: string; }'.
-assignmentCompatWithObjectMembersAccessibility.ts(104,5): error TS2322: Type 'Base' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(104,5): error TS2322: Type 'Base' is not assignable to type 'E'.
   Types have separate declarations of a private property 'foo'.
-assignmentCompatWithObjectMembersAccessibility.ts(105,5): error TS2322: Type 'I' is not assignable to type 'E'.
-  Types have separate declarations of a private property 'foo'.
-assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(105,5): error TS2322: Type 'I' is not assignable to type 'E'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D' is not assignable to type 'E'.
   Property 'foo' is private in type 'E' but not in type 'D'.
 
 
-==== assignmentCompatWithObjectMembersAccessibility.ts (24 errors) ====
+==== tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts (24 errors) ====
     // members N and M of types S and T have the same name, same accessibility, same optionality, and N is assignable M
     
-    namespace TargetIsPublic {
+    module TargetIsPublic {
         // targets
         class Base {
             public foo: string;
@@ -61,9 +55,9 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
             foo: string;
         }
     
-        declare var a: { foo: string; };
-        declare var b: Base;
-        declare var i: I;
+        var a: { foo: string; }
+        var b: Base;
+        var i: I;
     
         // sources
         class D {
@@ -73,8 +67,8 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         class E {
             private foo: string;
         }
-        declare var d: D;
-        declare var e: E;
+        var d: D;
+        var e: E;
     
         a = b;
         a = i;
@@ -128,7 +122,7 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
     
     }
     
-    namespace TargetIsPublic {
+    module TargetIsPublic {
         // targets
         class Base {
             private foo: string;
@@ -137,9 +131,9 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         interface I extends Base {
         }
     
-        declare var a: { foo: string; };
-        declare var b: Base;
-        declare var i: I;
+        var a: { foo: string; }
+        var b: Base;
+        var i: I;
     
         // sources
         class D {
@@ -150,8 +144,8 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
             private foo: string;
         }
     
-        declare var d: D;
-        declare var e: E;
+        var d: D;
+        var e: E;
     
         a = b; // error
         ~
@@ -160,7 +154,6 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         a = i; // error
         ~
 !!! error TS2322: Type 'I' is not assignable to type '{ foo: string; }'.
-!!! error TS2322:   Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
         a = d;
         a = e; // error
         ~
@@ -185,16 +178,13 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         i = a; // error
         ~
 !!! error TS2322: Type '{ foo: string; }' is not assignable to type 'I'.
-!!! error TS2322:   Property 'foo' is private in type 'Base' but not in type '{ foo: string; }'.
         i = b;
         i = d; // error
         ~
 !!! error TS2322: Type 'D' is not assignable to type 'I'.
-!!! error TS2322:   Property 'foo' is private in type 'Base' but not in type 'D'.
         i = e; // error
         ~
 !!! error TS2322: Type 'E' is not assignable to type 'I'.
-!!! error TS2322:   Types have separate declarations of a private property 'foo'.
         i = i;
     
         d = a;
@@ -205,7 +195,6 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         d = i; // error
         ~
 !!! error TS2322: Type 'I' is not assignable to type 'D'.
-!!! error TS2322:   Property 'foo' is private in type 'Base' but not in type 'D'.
         d = e; // error
         ~
 !!! error TS2322: Type 'E' is not assignable to type 'D'.
@@ -222,7 +211,6 @@ assignmentCompatWithObjectMembersAccessibility.ts(106,5): error TS2322: Type 'D'
         e = i; // errror
         ~
 !!! error TS2322: Type 'I' is not assignable to type 'E'.
-!!! error TS2322:   Types have separate declarations of a private property 'foo'.
         e = d; // errror
         ~
 !!! error TS2322: Type 'D' is not assignable to type 'E'.

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/automaticConstructors/classWithoutExplicitConstructor.ts] ////
-
 //// [classWithoutExplicitConstructor.ts]
 class C {
     x = 1

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/accessorBodyInTypeContext.ts] ////
-
 //// [accessorBodyInTypeContext.ts]
 type A = {
     get foo() { return 0 }

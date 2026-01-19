@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/abstractPropertyInitializer.ts] ////
-
 //// [abstractPropertyInitializer.ts]
 abstract class C {
     abstract prop = 1

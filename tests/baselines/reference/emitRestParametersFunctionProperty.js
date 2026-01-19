@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/restParameters/emitRestParametersFunctionProperty.ts] ////
-
 //// [emitRestParametersFunctionProperty.ts]
 var obj: {
     func1: (...rest) => void

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericLambaArgWithoutTypeArguments.ts] ////
-
 //// [genericLambaArgWithoutTypeArguments.ts]
 interface Foo<T> {
    x: T;

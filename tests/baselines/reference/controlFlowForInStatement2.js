@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowForInStatement2.ts] ////
-
 //// [controlFlowForInStatement2.ts]
 const keywordA = 'a';
 const keywordB = 'b';

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/commaOperator/commaOperatorWithSecondOperandStringType.ts] ////
-
 //// [commaOperatorWithSecondOperandStringType.ts]
 var ANY: any;
 var BOOLEAN: boolean;

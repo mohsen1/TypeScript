@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-ofStatements/ES5For-ofTypeCheck13.ts] ////
-
 //// [ES5For-ofTypeCheck13.ts]
 const strSet: Set<string> = new Set()
 strSet.add('Hello')

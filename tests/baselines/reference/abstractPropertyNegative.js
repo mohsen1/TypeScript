@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/abstractPropertyNegative.ts] ////
-
 //// [abstractPropertyNegative.ts]
 interface A {
     prop: string;
@@ -11,7 +9,7 @@ abstract class B implements A {
     abstract get readonlyProp(): string;
     abstract m(): string;
     abstract get mismatch(): string;
-    abstract set mismatch(val: number);
+    abstract set mismatch(val: number); // error, not same type
 }
 class C extends B {
     readonly ro = "readonly please";

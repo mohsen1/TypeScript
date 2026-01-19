@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/indexSignatures1.ts] ////
-
 //// [indexSignatures1.ts]
 // Symbol index signature checking
 
@@ -356,7 +354,7 @@ const y2 = dom.data123;
 dom = { data123: 'hello' };
 dom = { date123: 'hello' }; // Error
 const funcs = {
-    sfoo: x => x.length, // x: string
+    sfoo: x => x.length,
     nfoo: x => x * 2, // n: number
 };
 i1[s0]; // Error
@@ -534,36 +532,36 @@ declare let dom: {
 };
 declare const y1: string;
 declare const y2: string;
-type Funcs = {
+declare type Funcs = {
     [key: `s${string}`]: (x: string) => void;
     [key: `n${string}`]: (x: number) => void;
 };
 declare const funcs: Funcs;
-type Duplicates = {
+declare type Duplicates = {
     [key: string | number]: any;
     [key: number | symbol]: any;
     [key: symbol | `foo${string}`]: any;
     [key: `foo${string}`]: any;
 };
-type Conflicting = {
+declare type Conflicting = {
     [key: `a${string}`]: 'a';
     [key: `${string}a`]: 'b';
     [key: `a${string}a`]: 'c';
 };
-type Invalid<T extends string> = {
+declare type Invalid<T extends string> = {
     [key: 'a' | 'b' | 'c']: string;
     [key: T | number]: string;
     [key: Error]: string;
     [key: T & string]: string;
 };
-type Tag1 = {
+declare type Tag1 = {
     __tag1__: void;
 };
-type Tag2 = {
+declare type Tag2 = {
     __tag2__: void;
 };
-type TaggedString1 = string & Tag1;
-type TaggedString2 = string & Tag2;
+declare type TaggedString1 = string & Tag1;
+declare type TaggedString2 = string & Tag2;
 declare let s0: string;
 declare let s1: TaggedString1;
 declare let s2: TaggedString2;
@@ -637,23 +635,23 @@ declare function foo<TArg, TRet, TDir>(options: {
 declare let case1: void;
 declare let case2: void;
 declare let case3: void;
-type Pseudo = `&:${string}`;
+declare type Pseudo = `&:${string}`;
 declare const AmIPseudo1: Pseudo;
 declare const AmIPseudo: Pseudo;
-type PseudoDeclaration = {
+declare type PseudoDeclaration = {
     [key in Pseudo]: string;
 };
 declare const test: PseudoDeclaration;
-type FieldPattern = `/${string}`;
+declare type FieldPattern = `/${string}`;
 declare const path1: FieldPattern;
 declare const path2: FieldPattern;
-type PathsObject = {
+declare type PathsObject = {
     [P in FieldPattern]: object;
 };
 declare const pathObject: PathsObject;
-type IdType = `${number}-${number}-${number}-${number}`;
+declare type IdType = `${number}-${number}-${number}-${number}`;
 declare const id: IdType;
-type A = Record<IdType, string>;
+declare type A = Record<IdType, string>;
 declare const a: A;
 declare let aid: string;
 interface AA {
@@ -671,30 +669,12 @@ declare const obj2: {
 declare const obj3: {
     [key: number]: string;
 };
-type Id = string & {
+declare type Id = string & {
     __tag: 'id ';
 };
-type Rec1 = {
+declare type Rec1 = {
     [key: Id]: number;
 };
-type Rec2 = Record<Id, number>;
-type K1 = keyof Rec1;
-type K2 = keyof Rec2;
-
-
-!!!! File indexSignatures1.d.ts differs from original emit in noCheck emit
-//// [indexSignatures1.d.ts]
-===================================================================
---- Expected	The full check baseline
-+++ Actual	with noCheck set
-@@ -118,9 +118,9 @@
-     [x: symbol]: 4 | 5;
-     [sym]: 4;
- };
- declare const obj13: {
--    [x: string]: 0 | 2 | 1 | 3;
-+    [x: string]: 0 | 1 | 2 | 3;
-     [x: number]: 2 | 3;
-     [x: symbol]: 4 | 5;
-     x: 0;
-     1: 2;
+declare type Rec2 = Record<Id, number>;
+declare type K1 = keyof Rec1;
+declare type K2 = keyof Rec2;

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/classExtendsClauseClassNotReferringConstructor.ts] ////
-
 //// [classExtendsClauseClassNotReferringConstructor.ts]
 class A { a: number; }
-namespace Foo {
+module Foo {
     var A = 1;
     class B extends A { b: string; }
 }

@@ -1,12 +1,10 @@
-error TS5101: Option 'outFile' is deprecated and will stop functioning in TypeScript 7.0. Specify compilerOption '"ignoreDeprecations": "6.0"' to silence this error.
-actual.ts(12,5): error TS2339: Property 'a' does not exist on type 'Window'.
-actual.ts(13,5): error TS2339: Property 'b' does not exist on type 'Window'.
-b.js(12,5): error TS2339: Property 'a' does not exist on type 'Window'.
-b.js(13,5): error TS2339: Property 'b' does not exist on type 'Window'.
+tests/cases/conformance/es2019/actual.ts(12,5): error TS2339: Property 'a' does not exist on type 'Window'.
+tests/cases/conformance/es2019/actual.ts(13,5): error TS2339: Property 'b' does not exist on type 'Window'.
+tests/cases/conformance/es2019/b.js(12,5): error TS2339: Property 'a' does not exist on type 'Window'.
+tests/cases/conformance/es2019/b.js(13,5): error TS2339: Property 'b' does not exist on type 'Window'.
 
 
-!!! error TS5101: Option 'outFile' is deprecated and will stop functioning in TypeScript 7.0. Specify compilerOption '"ignoreDeprecations": "6.0"' to silence this error.
-==== b.js (2 errors) ====
+==== tests/cases/conformance/es2019/b.js (2 errors) ====
     var a = 10;
     this.a;
     this.b;
@@ -25,7 +23,7 @@ b.js(13,5): error TS2339: Property 'b' does not exist on type 'Window'.
         ~
 !!! error TS2339: Property 'b' does not exist on type 'Window'.
     
-==== actual.ts (2 errors) ====
+==== tests/cases/conformance/es2019/actual.ts (2 errors) ====
     var b = 10;
     this.a;
     this.b;

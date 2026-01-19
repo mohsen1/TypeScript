@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incrementalTsBuildInfoFile.ts] ////
-
 //// [a.ts]
 const x = 10;
 

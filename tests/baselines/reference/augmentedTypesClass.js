@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/augmentedTypesClass.ts] ////
-
 //// [augmentedTypesClass.ts]
 //// class then var
 class c1 { public foo() { } }

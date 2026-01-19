@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringWithGenericParameter.ts] ////
-
 //// [destructuringWithGenericParameter.ts]
 class GenericClass<T> {
     payload: T;

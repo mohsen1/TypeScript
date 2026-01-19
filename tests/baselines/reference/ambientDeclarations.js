@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/ambient/ambientDeclarations.ts] ////
-
 //// [ambientDeclarations.ts]
 // Ambient variable without type annotation
 declare var n;
@@ -55,13 +53,13 @@ declare enum E2 {
 declare enum E3 {
     A
 }
-declare namespace E3 {
+declare module E3 {
     var B;
 }
 var x = E3.B;
 
 // Ambient module
-declare namespace M1 {
+declare module M1 {
     var x;
     function fn(): number;
 }

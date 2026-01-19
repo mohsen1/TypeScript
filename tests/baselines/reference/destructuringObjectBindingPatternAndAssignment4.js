@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringObjectBindingPatternAndAssignment4.ts] ////
-
 //// [destructuringObjectBindingPatternAndAssignment4.ts]
 const {
     a = 1,

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/anonymousModules.ts] ////
-
 //// [anonymousModules.ts]
 module {
 	export var foo = 1;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/undefined/invalidUndefinedAssignments.ts] ////
-
 //// [invalidUndefinedAssignments.ts]
 var x: typeof undefined;
 
@@ -16,7 +14,7 @@ var g: I;
 g = x;
 I = x;
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 M = x;
 
 function i<T>(a: T) { }

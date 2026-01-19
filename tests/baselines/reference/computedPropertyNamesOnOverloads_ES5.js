@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNamesOnOverloads_ES5.ts] ////
-
 //// [computedPropertyNamesOnOverloads_ES5.ts]
 var methodName = "method";
 var accessorName = "accessor";

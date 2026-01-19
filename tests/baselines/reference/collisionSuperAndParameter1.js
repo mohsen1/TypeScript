@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndParameter1.ts] ////
-
 //// [collisionSuperAndParameter1.ts]
 class Foo {
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/bases.ts] ////
-
 //// [bases.ts]
 interface I {
     x;

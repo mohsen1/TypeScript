@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateLocalVariable4.ts] ////
-
 //// [duplicateLocalVariable4.ts]
 enum E{
 a

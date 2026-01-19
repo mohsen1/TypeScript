@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarations-scopes.ts] ////
-
 //// [constDeclarations-scopes.ts]
 // global
 const c = "string";
@@ -102,7 +100,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
     const c = 0;
     n = c;
 

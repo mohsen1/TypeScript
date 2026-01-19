@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericInheritedDefaultConstructors.ts] ////
-
 //// [genericInheritedDefaultConstructors.ts]
 // repro from #8166
 interface Constructor<T> {

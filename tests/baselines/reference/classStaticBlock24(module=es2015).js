@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock24.ts] ////
-
 //// [classStaticBlock24.ts]
 export class C {
   static x: number;

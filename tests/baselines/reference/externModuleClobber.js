@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/externModuleClobber.ts] ////
-
 //// [externModuleClobber.ts]
-declare namespace EM {
+declare module EM {
 	export class Position { }
 
 	export class EC {

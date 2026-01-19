@@ -1,81 +1,61 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedClassesOfTheSameName.ts] ////
-
-=== TwoInternalModulesThatMergeEachWithExportedClassesOfTheSameName.ts ===
-namespace A {
+=== tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedClassesOfTheSameName.ts ===
+module A {
 >A : typeof A
->  : ^^^^^^^^
 
     export class Point {
 >Point : Point
->      : ^^^^^
 
         x: number;
 >x : number
->  : ^^^^^^
 
         y: number;
 >y : number
->  : ^^^^^^
     }
 }
 
-namespace A{
+module A{
 >A : typeof A
->  : ^^^^^^^^
 
     // expected error
     export class Point {
 >Point : A.Point
->      : ^^^^^^^
 
         origin: number;
 >origin : number
->       : ^^^^^^
 
         angle: number;
 >angle : number
->      : ^^^^^^
     }
 }
 
-namespace X.Y.Z {
+module X.Y.Z {
 >X : typeof X
->  : ^^^^^^^^
 >Y : typeof Y
->  : ^^^^^^^^
 >Z : typeof Z
->  : ^^^^^^^^
 
     export class Line {
 >Line : Line
->     : ^^^^
 
         length: number;
 >length : number
->       : ^^^^^^
     }
 }
 
-namespace X {
+module X {
 >X : typeof X
->  : ^^^^^^^^
 
-    export namespace Y {
+    export module Y {
 >Y : typeof Y
->  : ^^^^^^^^
 
-        export namespace Z {
+        export module Z {
 >Z : typeof Z
->  : ^^^^^^^^
 
             // expected error
             export class Line {
 >Line : Z.Line
->     : ^^^^^^
 
                 name: string;
 >name : string
->     : ^^^^^^
             }
         }
     }

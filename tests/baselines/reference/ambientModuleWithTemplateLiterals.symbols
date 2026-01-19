@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/ambientModuleWithTemplateLiterals.ts] ////
-
-=== ambientModuleWithTemplateLiterals.ts ===
-declare namespace Foo {
+=== tests/cases/compiler/ambientModuleWithTemplateLiterals.ts ===
+declare module Foo {
 >Foo : Symbol(Foo, Decl(ambientModuleWithTemplateLiterals.ts, 0, 0))
 
     enum Bar {
->Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 23))
+>Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 20))
 
         a = `1`,
 >a : Symbol(Bar.a, Decl(ambientModuleWithTemplateLiterals.ts, 1, 14))
@@ -26,17 +24,17 @@ declare namespace Foo {
     export const c = Bar.a;
 >c : Symbol(c, Decl(ambientModuleWithTemplateLiterals.ts, 10, 16))
 >Bar.a : Symbol(Bar.a, Decl(ambientModuleWithTemplateLiterals.ts, 1, 14))
->Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 23))
+>Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 20))
 >a : Symbol(Bar.a, Decl(ambientModuleWithTemplateLiterals.ts, 1, 14))
 
     export const d = Bar['b'];
 >d : Symbol(d, Decl(ambientModuleWithTemplateLiterals.ts, 11, 16))
->Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 23))
+>Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 20))
 >'b' : Symbol(Bar.b, Decl(ambientModuleWithTemplateLiterals.ts, 2, 16))
 
     export const e = Bar[`c`];
 >e : Symbol(e, Decl(ambientModuleWithTemplateLiterals.ts, 12, 16))
->Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 23))
+>Bar : Symbol(Bar, Decl(ambientModuleWithTemplateLiterals.ts, 0, 20))
 >`c` : Symbol(Bar.c, Decl(ambientModuleWithTemplateLiterals.ts, 3, 16))
 }
 

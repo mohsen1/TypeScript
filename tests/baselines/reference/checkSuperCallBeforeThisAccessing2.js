@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkSuperCallBeforeThisAccessing2.ts] ////
-
 //// [checkSuperCallBeforeThisAccessing2.ts]
 class Based { }
 class Derived extends Based {

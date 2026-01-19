@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/complicatedIndexesOfIntersectionsAreInferencable.ts] ////
-
 //// [complicatedIndexesOfIntersectionsAreInferencable.ts]
 interface FormikConfig<Values> {
     initialValues: Values;

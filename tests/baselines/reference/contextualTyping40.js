@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTyping40.ts] ////
-
 //// [contextualTyping40.ts]
 var foo = <{():number; (i:number):number; }> function(){return 1;};
 

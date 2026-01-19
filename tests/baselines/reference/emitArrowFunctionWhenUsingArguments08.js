@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/arrowFunction/emitArrowFunctionWhenUsingArguments08.ts] ////
-
 //// [emitArrowFunctionWhenUsingArguments08.ts]
 function f(arguments) {
     var a = () => (arguments) => arguments;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignToEnum.ts] ////
-
 //// [assignToEnum.ts]
 enum A { foo, bar }
 A = undefined;  // invalid LHS

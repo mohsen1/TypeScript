@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/statements/continueStatements/doWhileContinueStatements.ts] ////
-
-=== doWhileContinueStatements.ts ===
+=== tests/cases/conformance/statements/continueStatements/doWhileContinueStatements.ts ===
 do {
     continue;
 } while(true)

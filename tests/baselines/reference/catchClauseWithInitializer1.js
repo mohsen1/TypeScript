@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/catchClauseWithInitializer1.ts] ////
-
 //// [catchClauseWithInitializer1.ts]
 try {
 }

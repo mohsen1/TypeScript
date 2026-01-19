@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocReturnTag2.ts] ////
-
 //// [returns.js]
 // @ts-check
 /**
@@ -15,7 +13,6 @@ function f() {
 function f1() {
     return 5 || true;
 }
-
 
 //// [dummy.js]
 // @ts-check

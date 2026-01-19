@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/genericRestTypes.ts] ////
-
-=== genericRestTypes.ts ===
+=== tests/cases/compiler/genericRestTypes.ts ===
 // Repro from #25793
 
 // Gets the parameters of a function type as a tuple

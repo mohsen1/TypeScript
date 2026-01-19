@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/contextuallyTypeArgumentsKeyword.ts] ////
-
-=== foo.js ===
+=== tests/cases/compiler/foo.js ===
 // Repro for #16585
 const x = {
 >x : Symbol(x, Decl(foo.js, 1, 5))

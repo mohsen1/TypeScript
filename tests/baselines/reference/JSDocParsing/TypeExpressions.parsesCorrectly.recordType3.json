@@ -18,6 +18,7 @@
                 "pos": 2,
                 "end": 5,
                 "flags": "JSDoc",
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "foo"
             },
@@ -26,6 +27,7 @@
                 "pos": 6,
                 "end": 13,
                 "flags": "JSDoc",
+                "modifierFlagsCache": 0,
                 "transformFlags": 1
             }
         },

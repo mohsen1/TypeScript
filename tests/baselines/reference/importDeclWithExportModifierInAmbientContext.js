@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/importDeclWithExportModifierInAmbientContext.ts] ////
-
 //// [importDeclWithExportModifierInAmbientContext.ts]
 declare module "m" {
-    namespace x {
+    module x {
         interface c {
         }
     }

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/classExpressionNames.ts] ////
-
-=== ts.ts ===
+=== tests/cases/compiler/ts.ts ===
 var o = {
 >o : Symbol(o, Decl(ts.ts, 0, 3))
 

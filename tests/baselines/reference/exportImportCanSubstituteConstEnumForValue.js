@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/exportImportCanSubstituteConstEnumForValue.ts] ////
-
 //// [exportImportCanSubstituteConstEnumForValue.ts]
-namespace MsPortalFx.ViewModels.Dialogs {
+module MsPortalFx.ViewModels.Dialogs {
 
     export const enum DialogResult {
         Abort,
@@ -31,7 +29,7 @@ namespace MsPortalFx.ViewModels.Dialogs {
 }
 
 
-namespace MsPortalFx.ViewModels {
+module MsPortalFx.ViewModels {
 
     /**
      * For some reason javascript code is emitted for this re-exported const enum.
@@ -79,9 +77,9 @@ var MsPortalFx;
         var SomeUsagesOfTheseConsts = /** @class */ (function () {
             function SomeUsagesOfTheseConsts() {
                 // these do get replaced by the const value
-                var value1 = 1 /* ReExportedEnum.Cancel */;
+                var value1 = 1 /* Cancel */;
                 console.log(value1);
-                var value2 = 2 /* DialogButtons.OKCancel */;
+                var value2 = 2 /* OKCancel */;
                 console.log(value2);
             }
             return SomeUsagesOfTheseConsts;
@@ -92,7 +90,7 @@ var MsPortalFx;
 
 
 //// [exportImportCanSubstituteConstEnumForValue.d.ts]
-declare namespace MsPortalFx.ViewModels.Dialogs {
+declare module MsPortalFx.ViewModels.Dialogs {
     const enum DialogResult {
         Abort = 0,
         Cancel = 1,
@@ -115,7 +113,7 @@ declare namespace MsPortalFx.ViewModels.Dialogs {
         YesNoCancel = 5
     }
 }
-declare namespace MsPortalFx.ViewModels {
+declare module MsPortalFx.ViewModels {
     /**
      * For some reason javascript code is emitted for this re-exported const enum.
      */

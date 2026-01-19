@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/duplicateLabel4.ts] ////
-
-=== duplicateLabel4.ts ===
-
+=== tests/cases/compiler/duplicateLabel4.ts ===
 target:
-while (true) {
-}
-
-target: 
-while (true) {
-}
+No type information for this code.while (true) {
+No type information for this code.}
+No type information for this code.
+No type information for this code.target: 
+No type information for this code.while (true) {
+No type information for this code.}
+No type information for this code.

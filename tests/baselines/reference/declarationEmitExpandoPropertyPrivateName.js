@@ -12,15 +12,17 @@ q.val = f();
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.f = f;
+exports.__esModule = true;
+exports.f = void 0;
 function f() { return null; }
+exports.f = f;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.q = q;
+exports.__esModule = true;
+exports.q = void 0;
 var a_1 = require("./a");
 function q() { }
+exports.q = q;
 q.val = (0, a_1.f)();
 
 

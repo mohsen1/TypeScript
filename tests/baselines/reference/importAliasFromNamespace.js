@@ -9,7 +9,7 @@ namespace My.Internal {
 }
 
 //// [usage.ts]
-/// <reference path="./internal.ts" preserve="true" />
+/// <reference path="./internal.ts" />
 namespace SomeOther.Thing {
     import Internal = My.Internal;
     export class Foo {
@@ -31,7 +31,7 @@ var My;
     })(Internal = My.Internal || (My.Internal = {}));
 })(My || (My = {}));
 //// [usage.js]
-/// <reference path="./internal.ts" preserve="true" />
+/// <reference path="./internal.ts" />
 var SomeOther;
 (function (SomeOther) {
     var Thing;
@@ -40,7 +40,7 @@ var SomeOther;
         var Foo = /** @class */ (function () {
             function Foo() {
                 Internal.getThing();
-                0 /* Internal.WhichThing.A */ ? "foo" : "bar";
+                0 /* A */ ? "foo" : "bar";
             }
             return Foo;
         }());
@@ -59,7 +59,7 @@ declare namespace My.Internal {
     }
 }
 //// [usage.d.ts]
-/// <reference path="internal.d.ts" preserve="true" />
+/// <reference path="internal.d.ts" />
 declare namespace SomeOther.Thing {
     class Foo {
         private _which;

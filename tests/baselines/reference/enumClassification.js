@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/enums/enumClassification.ts] ////
-
 //// [enumClassification.ts]
 // An enum type where each member has no initializer or an initializer that specififes
 // a numeric literal, a string literal, or a single identifier naming another member in

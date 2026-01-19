@@ -1,10 +1,10 @@
-assignFromNumberInterface.ts(3,1): error TS2322: Type 'Number' is not assignable to type 'number'.
+tests/cases/conformance/types/primitives/number/assignFromNumberInterface.ts(3,1): error TS2322: Type 'Number' is not assignable to type 'number'.
   'number' is a primitive, but 'Number' is a wrapper object. Prefer using 'number' when possible.
 
 
-==== assignFromNumberInterface.ts (1 errors) ====
+==== tests/cases/conformance/types/primitives/number/assignFromNumberInterface.ts (1 errors) ====
     var x = 1;
-    declare var a: Number;
+    var a: Number;
     x = a;
     ~
 !!! error TS2322: Type 'Number' is not assignable to type 'number'.

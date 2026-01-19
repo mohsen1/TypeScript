@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/augmentedTypesEnum2.ts] ////
-
 //// [augmentedTypesEnum2.ts]
 // enum then interface
 enum e1 { One } // error

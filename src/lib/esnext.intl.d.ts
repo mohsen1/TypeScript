@@ -1,3 +1,3 @@
 declare namespace Intl {
-    // Empty
+   // Empty for now
 }

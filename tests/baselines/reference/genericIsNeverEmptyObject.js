@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericIsNeverEmptyObject.ts] ////
-
 //// [genericIsNeverEmptyObject.ts]
 // Repro from #29067
 

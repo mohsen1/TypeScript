@@ -1,20 +1,18 @@
-//// [tests/cases/compiler/cloduleTest2.ts] ////
-
 //// [cloduleTest2.ts]
-namespace T1 {
-    namespace m3d { export var y = 2; }
+module T1 {
+    module m3d { export var y = 2; }
     declare class m3d { constructor(foo); foo(): void ; static bar(); }
     var r = new m3d(); // error
 }
 
-namespace T2 {
+module T2 {
     declare class m3d { constructor(foo); foo(): void; static bar(); }
-    namespace m3d { export var y = 2; }
+    module m3d { export var y = 2; }
     var r = new m3d(); // error
 }
 
-namespace T3 {
-    namespace m3d { export var y = 2; }
+module T3 {
+    module m3d { export var y = 2; }
     declare class m3d { foo(): void; static bar(); }
     var r = new m3d();
     r.foo();
@@ -22,16 +20,16 @@ namespace T3 {
     r.y; // error
 }
 
-namespace T4 {
+module T4 {
     declare class m3d { foo(): void; static bar(); }
-    namespace m3d { export var y = 2; }
+    module m3d { export var y = 2; }
     var r = new m3d();
     r.foo();
     r.bar(); // error
     r.y; // error
 }
 
-namespace m3d { export var y = 2; }
+module m3d { export var y = 2; }
 declare class m3d { constructor(foo); foo(): void; static bar(); }
 var r = new m3d(); // error
 

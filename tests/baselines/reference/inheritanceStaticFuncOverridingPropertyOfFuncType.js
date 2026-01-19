@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceStaticFuncOverridingPropertyOfFuncType.ts] ////
-
 //// [inheritanceStaticFuncOverridingPropertyOfFuncType.ts]
 class a {
     static x: () => string;

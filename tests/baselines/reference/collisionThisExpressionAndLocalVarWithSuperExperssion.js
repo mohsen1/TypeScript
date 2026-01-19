@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionThisExpressionAndLocalVarWithSuperExperssion.ts] ////
-
 //// [collisionThisExpressionAndLocalVarWithSuperExperssion.ts]
 class a {
     public foo() {

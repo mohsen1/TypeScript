@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithOnlyNullValueOrUndefinedValue.ts] ////
-
 //// [additionOperatorWithOnlyNullValueOrUndefinedValue.ts]
 // bug 819721
 var r1 = null + null;

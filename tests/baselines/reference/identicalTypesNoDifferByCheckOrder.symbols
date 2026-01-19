@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/identicalTypesNoDifferByCheckOrder.ts] ////
-
-=== identicalTypesNoDifferByCheckOrder.ts ===
+=== tests/cases/compiler/identicalTypesNoDifferByCheckOrder.ts ===
 interface SomeProps {
 >SomeProps : Symbol(SomeProps, Decl(identicalTypesNoDifferByCheckOrder.ts, 0, 0))
 

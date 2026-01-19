@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/internalAliasUninitializedModule.ts] ////
-
 //// [internalAliasUninitializedModule.ts]
-namespace a {
-    export namespace b {
+module a {
+    export module b {
         export interface I {
             foo();
         }
     }
 }
 
-namespace c {
+module c {
     import b = a.b;
     export var x: b.I;
     x.foo();
@@ -23,14 +21,14 @@ var c;
 
 
 //// [internalAliasUninitializedModule.d.ts]
-declare namespace a {
-    namespace b {
+declare module a {
+    module b {
         interface I {
             foo(): any;
         }
     }
 }
-declare namespace c {
+declare module c {
     import b = a.b;
     var x: b.I;
 }

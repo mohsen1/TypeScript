@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/copyrightWithoutNewLine1.ts] ////
-
 //// [copyrightWithoutNewLine1.ts]
 /*****************************
 * (c) Copyright - Important
@@ -11,13 +9,11 @@ var greeter = new model.Greeter(el);
 greeter.start();
 
 //// [copyrightWithoutNewLine1.js]
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-/*****************************
-* (c) Copyright - Important
-****************************/
-var model = require("./greeter");
-var el = document.getElementById('content');
-var greeter = new model.Greeter(el);
-/** things */
-greeter.start();
+define(["require", "exports", "./greeter"], function (require, exports, model) {
+    "use strict";
+    exports.__esModule = true;
+    var el = document.getElementById('content');
+    var greeter = new model.Greeter(el);
+    /** things */
+    greeter.start();
+});

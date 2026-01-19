@@ -1,10 +1,10 @@
-ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(4,12): error TS2300: Duplicate identifier 'Origin'.
-ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(8,16): error TS2300: Duplicate identifier 'Origin'.
-ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(16,16): error TS2300: Duplicate identifier 'Origin'.
-ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(20,20): error TS2300: Duplicate identifier 'Origin'.
+tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(4,12): error TS2300: Duplicate identifier 'Origin'.
+tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(8,16): error TS2300: Duplicate identifier 'Origin'.
+tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(16,16): error TS2300: Duplicate identifier 'Origin'.
+tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(20,20): error TS2300: Duplicate identifier 'Origin'.
 
 
-==== ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts (4 errors) ====
+==== tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts (4 errors) ====
     class Point {
         constructor(public x: number, public y: number) { }
     
@@ -13,14 +13,14 @@ ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(20,20):
 !!! error TS2300: Duplicate identifier 'Origin'.
     }
     
-    namespace Point {
+    module Point {
         export var Origin = ""; //expected duplicate identifier error
                    ~~~~~~
 !!! error TS2300: Duplicate identifier 'Origin'.
     }
     
     
-    namespace A {
+    module A {
         export class Point {
             constructor(public x: number, public y: number) { }
     
@@ -29,7 +29,7 @@ ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts(20,20):
 !!! error TS2300: Duplicate identifier 'Origin'.
         }
     
-        export namespace Point {
+        export module Point {
             export var Origin = ""; //expected duplicate identifier error
                        ~~~~~~
 !!! error TS2300: Duplicate identifier 'Origin'.

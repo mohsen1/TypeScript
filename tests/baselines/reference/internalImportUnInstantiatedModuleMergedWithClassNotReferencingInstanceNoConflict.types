@@ -1,25 +1,18 @@
-//// [tests/cases/compiler/internalImportUnInstantiatedModuleMergedWithClassNotReferencingInstanceNoConflict.ts] ////
-
-=== internalImportUnInstantiatedModuleMergedWithClassNotReferencingInstanceNoConflict.ts ===
+=== tests/cases/compiler/internalImportUnInstantiatedModuleMergedWithClassNotReferencingInstanceNoConflict.ts ===
 class A {
 >A : A
->  : ^
 
     aProp: string;
 >aProp : string
->      : ^^^^^^
 }
-namespace A {
+module A {
     export interface X { s: string }
 >s : string
->  : ^^^^^^
 }
 
-namespace B {
+module B {
     import Y = A;
 >Y : typeof Y
->  : ^^^^^^^^
 >A : Y
->  : ^
 }
 

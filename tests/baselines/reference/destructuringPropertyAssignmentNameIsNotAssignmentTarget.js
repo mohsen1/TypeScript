@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringPropertyAssignmentNameIsNotAssignmentTarget.ts] ////
-
 //// [destructuringPropertyAssignmentNameIsNotAssignmentTarget.ts]
 // test for #10668
 function qux(bar: { value: number }) {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypeArrayReturnType.ts] ////
-
 //// [contextualTypeArrayReturnType.ts]
 interface IBookStyle {
     initialLeftPageTransforms?: (width: number) => NamedTransform[];

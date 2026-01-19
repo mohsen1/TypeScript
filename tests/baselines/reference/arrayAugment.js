@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayAugment.ts] ////
-
 //// [arrayAugment.ts]
 interface Array<T> {
     split: (parts: number) => T[][];

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/classExtendingQualifiedName.ts] ////
-
 //// [classExtendingQualifiedName.ts]
-namespace M {
+module M {
     class C {
     }
 

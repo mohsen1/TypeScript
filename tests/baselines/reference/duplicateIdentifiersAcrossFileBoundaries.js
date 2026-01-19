@@ -11,8 +11,8 @@ class Foo {
     static x: number;
 }
 
-namespace N {
-    export namespace F {
+module N {
+    export module F {
         var t;
     }
 }
@@ -24,11 +24,11 @@ function C2() { } // error -- cannot merge function with non-ambient class
 class f { } // error -- cannot merge function with non-ambient class
 var v = 3;
 
-namespace Foo {
+module Foo {
     export var x: number; // error for redeclaring var in a different parent
 }
 
-declare namespace N {
+declare module N {
     export function F(); // no error because function is ambient
 }
 
@@ -88,8 +88,8 @@ declare var v: number;
 declare class Foo {
     static x: number;
 }
-declare namespace N {
-    namespace F {
+declare module N {
+    module F {
     }
 }
 //// [file2.d.ts]
@@ -101,9 +101,9 @@ declare function C2(): void;
 declare class f {
 }
 declare var v: number;
-declare namespace Foo {
+declare module Foo {
     var x: number;
 }
-declare namespace N {
+declare module N {
     function F(): any;
 }

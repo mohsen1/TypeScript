@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkInfiniteExpansionTermination.ts] ////
-
 //// [checkInfiniteExpansionTermination.ts]
 // Regression test for #1002
 // Before fix this code would cause infinite loop

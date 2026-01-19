@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/importInTypePosition.ts] ////
-
 //// [importInTypePosition.ts]
-namespace A {
+module A {
     export class Point {
         constructor(public x: number, public y: number) { }
     }
@@ -9,12 +7,12 @@ namespace A {
 }
 
 // no code gen expected
-namespace B {
+module B {
 
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
 }
 // no code gen expected
-namespace C {
+module C {
 
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
     var m: typeof a;

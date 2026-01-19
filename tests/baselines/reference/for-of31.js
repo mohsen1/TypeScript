@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/es6/for-ofStatements/for-of31.ts] ////
-
 //// [for-of31.ts]
-class MyStringIterator {
+class StringIterator {
     next() {
         return {
             // no done property
@@ -14,10 +12,10 @@ class MyStringIterator {
     }
 }
 
-for (var v of new MyStringIterator) { }
+for (var v of new StringIterator) { }
 
 //// [for-of31.js]
-class MyStringIterator {
+class StringIterator {
     next() {
         return {
             // no done property
@@ -28,4 +26,4 @@ class MyStringIterator {
         return this;
     }
 }
-for (var v of new MyStringIterator) { }
+for (var v of new StringIterator) { }

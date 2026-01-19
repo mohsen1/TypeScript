@@ -1,38 +1,36 @@
-//// [tests/cases/compiler/duplicateIdentifiersAcrossContainerBoundaries.ts] ////
-
 //// [duplicateIdentifiersAcrossContainerBoundaries.ts]
-namespace M {
+module M {
     export interface I { }
 }
-namespace M {
+module M {
     export class I { }
 }
 
-namespace M {
+module M {
     export function f() { }
 }
-namespace M {
+module M {
     export class f { } // error
 }
 
-namespace M {
+module M {
     function g() { }
 }
-namespace M {
+module M {
     export class g { } // no error
 }
 
-namespace M {
+module M {
     export class C { }
 }
-namespace M {
+module M {
     function C() { } // no error
 }
 
-namespace M {
+module M {
     export var v = 3;
 }
-namespace M {
+module M {
     export var v = 3; // error for redeclaring var in a different parent
 }
 
@@ -40,16 +38,16 @@ class Foo {
     static x: number;
 }
 
-namespace Foo {
+module Foo {
     export var x: number; // error for redeclaring var in a different parent
 }
 
-namespace N {
-    export namespace F {
+module N {
+    export module F {
         var t;
     }
 }
-declare namespace N {
+declare module N {
     export function F(); // no error because function is ambient
 }
 

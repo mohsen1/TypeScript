@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-inStatements/for-inStatements.ts] ////
-
 //// [for-inStatements.ts]
 var aString: string;
 for (aString in {}) { }
@@ -67,7 +65,7 @@ var i: I;
 for (var x in i[42]) { } 
 
 
-namespace M {
+module M {
     export class X<T> {
         name:string
     }

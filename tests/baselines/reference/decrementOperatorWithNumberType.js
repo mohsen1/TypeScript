@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/decrementOperator/decrementOperatorWithNumberType.ts] ////
-
 //// [decrementOperatorWithNumberType.ts]
 // -- operator on number type
 var NUMBER: number;
@@ -8,7 +6,7 @@ var NUMBER1: number[] = [1, 2];
 class A {
     public a: number;
 }
-namespace M {
+module M {
     export var n: number;
 }
 

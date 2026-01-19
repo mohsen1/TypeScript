@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceImplementation1.ts] ////
-
 //// [interfaceImplementation1.ts]
 interface I1 {
     iObj:{ };
@@ -16,8 +14,8 @@ class C1 implements I1,I2 {
     private iFn();
 	private iFn(n?:number, s?:string) { }
     private iAny:any;
-    private iNum!:number;
-    private iObj!:{ };
+    private iNum:number;
+    private iObj:{ };
 }
 
 interface I3 {
@@ -43,7 +41,7 @@ new a();
 new b();
 */
 
-declare var c:I4;
+var c:I4;
 c[5];
 c["foo"];
 
@@ -65,5 +63,9 @@ var a = function () {
     return new C2();
 };
 new a();
+/*var b:I4 = C2;
+new b();
+*/
+var c;
 c[5];
 c["foo"];

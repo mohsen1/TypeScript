@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/internalAliasVarInsideTopLevelModuleWithoutExport.ts] ////
-
 //// [internalAliasVarInsideTopLevelModuleWithoutExport.ts]
-export namespace a {
+export module a {
     export var x = 10;
 }
 
@@ -12,18 +10,18 @@ export var bVal = b;
 
 //// [internalAliasVarInsideTopLevelModuleWithoutExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.bVal = exports.a = void 0;
 var a;
 (function (a) {
     a.x = 10;
-})(a || (exports.a = a = {}));
+})(a = exports.a || (exports.a = {}));
 var b = a.x;
 exports.bVal = b;
 
 
 //// [internalAliasVarInsideTopLevelModuleWithoutExport.d.ts]
-export declare namespace a {
+export declare module a {
     var x: number;
 }
 export declare var bVal: number;

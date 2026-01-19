@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/bitwiseNotOperator/bitwiseNotOperatorWithStringType.ts] ////
-
 //// [bitwiseNotOperatorWithStringType.ts]
 // ~ operator on string type
 var STRING: string;
@@ -11,7 +9,7 @@ class A {
     public a: string;
     static foo() { return ""; }
 }
-namespace M {
+module M {
     export var n: string;
 }
 

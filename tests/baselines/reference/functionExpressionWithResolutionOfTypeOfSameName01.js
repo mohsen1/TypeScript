@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionExpressionWithResolutionOfTypeOfSameName01.ts] ////
-
 //// [functionExpressionWithResolutionOfTypeOfSameName01.ts]
 interface f {
 }

@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/genericOfACloduleType1.ts] ////
-
 //// [genericOfACloduleType1.ts]
 class G<T>{ bar(x: T) { return x; } }
-namespace M {
+module M {
     export class C { foo() { } }
-    export namespace C {
+    export module C {
         export class X {
         }
     }

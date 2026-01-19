@@ -1,15 +1,13 @@
-error TS5107: Option 'moduleResolution=classic' is deprecated and will stop functioning in TypeScript 7.0. Specify compilerOption '"ignoreDeprecations": "6.0"' to silence this error.
-external.ts(1,1): error TS2343: This syntax requires an imported helper named '__exportStar' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(3,16): error TS2343: This syntax requires an imported helper named '__extends' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(7,1): error TS2343: This syntax requires an imported helper named '__decorate' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(7,1): error TS2343: This syntax requires an imported helper named '__metadata' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(9,12): error TS2343: This syntax requires an imported helper named '__param' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(14,13): error TS2343: This syntax requires an imported helper named '__assign' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
-external.ts(15,12): error TS2343: This syntax requires an imported helper named '__rest' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(1,1): error TS2343: This syntax requires an imported helper named '__exportStar' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(3,16): error TS2343: This syntax requires an imported helper named '__extends' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(7,1): error TS2343: This syntax requires an imported helper named '__decorate' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(7,1): error TS2343: This syntax requires an imported helper named '__metadata' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(9,12): error TS2343: This syntax requires an imported helper named '__param' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(14,13): error TS2343: This syntax requires an imported helper named '__assign' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
+tests/cases/compiler/external.ts(15,12): error TS2343: This syntax requires an imported helper named '__rest' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
 
 
-!!! error TS5107: Option 'moduleResolution=classic' is deprecated and will stop functioning in TypeScript 7.0. Specify compilerOption '"ignoreDeprecations": "6.0"' to silence this error.
-==== external.ts (7 errors) ====
+==== tests/cases/compiler/external.ts (7 errors) ====
     export * from "./other";
     ~~~~~~~~~~~~~~~~~~~~~~~~
 !!! error TS2343: This syntax requires an imported helper named '__exportStar' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
@@ -40,10 +38,10 @@ external.ts(15,12): error TS2343: This syntax requires an imported helper named 
                ~
 !!! error TS2343: This syntax requires an imported helper named '__rest' which does not exist in 'tslib'. Consider upgrading your version of 'tslib'.
     
-==== other.ts (0 errors) ====
+==== tests/cases/compiler/other.ts (0 errors) ====
     export const x = 1;
     
-==== script.ts (0 errors) ====
+==== tests/cases/compiler/script.ts (0 errors) ====
     class A { }
     class B extends A { }
     
@@ -55,6 +53,6 @@ external.ts(15,12): error TS2343: This syntax requires an imported helper named 
         }
     }
     
-==== tslib.d.ts (0 errors) ====
+==== tests/cases/compiler/tslib.d.ts (0 errors) ====
     export {}
     

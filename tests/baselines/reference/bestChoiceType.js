@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/bestChoiceType.ts] ////
-
 //// [bestChoiceType.ts]
 // Repro from #10041
 

@@ -17,4 +17,4 @@ var Foo = /** @class */ (function () {
 module.exports = Foo;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

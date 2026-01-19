@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkSwitchStatementIfCaseTypeIsString.ts] ////
-
 //// [checkSwitchStatementIfCaseTypeIsString.ts]
 declare function use(a: any): void;
 

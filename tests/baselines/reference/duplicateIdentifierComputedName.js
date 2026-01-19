@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateIdentifierComputedName.ts] ////
-
 //// [duplicateIdentifierComputedName.ts]
 class C {
     ["a"]: string;

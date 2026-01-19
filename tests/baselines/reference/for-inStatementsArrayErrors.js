@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/statements/for-inStatements/for-inStatementsArrayErrors.ts] ////
-
 //// [for-inStatementsArrayErrors.ts]
-declare let a: Date[];
+let a: Date[];
 
 for (let x in a) {
     let a1 = a[x + 1];
@@ -21,6 +19,7 @@ for (var j in a ) {
 
 
 //// [for-inStatementsArrayErrors.js]
+var a;
 for (var x in a) {
     var a1 = a[x + 1];
     var a2 = a[x - 1];

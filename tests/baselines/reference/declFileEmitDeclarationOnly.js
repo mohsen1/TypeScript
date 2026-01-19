@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileEmitDeclarationOnly.ts] ////
-
 //// [helloworld.ts]
 const Log = {
   info(msg: string) {}

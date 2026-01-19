@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/incrementOnTypeParameter.ts] ////
-
 //// [incrementOnTypeParameter.ts]
 class C<T> {
-    a!: T;
+    a: T;
     foo() {
         this.a++; 
-        for (var i: T = this.a, j = 0; j < 10; i++) { 
+        for (var i: T, j = 0; j < 10; i++) { 
         }
     }
 }
@@ -17,7 +15,7 @@ var C = /** @class */ (function () {
     }
     C.prototype.foo = function () {
         this.a++;
-        for (var i = this.a, j = 0; j < 10; i++) {
+        for (var i, j = 0; j < 10; i++) {
         }
     };
     return C;

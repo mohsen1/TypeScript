@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumWithQuotedElementName1.ts] ////
-
 //// [enumWithQuotedElementName1.ts]
 enum E {
    'fo"o',

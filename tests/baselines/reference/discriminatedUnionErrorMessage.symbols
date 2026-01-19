@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/discriminatedUnionErrorMessage.ts] ////
-
-=== discriminatedUnionErrorMessage.ts ===
+=== tests/cases/compiler/discriminatedUnionErrorMessage.ts ===
 type Square = { kind: "sq", size: number }
 >Square : Symbol(Square, Decl(discriminatedUnionErrorMessage.ts, 0, 0))
 >kind : Symbol(kind, Decl(discriminatedUnionErrorMessage.ts, 0, 15))

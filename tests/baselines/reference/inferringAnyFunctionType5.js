@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferringAnyFunctionType5.ts] ////
-
 //// [inferringAnyFunctionType5.ts]
 function f<T extends { q: (p1: number) => number }>(p: T): T {
     return p;

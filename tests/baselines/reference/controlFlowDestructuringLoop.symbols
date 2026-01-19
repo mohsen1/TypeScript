@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/controlFlowDestructuringLoop.ts] ////
-
-=== controlFlowDestructuringLoop.ts ===
+=== tests/cases/compiler/controlFlowDestructuringLoop.ts ===
 // Repro from #28758
 
 interface NumVal { val: number; }

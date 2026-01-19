@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritedGenericCallSignature.ts] ////
-
 //// [inheritedGenericCallSignature.ts]
 interface I1<T> {
 

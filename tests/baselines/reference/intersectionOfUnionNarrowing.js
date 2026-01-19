@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionOfUnionNarrowing.ts] ////
-
 //// [intersectionOfUnionNarrowing.ts]
 interface X {
   a?: { aProp: string };

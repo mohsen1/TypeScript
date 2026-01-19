@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/interfaceInheritance2.ts] ////
-
-=== interfaceInheritance2.ts ===
+=== tests/cases/compiler/interfaceInheritance2.ts ===
 interface I6 {
  ():void;
 }
@@ -9,11 +7,8 @@ interface I7 extends I6 { }
 
 var v1:I7;
 >v1 : I7
->   : ^^
 
 v1();
 >v1() : void
->     : ^^^^
 >v1 : I7
->   : ^^
 

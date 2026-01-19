@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/genericArgumentCallSigAssignmentCompat.ts] ////
-
 //// [genericArgumentCallSigAssignmentCompat.ts]
-namespace Underscore {
+module Underscore {
     export interface Iterator<T, U> {
         (value: T, index: any, list: any): U;
     }

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/checkJsFiles_skipDiagnostics.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 var x = 0;
 >x : Symbol(x, Decl(a.js, 0, 3))
 

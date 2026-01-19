@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportClassWithInaccessibleTypeInTypeParameterConstraint.ts] ////
-
 //// [ExportClassWithInaccessibleTypeInTypeParameterConstraint.ts]
-namespace A {
+module A {
 
     class Point {
         x: number;

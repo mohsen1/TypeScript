@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitFBoundedTypeParams.ts] ////
-
 //// [declarationEmitFBoundedTypeParams.ts]
 // Repro from #6040
 

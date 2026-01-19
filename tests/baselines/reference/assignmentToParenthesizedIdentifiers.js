@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/valuesAndReferences/assignmentToParenthesizedIdentifiers.ts] ////
-
 //// [assignmentToParenthesizedIdentifiers.ts]
 var x: number;
 x = 3; // OK
@@ -7,7 +5,7 @@ x = 3; // OK
 x = ''; // Error
 (x) = ''; // Error
 
-namespace M {
+module M {
     export var y: number;
 }
 M.y = 3; // OK
@@ -20,8 +18,8 @@ M.y = ''; // Error
 M = { y: 3 }; // Error
 (M) = { y: 3 }; // Error
 
-namespace M2 {
-    export namespace M3 {
+module M2 {
+    export module M3 {
         export var x: number;
     }
 

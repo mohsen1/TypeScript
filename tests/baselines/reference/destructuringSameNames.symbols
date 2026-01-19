@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringSameNames.ts] ////
-
-=== destructuringSameNames.ts ===
+=== tests/cases/conformance/es6/destructuring/destructuringSameNames.ts ===
 // Valid cases
 
 let { foo, foo: bar } = { foo: 1 };

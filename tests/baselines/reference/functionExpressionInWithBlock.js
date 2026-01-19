@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionExpressionInWithBlock.ts] ////
-
 //// [functionExpressionInWithBlock.ts]
 function x() {
  with({}) {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emptyTypeArgumentList.ts] ////
-
 //// [emptyTypeArgumentList.ts]
 function foo<T>() { }
 foo<>();

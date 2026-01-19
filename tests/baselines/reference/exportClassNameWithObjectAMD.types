@@ -1,7 +1,4 @@
-//// [tests/cases/conformance/externalModules/exportClassNameWithObjectAMD.ts] ////
-
-=== exportClassNameWithObjectAMD.ts ===
+=== tests/cases/conformance/externalModules/exportClassNameWithObjectAMD.ts ===
 export class Object {}
 >Object : Object
->       : ^^^^^^
 

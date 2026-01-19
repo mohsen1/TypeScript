@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferentialTypingObjectLiteralMethod1.ts] ////
-
 //// [inferentialTypingObjectLiteralMethod1.ts]
 interface Int<T, U> {
     method(x: T): U;

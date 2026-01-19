@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithTypeParameter.ts] ////
-
-=== comparisonOperatorWithTypeParameter.ts ===
+=== tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithTypeParameter.ts ===
 var a: {};
 >a : Symbol(a, Decl(comparisonOperatorWithTypeParameter.ts, 0, 3))
 

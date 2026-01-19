@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileForInterfaceWithRestParams.ts] ////
-
 //// [declFileForInterfaceWithRestParams.ts]
 interface I {
     foo(...x): typeof x;

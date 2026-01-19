@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuringWithOptionalBindingParameters.ts] ////
-
 //// [declarationEmitDestructuringWithOptionalBindingParameters.ts]
 function foo([x,y,z]?: [string, number, boolean]) {
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classExpressions/classExpression5.ts] ////
-
 //// [classExpression5.ts]
 new class {
     hi() {

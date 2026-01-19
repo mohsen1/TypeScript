@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/checkJsdocTypeTagOnExportAssignment7.ts] ////
+=== tests/cases/compiler/checkJsdocTypeTagOnExportAssignment7.js ===
 
-=== checkJsdocTypeTagOnExportAssignment7.js ===
-
-=== a.js ===
+No type information for this code.=== tests/cases/compiler/a.js ===
 /**
  * @typedef {Object} Foo
  * @property {number} a
@@ -11,33 +9,22 @@
 
 const abc = { a: 1, b: 1, c: 1 };
 >abc : { a: number; b: number; c: number; }
->    : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 >{ a: 1, b: 1, c: 1 } : { a: number; b: number; c: number; }
->                     : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 >a : number
->  : ^^^^^^
 >1 : 1
->  : ^
 >b : number
->  : ^^^^^^
 >1 : 1
->  : ^
 >c : number
->  : ^^^^^^
 >1 : 1
->  : ^
 
 /** @type {Foo} */
 export default abc;
 >abc : { a: number; b: number; c: number; }
->    : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-=== b.js ===
+=== tests/cases/compiler/b.js ===
 import a from "./a";
->a : import("a").Foo
->  : ^^^^^^^^^^^^^^^
+>a : import("tests/cases/compiler/a").Foo
 
 a;
->a : import("a").Foo
->  : ^^^^^^^^^^^^^^^
+>a : import("tests/cases/compiler/a").Foo
 

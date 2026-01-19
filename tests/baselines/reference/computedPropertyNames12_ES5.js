@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames12_ES5.ts] ////
-
 //// [computedPropertyNames12_ES5.ts]
 var s: string;
 var n: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionAsWeakTypeSource.ts] ////
-
 //// [intersectionAsWeakTypeSource.ts]
 interface X { x: string }
 interface Y { y: number }

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/importHelpersNoHelpersForPrivateFields.ts] ////
-
-=== main.ts ===
+=== tests/cases/compiler/main.ts ===
 export class Foo {
 >Foo : Symbol(Foo, Decl(main.ts, 0, 0))
 
@@ -22,7 +20,7 @@ export class Foo {
     }
 }
 
-=== tslib.d.ts ===
-
+=== tests/cases/compiler/tslib.d.ts ===
 export {}
-
+No type information for this code.
+No type information for this code.

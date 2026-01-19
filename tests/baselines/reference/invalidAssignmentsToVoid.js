@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/void/invalidAssignmentsToVoid.ts] ////
-
 //// [invalidAssignmentsToVoid.ts]
 var x: void;
 x = 1;
@@ -7,16 +5,16 @@ x = true;
 x = '';
 x = {}
 
-class C { foo!: string; }
-declare var c: C;
+class C { foo: string; }
+var c: C;
 x = C;
 x = c;
 
 interface I { foo: string; }
-declare var i: I;
+var i: I;
 x = i;
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 x = M;
 
 function f<T>(a: T) {
@@ -35,8 +33,10 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var c;
 x = C;
 x = c;
+var i;
 x = i;
 var M;
 (function (M) {

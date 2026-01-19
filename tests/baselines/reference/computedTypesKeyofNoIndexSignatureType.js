@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/computedTypesKeyofNoIndexSignatureType.ts] ////
-
 //// [computedTypesKeyofNoIndexSignatureType.ts]
 type Compute<A> = { [K in keyof A]: Compute<A[K]>; } & {};
 

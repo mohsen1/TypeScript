@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithUndefinedValueAndValidOperator.ts] ////
-
 //// [additionOperatorWithUndefinedValueAndValidOperator.ts]
 // If one operand is the null or undefined value, it is treated as having the type of the other operand.
 
 enum E { a, b, c }
 
-declare var a: any;
-declare var b: number;
-declare var c: E;
-declare var d: string;
+var a: any;
+var b: number;
+var c: E;
+var d: string;
 
 // undefined + any
 var r1: any = undefined + a;
@@ -40,6 +38,10 @@ var E;
     E[E["b"] = 1] = "b";
     E[E["c"] = 2] = "c";
 })(E || (E = {}));
+var a;
+var b;
+var c;
+var d;
 // undefined + any
 var r1 = undefined + a;
 var r2 = a + undefined;

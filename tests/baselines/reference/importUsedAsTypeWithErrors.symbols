@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/importUsedAsTypeWithErrors.ts] ////
-
-=== test.ts ===
+=== tests/cases/compiler/test.ts ===
 export interface T {
 >T : Symbol(T, Decl(test.ts, 0, 0))
 
@@ -8,7 +6,7 @@ export interface T {
 >value : Symbol(T.value, Decl(test.ts, 0, 20))
 }
 
-=== main.ts ===
+=== tests/cases/compiler/main.ts ===
 export const a: import("./test") = null;
 >a : Symbol(a, Decl(main.ts, 0, 12))
 

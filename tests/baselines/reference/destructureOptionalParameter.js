@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructureOptionalParameter.ts] ////
-
 //// [destructureOptionalParameter.ts]
 declare function f1({ a, b }?: { a: number, b: string }): void;
 

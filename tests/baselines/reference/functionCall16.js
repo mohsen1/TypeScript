@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionCall16.ts] ////
-
 //// [functionCall16.ts]
 function foo(a:string, b?:string, ...c:number[]){}
 foo('foo', 1); 

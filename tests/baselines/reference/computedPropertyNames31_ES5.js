@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames31_ES5.ts] ////
-
 //// [computedPropertyNames31_ES5.ts]
 class Base {
     bar() {

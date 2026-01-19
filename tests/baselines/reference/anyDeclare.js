@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/anyDeclare.ts] ////
-
 //// [anyDeclare.ts]
 declare var x: any;
-namespace myMod {
+module myMod {
     var myFn;
     function myFn() {  }
 }

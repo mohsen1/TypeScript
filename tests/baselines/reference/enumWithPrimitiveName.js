@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumWithPrimitiveName.ts] ////
-
 //// [enumWithPrimitiveName.ts]
 enum string { }
 enum number { }

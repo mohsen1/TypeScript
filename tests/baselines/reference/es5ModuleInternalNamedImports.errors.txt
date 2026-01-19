@@ -1,19 +1,19 @@
-es5ModuleInternalNamedImports.ts(22,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(23,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(24,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(25,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(26,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(27,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(28,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(29,5): error TS1194: Export declarations are not permitted in a namespace.
-es5ModuleInternalNamedImports.ts(30,25): error TS1147: Import declarations in a namespace cannot reference a module.
-es5ModuleInternalNamedImports.ts(31,20): error TS1147: Import declarations in a namespace cannot reference a module.
-es5ModuleInternalNamedImports.ts(32,32): error TS1147: Import declarations in a namespace cannot reference a module.
-es5ModuleInternalNamedImports.ts(34,16): error TS2307: Cannot find module 'M3' or its corresponding type declarations.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(22,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(23,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(24,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(25,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(26,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(27,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(28,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(29,5): error TS1194: Export declarations are not permitted in a namespace.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(30,25): error TS1147: Import declarations in a namespace cannot reference a module.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(31,20): error TS1147: Import declarations in a namespace cannot reference a module.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(32,32): error TS1147: Import declarations in a namespace cannot reference a module.
+tests/cases/compiler/es5ModuleInternalNamedImports.ts(34,16): error TS2792: Cannot find module 'M3'. Did you mean to set the 'moduleResolution' option to 'node', or to add aliases to the 'paths' option?
 
 
-==== es5ModuleInternalNamedImports.ts (12 errors) ====
-    export namespace M {
+==== tests/cases/compiler/es5ModuleInternalNamedImports.ts (12 errors) ====
+    export module M {
         // variable
         export var M_V = 0;
         // interface
@@ -21,9 +21,9 @@ es5ModuleInternalNamedImports.ts(34,16): error TS2307: Cannot find module 'M3' o
         //calss
         export class M_C { }
         // instantiated module
-        export namespace M_M { var x; }
+        export module M_M { var x; }
         // uninstantiated module
-        export namespace M_MU { }
+        export module M_MU { }
         // function
         export function M_F() { }
         // enum
@@ -70,5 +70,5 @@ es5ModuleInternalNamedImports.ts(34,16): error TS2307: Cannot find module 'M3' o
     }
     import M3 from "M3";
                    ~~~~
-!!! error TS2307: Cannot find module 'M3' or its corresponding type declarations.
+!!! error TS2792: Cannot find module 'M3'. Did you mean to set the 'moduleResolution' option to 'node', or to add aliases to the 'paths' option?
     

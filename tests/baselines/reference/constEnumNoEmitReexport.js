@@ -30,30 +30,30 @@ MyConstEnum.Foo;
 
 //// [ConstEnum.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 ;
 //// [ImportExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [ImportExportDefault.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [ReExportDefault.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [ReExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [Usage1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-0 /* MyConstEnum1.Foo */;
-0 /* MyConstEnum2.Foo */;
+exports.__esModule = true;
+0 /* Foo */;
+0 /* Foo */;
 //// [Usage2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-0 /* MyConstEnum.Foo */;
+exports.__esModule = true;
+0 /* Foo */;
 //// [Usage3.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-0 /* MyConstEnum.Foo */;
+exports.__esModule = true;
+0 /* Foo */;

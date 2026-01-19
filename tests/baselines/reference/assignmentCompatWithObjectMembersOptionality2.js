@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality2.ts] ////
-
 //// [assignmentCompatWithObjectMembersOptionality2.ts]
 // M is optional and S contains no property with the same name as M
 // N is optional and T contains no property with the same name as N
@@ -8,14 +6,14 @@ class Base { foo: string; }
 class Derived extends Base { bar: string; }
 class Derived2 extends Derived { baz: string; }
 
-namespace TargetHasOptional {
+module TargetHasOptional {
     // targets
     interface C {
         opt?: Base
     }
-    declare var c: C;
+    var c: C;
 
-    declare var a: { opt?: Base; };
+    var a: { opt?: Base; }
     var b: typeof a = { opt: new Base() }
 
     // sources
@@ -28,9 +26,9 @@ namespace TargetHasOptional {
     interface F {
         other?: Derived;
     }
-    declare var d: D;
-    declare var e: E;
-    declare var f: F;
+    var d: D;
+    var e: E;
+    var f: F;
 
     // disallowed by weak type checking
     c = d;
@@ -50,14 +48,14 @@ namespace TargetHasOptional {
     b = c;
 }
 
-namespace SourceHasOptional {
+module SourceHasOptional {
     // targets
     interface C {
         opt: Base
     }
-    declare var c: C;
+    var c: C;
 
-    declare var a: { opt: Base; };
+    var a: { opt: Base; }
     var b = { opt: new Base() }
 
     // sources
@@ -70,9 +68,9 @@ namespace SourceHasOptional {
     interface F {
         other: Derived;
     }
-    declare var d: D;
-    declare var e: E;
-    declare var f: F;
+    var d: D;
+    var e: E;
+    var f: F;
 
     c = d; // error
     c = e; // error
@@ -131,7 +129,12 @@ var Derived2 = /** @class */ (function (_super) {
 }(Derived));
 var TargetHasOptional;
 (function (TargetHasOptional) {
+    var c;
+    var a;
     var b = { opt: new Base() };
+    var d;
+    var e;
+    var f;
     // disallowed by weak type checking
     c = d;
     c = e;
@@ -150,7 +153,12 @@ var TargetHasOptional;
 })(TargetHasOptional || (TargetHasOptional = {}));
 var SourceHasOptional;
 (function (SourceHasOptional) {
+    var c;
+    var a;
     var b = { opt: new Base() };
+    var d;
+    var e;
+    var f;
     c = d; // error
     c = e; // error
     c = f; // error

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asiPublicPrivateProtected.ts] ////
-
 //// [asiPublicPrivateProtected.ts]
 public
 class NonPublicClass {

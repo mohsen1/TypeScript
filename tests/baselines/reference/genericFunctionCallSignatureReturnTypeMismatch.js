@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/genericFunctionCallSignatureReturnTypeMismatch.ts] ////
-
 //// [genericFunctionCallSignatureReturnTypeMismatch.ts]
 interface Array<T> {}
 
-declare var f : { <T>(x:T): T; }
+var f : { <T>(x:T): T; }
 
-declare var g : { <S>() : S[]; };
+var g : { <S>() : S[]; };
 f = g;
 
 var s = f("str").toUpperCase();
@@ -14,6 +12,8 @@ console.log(s);
 
 
 //// [genericFunctionCallSignatureReturnTypeMismatch.js]
+var f;
+var g;
 f = g;
 var s = f("str").toUpperCase();
 console.log(s);

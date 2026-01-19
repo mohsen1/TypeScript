@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithModuleMemberThatUsesClassTypeParameter.ts] ////
-
 //// [ClassAndModuleThatMergeWithModuleMemberThatUsesClassTypeParameter.ts]
 // all expected to be errors
 
@@ -9,7 +7,7 @@ class clodule1<T>{
     value: T;
 }
 
-namespace clodule1 {
+module clodule1 {
     function f(x: T) { }
 }
 
@@ -19,7 +17,7 @@ class clodule2<T>{
     value: T;
 }
 
-namespace clodule2 {
+module clodule2 {
     var x: T;
 
     class D<U extends T>{
@@ -34,7 +32,7 @@ class clodule3<T>{
     value: T;
 }
 
-namespace clodule3 {
+module clodule3 {
     export var y = { id: T };
 }
 
@@ -44,7 +42,7 @@ class clodule4<T>{
     value: T;
 }
 
-namespace clodule4 {
+module clodule4 {
     class D {
         name: T;
     }

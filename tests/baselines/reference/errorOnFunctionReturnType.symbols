@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/errorOnFunctionReturnType.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/foo.js ===
 /**
  * @callback FunctionReturningPromise
  * @returns {Promise<number>}

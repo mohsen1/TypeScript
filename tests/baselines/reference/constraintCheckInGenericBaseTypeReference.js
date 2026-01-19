@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constraintCheckInGenericBaseTypeReference.ts] ////
-
 //// [constraintCheckInGenericBaseTypeReference.ts]
 // No errors
 class Constraint {

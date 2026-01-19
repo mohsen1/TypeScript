@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/salsa/constructorFunctionsStrict.ts] ////
-
-=== a.js ===
+=== tests/cases/conformance/salsa/a.js ===
 /** @param {number} x */
 function C(x) {
 >C : Symbol(C, Decl(a.js, 0, 0))

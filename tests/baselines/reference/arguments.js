@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arguments.ts] ////
-
 //// [arguments.ts]
 function f() {
     var x=arguments[12];

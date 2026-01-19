@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/optionalChaining/callChain/callChainWithSuper.ts] ////
-
 //// [callChainWithSuper.ts]
 // GH#34952
 class Base { method?() {} }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexerA.ts] ////
-
 //// [indexerA.ts]
 class JQueryElement {
     id:string;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberAccessorDeclarations/accessorWithMismatchedAccessibilityModifiers.ts] ////
-
 //// [accessorWithMismatchedAccessibilityModifiers.ts]
 class C {
     get x() {

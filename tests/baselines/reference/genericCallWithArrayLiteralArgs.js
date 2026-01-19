@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericCallWithArrayLiteralArgs.ts] ////
-
 //// [genericCallWithArrayLiteralArgs.ts]
 function foo<T>(t: T) {
     return t;

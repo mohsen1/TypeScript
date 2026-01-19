@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/FunctionDeclaration7.ts] ////
-
 //// [FunctionDeclaration7.ts]
-namespace M {
+module M {
    function foo();
 }
 

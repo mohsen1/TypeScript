@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classUpdateTests.ts] ////
-
 //// [classUpdateTests.ts]
 //
 // test codegen for instance properties
@@ -194,7 +192,7 @@ var G = /** @class */ (function (_super) {
 }(D));
 var H = /** @class */ (function () {
     function H() {
-        return _super.call(this) || this;
+        _this = _super.call(this) || this;
     } // ERROR - no super call allowed
     return H;
 }());
@@ -208,7 +206,7 @@ var I = /** @class */ (function (_super) {
 var J = /** @class */ (function (_super) {
     __extends(J, _super);
     function J(p1) {
-        var _this = _super.call(this) || this; // NO ERROR
+        var _this = _super.call(this) || this;
         _this.p1 = p1;
         return _this;
     }
@@ -228,7 +226,7 @@ var K = /** @class */ (function (_super) {
 var L = /** @class */ (function (_super) {
     __extends(L, _super);
     function L(p1) {
-        var _this = _super.call(this) || this; // NO ERROR
+        var _this = _super.call(this) || this;
         _this.p1 = p1;
         return _this;
     }

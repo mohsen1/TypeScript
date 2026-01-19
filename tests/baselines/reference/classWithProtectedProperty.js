@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/classWithProtectedProperty.ts] ////
-
 //// [classWithProtectedProperty.ts]
 // accessing any protected outside the class is an error
 

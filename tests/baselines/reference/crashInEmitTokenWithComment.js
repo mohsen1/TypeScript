@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/crashInEmitTokenWithComment.ts] ////
-
 //// [crashInEmitTokenWithComment.ts]
 // GH#32358
 const fn = (param: string) => undefined;

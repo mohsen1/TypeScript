@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportNonLocalDeclarations.ts] ////
-
 //// [exportNonLocalDeclarations.ts]
 export { string };
 export type { number };
@@ -7,5 +5,5 @@ export type { number };
 
 //// [exportNonLocalDeclarations.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.string = void 0;

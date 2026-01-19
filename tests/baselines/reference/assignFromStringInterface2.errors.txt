@@ -1,10 +1,9 @@
-assignFromStringInterface2.ts(42,1): error TS2740: Type 'NotString' is missing the following properties from type 'String': codePointAt, includes, endsWith, normalize, and 16 more.
-assignFromStringInterface2.ts(47,1): error TS2322: Type 'String' is not assignable to type 'string'.
+tests/cases/conformance/types/primitives/string/assignFromStringInterface2.ts(47,1): error TS2322: Type 'String' is not assignable to type 'string'.
   'string' is a primitive, but 'String' is a wrapper object. Prefer using 'string' when possible.
-assignFromStringInterface2.ts(48,1): error TS2322: Type 'NotString' is not assignable to type 'string'.
+tests/cases/conformance/types/primitives/string/assignFromStringInterface2.ts(48,1): error TS2322: Type 'NotString' is not assignable to type 'string'.
 
 
-==== assignFromStringInterface2.ts (3 errors) ====
+==== tests/cases/conformance/types/primitives/string/assignFromStringInterface2.ts (2 errors) ====
     interface String {
         doStuff(): string;
     }
@@ -18,8 +17,8 @@ assignFromStringInterface2.ts(48,1): error TS2322: Type 'NotString' is not assig
         indexOf(searchString: string, position?: number): number;
         lastIndexOf(searchString: string, position?: number): number;
         localeCompare(that: string): number;
-        match(regexp: string): RegExpMatchArray;
-        match(regexp: RegExp): RegExpMatchArray;
+        match(regexp: string): string[];
+        match(regexp: RegExp): string[];
         replace(searchValue: string, replaceValue: string): string;
         replace(searchValue: string, replaceValue: (substring: string, ...args: any[]) => string): string;
         replace(searchValue: RegExp, replaceValue: string): string;
@@ -42,16 +41,14 @@ assignFromStringInterface2.ts(48,1): error TS2322: Type 'NotString' is not assig
     }
     
     var x = '';
-    declare var a: String;
-    declare var b: NotString;
+    var a: String;
+    var b: NotString;
     
-    a = x;
-    a = b;
-    ~
-!!! error TS2740: Type 'NotString' is missing the following properties from type 'String': codePointAt, includes, endsWith, normalize, and 16 more.
+    a = x; 
+    a = b; 
     
-    b = a;
-    b = x;
+    b = a; 
+    b = x; 
     
     x = a; // expected error
     ~

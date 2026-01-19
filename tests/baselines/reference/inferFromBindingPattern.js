@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/inferFromBindingPattern.ts] ////
-
 //// [inferFromBindingPattern.ts]
 declare function f1<T extends string>(): T;
 declare function f2<T extends string>(): [T];

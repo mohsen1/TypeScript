@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/anonymousClassDeclarationDoesntPrintWithReadonly.ts] ////
-
 //// [anonymousClassDeclarationDoesntPrintWithReadonly.ts]
 export class X {
     constructor(readonly a: number) { }
@@ -26,9 +24,8 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.X = void 0;
-exports.y = y;
+exports.__esModule = true;
+exports.y = exports.X = void 0;
 var X = /** @class */ (function () {
     function X(a) {
         this.a = a;
@@ -45,6 +42,7 @@ function y() {
         return class_1;
     }(X));
 }
+exports.y = y;
 
 
 //// [anonymousClassDeclarationDoesntPrintWithReadonly.d.ts]

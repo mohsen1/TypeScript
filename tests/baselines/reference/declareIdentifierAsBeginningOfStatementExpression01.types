@@ -1,9 +1,6 @@
-//// [tests/cases/compiler/declareIdentifierAsBeginningOfStatementExpression01.ts] ////
-
-=== declareIdentifierAsBeginningOfStatementExpression01.ts ===
+=== tests/cases/compiler/declareIdentifierAsBeginningOfStatementExpression01.ts ===
 class C {
 >C : C
->  : ^
 }
 
 var declare: any;
@@ -11,8 +8,6 @@ var declare: any;
 
 declare instanceof C;
 >declare instanceof C : boolean
->                     : ^^^^^^^
 >declare : any
 >C : typeof C
->  : ^^^^^^^^
 

@@ -1,11 +1,9 @@
-//// [tests/cases/conformance/expressions/unaryOperators/decrementOperator/decrementOperatorWithAnyOtherTypeInvalidOperations.ts] ////
-
 //// [decrementOperatorWithAnyOtherTypeInvalidOperations.ts]
 // -- operator on any type
-declare var ANY1: any;
+var ANY1: any;
 var ANY2: any[] = ["", ""];
 
-declare var obj: () => {}
+var obj: () => {}
 var obj1 = { x: "", y: () => { } };
 function foo(): any {
     var a;
@@ -18,7 +16,7 @@ class A {
         return a;
     }
 }
-namespace M {
+module M {
     export var n: any;
 }
 var objA = new A();
@@ -75,7 +73,10 @@ ANY2--;
 ++ANY2[0]--;
 
 //// [decrementOperatorWithAnyOtherTypeInvalidOperations.js]
+// -- operator on any type
+var ANY1;
 var ANY2 = ["", ""];
+var obj;
 var obj1 = { x: "", y: function () { } };
 function foo() {
     var a;

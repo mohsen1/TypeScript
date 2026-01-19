@@ -1,24 +1,22 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/classConstructorParametersAccessibility2.ts] ////
-
 //// [classConstructorParametersAccessibility2.ts]
 class C1 {
     constructor(public x?: number) { }
 }
-declare var c1: C1;
+var c1: C1;
 c1.x // OK
 
 
 class C2 {
     constructor(private p?: number) { }
 }
-declare var c2: C2;
+var c2: C2;
 c2.p // private, error
 
 
 class C3 {
     constructor(protected p?: number) { }
 }
-declare var c3: C3;
+var c3: C3;
 c3.p // protected, error
 class Derived extends C3 {
     constructor(p: number) {
@@ -50,6 +48,7 @@ var C1 = /** @class */ (function () {
     }
     return C1;
 }());
+var c1;
 c1.x; // OK
 var C2 = /** @class */ (function () {
     function C2(p) {
@@ -57,6 +56,7 @@ var C2 = /** @class */ (function () {
     }
     return C2;
 }());
+var c2;
 c2.p; // private, error
 var C3 = /** @class */ (function () {
     function C3(p) {
@@ -64,6 +64,7 @@ var C3 = /** @class */ (function () {
     }
     return C3;
 }());
+var c3;
 c3.p; // protected, error
 var Derived = /** @class */ (function (_super) {
     __extends(Derived, _super);

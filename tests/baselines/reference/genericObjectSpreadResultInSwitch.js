@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericObjectSpreadResultInSwitch.ts] ////
-
 //// [genericObjectSpreadResultInSwitch.ts]
 type Params = {
     foo: string;

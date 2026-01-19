@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorElaboration.ts] ////
-
 //// [errorElaboration.ts]
 // Repro for #5712
 
@@ -11,7 +9,7 @@ interface Container<T> {
     m2: T;
 }
 declare function foo(x: () => Container<Ref<number>>): void;
-declare let a: () => Container<Ref<string>>;
+let a: () => Container<Ref<string>>;
 foo(a);
 
 // Repro for #25498
@@ -28,6 +26,7 @@ const x = ({ [foo.bar]: c }) => undefined;
 
 //// [errorElaboration.js]
 // Repro for #5712
+var a;
 foo(a);
 // Repro for #25498
 function test() {

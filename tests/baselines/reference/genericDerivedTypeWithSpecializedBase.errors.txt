@@ -1,9 +1,9 @@
-genericDerivedTypeWithSpecializedBase.ts(11,1): error TS2322: Type 'B<number>' is not assignable to type 'A<number>'.
+tests/cases/compiler/genericDerivedTypeWithSpecializedBase.ts(11,1): error TS2322: Type 'B<number>' is not assignable to type 'A<number>'.
   Types of property 'x' are incompatible.
     Type 'string' is not assignable to type 'number'.
 
 
-==== genericDerivedTypeWithSpecializedBase.ts (1 errors) ====
+==== tests/cases/compiler/genericDerivedTypeWithSpecializedBase.ts (1 errors) ====
     class A<T> {
         x: T;
     }
@@ -12,8 +12,8 @@ genericDerivedTypeWithSpecializedBase.ts(11,1): error TS2322: Type 'B<number>' i
         y: U;
     }
     
-    declare var x: A<number>;
-    declare var y: B<number>;
+    var x: A<number>;
+    var y: B<number>;
     x = y;  // error
     ~
 !!! error TS2322: Type 'B<number>' is not assignable to type 'A<number>'.

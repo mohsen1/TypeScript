@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/expandoFunctionContextualTypes.ts] ////
-
 //// [expandoFunctionContextualTypes.ts]
 interface MyComponentProps {
     color: "red" | "blue"

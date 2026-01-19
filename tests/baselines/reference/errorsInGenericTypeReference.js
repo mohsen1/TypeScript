@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorsInGenericTypeReference.ts] ////
-
 //// [errorsInGenericTypeReference.ts]
 interface IFoo<T> { }
 

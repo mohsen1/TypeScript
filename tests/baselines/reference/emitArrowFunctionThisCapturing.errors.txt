@@ -1,7 +1,7 @@
-emitArrowFunctionThisCapturing.ts(6,10): error TS2339: Property 'name' does not exist on type 'typeof globalThis'.
+tests/cases/conformance/es6/arrowFunction/emitArrowFunctionThisCapturing.ts(6,10): error TS2339: Property 'name' does not exist on type 'typeof globalThis'.
 
 
-==== emitArrowFunctionThisCapturing.ts (1 errors) ====
+==== tests/cases/conformance/es6/arrowFunction/emitArrowFunctionThisCapturing.ts (1 errors) ====
     var f1 = () => {
         this.age = 10
     };

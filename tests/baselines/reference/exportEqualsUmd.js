@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportEqualsUmd.ts] ////
-
 //// [exportEqualsUmd.ts]
 export = { ["hi"]: "there" };
 

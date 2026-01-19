@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/enums/awaitAndYield.ts] ////
-
 //// [awaitAndYield.ts]
 async function* test(x: Promise<number>) {
     enum E {

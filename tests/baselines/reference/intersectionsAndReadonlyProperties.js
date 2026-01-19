@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/intersectionsAndReadonlyProperties.ts] ////
-
 //// [intersectionsAndReadonlyProperties.ts]
 // readonly and non-readonly
 type Intersection1 = { readonly a: number } & { a: number };

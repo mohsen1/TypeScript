@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/contextualTyping/getSetAccessorContextualTyping.ts] ////
-
 //// [getSetAccessorContextualTyping.ts]
 // In the body of a get accessor with no return type annotation,
 // if a matching set accessor exists and that set accessor has a parameter type annotation,

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/augmentedTypeBracketNamedPropertyAccess.ts] ////
-
 //// [augmentedTypeBracketNamedPropertyAccess.ts]
 interface Object {
     data: number;

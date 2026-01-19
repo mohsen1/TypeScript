@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility.ts] ////
-
 //// [classConstructorAccessibility.ts]
 class C {
     public constructor(public x: number) { }
@@ -17,7 +15,7 @@ var c = new C(1);
 var d = new D(1); // error
 var e = new E(1); // error
 
-namespace Generic {
+module Generic {
     class C<T> {
         public constructor(public x: T) { }
     }
@@ -100,5 +98,5 @@ declare class E {
 declare var c: C;
 declare var d: any;
 declare var e: any;
-declare namespace Generic {
+declare module Generic {
 }

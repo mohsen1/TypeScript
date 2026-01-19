@@ -1,17 +1,15 @@
-//// [tests/cases/compiler/es6ModuleLet.ts] ////
-
 //// [es6ModuleLet.ts]
 export let a = "hello";
 export let x: string = a, y = x;
 let b = y;
 let c: string = b, d = c;
-export namespace m1 {
+export module m1 {
     export let k = a;
     export let l: string = b, m = k;
     let n = m1.k;
     let o: string = n, p = k;
 }
-namespace m2 {
+module m2 {
     export let k = a;
     export let l: string = b, m = k;
     let n = m1.k;

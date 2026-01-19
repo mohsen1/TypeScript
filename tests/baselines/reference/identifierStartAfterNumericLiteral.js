@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/identifierStartAfterNumericLiteral.ts] ////
-
 //// [identifierStartAfterNumericLiteral.ts]
 let valueIn = 3in[null];
 

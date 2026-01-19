@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorForwardReferenceForwadingConstructor.ts] ////
-
 //// [errorForwardReferenceForwadingConstructor.ts]
 // Error forward referencing derived class with forwarding constructor
 

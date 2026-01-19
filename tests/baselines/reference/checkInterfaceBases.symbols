@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/checkInterfaceBases.ts] ////
-
-=== app.ts ===
+=== tests/cases/compiler/app.ts ===
 ///<reference path='jquery.d.ts' />
 interface SecondEvent {
 >SecondEvent : Symbol(SecondEvent, Decl(app.ts, 0, 0))
@@ -13,7 +11,7 @@ interface Third extends JQueryEventObjectTest, SecondEvent {}
 >JQueryEventObjectTest : Symbol(JQueryEventObjectTest, Decl(jquery.d.ts, 0, 0))
 >SecondEvent : Symbol(SecondEvent, Decl(app.ts, 0, 0))
 
-=== jquery.d.ts ===
+=== tests/cases/compiler/jquery.d.ts ===
 interface JQueryEventObjectTest {
 >JQueryEventObjectTest : Symbol(JQueryEventObjectTest, Decl(jquery.d.ts, 0, 0))
 

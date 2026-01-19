@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/assignmentCompatability7.ts] ////
-
 //// [assignmentCompatability7.ts]
-namespace __test1__ {
+module __test1__ {
     export interface interfaceWithPublicAndOptional<T,U> { one: T; two?: U; };  var obj4: interfaceWithPublicAndOptional<number,string> = { one: 1 };;
     export var __val__obj4 = obj4;
 }
-namespace __test2__ {
+module __test2__ {
     export interface interfaceWithPublicAndOptional<T,U> { one: T; two?: U; };  var obj4: interfaceWithPublicAndOptional<number,string> = { one: 1 };;
     export var __val__obj4 = obj4;
 }

@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembers.ts] ////
-
-=== assignmentCompatWithObjectMembers.ts ===
+=== tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembers.ts ===
 // members N and M of types S and T have the same name, same accessibility, same optionality, and N is assignable M
 // no errors expected
 
-namespace SimpleTypes {
+module SimpleTypes {
 >SimpleTypes : Symbol(SimpleTypes, Decl(assignmentCompatWithObjectMembers.ts, 0, 0))
 
     class S { foo: string; }
->S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 3, 23))
+>S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 3, 20))
 >foo : Symbol(S.foo, Decl(assignmentCompatWithObjectMembers.ts, 4, 13))
 
     class T { foo: string; }
@@ -17,7 +15,7 @@ namespace SimpleTypes {
 
     var s: S;
 >s : Symbol(s, Decl(assignmentCompatWithObjectMembers.ts, 6, 7))
->S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 3, 23))
+>S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 3, 20))
 
     var t: T;
 >t : Symbol(t, Decl(assignmentCompatWithObjectMembers.ts, 7, 7))
@@ -132,13 +130,13 @@ namespace SimpleTypes {
 >t : Symbol(t, Decl(assignmentCompatWithObjectMembers.ts, 7, 7))
 }
 
-namespace ObjectTypes {
+module ObjectTypes {
 >ObjectTypes : Symbol(ObjectTypes, Decl(assignmentCompatWithObjectMembers.ts, 42, 1))
 
     class S { foo: S; }
->S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 23))
+>S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 20))
 >foo : Symbol(S.foo, Decl(assignmentCompatWithObjectMembers.ts, 45, 13))
->S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 23))
+>S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 20))
 
     class T { foo: T; }
 >T : Symbol(T, Decl(assignmentCompatWithObjectMembers.ts, 45, 23))
@@ -147,7 +145,7 @@ namespace ObjectTypes {
 
     var s: S;
 >s : Symbol(s, Decl(assignmentCompatWithObjectMembers.ts, 47, 7))
->S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 23))
+>S : Symbol(S, Decl(assignmentCompatWithObjectMembers.ts, 44, 20))
 
     var t: T;
 >t : Symbol(t, Decl(assignmentCompatWithObjectMembers.ts, 48, 7))

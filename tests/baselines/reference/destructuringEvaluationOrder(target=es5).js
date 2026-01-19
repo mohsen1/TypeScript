@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringEvaluationOrder.ts] ////
-
 //// [destructuringEvaluationOrder.ts]
 // https://github.com/microsoft/TypeScript/issues/39205
 let trace: any[] = [];

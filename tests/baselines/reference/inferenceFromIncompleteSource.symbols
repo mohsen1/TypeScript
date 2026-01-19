@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/inferenceFromIncompleteSource.ts] ////
-
-=== inferenceFromIncompleteSource.ts ===
+=== tests/cases/compiler/inferenceFromIncompleteSource.ts ===
 // Repro from #42030
 
 interface ListProps<T, K extends keyof T> {

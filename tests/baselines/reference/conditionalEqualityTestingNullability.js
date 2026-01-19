@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalEqualityTestingNullability.ts] ////
-
 //// [conditionalEqualityTestingNullability.ts]
 export type Equals<A1 extends any, A2 extends any> =
     (<A>() => A extends A1 ? 1 : 0) extends (<A>() => A extends A2 ? 1 : 0)
@@ -18,4 +16,4 @@ type ShouldBe0 = Equals<typeof a, typeof b>;
 
 //// [conditionalEqualityTestingNullability.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

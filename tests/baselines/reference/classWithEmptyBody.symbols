@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/classDeclarations/classBody/classWithEmptyBody.ts] ////
-
-=== classWithEmptyBody.ts ===
+=== tests/cases/conformance/classes/classDeclarations/classBody/classWithEmptyBody.ts ===
 class C {
 >C : Symbol(C, Decl(classWithEmptyBody.ts, 0, 0))
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5ExportDefaultClassDeclaration2.ts] ////
-
 //// [es5ExportDefaultClassDeclaration2.ts]
 export default class {
     method() { }

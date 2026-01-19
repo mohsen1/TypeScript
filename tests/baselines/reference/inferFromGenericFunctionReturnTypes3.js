@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferFromGenericFunctionReturnTypes3.ts] ////
-
 //// [inferFromGenericFunctionReturnTypes3.ts]
 // Repros from #5487
 
@@ -321,7 +319,7 @@ export declare namespace DiagnosticSeverity {
     const Information = 3;
     const Hint = 4;
 }
-export type DiagnosticSeverity = 1 | 2 | 3 | 4;
+export declare type DiagnosticSeverity = 1 | 2 | 3 | 4;
 export interface Diagnostic {
     severity?: DiagnosticSeverity;
     code?: number | string;

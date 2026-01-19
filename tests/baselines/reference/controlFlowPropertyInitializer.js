@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowPropertyInitializer.ts] ////
-
 //// [controlFlowPropertyInitializer.ts]
 // Repro from #8967
 

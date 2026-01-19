@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/decorators/invalid/decoratorOnImportEquals1.ts] ////
-
 //// [decoratorOnImportEquals1.ts]
 declare function dec<T>(target: T): T;
 
-namespace M1 {
+module M1 {
     export var X: number;
 }
 
-namespace M2 {
+module M2 {
     @dec
     import X = M1.X;
 }

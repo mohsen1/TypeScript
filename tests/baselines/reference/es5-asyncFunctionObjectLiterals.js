@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-asyncFunctionObjectLiterals.ts] ////
-
 //// [es5-asyncFunctionObjectLiterals.ts]
 declare var x, y, z, a, b, c;
 

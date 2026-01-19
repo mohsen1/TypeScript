@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts] ////
-
 //// [assignmentCompatWithObjectMembersOptionality.ts]
 // Derived member is not optional but base member is, should be ok
 
@@ -7,14 +5,14 @@ class Base { foo: string; }
 class Derived extends Base { bar: string; }
 class Derived2 extends Derived { baz: string; }
 
-namespace TargetHasOptional {
+module TargetHasOptional {
     // targets
     interface C {
         opt?: Base
     }
-    declare var c: C;
+    var c: C;
 
-    declare var a: { opt?: Base; };
+    var a: { opt?: Base; }
     var b: typeof a = { opt: new Base() }
 
     // sources
@@ -27,9 +25,9 @@ namespace TargetHasOptional {
     interface F {
         opt?: Derived;
     }
-    declare var d: D;
-    declare var e: E;
-    declare var f: F;
+    var d: D;
+    var e: E;
+    var f: F;
 
     // all ok
     c = d;
@@ -49,14 +47,14 @@ namespace TargetHasOptional {
     b = c;
 }
 
-namespace SourceHasOptional {
+module SourceHasOptional {
     // targets
     interface C {
         opt: Base
     }
-    declare var c: C;
+    var c: C;
 
-    declare var a: { opt: Base; };
+    var a: { opt: Base; }
     var b = { opt: new Base() }
 
     // sources
@@ -69,9 +67,9 @@ namespace SourceHasOptional {
     interface F {
         opt: Derived;
     }
-    declare var d: D;
-    declare var e: E;
-    declare var f: F;
+    var d: D;
+    var e: E;
+    var f: F;
 
     c = d; // error
     c = e; // error
@@ -128,7 +126,12 @@ var Derived2 = /** @class */ (function (_super) {
 }(Derived));
 var TargetHasOptional;
 (function (TargetHasOptional) {
+    var c;
+    var a;
     var b = { opt: new Base() };
+    var d;
+    var e;
+    var f;
     // all ok
     c = d;
     c = e;
@@ -146,7 +149,12 @@ var TargetHasOptional;
 })(TargetHasOptional || (TargetHasOptional = {}));
 var SourceHasOptional;
 (function (SourceHasOptional) {
+    var c;
+    var a;
     var b = { opt: new Base() };
+    var d;
+    var e;
+    var f;
     c = d; // error
     c = e; // error
     c = f; // ok

@@ -8,12 +8,12 @@ export import "server";
 
 //// [server.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a = void 0;
 exports.a = 10;
 //// [client.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 require("server");
 
 

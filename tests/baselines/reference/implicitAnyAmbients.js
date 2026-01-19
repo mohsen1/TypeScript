@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/implicitAnyAmbients.ts] ////
-
 //// [implicitAnyAmbients.ts]
-declare namespace m {
+declare module m {
     var x; // error
     var y: any;
 
@@ -21,7 +19,7 @@ declare namespace m {
         foo3(x: any): any;
     }
 
-    namespace n {
+    module n {
         var y; // error
     }
 

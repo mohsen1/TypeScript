@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incrementalOut.ts] ////
-
 //// [incrementalOut.ts]
 const x = 10;
 

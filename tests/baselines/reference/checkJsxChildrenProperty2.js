@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/checkJsxChildrenProperty2.tsx] ////
-
 //// [file.tsx]
 import React = require('react');
 
@@ -57,7 +55,7 @@ let k5 =
 
 //// [file.jsx]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var React = require("react");
 function Comp(p) {
     return <div>{p.b}</div>;

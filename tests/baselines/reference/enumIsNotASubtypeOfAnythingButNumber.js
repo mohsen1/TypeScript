@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/enumIsNotASubtypeOfAnythingButNumber.ts] ////
-
 //// [enumIsNotASubtypeOfAnythingButNumber.ts]
 // enums are only subtypes of number, any and no other types
 
@@ -90,7 +88,7 @@ interface I14 {
 
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 interface I15 {
@@ -100,7 +98,7 @@ interface I15 {
 
 
 class c { baz: string }
-namespace c {
+module c {
     export var bar = 1;
 }
 interface I16 {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowIfStatement.ts] ////
-
 //// [controlFlowIfStatement.ts]
 let x: string | number | boolean | RegExp;
 let cond: boolean;

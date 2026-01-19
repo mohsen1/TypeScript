@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/higherOrderMappedIndexLookupInference.ts] ////
-
 //// [higherOrderMappedIndexLookupInference.ts]
 // @strict
 

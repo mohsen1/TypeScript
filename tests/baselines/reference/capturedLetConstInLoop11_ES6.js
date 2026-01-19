@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop11_ES6.ts] ////
-
 //// [capturedLetConstInLoop11_ES6.ts]
 for (;;) {
     let x = 1;

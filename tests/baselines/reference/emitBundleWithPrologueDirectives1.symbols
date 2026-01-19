@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emitBundleWithPrologueDirectives1.ts] ////
-
-=== test.ts ===
+=== tests/cases/compiler/test.ts ===
 /* Detached Comment */
 
 // Class Doo Comment

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/classTypes/indexersInClassType.ts] ////
-
 //// [indexersInClassType.ts]
 class C {
     [x: number]: Date;

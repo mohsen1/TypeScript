@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularContextualReturnType.ts] ////
-
 //// [circularContextualReturnType.ts]
 // Repro from #17711
 
@@ -16,5 +14,5 @@ Object.freeze({
 Object.freeze({
     foo: function () {
         return Object.freeze('a');
-    },
+    }
 });

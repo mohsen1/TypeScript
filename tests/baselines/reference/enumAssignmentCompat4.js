@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumAssignmentCompat4.ts] ////
-
 //// [enumAssignmentCompat4.ts]
 namespace M {
     export enum MyEnum {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deleteExpressionMustBeOptional_exactOptionalPropertyTypes.ts] ////
-
 //// [deleteExpressionMustBeOptional_exactOptionalPropertyTypes.ts]
 interface Foo {
     a: number

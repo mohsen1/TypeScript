@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericBaseClassLiteralProperty2.ts] ////
-
 //// [genericBaseClassLiteralProperty2.ts]
 class CollectionItem2 { }
 

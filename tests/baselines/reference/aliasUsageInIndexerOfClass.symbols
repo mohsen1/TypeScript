@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/aliasUsageInIndexerOfClass.ts] ////
-
-=== aliasUsageInIndexerOfClass_main.ts ===
+=== tests/cases/compiler/aliasUsageInIndexerOfClass_main.ts ===
 import Backbone = require("./aliasUsageInIndexerOfClass_backbone");
 >Backbone : Symbol(Backbone, Decl(aliasUsageInIndexerOfClass_main.ts, 0, 0))
 
@@ -38,7 +36,7 @@ class N2 {
 >x : Symbol(N2.x, Decl(aliasUsageInIndexerOfClass_main.ts, 10, 33))
 >IHasVisualizationModel : Symbol(IHasVisualizationModel, Decl(aliasUsageInIndexerOfClass_main.ts, 1, 65))
 }
-=== aliasUsageInIndexerOfClass_backbone.ts ===
+=== tests/cases/compiler/aliasUsageInIndexerOfClass_backbone.ts ===
 export class Model {
 >Model : Symbol(Model, Decl(aliasUsageInIndexerOfClass_backbone.ts, 0, 0))
 
@@ -46,7 +44,7 @@ export class Model {
 >someData : Symbol(Model.someData, Decl(aliasUsageInIndexerOfClass_backbone.ts, 0, 20))
 }
 
-=== aliasUsageInIndexerOfClass_moduleA.ts ===
+=== tests/cases/compiler/aliasUsageInIndexerOfClass_moduleA.ts ===
 import Backbone = require("./aliasUsageInIndexerOfClass_backbone");
 >Backbone : Symbol(Backbone, Decl(aliasUsageInIndexerOfClass_moduleA.ts, 0, 0))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferredNonidentifierTypesGetQuotes.ts] ////
-
 //// [inferredNonidentifierTypesGetQuotes.ts]
 var x = [{ "a-b": "string" }, {}];
 

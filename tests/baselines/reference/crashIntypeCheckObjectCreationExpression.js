@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/crashIntypeCheckObjectCreationExpression.ts] ////
-
 //// [crashIntypeCheckObjectCreationExpression.ts]
 export class BuildWorkspaceService {
     public injectRequestService<P0, P1, P2>(service: P0) {
@@ -13,7 +11,7 @@ export class BuildWorkspaceService {
 //// [crashIntypeCheckObjectCreationExpression.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.BuildWorkspaceService = void 0;
     var BuildWorkspaceService = /** @class */ (function () {
         function BuildWorkspaceService() {

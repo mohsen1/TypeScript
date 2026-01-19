@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarations-validContexts.ts] ////
-
 //// [constDeclarations-validContexts.ts]
 // Control flow statements with blocks
 if (true) { 
@@ -85,7 +83,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
     const c22 = 0;
 
     {

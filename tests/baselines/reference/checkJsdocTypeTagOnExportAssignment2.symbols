@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/checkJsdocTypeTagOnExportAssignment2.ts] ////
+=== tests/cases/compiler/checkJsdocTypeTagOnExportAssignment2.js ===
 
-=== checkJsdocTypeTagOnExportAssignment2.js ===
-
-=== a.ts ===
+No type information for this code.=== tests/cases/compiler/a.ts ===
 export interface Foo {
 >Foo : Symbol(Foo, Decl(a.ts, 0, 0))
 
@@ -13,12 +11,12 @@ export interface Foo {
 >b : Symbol(Foo.b, Decl(a.ts, 1, 14))
 }
 
-=== b.js ===
+=== tests/cases/compiler/b.js ===
 /** @type {import("./a").Foo} */
 export default { c: false };
 >c : Symbol(c, Decl(b.js, 1, 16))
 
-=== c.js ===
+=== tests/cases/compiler/c.js ===
 import b from "./b";
 >b : Symbol(b, Decl(c.js, 0, 6))
 

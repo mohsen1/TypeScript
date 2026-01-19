@@ -14,8 +14,8 @@ export interface F {
 import * as A from './a'
 import * as B from './b'
 
-declare let a: A.F
-declare let b: B.F
+let a: A.F
+let b: B.F
 
 if (a === b) {
 
@@ -26,13 +26,15 @@ a = b
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [c.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+var a;
+var b;
 if (a === b) {
 }
 a = b;

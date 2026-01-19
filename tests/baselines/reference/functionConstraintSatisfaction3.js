@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeArgumentLists/functionConstraintSatisfaction3.ts] ////
-
 //// [functionConstraintSatisfaction3.ts]
 // satisfaction of a constraint to Function, no errors expected
 

@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportVariableOfGenericTypeWithInaccessibleTypeAsTypeArgument.ts] ////
-
 //// [ExportVariableOfGenericTypeWithInaccessibleTypeAsTypeArgument.ts]
-namespace A {
+module A {
     class B {
         id: number;
     }

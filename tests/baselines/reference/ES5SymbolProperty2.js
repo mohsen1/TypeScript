@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/Symbols/ES5SymbolProperty2.ts] ////
-
 //// [ES5SymbolProperty2.ts]
-namespace M {
+module M {
     var Symbol: any;
 
     export class C {

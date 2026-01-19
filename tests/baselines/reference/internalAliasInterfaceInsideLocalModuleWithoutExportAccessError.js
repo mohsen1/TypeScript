@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/internalAliasInterfaceInsideLocalModuleWithoutExportAccessError.ts] ////
-
 //// [internalAliasInterfaceInsideLocalModuleWithoutExportAccessError.ts]
-export namespace a {
+export module a {
     export interface I {
     }
 }
 
-export namespace c {
+export module c {
     import b = a.I;
     export var x: b;
 }
@@ -14,10 +12,12 @@ export namespace c {
 var x: c.b;
 
 //// [internalAliasInterfaceInsideLocalModuleWithoutExportAccessError.js]
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.c = void 0;
-var c;
-(function (c) {
-})(c || (exports.c = c = {}));
-var x;
+define(["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    exports.c = void 0;
+    var c;
+    (function (c) {
+    })(c = exports.c || (exports.c = {}));
+    var x;
+});

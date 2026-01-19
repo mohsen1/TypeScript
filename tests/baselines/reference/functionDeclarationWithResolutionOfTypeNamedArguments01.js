@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionDeclarationWithResolutionOfTypeNamedArguments01.ts] ////
-
 //// [functionDeclarationWithResolutionOfTypeNamedArguments01.ts]
 interface arguments {
 }

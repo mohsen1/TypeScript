@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classPropertyErrorOnNameOnly.ts] ////
-
 //// [classPropertyErrorOnNameOnly.ts]
 type Values = 1 | 2 | 3 | 4 | 5 | 6
 

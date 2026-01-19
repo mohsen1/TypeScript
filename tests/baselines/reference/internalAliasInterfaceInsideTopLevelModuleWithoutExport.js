@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/internalAliasInterfaceInsideTopLevelModuleWithoutExport.ts] ////
-
 //// [internalAliasInterfaceInsideTopLevelModuleWithoutExport.ts]
-export namespace a {
+export module a {
     export interface I {
     }
 }
@@ -13,13 +11,13 @@ export var x: b;
 //// [internalAliasInterfaceInsideTopLevelModuleWithoutExport.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.x = void 0;
 });
 
 
 //// [internalAliasInterfaceInsideTopLevelModuleWithoutExport.d.ts]
-export declare namespace a {
+export declare module a {
     interface I {
     }
 }

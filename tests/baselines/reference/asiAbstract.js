@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asiAbstract.ts] ////
-
 //// [asiAbstract.ts]
 abstract
 class NonAbstractClass {

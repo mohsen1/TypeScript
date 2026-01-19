@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithUndefinedValueAndValidOperands.ts] ////
-
 //// [exponentiationOperatorWithUndefinedValueAndValidOperands.ts]
 // If one operand is the undefined or undefined value, it is treated as having the type of the
 // other operand.
@@ -9,8 +7,8 @@ enum E {
     b
 }
 
-declare var a: any;
-declare var b: number;
+var a: any;
+var b: number;
 
 // operator *
 var rk1 = undefined ** a;
@@ -30,6 +28,8 @@ var E;
     E[E["a"] = 0] = "a";
     E[E["b"] = 1] = "b";
 })(E || (E = {}));
+var a;
+var b;
 // operator *
 var rk1 = Math.pow(undefined, a);
 var rk2 = Math.pow(undefined, b);

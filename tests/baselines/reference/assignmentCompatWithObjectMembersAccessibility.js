@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersAccessibility.ts] ////
-
 //// [assignmentCompatWithObjectMembersAccessibility.ts]
 // members N and M of types S and T have the same name, same accessibility, same optionality, and N is assignable M
 
-namespace TargetIsPublic {
+module TargetIsPublic {
     // targets
     class Base {
         public foo: string;
@@ -13,9 +11,9 @@ namespace TargetIsPublic {
         foo: string;
     }
 
-    declare var a: { foo: string; };
-    declare var b: Base;
-    declare var i: I;
+    var a: { foo: string; }
+    var b: Base;
+    var i: I;
 
     // sources
     class D {
@@ -25,8 +23,8 @@ namespace TargetIsPublic {
     class E {
         private foo: string;
     }
-    declare var d: D;
-    declare var e: E;
+    var d: D;
+    var e: E;
 
     a = b;
     a = i;
@@ -56,7 +54,7 @@ namespace TargetIsPublic {
 
 }
 
-namespace TargetIsPublic {
+module TargetIsPublic {
     // targets
     class Base {
         private foo: string;
@@ -65,9 +63,9 @@ namespace TargetIsPublic {
     interface I extends Base {
     }
 
-    declare var a: { foo: string; };
-    declare var b: Base;
-    declare var i: I;
+    var a: { foo: string; }
+    var b: Base;
+    var i: I;
 
     // sources
     class D {
@@ -78,8 +76,8 @@ namespace TargetIsPublic {
         private foo: string;
     }
 
-    declare var d: D;
-    declare var e: E;
+    var d: D;
+    var e: E;
 
     a = b; // error
     a = i; // error
@@ -121,6 +119,9 @@ var TargetIsPublic;
         }
         return Base;
     }());
+    var a;
+    var b;
+    var i;
     // sources
     var D = /** @class */ (function () {
         function D() {
@@ -132,6 +133,8 @@ var TargetIsPublic;
         }
         return E;
     }());
+    var d;
+    var e;
     a = b;
     a = i;
     a = d;
@@ -161,6 +164,9 @@ var TargetIsPublic;
         }
         return Base;
     }());
+    var a;
+    var b;
+    var i;
     // sources
     var D = /** @class */ (function () {
         function D() {
@@ -172,6 +178,8 @@ var TargetIsPublic;
         }
         return E;
     }());
+    var d;
+    var e;
     a = b; // error
     a = i; // error
     a = d;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringObjectAssignmentPatternWithNestedSpread.ts] ////
-
 //// [destructuringObjectAssignmentPatternWithNestedSpread.ts]
 let a: any, b: any, c: any = {x: {a: 1, y: 2}}, d: any;
 ({x: {a, ...b} = d} = c);

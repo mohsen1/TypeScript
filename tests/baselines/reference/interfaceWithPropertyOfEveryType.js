@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceWithPropertyOfEveryType.ts] ////
-
 //// [interfaceWithPropertyOfEveryType.ts]
 class C { foo: string; }
 function f1() { }
-namespace M {
+module M {
     export var y = 1;
 }
 enum E { A }

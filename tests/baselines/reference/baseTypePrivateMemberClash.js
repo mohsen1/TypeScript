@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/baseTypePrivateMemberClash.ts] ////
-
 //// [baseTypePrivateMemberClash.ts]
 class X {
     private m: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeAliases/intrinsicKeyword.ts] ////
-
 //// [intrinsicKeyword.ts]
 let e1: intrinsic;
 let e2: { intrinsic: intrinsic };

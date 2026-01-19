@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/excessPropertyCheckWithSpread.ts] ////
-
 //// [excessPropertyCheckWithSpread.ts]
 declare function f({ a: number }): void
 interface I {

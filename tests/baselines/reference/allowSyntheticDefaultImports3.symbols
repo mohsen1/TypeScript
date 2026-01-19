@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/allowSyntheticDefaultImports3.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 import Namespace from "./b";
 >Namespace : Symbol(Namespace, Decl(a.ts, 0, 6))
 
@@ -8,7 +6,7 @@ export var x = new Namespace.Foo();
 >x : Symbol(x, Decl(a.ts, 1, 10))
 >Namespace : Symbol(Namespace, Decl(a.ts, 0, 6))
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 export class Foo {
 >Foo : Symbol(Foo, Decl(b.ts, 0, 0))
 

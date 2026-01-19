@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/exportAssignmentInternalModule.ts] ////
 
 //// [exportAssignmentInternalModule_A.ts]
-namespace M {
+module M {
 	export var x;
 }
 
@@ -23,6 +23,6 @@ define(["require", "exports"], function (require, exports) {
 //// [exportAssignmentInternalModule_B.js]
 define(["require", "exports", "exportAssignmentInternalModule_A"], function (require, exports, modM) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var n = modM.x;
 });

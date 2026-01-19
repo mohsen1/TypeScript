@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/enumDecl1.ts] ////
-
 //// [enumDecl1.ts]
-declare namespace mAmbient {
+declare module mAmbient {
     enum e {
         x,
         y,
@@ -14,7 +12,7 @@ declare namespace mAmbient {
 
 
 //// [enumDecl1.d.ts]
-declare namespace mAmbient {
+declare module mAmbient {
     enum e {
         x,
         y,

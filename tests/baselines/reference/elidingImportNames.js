@@ -16,17 +16,17 @@ export var main = 10;
 
 //// [elidingImportNames_main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.main = void 0;
 exports.main = 10;
 //// [elidingImportNames_main1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.main = void 0;
 exports.main = 10;
 //// [elidingImportNames_test.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var a = require("./elidingImportNames_main"); // alias used in typeof
 var b = a;
 var x;

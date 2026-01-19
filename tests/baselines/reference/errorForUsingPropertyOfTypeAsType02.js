@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorForUsingPropertyOfTypeAsType02.ts] ////
-
 //// [errorForUsingPropertyOfTypeAsType02.ts]
 namespace Test1 {
     function foo<T extends { abc: number }>(x: T) {

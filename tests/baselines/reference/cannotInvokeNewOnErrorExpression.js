@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/cannotInvokeNewOnErrorExpression.ts] ////
-
 //// [cannotInvokeNewOnErrorExpression.ts]
-namespace M
+module M
 {
     class ClassA {}
 }

@@ -28,7 +28,7 @@ class N2 {
 
 //// [aliasUsageInIndexerOfClass_backbone.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Model = void 0;
 var Model = /** @class */ (function () {
     function Model() {
@@ -53,7 +53,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.VisualizationModel = void 0;
 var Backbone = require("./aliasUsageInIndexerOfClass_backbone");
 var VisualizationModel = /** @class */ (function (_super) {
@@ -66,7 +66,7 @@ var VisualizationModel = /** @class */ (function (_super) {
 exports.VisualizationModel = VisualizationModel;
 //// [aliasUsageInIndexerOfClass_main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var moduleA = require("./aliasUsageInIndexerOfClass_moduleA");
 var N = /** @class */ (function () {
     function N() {

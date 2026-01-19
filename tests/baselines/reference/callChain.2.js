@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/optionalChaining/callChain/callChain.2.ts] ////
-
 //// [callChain.2.ts]
 declare const o1: undefined | (() => number);
 o1?.();

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ExportAssignment7.ts] ////
-
 //// [ExportAssignment7.ts]
 export class C {
 }

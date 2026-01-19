@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/anonterface.ts] ////
-
 //// [anonterface.ts]
-namespace M {
+module M {
     export class C {
         m(fn:{ (n:number):string; },n2:number):string {
             return fn(n2);

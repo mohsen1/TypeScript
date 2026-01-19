@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/instanceSubtypeCheck1.ts] ////
-
 //// [instanceSubtypeCheck1.ts]
 interface A<T>
 {

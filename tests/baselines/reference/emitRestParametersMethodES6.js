@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/restParameters/emitRestParametersMethodES6.ts] ////
-
 //// [emitRestParametersMethodES6.ts]
 class C {
     constructor(name: string, ...rest) { }

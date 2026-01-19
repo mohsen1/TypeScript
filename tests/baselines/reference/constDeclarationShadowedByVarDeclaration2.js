@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarationShadowedByVarDeclaration2.ts] ////
-
 //// [constDeclarationShadowedByVarDeclaration2.ts]
 // No errors, const declaration is not shadowed
 function outer() {

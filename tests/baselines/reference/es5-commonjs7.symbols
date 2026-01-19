@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/es5-commonjs7.ts] ////
-
-=== test.d.ts ===
+=== tests/cases/compiler/test.d.ts ===
 export default undefined;
 >undefined : Symbol(undefined)
 

@@ -16,11 +16,12 @@ export function foo() {
 
 //// [app.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.foo = foo;
+exports.__esModule = true;
+exports.foo = void 0;
 function foo() {
     return new Object();
 }
+exports.foo = foo;
 
 
 //// [app.d.ts]

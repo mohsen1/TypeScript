@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/emitter/es2019/noCatchBinding/emitter.noCatchBinding.es2019.ts] ////
-
 //// [emitter.noCatchBinding.es2019.ts]
 function f() {
     try { } catch { }

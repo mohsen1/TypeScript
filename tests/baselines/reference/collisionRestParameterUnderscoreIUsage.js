@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionRestParameterUnderscoreIUsage.ts] ////
-
 //// [collisionRestParameterUnderscoreIUsage.ts]
 declare var console: { log(msg?: string): void; };
 var _i = "This is what I'd expect to see";

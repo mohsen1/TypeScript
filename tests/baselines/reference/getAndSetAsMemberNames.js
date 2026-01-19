@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/getAndSetAsMemberNames.ts] ////
-
 //// [getAndSetAsMemberNames.ts]
 class C1 {
     set: boolean;

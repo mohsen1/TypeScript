@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/functions/functionWithUseStrictAndSimpleParameterList.ts] ////
-
 //// [functionWithUseStrictAndSimpleParameterList.ts]
 function a(a = 10) {
     "use strict";
@@ -53,7 +51,7 @@ function invalidPrologue(a = 10, b = 20) {
 
 //// [functionWithUseStrictAndSimpleParameterList.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.foo = void 0;
 function a(a) {
     "use strict";

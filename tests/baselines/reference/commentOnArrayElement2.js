@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnArrayElement2.ts] ////
-
 //// [commentOnArrayElement2.ts]
 const array = [
     /* element 1*/

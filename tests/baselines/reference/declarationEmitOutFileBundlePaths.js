@@ -17,7 +17,7 @@ export {
 
 //// [index.d.ts]
 declare module "versions.static" {
-    const _default: {
+    var _default: {
         "@a/b": string;
         "@a/c": string;
     };

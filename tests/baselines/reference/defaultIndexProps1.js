@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/defaultIndexProps1.ts] ////
-
 //// [defaultIndexProps1.ts]
 class Foo {
 	public v = "Yo";

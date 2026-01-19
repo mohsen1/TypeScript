@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/extBaseClass1.ts] ////
-
 //// [extBaseClass1.ts]
-namespace M {
+module M {
     export class B {
 	    public x=10;
     }
@@ -10,12 +8,12 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
     export class C2 extends B {
     }
 }
 
-namespace N {
+module N {
     export class C3 extends M.B {
     }
 }

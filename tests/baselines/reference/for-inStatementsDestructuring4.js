@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-inStatements/for-inStatementsDestructuring4.ts] ////
-
 //// [for-inStatementsDestructuring4.ts]
 var a, b;
 for ({a, b} in []) { }

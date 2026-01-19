@@ -7,18 +7,18 @@
 */
 
 /*! Don't keep this pinned comment */
-declare namespace C {
+declare module C {
     function foo();
 }
 
 // Don't keep this comment.
-declare namespace D {
+declare module D {
     class bar { }
 }
 
 //// [b.ts]
 ///<reference path="a.ts"/>
-declare namespace E {
+declare module E {
     class foobar extends D.bar {
         foo();
     }

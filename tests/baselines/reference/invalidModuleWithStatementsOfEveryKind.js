@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/internalModules/moduleBody/invalidModuleWithStatementsOfEveryKind.ts] ////
-
 //// [invalidModuleWithStatementsOfEveryKind.ts]
 // All of these should be an error
 
-namespace Y {
+module Y {
     public class A { s: string }
 
     public class BB<T> extends A {
@@ -11,24 +9,24 @@ namespace Y {
     }
 }
 
-namespace Y2 {
+module Y2 {
     public class AA<T> { s: T }
     public interface I { id: number }
 
     public class B extends AA<string> implements I { id: number }
 }
 
-namespace Y3 {
-    public namespace Module {
+module Y3 {
+    public module Module {
         class A { s: string }
     }
 }
 
-namespace Y4 {
+module Y4 {
     public enum Color { Blue, Red }
 }
 
-namespace YY {
+module YY {
     private class A { s: string }
 
     private class BB<T> extends A {
@@ -36,25 +34,25 @@ namespace YY {
     }
 }
 
-namespace YY2 {
+module YY2 {
     private class AA<T> { s: T }
     private interface I { id: number }
 
     private class B extends AA<string> implements I { id: number }
 }
 
-namespace YY3 {
-    private namespace Module {
+module YY3 {
+    private module Module {
         class A { s: string }
     }
 }
 
-namespace YY4 {
+module YY4 {
     private enum Color { Blue, Red }
 }
 
 
-namespace YYY {
+module YYY {
     static class A { s: string }
 
     static class BB<T> extends A {
@@ -62,20 +60,20 @@ namespace YYY {
     }
 }
 
-namespace YYY2 {
+module YYY2 {
     static class AA<T> { s: T }
     static interface I { id: number }
 
     static class B extends AA<string> implements I { id: number }
 }
 
-namespace YYY3 {
-    static namespace Module {
+module YYY3 {
+    static module Module {
         class A { s: string }
     }
 }
 
-namespace YYY4 {
+module YYY4 {
     static enum Color { Blue, Red }
 }
 

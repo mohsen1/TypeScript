@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/asiPreventsParsingAsAmbientExternalModule01.ts] ////
-
 //// [asiPreventsParsingAsAmbientExternalModule01.ts]
 var declare: number;
 var module: string;

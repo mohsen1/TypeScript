@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doNotEmitDetachedCommentsAtStartOfFunctionBody.ts] ////
-
 //// [doNotEmitDetachedCommentsAtStartOfFunctionBody.ts]
 function foo1() {
     // Single line comment

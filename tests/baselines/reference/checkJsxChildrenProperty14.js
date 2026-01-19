@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/checkJsxChildrenProperty14.tsx] ////
-
 //// [file.tsx]
 import React = require('react');
 
@@ -61,7 +59,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var React = require("react");
 var Button = /** @class */ (function (_super) {
     __extends(Button, _super);

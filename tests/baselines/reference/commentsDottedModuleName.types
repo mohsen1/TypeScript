@@ -1,16 +1,11 @@
-//// [tests/cases/compiler/commentsDottedModuleName.ts] ////
-
-=== commentsDottedModuleName.ts ===
+=== tests/cases/compiler/commentsDottedModuleName.ts ===
 /** this is multi declare module*/
-export namespace outerModule.InnerModule {
+export module outerModule.InnerModule {
 >outerModule : typeof outerModule
->            : ^^^^^^^^^^^^^^^^^^
 >InnerModule : typeof InnerModule
->            : ^^^^^^^^^^^^^^^^^^
 
     /// class b comment
     export class b {
 >b : b
->  : ^
     }
 }

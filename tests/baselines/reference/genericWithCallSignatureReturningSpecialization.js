@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericWithCallSignatureReturningSpecialization.ts] ////
-
 //// [genericWithCallSignatureReturningSpecialization.ts]
 interface B<T> {
     f(): B<number>;

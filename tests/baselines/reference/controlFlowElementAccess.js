@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowElementAccess.ts] ////
-
 //// [controlFlowElementAccess.ts]
 let x: { o: boolean } = { o: false }
 if (x['o'] === false) {

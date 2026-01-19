@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/expandoFunctionContextualTypesNoValue.ts] ////
-
-=== expandoFunctionContextualTypesNoValue.ts ===
+=== tests/cases/compiler/expandoFunctionContextualTypesNoValue.ts ===
 // GH #38532
 import Foo from "blah";
 >Foo : Symbol(Foo, Decl(expandoFunctionContextualTypesNoValue.ts, 1, 23), Decl(expandoFunctionContextualTypesNoValue.ts, 1, 6))

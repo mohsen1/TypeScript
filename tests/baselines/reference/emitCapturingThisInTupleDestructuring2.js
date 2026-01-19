@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitCapturingThisInTupleDestructuring2.ts] ////
-
 //// [emitCapturingThisInTupleDestructuring2.ts]
 var array1: [number, number] = [1, 2];
 

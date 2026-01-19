@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/enumAssignability.ts] ////
-
 //// [enumAssignability.ts]
 // enums assignable to number, any, Object, errors unless otherwise noted
 
@@ -16,7 +14,7 @@ f = 1; // ok
 var x: number = e; // ok
 x = f; // ok
 
-namespace Others {
+module Others {
     var a: any = e; // ok
 
     class C {

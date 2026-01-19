@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportModuleWithAccessibleTypesOnItsExportedMembers.ts] ////
-
 //// [ExportModuleWithAccessibleTypesOnItsExportedMembers.ts]
-namespace A {
+module A {
 
     export class Point {
         constructor(public x: number, public y: number) { }
     }
 
-    export namespace B {
+    export module B {
         export var Origin: Point = new Point(0, 0);
 
         export class Line {

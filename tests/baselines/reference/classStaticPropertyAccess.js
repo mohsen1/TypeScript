@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classStaticPropertyAccess.ts] ////
-
 //// [classStaticPropertyAccess.ts]
 class A {
     public static "\""() {}

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/contextualTypes/jsdoc/contextualTypeFromJSDoc.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/types/contextualTypes/jsdoc/index.js ===
 /** @type {Array<[string, {x?:number, y?:number}]>} */
 const arr = [
 >arr : Symbol(arr, Decl(index.js, 1, 5))

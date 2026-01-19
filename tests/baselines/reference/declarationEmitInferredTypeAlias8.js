@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitInferredTypeAlias8.ts] ////
-
 //// [declarationEmitInferredTypeAlias8.ts]
 type Foo<T> = T | { x: Foo<T> };
 var x: Foo<number[]>;
@@ -16,7 +14,7 @@ function returnSomeGlobalValue() {
 
 
 //// [declarationEmitInferredTypeAlias8.d.ts]
-type Foo<T> = T | {
+declare type Foo<T> = T | {
     x: Foo<T>;
 };
 declare var x: Foo<number[]>;

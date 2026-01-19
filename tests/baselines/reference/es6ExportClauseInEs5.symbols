@@ -1,13 +1,11 @@
-//// [tests/cases/compiler/es6ExportClauseInEs5.ts] ////
-
-=== server.ts ===
+=== tests/cases/compiler/server.ts ===
 class c {
 >c : Symbol(c, Decl(server.ts, 0, 0))
 }
 interface i {
 >i : Symbol(i, Decl(server.ts, 1, 1))
 }
-namespace m {
+module m {
 >m : Symbol(m, Decl(server.ts, 3, 1))
 
     export var x = 10;
@@ -16,7 +14,7 @@ namespace m {
 var x = 10;
 >x : Symbol(x, Decl(server.ts, 7, 3))
 
-namespace uninstantiated {
+module uninstantiated {
 >uninstantiated : Symbol(uninstantiated, Decl(server.ts, 7, 11))
 }
 export { c };

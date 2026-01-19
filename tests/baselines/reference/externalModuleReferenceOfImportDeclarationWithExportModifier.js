@@ -11,15 +11,16 @@ file1.foo();
 //// [externalModuleReferenceOfImportDeclarationWithExportModifier_0.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.foo = foo;
+    exports.__esModule = true;
+    exports.foo = void 0;
     function foo() { }
+    exports.foo = foo;
     ;
 });
 //// [externalModuleReferenceOfImportDeclarationWithExportModifier_1.js]
 define(["require", "exports", "externalModuleReferenceOfImportDeclarationWithExportModifier_0"], function (require, exports, file1) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.file1 = file1;
     exports.file1.foo();
 });

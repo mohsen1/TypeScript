@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportAssignmentWithExports.ts] ////
-
 //// [exportAssignmentWithExports.ts]
 export class C { }
 class D { }

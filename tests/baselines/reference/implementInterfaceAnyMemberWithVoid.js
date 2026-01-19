@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implementInterfaceAnyMemberWithVoid.ts] ////
-
 //// [implementInterfaceAnyMemberWithVoid.ts]
 interface I {
     foo(value: number);

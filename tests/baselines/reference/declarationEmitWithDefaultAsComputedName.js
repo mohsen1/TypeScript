@@ -25,20 +25,17 @@ exports.default = createExperiment({
 });
 //// [main.js]
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 var _a;
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.obj = void 0;
-var other_1 = __importDefault(require("./other"));
+var other_1 = require("./other");
 exports.obj = (_a = {},
     _a[other_1.default.name] = 1,
     _a);
 
 
 //// [other.d.ts]
-type Experiment<Name> = {
+declare type Experiment<Name> = {
     name: Name;
 };
 declare const _default: Experiment<"foo">;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionArgumentsInType.ts] ////
-
 //// [collisionArgumentsInType.ts]
 var v1: (i: number, ...arguments) => void; // no error - no code gen
 var v12: (arguments: number, ...restParameters) => void; // no error - no code gen

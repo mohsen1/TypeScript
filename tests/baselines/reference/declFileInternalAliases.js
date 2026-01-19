@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/declFileInternalAliases.ts] ////
-
 //// [declFileInternalAliases.ts]
-namespace m {
+module m {
     export class c {
     }
 }
-namespace m1 {
+module m1 {
     import x = m.c;
     export var d = new x(); // emit the type as m.c
 }
-namespace m2 {
+module m2 {
     export import x = m.c;
     export var d = new x(); // emit the type as x
 }
@@ -37,15 +35,15 @@ var m2;
 
 
 //// [declFileInternalAliases.d.ts]
-declare namespace m {
+declare module m {
     class c {
     }
 }
-declare namespace m1 {
+declare module m1 {
     import x = m.c;
     var d: x;
 }
-declare namespace m2 {
+declare module m2 {
     export import x = m.c;
     var d: x;
 }

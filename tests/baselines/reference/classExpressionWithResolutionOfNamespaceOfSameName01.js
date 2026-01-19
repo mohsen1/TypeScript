@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExpressionWithResolutionOfNamespaceOfSameName01.ts] ////
-
 //// [classExpressionWithResolutionOfNamespaceOfSameName01.ts]
 namespace C {
     export interface type {

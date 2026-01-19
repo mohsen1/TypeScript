@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames44_ES5.ts] ////
-
 //// [computedPropertyNames44_ES5.ts]
 class Foo { x }
 class Foo2 { x; y }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceDeclaration1.ts] ////
-
 //// [interfaceDeclaration1.ts]
 interface I1 {
     item:number;

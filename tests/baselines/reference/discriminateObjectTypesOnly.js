@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminateObjectTypesOnly.ts] ////
-
 //// [discriminateObjectTypesOnly.ts]
 type Thing = number | object;
 const k: Thing = { toFixed: null }; // OK, satisfies object

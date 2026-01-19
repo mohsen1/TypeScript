@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithMemberInterfaceConflict.ts] ////
-
 //// [collisionCodeGenModuleWithMemberInterfaceConflict.ts]
-namespace m1 {
+module m1 {
     export interface m1 {
     }
     export class m2 implements m1 {

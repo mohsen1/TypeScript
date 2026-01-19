@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeAssertions6.ts] ////
-
 //// [genericTypeAssertions6.ts]
 class A<T,U> {
     constructor(x) {
@@ -23,7 +21,7 @@ class B<T extends Date, U extends Date> extends A<T, U> {
     }
 }
 
-declare var b: B<Date, Date>;
+var b: B<Date, Date>;
 var c: A<Date, Date> = <A<Date, Date>>b;
 
 //// [genericTypeAssertions6.js]
@@ -67,4 +65,5 @@ var B = /** @class */ (function (_super) {
     };
     return B;
 }(A));
+var b;
 var c = b;

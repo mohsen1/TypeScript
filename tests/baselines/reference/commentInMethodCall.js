@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentInMethodCall.ts] ////
-
 //// [commentInMethodCall.ts]
 //commment here
 var s: string[];

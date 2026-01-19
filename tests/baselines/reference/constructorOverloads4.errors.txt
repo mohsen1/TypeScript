@@ -1,9 +1,9 @@
-constructorOverloads4.ts(10,1): error TS2349: This expression is not callable.
+tests/cases/compiler/constructorOverloads4.ts(10,1): error TS2349: This expression is not callable.
   Type 'Function' has no call signatures.
 
 
-==== constructorOverloads4.ts (1 errors) ====
-    declare namespace M {    
+==== tests/cases/compiler/constructorOverloads4.ts (1 errors) ====
+    declare module M {    
         export class Function {
             constructor(...args: string[]);
         }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayLiteralInNonVarArgParameter.ts] ////
-
 //// [arrayLiteralInNonVarArgParameter.ts]
 function panic(val: string[], ...opt: string[]) { }
 

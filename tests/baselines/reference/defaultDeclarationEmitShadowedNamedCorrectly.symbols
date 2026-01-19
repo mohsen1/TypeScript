@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/defaultDeclarationEmitShadowedNamedCorrectly.ts] ////
-
-=== this.ts ===
+=== tests/cases/compiler/this.ts ===
 import * as me from "./this";
 >me : Symbol(me, Decl(this.ts, 0, 6))
 

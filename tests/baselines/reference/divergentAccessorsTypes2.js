@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/divergentAccessorsTypes2.ts] ////
-
 //// [divergentAccessorsTypes2.ts]
 class Test1<T> {
     get foo(): T { return null as any }

@@ -1,8 +1,6 @@
-//// [tests/cases/conformance/expressions/unaryOperators/deleteOperator/deleteOperatorWithNumberType.ts] ////
-
 //// [deleteOperatorWithNumberType.ts]
 // delete  operator on number type
-declare var NUMBER: number;
+var NUMBER: number;
 var NUMBER1: number[] = [1, 2];
 
 function foo(): number { return 1; }
@@ -11,7 +9,7 @@ class A {
     public a: number;
     static foo() { return 1; }
 }
-namespace M {
+module M {
     export var n: number;
 }
 
@@ -48,6 +46,8 @@ delete M.n;
 delete objA.a, M.n;
 
 //// [deleteOperatorWithNumberType.js]
+// delete  operator on number type
+var NUMBER;
 var NUMBER1 = [1, 2];
 function foo() { return 1; }
 var A = /** @class */ (function () {

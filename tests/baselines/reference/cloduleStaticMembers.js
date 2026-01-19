@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/cloduleStaticMembers.ts] ////
-
 //// [cloduleStaticMembers.ts]
 class Clod {
     private static x = 10;
     public static y = 10;
 }
-namespace Clod {
+module Clod {
     var p = Clod.x;
     var q = x;
 

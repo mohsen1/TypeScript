@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticFunctionAndExportedFunctionThatShareAName.ts] ////
-
 //// [ClassAndModuleThatMergeWithStaticFunctionAndExportedFunctionThatShareAName.ts]
 class Point {
     constructor(public x: number, public y: number) { }
@@ -7,19 +5,19 @@ class Point {
     static Origin(): Point { return { x: 0, y: 0 }; } // unexpected error here bug 840246
 }
 
-namespace Point {
+module Point {
     export function Origin() { return null; } //expected duplicate identifier error
 }
 
 
-namespace A {
+module A {
     export class Point {
         constructor(public x: number, public y: number) { }
 
         static Origin(): Point { return { x: 0, y: 0 }; } // unexpected error here bug 840246
     }
 
-    export namespace Point {
+    export module Point {
         export function Origin() { return ""; }//expected duplicate identifier error
     }
 }

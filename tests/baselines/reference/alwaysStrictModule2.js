@@ -1,14 +1,14 @@
 //// [tests/cases/compiler/alwaysStrictModule2.ts] ////
 
 //// [a.ts]
-namespace M {
+module M {
     export function f() {
         var arguments = [];
     }
 }
 
 //// [b.ts]
-namespace M {
+module M {
     export function f2() {
         var arguments = [];
     }

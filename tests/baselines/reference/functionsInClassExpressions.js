@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionsInClassExpressions.ts] ////
-
 //// [functionsInClassExpressions.ts]
 let Foo = class {
     constructor() {

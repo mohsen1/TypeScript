@@ -1,12 +1,9 @@
-//// [tests/cases/compiler/extendsJavaScript.ts] ////
-
-=== extendsJavaScript.js ===
+=== tests/cases/compiler/extendsJavaScript.js ===
 /**
  * @extends {SomeBase}
  */
 class MyClass {
 >MyClass : MyClass
->        : ^^^^^^^
 
 }
 

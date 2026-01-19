@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/enumKeysQuotedAsObjectPropertiesInDeclarationEmit.ts] ////
-
-=== enumKeysQuotedAsObjectPropertiesInDeclarationEmit.ts ===
+=== tests/cases/compiler/enumKeysQuotedAsObjectPropertiesInDeclarationEmit.ts ===
 export enum MouseButton {
 >MouseButton : Symbol(MouseButton, Decl(enumKeysQuotedAsObjectPropertiesInDeclarationEmit.ts, 0, 0))
 

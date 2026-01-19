@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/contextualSignatureInstantiation.ts] ////
-
 //// [contextualSignatureInstantiation.ts]
 // TypeScript Spec, section 4.12.2:
 // If e is an expression of a function type that contains exactly one generic call signature and no other members,

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forLoopEndingMultilineComments.ts] ////
-
 //// [forLoopEndingMultilineComments.ts]
 declare var a: any;
 
@@ -22,8 +20,8 @@ export function consoleTestResultHandler(testResult: any): boolean {
 
 //// [forLoopEndingMultilineComments.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.consoleTestResultHandler = consoleTestResultHandler;
+exports.__esModule = true;
+exports.consoleTestResultHandler = void 0;
 function consoleTestResultHandler(testResult) {
     // needed to get colors to show up when passing through Grunt
     void a;
@@ -39,3 +37,4 @@ function consoleTestResultHandler(testResult) {
     }
     return true;
 }
+exports.consoleTestResultHandler = consoleTestResultHandler;

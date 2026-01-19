@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignaturesWithParameterInitializers2.ts] ////
-
 //// [callSignaturesWithParameterInitializers2.ts]
 // Optional parameters allow initializers only in implementation signatures
 // All the below declarations are errors
@@ -15,7 +13,7 @@ class C {
     foo(x = 1) { }
 }
 
-declare var c: C;
+var c: C;
 c.foo();
 c.foo(1);
 
@@ -43,15 +41,16 @@ var C = /** @class */ (function () {
     };
     return C;
 }());
+var c;
 c.foo();
 c.foo(1);
 var b = {
     foo: function (x) {
         if (x === void 0) { x = 1; }
-    }, // error
+    },
     foo: function (x) {
         if (x === void 0) { x = 1; }
-    },
+    }
 };
 b.foo();
 b.foo(1);

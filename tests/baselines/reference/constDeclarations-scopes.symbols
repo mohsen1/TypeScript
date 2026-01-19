@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/constDeclarations-scopes.ts] ////
-
-=== constDeclarations-scopes.ts ===
+=== tests/cases/compiler/constDeclarations-scopes.ts ===
 // global
 const c = "string";
 >c : Symbol(c, Decl(constDeclarations-scopes.ts, 1, 5))
@@ -194,7 +192,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
 >m : Symbol(m, Decl(constDeclarations-scopes.ts, 98, 2))
 
     const c = 0;

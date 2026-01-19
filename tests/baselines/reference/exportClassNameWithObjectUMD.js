@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportClassNameWithObjectUMD.ts] ////
-
 //// [exportClassNameWithObjectUMD.ts]
 export class Object {}
 

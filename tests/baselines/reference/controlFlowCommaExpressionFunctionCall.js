@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowCommaExpressionFunctionCall.ts] ////
-
 //// [controlFlowCommaExpressionFunctionCall.ts]
 const otherValue = () => true;
 const value : number | string = null as any;

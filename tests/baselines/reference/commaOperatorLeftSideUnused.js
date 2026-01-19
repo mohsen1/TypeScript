@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commaOperatorLeftSideUnused.ts] ////
-
 //// [commaOperatorLeftSideUnused.ts]
 var xx: any;
 var yy: any;
@@ -42,7 +40,6 @@ xx = (!xx, 10);
 xx = (~xx, 10);
 xx = (-xx, 10);
 xx = (+xx, 10);
-xx = (0, xx)();
 
 // OK cases
 xx = (xx ? x++ : 4, 10);
@@ -54,15 +51,9 @@ xx = ((xx+= 4), xx);
 xx = (Math.pow(3, 2), 4);
 xx = (void xx, 10);
 xx = (xx as any, 100);
-xx = (0, xx.fn)();
-xx = (0, xx['fn'])();
-xx = (0, xx.fn)``;
+
 
 //// [commaOperatorLeftSideUnused.js]
-var __makeTemplateObject = (this && this.__makeTemplateObject) || function (cooked, raw) {
-    if (Object.defineProperty) { Object.defineProperty(cooked, "raw", { value: raw }); } else { cooked.raw = raw; }
-    return cooked;
-};
 var xx;
 var yy;
 function fn() {
@@ -100,7 +91,6 @@ xx = (!xx, 10);
 xx = (~xx, 10);
 xx = (-xx, 10);
 xx = (+xx, 10);
-xx = (0, xx)();
 // OK cases
 xx = (xx ? x++ : 4, 10);
 xx = (--xx, 3);
@@ -111,6 +101,3 @@ xx = ((xx += 4), xx);
 xx = (Math.pow(3, 2), 4);
 xx = (void xx, 10);
 xx = (xx, 100);
-xx = (0, xx.fn)();
-xx = (0, xx['fn'])();
-xx = (0, xx.fn)(__makeTemplateObject([""], [""]));

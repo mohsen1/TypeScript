@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericSignatureIdentity.ts] ////
-
 //// [genericSignatureIdentity.ts]
 // This test is here to remind us of our current limits of type identity checking.
 // Ideally all of the below declarations would be considered different (and thus errors)

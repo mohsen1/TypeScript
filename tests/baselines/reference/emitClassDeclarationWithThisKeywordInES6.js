@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/classDeclaration/emitClassDeclarationWithThisKeywordInES6.ts] ////
-
 //// [emitClassDeclarationWithThisKeywordInES6.ts]
 class B {
     x = 10;

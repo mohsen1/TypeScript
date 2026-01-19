@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-inStatements/for-inStatementsInvalid.ts] ////
-
 //// [for-inStatementsInvalid.ts]
 var aNumber: number;
 for (aNumber in {}) { }
@@ -15,7 +13,7 @@ for (var idx : number in {}) { }
 function fn(): void { }
 for (var x in fn()) { }
 
-declare var c : string, d:string, e: any;
+var c : string, d:string, e;
 
 for (var x in c || d) { }
 for (var x in e ? c : d) { }
@@ -60,7 +58,7 @@ interface I {
     id: number;
     [idx: number]: number;
 }
-declare var i: I;
+var i: I;
 
 for (var x in i[42]) { } 
 
@@ -90,6 +88,7 @@ for (aRegExp in {}) { }
 for (var idx in {}) { }
 function fn() { }
 for (var x in fn()) { }
+var c, d, e;
 for (var x in c || d) { }
 for (var x in e ? c : d) { }
 for (var x in 42 ? c : d) { }
@@ -130,4 +129,5 @@ var B = /** @class */ (function (_super) {
     };
     return B;
 }(A));
+var i;
 for (var x in i[42]) { }

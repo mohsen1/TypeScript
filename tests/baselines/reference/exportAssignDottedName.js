@@ -12,11 +12,12 @@ export = foo1.x; // Ok
 
 //// [foo1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.x = x;
+exports.__esModule = true;
+exports.x = void 0;
 function x() {
     return true;
 }
+exports.x = x;
 //// [foo2.js]
 "use strict";
 var foo1 = require("./foo1");

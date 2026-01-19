@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowIterationErrors.ts] ////
-
 //// [controlFlowIterationErrors.ts]
 let cond: boolean;
 

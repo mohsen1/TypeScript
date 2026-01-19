@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringInFunctionType.ts] ////
-
 //// [destructuringInFunctionType.ts]
 interface a { a }
 interface b { b }
@@ -41,31 +39,31 @@ interface b {
 interface c {
     c: any;
 }
-type T1 = ([a, b, c]);
-type F1 = ([a, b, c]: [any, any, any]) => void;
-type T2 = ({
+declare type T1 = ([a, b, c]);
+declare type F1 = ([a, b, c]: [any, any, any]) => void;
+declare type T2 = ({
     a: any;
 });
-type F2 = ({ a }: {
+declare type F2 = ({ a }: {
     a: any;
 }) => void;
-type T3 = ([{
+declare type T3 = ([{
     a: b;
 }, {
     b: a;
 }]);
-type F3 = ([{ a: b }, { b: a }]: [{
+declare type F3 = ([{ a: b }, { b: a }]: [{
     a: any;
 }, {
     b: any;
 }]) => void;
-type T4 = ([{
+declare type T4 = ([{
     a: [b, c];
 }]);
-type F4 = ([{ a: [b, c] }]: [{
+declare type F4 = ([{ a: [b, c] }]: [{
     a: [any, any];
 }]) => void;
-type C1 = new ([{ a: [b, c] }]: [{
+declare type C1 = new ([{ a: [b, c] }]: [{
     a: [any, any];
 }]) => void;
 declare var v1: ([a, b, c]: [any, any, any]) => string;

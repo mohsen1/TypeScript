@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deepElaborationsIntoArrowExpressions.ts] ////
-
 //// [deepElaborationsIntoArrowExpressions.ts]
 const a: {
     y(): "a"

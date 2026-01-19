@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deepExcessPropertyCheckingWhenTargetIsIntersection.ts] ////
-
 //// [deepExcessPropertyCheckingWhenTargetIsIntersection.ts]
 interface StatelessComponent<P = {}> {
   (props: P & { children?: number }, context?: any): null;

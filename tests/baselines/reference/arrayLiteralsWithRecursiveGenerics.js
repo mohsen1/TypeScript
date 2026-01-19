@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/arrayLiteralsWithRecursiveGenerics.ts] ////
-
 //// [arrayLiteralsWithRecursiveGenerics.ts]
 class List<T> {
     data: T;

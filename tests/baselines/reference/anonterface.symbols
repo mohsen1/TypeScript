@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/anonterface.ts] ////
-
-=== anonterface.ts ===
-namespace M {
+=== tests/cases/compiler/anonterface.ts ===
+module M {
 >M : Symbol(M, Decl(anonterface.ts, 0, 0))
 
     export class C {
->C : Symbol(C, Decl(anonterface.ts, 0, 13))
+>C : Symbol(C, Decl(anonterface.ts, 0, 10))
 
         m(fn:{ (n:number):string; },n2:number):string {
 >m : Symbol(C.m, Decl(anonterface.ts, 1, 20))
@@ -22,9 +20,9 @@ namespace M {
 
 var c=new M.C();
 >c : Symbol(c, Decl(anonterface.ts, 8, 3))
->M.C : Symbol(M.C, Decl(anonterface.ts, 0, 13))
+>M.C : Symbol(M.C, Decl(anonterface.ts, 0, 10))
 >M : Symbol(M, Decl(anonterface.ts, 0, 0))
->C : Symbol(M.C, Decl(anonterface.ts, 0, 13))
+>C : Symbol(M.C, Decl(anonterface.ts, 0, 10))
 
 c.m(function(n) { return "hello: "+n; },18);
 >c.m : Symbol(M.C.m, Decl(anonterface.ts, 1, 20))

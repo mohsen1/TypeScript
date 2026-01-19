@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateObjectLiteralProperty.ts] ////
-
 //// [duplicateObjectLiteralProperty.ts]
 var x = {
     a: 1,
@@ -23,9 +21,9 @@ var y = {
 //// [duplicateObjectLiteralProperty.js]
 var x = {
     a: 1,
-    b: true, // OK
-    a: 56, // Duplicate
-    \u0061: "ss", // Duplicate
+    b: true,
+    a: 56,
+    \u0061: "ss",
     a: {
         c: 1,
         "c": 56, // Duplicate

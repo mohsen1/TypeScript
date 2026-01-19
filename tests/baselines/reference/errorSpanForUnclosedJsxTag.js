@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorSpanForUnclosedJsxTag.tsx] ////
-
 //// [errorSpanForUnclosedJsxTag.tsx]
 declare const React: any
 

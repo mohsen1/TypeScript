@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/bivariantInferences.ts] ////
-
 //// [bivariantInferences.ts]
 // Repro from #27337
 

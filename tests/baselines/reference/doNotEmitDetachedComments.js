@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doNotEmitDetachedComments.ts] ////
-
 //// [doNotEmitDetachedComments.ts]
 /*
 

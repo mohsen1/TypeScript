@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/excessPropertyCheckWithEmptyObject.ts] ////
-
 //// [excessPropertyCheckWithEmptyObject.ts]
 // Repro from #14910
 

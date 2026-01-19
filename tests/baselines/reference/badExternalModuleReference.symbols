@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/badExternalModuleReference.ts] ////
-
-=== badExternalModuleReference.ts ===
+=== tests/cases/compiler/badExternalModuleReference.ts ===
 import a1 = require("garbage");
 >a1 : Symbol(a1, Decl(badExternalModuleReference.ts, 0, 0))
 

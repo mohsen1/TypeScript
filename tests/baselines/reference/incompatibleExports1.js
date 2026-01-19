@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incompatibleExports1.ts] ////
-
 //// [incompatibleExports1.ts]
 declare module "foo" { 
     export interface x { a: string } 
@@ -8,11 +6,11 @@ declare module "foo" {
 }
  
 declare module "baz" {
-    export namespace a {
+    export module a {
         export var b: number;
     }
  
-    namespace c {
+    module c {
         export var c: string;
     }
  

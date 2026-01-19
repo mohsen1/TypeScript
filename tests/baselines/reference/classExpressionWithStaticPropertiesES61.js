@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExpressionWithStaticPropertiesES61.ts] ////
-
 //// [classExpressionWithStaticPropertiesES61.ts]
 var v = class C { 
     static a = 1;

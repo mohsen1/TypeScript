@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericRestArgs.ts] ////
-
 //// [genericRestArgs.ts]
 function makeArrayG<T>(...items: T[]): T[] { return items; }
 var a1Ga = makeArrayG(1, ""); // no error

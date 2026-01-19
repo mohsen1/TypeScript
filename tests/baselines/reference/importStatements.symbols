@@ -1,11 +1,9 @@
-//// [tests/cases/conformance/internalModules/codeGeneration/importStatements.ts] ////
-
-=== importStatements.ts ===
-namespace A {
+=== tests/cases/conformance/internalModules/codeGeneration/importStatements.ts ===
+module A {
 >A : Symbol(A, Decl(importStatements.ts, 0, 0))
 
     export class Point {
->Point : Symbol(Point, Decl(importStatements.ts, 0, 13))
+>Point : Symbol(Point, Decl(importStatements.ts, 0, 10))
 
         constructor(public x: number, public y: number) { }
 >x : Symbol(Point.x, Decl(importStatements.ts, 2, 20))
@@ -14,34 +12,34 @@ namespace A {
 
     export var Origin = new Point(0, 0);
 >Origin : Symbol(Origin, Decl(importStatements.ts, 5, 14))
->Point : Symbol(Point, Decl(importStatements.ts, 0, 13))
+>Point : Symbol(Point, Decl(importStatements.ts, 0, 10))
 }
 
 // no code gen expected
-namespace B {
+module B {
 >B : Symbol(B, Decl(importStatements.ts, 6, 1))
 
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
->a : Symbol(a, Decl(importStatements.ts, 9, 13))
+>a : Symbol(a, Decl(importStatements.ts, 9, 10))
 >A : Symbol(a, Decl(importStatements.ts, 0, 0))
 }
 
 // no code gen expected
-namespace C {
+module C {
 >C : Symbol(C, Decl(importStatements.ts, 11, 1))
 
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
->a : Symbol(a, Decl(importStatements.ts, 14, 13))
+>a : Symbol(a, Decl(importStatements.ts, 14, 10))
 >A : Symbol(a, Decl(importStatements.ts, 0, 0))
 
     var m: typeof a;
 >m : Symbol(m, Decl(importStatements.ts, 16, 7))
->a : Symbol(a, Decl(importStatements.ts, 14, 13))
+>a : Symbol(a, Decl(importStatements.ts, 14, 10))
 
     var p: a.Point;
 >p : Symbol(p, Decl(importStatements.ts, 17, 7), Decl(importStatements.ts, 18, 7))
->a : Symbol(a, Decl(importStatements.ts, 14, 13))
->Point : Symbol(a.Point, Decl(importStatements.ts, 0, 13))
+>a : Symbol(a, Decl(importStatements.ts, 14, 10))
+>Point : Symbol(a.Point, Decl(importStatements.ts, 0, 10))
 
     var p = {x:0, y:0 };
 >p : Symbol(p, Decl(importStatements.ts, 17, 7), Decl(importStatements.ts, 18, 7))
@@ -50,37 +48,37 @@ namespace C {
 }
 
 // code gen expected
-namespace D {
+module D {
 >D : Symbol(D, Decl(importStatements.ts, 19, 1))
 
     import a = A;
->a : Symbol(a, Decl(importStatements.ts, 22, 13))
+>a : Symbol(a, Decl(importStatements.ts, 22, 10))
 >A : Symbol(a, Decl(importStatements.ts, 0, 0))
 
     var p = new a.Point(1, 1);
 >p : Symbol(p, Decl(importStatements.ts, 25, 7))
->a.Point : Symbol(a.Point, Decl(importStatements.ts, 0, 13))
->a : Symbol(a, Decl(importStatements.ts, 22, 13))
->Point : Symbol(a.Point, Decl(importStatements.ts, 0, 13))
+>a.Point : Symbol(a.Point, Decl(importStatements.ts, 0, 10))
+>a : Symbol(a, Decl(importStatements.ts, 22, 10))
+>Point : Symbol(a.Point, Decl(importStatements.ts, 0, 10))
 }
 
-namespace E {
+module E {
 >E : Symbol(E, Decl(importStatements.ts, 26, 1))
 
     import a = A;
->a : Symbol(a, Decl(importStatements.ts, 28, 13))
+>a : Symbol(a, Decl(importStatements.ts, 28, 10))
 >A : Symbol(a, Decl(importStatements.ts, 0, 0))
 
     export function xDist(x: a.Point) {
 >xDist : Symbol(xDist, Decl(importStatements.ts, 29, 17))
 >x : Symbol(x, Decl(importStatements.ts, 30, 26))
->a : Symbol(a, Decl(importStatements.ts, 28, 13))
->Point : Symbol(a.Point, Decl(importStatements.ts, 0, 13))
+>a : Symbol(a, Decl(importStatements.ts, 28, 10))
+>Point : Symbol(a.Point, Decl(importStatements.ts, 0, 10))
 
         return (a.Origin.x - x.x);
 >a.Origin.x : Symbol(a.Point.x, Decl(importStatements.ts, 2, 20))
 >a.Origin : Symbol(a.Origin, Decl(importStatements.ts, 5, 14))
->a : Symbol(a, Decl(importStatements.ts, 28, 13))
+>a : Symbol(a, Decl(importStatements.ts, 28, 10))
 >Origin : Symbol(a.Origin, Decl(importStatements.ts, 5, 14))
 >x : Symbol(a.Point.x, Decl(importStatements.ts, 2, 20))
 >x.x : Symbol(a.Point.x, Decl(importStatements.ts, 2, 20))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classMemberInitializerScoping.ts] ////
-
 //// [classMemberInitializerScoping.ts]
 var aaa = 1;
 class CCC {

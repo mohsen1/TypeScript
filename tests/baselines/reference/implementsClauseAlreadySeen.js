@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implementsClauseAlreadySeen.ts] ////
-
 //// [implementsClauseAlreadySeen.ts]
 class C {
     

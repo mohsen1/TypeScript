@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/externSyntax.ts] ////
-
 //// [externSyntax.ts]
 declare var v;
-declare namespace M {
+declare module M {
     export class D {
         public p;
     }

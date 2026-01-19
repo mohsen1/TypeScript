@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/Symbols/ES5SymbolProperty1.ts] ////
-
 //// [ES5SymbolProperty1.ts]
 interface SymbolConstructor {
     foo: string;

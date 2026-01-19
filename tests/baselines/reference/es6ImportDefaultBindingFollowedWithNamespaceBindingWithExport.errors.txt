@@ -1,14 +1,14 @@
-client.ts(1,1): error TS1191: An import declaration cannot have modifiers.
-client.ts(1,15): error TS1192: Module '"server"' has no default export.
+tests/cases/compiler/client.ts(1,1): error TS1191: An import declaration cannot have modifiers.
+tests/cases/compiler/client.ts(1,15): error TS1192: Module '"tests/cases/compiler/server"' has no default export.
 
 
-==== server.ts (0 errors) ====
+==== tests/cases/compiler/server.ts (0 errors) ====
     export var a = 10;
     
-==== client.ts (2 errors) ====
+==== tests/cases/compiler/client.ts (2 errors) ====
     export import defaultBinding, * as nameSpaceBinding  from "./server";
     ~~~~~~
 !!! error TS1191: An import declaration cannot have modifiers.
                   ~~~~~~~~~~~~~~
-!!! error TS1192: Module '"server"' has no default export.
+!!! error TS1192: Module '"tests/cases/compiler/server"' has no default export.
     export var x: number = nameSpaceBinding.a;

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/es6ModuleInternalNamedImports.ts] ////
-
 //// [es6ModuleInternalNamedImports.ts]
-export namespace M {
+export module M {
     // variable
     export var M_V = 0;
     // interface
@@ -9,9 +7,9 @@ export namespace M {
     //calss
     export class M_C { }
     // instantiated module
-    export namespace M_M { var x; }
+    export module M_M { var x; }
     // uninstantiated module
-    export namespace M_MU { }
+    export module M_MU { }
     // function
     export function M_F() { }
     // enum

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/importAndVariableDeclarationConflict4.ts] ////
-
 //// [importAndVariableDeclarationConflict4.ts]
-namespace m {
+module m {
   export var m = '';
 }
 

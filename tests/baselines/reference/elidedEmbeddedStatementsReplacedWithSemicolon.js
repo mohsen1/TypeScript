@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/elidedEmbeddedStatementsReplacedWithSemicolon.ts] ////
-
 //// [elidedEmbeddedStatementsReplacedWithSemicolon.ts]
 if (1)
     const enum A {}

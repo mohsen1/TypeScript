@@ -1,19 +1,14 @@
-//// [tests/cases/conformance/ambient/ambientShorthand.ts] ////
-
-=== user.ts ===
+=== tests/cases/conformance/ambient/user.ts ===
 ///<reference path="declarations.d.ts"/>
 import foo, {bar} from "jquery";
 >foo : any
->    : ^^^
 >bar : any
->    : ^^^
 
 import * as baz from "fs";
 >baz : any
 
 import boom = require("jquery");
 >boom : any
->     : ^^^
 
 foo(bar, baz, boom);
 >foo(bar, baz, boom) : any
@@ -22,7 +17,7 @@ foo(bar, baz, boom);
 >baz : any
 >boom : any
 
-=== declarations.d.ts ===
+=== tests/cases/conformance/ambient/declarations.d.ts ===
 declare module "jquery"
 >"jquery" : any
 

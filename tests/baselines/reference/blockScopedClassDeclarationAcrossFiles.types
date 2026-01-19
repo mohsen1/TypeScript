@@ -1,14 +1,9 @@
-//// [tests/cases/compiler/blockScopedClassDeclarationAcrossFiles.ts] ////
-
-=== c.ts ===
+=== tests/cases/compiler/c.ts ===
 let foo: typeof C;
 >foo : typeof C
->    : ^^^^^^^^
 >C : typeof C
->  : ^^^^^^^^
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 class C { }
 >C : C
->  : ^
 

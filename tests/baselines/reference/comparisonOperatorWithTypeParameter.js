@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithTypeParameter.ts] ////
-
 //// [comparisonOperatorWithTypeParameter.ts]
 var a: {};
 var b: Object;

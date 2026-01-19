@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionsMissingReturnStatementsAndExpressions.ts] ////
-
 //// [functionsMissingReturnStatementsAndExpressions.ts]
 function f1(): string {
     // errors because there are no return statements
@@ -33,12 +31,12 @@ function f7(): void {
     return null;
 }
 
-function f8(): any {
+function f8(): void {
     // Fine since are typed any.
     return;
 }
 
-function f9(): any {
+function f9(): void {
     // Fine since we are typed any and return undefined
     return undefined;
 }
@@ -103,32 +101,6 @@ function f21(): number | string {
     // Not okay; union does not contain void or any
 }
 
-function f22(): undefined {
-    // Okay; return type allows implicit return of undefined
-}
-
-function f23(): undefined | number {
-    // Error; because `undefined | number` becomes `number` without strictNullChecks.
-}
-
-const f30: () => undefined = () => {
-    // Ok, contextual type for implicit return is `undefined`
-}
-
-const f31: () => undefined = () => {
-    // Ok, contextual type for expression-less return is `undefined`
-    return;
-}
-
-const f32: () => undefined | number = () => {
-    // Error, contextual type for implicit return isn't just `undefined`
-}
-
-const f33: () => undefined | number = () => {
-    // Error, contextual type for expression-less return isn't just `undefined`
-    return;
-}
-
 class C {
     public get m1() {
         // Errors; get accessors must return a value.
@@ -155,7 +127,6 @@ class C {
         throw undefined.
     }
 }
-
 
 //// [functionsMissingReturnStatementsAndExpressions.js]
 function f1() {
@@ -238,26 +209,6 @@ function f20() {
 function f21() {
     // Not okay; union does not contain void or any
 }
-function f22() {
-    // Okay; return type allows implicit return of undefined
-}
-function f23() {
-    // Error; because `undefined | number` becomes `number` without strictNullChecks.
-}
-var f30 = function () {
-    // Ok, contextual type for implicit return is `undefined`
-};
-var f31 = function () {
-    // Ok, contextual type for expression-less return is `undefined`
-    return;
-};
-var f32 = function () {
-    // Error, contextual type for implicit return isn't just `undefined`
-};
-var f33 = function () {
-    // Error, contextual type for expression-less return isn't just `undefined`
-    return;
-};
 var C = /** @class */ (function () {
     function C() {
     }

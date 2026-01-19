@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsPropertyNameInJsMode1.ts] ////
-
 //// [a.js]
 const foo = {
    f1: (params) => { }

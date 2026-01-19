@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classOrder1.ts] ////
-
 //// [classOrder1.ts]
 class A {
     public foo() {

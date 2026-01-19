@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/conditionalTypeSimplification.ts] ////
-
-=== conditionalTypeSimplification.ts ===
+=== tests/cases/compiler/conditionalTypeSimplification.ts ===
 // Repro from #30794
 
 interface AbstractSchema<S, V> {

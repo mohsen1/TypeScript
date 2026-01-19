@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/compilerOptionsDeclarationAndNoEmit.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class c {
 >c : Symbol(c, Decl(a.ts, 0, 0))
 }

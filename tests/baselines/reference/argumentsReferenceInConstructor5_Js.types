@@ -1,22 +1,15 @@
-//// [tests/cases/compiler/argumentsReferenceInConstructor5_Js.ts] ////
-
 === /a.js ===
 const bar = {
 >bar : { arguments: {}; }
->    : ^^^^^^^^^^^^^^^^^^
 >{	arguments: {}} : { arguments: {}; }
->                 : ^^^^^^^^^^^^^^^^^^
 
 	arguments: {}
 >arguments : {}
->          : ^^
 >{} : {}
->   : ^^
 }
 
 class A {
 >A : A
->  : ^
 
 	/**
 	 * Constructor
@@ -26,7 +19,6 @@ class A {
 	constructor(foo = {}) {
 >foo : any
 >{} : {}
->   : ^^
 
 		/**
 		 * @type object
@@ -35,9 +27,7 @@ class A {
 >this.foo = foo : any
 >this.foo : any
 >this : this
->     : ^^^^
 >foo : any
->    : ^^^
 >foo : any
 
 		/**
@@ -45,18 +35,12 @@ class A {
 		 */
 		this.bar = bar.arguments;
 >this.bar = bar.arguments : {}
->                         : ^^
 >this.bar : any
 >this : this
->     : ^^^^
 >bar : any
->    : ^^^
 >bar.arguments : {}
->              : ^^
 >bar : { arguments: {}; }
->    : ^^^^^^^^^^^^^^^^^^
 >arguments : {}
->          : ^^
 	}
 }
 

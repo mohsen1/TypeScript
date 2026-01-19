@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/returnStatements/invalidReturnStatements.ts] ////
-
 //// [invalidReturnStatements.ts]
 // all the following should be error
 function fn1(): number {  }

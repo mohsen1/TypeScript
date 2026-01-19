@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/expressions/functionCalls/forgottenNew.ts] ////
-
 //// [forgottenNew.ts]
-namespace Tools {
+module Tools {
     export class NullLogger { }
 }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es6/awaitBinaryExpression/awaitBinaryExpression3_es6.ts] ////
-
 //// [awaitBinaryExpression3_es6.ts]
 declare var a: number;
 declare var p: Promise<number>;

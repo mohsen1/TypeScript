@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/complexClassRelationships.ts] ////
-
 //// [complexClassRelationships.ts]
 // There should be no errors in this file
 class Derived extends Base {

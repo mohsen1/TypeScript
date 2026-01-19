@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/innerExtern.ts] ////
-
 //// [innerExtern.ts]
-namespace A {
-    export declare namespace BB {
+module A {
+    export declare module BB {
         export var Elephant;
     }
-    export namespace B {
+    export module B {
         export class C {
             x = BB.Elephant.X;
         }

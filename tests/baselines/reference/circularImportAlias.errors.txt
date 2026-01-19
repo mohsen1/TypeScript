@@ -1,20 +1,20 @@
-circularImportAlias.ts(5,30): error TS2449: Class 'C' used before its declaration.
+tests/cases/conformance/internalModules/importDeclarations/circularImportAlias.ts(5,30): error TS2449: Class 'C' used before its declaration.
 
 
-==== circularImportAlias.ts (1 errors) ====
+==== tests/cases/conformance/internalModules/importDeclarations/circularImportAlias.ts (1 errors) ====
     // expected no error
     
-    namespace B {
+    module B {
         export import a = A;
         export class D extends a.C {
                                  ~
 !!! error TS2449: Class 'C' used before its declaration.
-!!! related TS2728 circularImportAlias.ts:11:18: 'C' is declared here.
+!!! related TS2728 tests/cases/conformance/internalModules/importDeclarations/circularImportAlias.ts:11:18: 'C' is declared here.
             id: number;
         }
     }
     
-    namespace A {
+    module A {
         export class C { name: string }
         export import b = B;
     }

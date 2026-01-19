@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/doNotEmitDetachedComments.ts] ////
-
-=== doNotEmitDetachedComments.ts ===
+=== tests/cases/compiler/doNotEmitDetachedComments.ts ===
 /*
 
     multi line
@@ -9,15 +7,12 @@
 
 var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 
 // Single Line comment
 
 function foo() { }
 >foo : () => void
->    : ^^^^^^^^^^
 
 
 /*
@@ -31,7 +26,6 @@ function foo() { }
 
 function bar() { }
 >bar : () => void
->    : ^^^^^^^^^^
 
 
 //========================

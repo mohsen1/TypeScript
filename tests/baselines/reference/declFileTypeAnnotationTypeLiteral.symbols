@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declFileTypeAnnotationTypeLiteral.ts] ////
-
-=== declFileTypeAnnotationTypeLiteral.ts ===
+=== tests/cases/compiler/declFileTypeAnnotationTypeLiteral.ts ===
 class c {
 >c : Symbol(c, Decl(declFileTypeAnnotationTypeLiteral.ts, 0, 0))
 }
@@ -8,11 +6,11 @@ class g<T> {
 >g : Symbol(g, Decl(declFileTypeAnnotationTypeLiteral.ts, 1, 1))
 >T : Symbol(T, Decl(declFileTypeAnnotationTypeLiteral.ts, 2, 8))
 }
-namespace m {
+module m {
 >m : Symbol(m, Decl(declFileTypeAnnotationTypeLiteral.ts, 3, 1))
 
     export class c {
->c : Symbol(c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 13))
+>c : Symbol(c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 10))
     }
 }
 
@@ -37,7 +35,7 @@ var x: {
     new (a: string): m.c;
 >a : Symbol(a, Decl(declFileTypeAnnotationTypeLiteral.ts, 17, 9))
 >m : Symbol(m, Decl(declFileTypeAnnotationTypeLiteral.ts, 3, 1))
->c : Symbol(m.c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 13))
+>c : Symbol(m.c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 10))
 
     // Indexers
     [n: number]: c;
@@ -82,5 +80,5 @@ var z: new (a: string) => m.c;
 >z : Symbol(z, Decl(declFileTypeAnnotationTypeLiteral.ts, 37, 3))
 >a : Symbol(a, Decl(declFileTypeAnnotationTypeLiteral.ts, 37, 12))
 >m : Symbol(m, Decl(declFileTypeAnnotationTypeLiteral.ts, 3, 1))
->c : Symbol(m.c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 13))
+>c : Symbol(m.c, Decl(declFileTypeAnnotationTypeLiteral.ts, 4, 10))
 

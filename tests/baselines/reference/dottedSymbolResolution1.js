@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/dottedSymbolResolution1.ts] ////
-
 //// [dottedSymbolResolution1.ts]
 interface JQuery {
     find(selector: string): JQuery;

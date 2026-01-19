@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularlySimplifyingConditionalTypesNoCrash.ts] ////
-
 //// [circularlySimplifyingConditionalTypesNoCrash.ts]
 type Omit<T, K extends keyof T> = Pick<T, Exclude<keyof T, K>>;
 
@@ -54,7 +52,7 @@ export {};
 
 //// [circularlySimplifyingConditionalTypesNoCrash.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var myStoreConnect = function (mapStateToProps, mapDispatchToProps, mergeProps, options) {
     if (options === void 0) { options = {}; }
     return connect(mapStateToProps, mapDispatchToProps, mergeProps, options);

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inlineConditionalHasSimilarAssignability.ts] ////
-
 //// [inlineConditionalHasSimilarAssignability.ts]
 type MyExtract<T, U> = T extends U ? T : never
 

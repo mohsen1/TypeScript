@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorElaborationDivesIntoApparentlyPresentPropsOnly.ts] ////
-
 //// [errorElaborationDivesIntoApparentlyPresentPropsOnly.ts]
 function foo<T extends { a: string }>(x: T) {
     x = { a: "abc", b: 20, c: 30 };

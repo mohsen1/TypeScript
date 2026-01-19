@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorArgs.ts] ////
-
 //// [constructorArgs.ts]
 interface Options {
  value: number;

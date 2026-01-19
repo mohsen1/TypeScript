@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superCalls/errorSuperCalls.ts] ////
-
 //// [errorSuperCalls.ts]
 //super call in class constructor with no base type
 class NoBase {
@@ -95,10 +93,9 @@ var __extends = (this && this.__extends) || (function () {
 //super call in class constructor with no base type
 var NoBase = /** @class */ (function () {
     function NoBase() {
-        var _this = _super.call(this) || this;
+        _this = _super.call(this) || this;
         //super call in class member initializer with no base type
         this.p = _this = _super.call(this) || this;
-        return _this;
     }
     //super call in class member function with no base type
     NoBase.prototype.fn = function () {
@@ -146,7 +143,8 @@ var Derived = /** @class */ (function (_super) {
     //super call with type arguments 
     function Derived() {
         var _this = _super.call(this) || this;
-        return _super.call(this) || this;
+        _this = _super.call(this) || this;
+        return _this;
     }
     return Derived;
 }(Base));

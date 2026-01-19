@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deferredLookupTypeResolution2.ts] ////
-
 //// [deferredLookupTypeResolution2.ts]
 // Repro from #17456
 
@@ -30,28 +28,28 @@ type DeepOK<T> = { true: 'true', otherwise: 'false' }[Juxtapose<T>];
 
 
 //// [deferredLookupTypeResolution2.d.ts]
-type StringContains<S extends string, L extends string> = ({
+declare type StringContains<S extends string, L extends string> = ({
     [K in S]: 'true';
 } & {
     [key: string]: 'false';
 })[L];
-type ObjectHasKey<O, L extends string> = StringContains<Extract<keyof O, string>, L>;
-type A<T> = ObjectHasKey<T, '0'>;
-type B = ObjectHasKey<[string, number], '1'>;
-type C = ObjectHasKey<[string, number], '2'>;
-type D = A<[string]>;
-type E<T> = {
+declare type ObjectHasKey<O, L extends string> = StringContains<Extract<keyof O, string>, L>;
+declare type A<T> = ObjectHasKey<T, '0'>;
+declare type B = ObjectHasKey<[string, number], '1'>;
+declare type C = ObjectHasKey<[string, number], '2'>;
+declare type D = A<[string]>;
+declare type E<T> = {
     true: 'true';
 }[ObjectHasKey<T, '1'>];
-type Juxtapose<T> = ({
+declare type Juxtapose<T> = ({
     true: 'otherwise';
 } & {
     [k: string]: 'true';
 })[ObjectHasKey<T, '1'>];
-type DeepError<T> = {
+declare type DeepError<T> = {
     true: 'true';
 }[Juxtapose<T>];
-type DeepOK<T> = {
+declare type DeepOK<T> = {
     true: 'true';
     otherwise: 'false';
 }[Juxtapose<T>];

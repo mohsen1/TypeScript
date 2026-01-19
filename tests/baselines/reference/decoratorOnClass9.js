@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/class/decoratorOnClass9.ts] ////
-
 //// [decoratorOnClass9.ts]
 declare var dec: any;
 

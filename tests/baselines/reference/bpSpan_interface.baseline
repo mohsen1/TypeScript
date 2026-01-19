@@ -1,4 +1,3 @@
-// === breakpoints ===
 
 1  >interface I {
 
@@ -28,65 +27,65 @@
 
     ~~                                            => Pos: (132 to 133)  SpanInfo: undefined
 --------------------------------
-8  >namespace m {
+8  >module m {
 
-    ~~~~~~~~~~~~~~                                => Pos: (134 to 147)  SpanInfo: undefined
+    ~~~~~~~~~~~                                   => Pos: (134 to 144)  SpanInfo: undefined
 --------------------------------
 9  >    interface I1 {
 
-    ~~~~~~~~~~~~~~~~~~~                           => Pos: (148 to 166)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~                           => Pos: (145 to 163)  SpanInfo: undefined
 --------------------------------
 10 >        property: string;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (167 to 192)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (164 to 189)  SpanInfo: undefined
 --------------------------------
 11 >        method(): number;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (193 to 218)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (190 to 215)  SpanInfo: undefined
 --------------------------------
 12 >        (a: string): string;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (219 to 247)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (216 to 244)  SpanInfo: undefined
 --------------------------------
 13 >        new (a: string): I;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~                  => Pos: (248 to 275)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~                  => Pos: (245 to 272)  SpanInfo: undefined
 --------------------------------
 14 >        [a: number]: number;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (276 to 304)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (273 to 301)  SpanInfo: undefined
 --------------------------------
 15 >    }
 
-    ~~~~~~                                        => Pos: (305 to 310)  SpanInfo: undefined
+    ~~~~~~                                        => Pos: (302 to 307)  SpanInfo: undefined
 --------------------------------
 16 >    export interface I2 {
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (311 to 336)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (308 to 333)  SpanInfo: undefined
 --------------------------------
 17 >        property: string;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (337 to 362)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (334 to 359)  SpanInfo: undefined
 --------------------------------
 18 >        method(): number;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (363 to 388)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~                    => Pos: (360 to 385)  SpanInfo: undefined
 --------------------------------
 19 >        (a: string): string;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (389 to 417)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (386 to 414)  SpanInfo: undefined
 --------------------------------
 20 >        new (a: string): I;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~                  => Pos: (418 to 445)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~                  => Pos: (415 to 442)  SpanInfo: undefined
 --------------------------------
 21 >        [a: number]: number;
 
-    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (446 to 474)  SpanInfo: undefined
+    ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~                 => Pos: (443 to 471)  SpanInfo: undefined
 --------------------------------
 22 >    }
 
-    ~~~~~~                                        => Pos: (475 to 480)  SpanInfo: undefined
+    ~~~~~~                                        => Pos: (472 to 477)  SpanInfo: undefined
 --------------------------------
 23 >}
-    ~                                             => Pos: (481 to 481)  SpanInfo: undefined
+    ~                                             => Pos: (478 to 478)  SpanInfo: undefined

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/downlevelLetConst12.ts] ////
-
 //// [downlevelLetConst12.ts]
 'use strict'
 // top level let\const should not be renamed

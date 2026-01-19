@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/compositeGenericFunction.ts] ////
-
 //// [compositeGenericFunction.ts]
 function f<T>(value: T) { return value; };
 

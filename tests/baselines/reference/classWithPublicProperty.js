@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/classWithPublicProperty.ts] ////
-
 //// [classWithPublicProperty.ts]
 class C {
     public x;

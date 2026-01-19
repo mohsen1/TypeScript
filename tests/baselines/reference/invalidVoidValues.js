@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/void/invalidVoidValues.ts] ////
-
 //// [invalidVoidValues.ts]
 var x: void;
 x = 1;
@@ -10,17 +8,17 @@ enum E { A }
 x = E;
 x = E.A;
 
-class C { foo!: string }
-declare var a: C;
+class C { foo: string }
+var a: C;
 x = a;
 
 interface I { foo: string }
-declare var b: I;
+var b: I;
 x = b;
 
 x = { f() {} }
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 x = M;
 
 function f<T>(a: T) {
@@ -44,7 +42,9 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var a;
 x = a;
+var b;
 x = b;
 x = { f: function () { } };
 var M;

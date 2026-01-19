@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocReturnTag1.ts] ////
-
-=== returns.js ===
+=== tests/cases/conformance/jsdoc/returns.js ===
 // @ts-check
 /**
  * @returns {string} This comment is not currently exposed
@@ -28,4 +26,3 @@ function f2() {
 
     return 5 || "hello";
 }
-

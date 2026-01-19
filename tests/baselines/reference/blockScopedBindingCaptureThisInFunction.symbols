@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/blockScopedBindingCaptureThisInFunction.ts] ////
-
-=== blockScopedBindingCaptureThisInFunction.ts ===
+=== tests/cases/compiler/blockScopedBindingCaptureThisInFunction.ts ===
 // https://github.com/Microsoft/TypeScript/issues/11038
 () => function () {
     for (let someKey in {}) {

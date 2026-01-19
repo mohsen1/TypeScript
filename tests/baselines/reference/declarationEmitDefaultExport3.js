@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDefaultExport3.ts] ////
-
 //// [declarationEmitDefaultExport3.ts]
 export default function foo() {
     return ""

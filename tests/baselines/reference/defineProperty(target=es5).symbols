@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/defineProperty.ts] ////
-
-=== defineProperty.ts ===
+=== tests/cases/conformance/classes/propertyMemberDeclarations/defineProperty.ts ===
 var x: "p" = "p"
 >x : Symbol(x, Decl(defineProperty.ts, 0, 3))
 

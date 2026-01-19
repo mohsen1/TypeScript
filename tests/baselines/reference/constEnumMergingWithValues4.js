@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/constEnumMergingWithValues4.ts] ////
-
 //// [m1.ts]
-namespace foo {
+module foo {
     const enum E { X }
 }
 
-namespace foo {
+module foo {
     var x = 1;
 }
 

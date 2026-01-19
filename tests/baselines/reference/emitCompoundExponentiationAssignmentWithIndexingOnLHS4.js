@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/emitCompoundExponentiationAssignmentWithIndexingOnLHS4.ts] ////
-
 //// [emitCompoundExponentiationAssignmentWithIndexingOnLHS4.ts]
 var globalCounter = 0;
 function incrementIdx(max: number) {

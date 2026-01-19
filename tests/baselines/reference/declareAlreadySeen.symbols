@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declareAlreadySeen.ts] ////
-
-=== declareAlreadySeen.ts ===
-namespace M {
+=== tests/cases/compiler/declareAlreadySeen.ts ===
+module M {
 >M : Symbol(M, Decl(declareAlreadySeen.ts, 0, 0))
 
     declare declare var x;
@@ -10,9 +8,9 @@ namespace M {
     declare declare function f();
 >f : Symbol(f, Decl(declareAlreadySeen.ts, 1, 26))
 
-    declare declare namespace N { }  
+    declare declare module N { }  
 >N : Symbol(N, Decl(declareAlreadySeen.ts, 2, 33))
 
     declare declare class C { }
->C : Symbol(C, Decl(declareAlreadySeen.ts, 4, 35))
+>C : Symbol(C, Decl(declareAlreadySeen.ts, 4, 32))
 }

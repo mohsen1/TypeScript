@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextuallyTypedSymbolNamedProperties.ts] ////
-
 //// [contextuallyTypedSymbolNamedProperties.ts]
 // Repros from #43628
 
@@ -37,7 +35,7 @@ const x = { [A]: s => s.length };
 //// [contextuallyTypedSymbolNamedProperties.d.ts]
 declare const A: unique symbol;
 declare const B: unique symbol;
-type Action = {
+declare type Action = {
     type: typeof A;
     data: string;
 } | {

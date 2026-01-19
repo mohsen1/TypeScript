@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeAliases/interfaceDoesNotDependOnBaseTypes.ts] ////
-
-=== interfaceDoesNotDependOnBaseTypes.ts ===
+=== tests/cases/conformance/types/typeAliases/interfaceDoesNotDependOnBaseTypes.ts ===
 var x: StringTree;
 >x : Symbol(x, Decl(interfaceDoesNotDependOnBaseTypes.ts, 0, 3))
 >StringTree : Symbol(StringTree, Decl(interfaceDoesNotDependOnBaseTypes.ts, 4, 1))
@@ -25,6 +23,6 @@ type StringTree = string | StringTreeArray;
 
 interface StringTreeArray extends Array<StringTree> { }
 >StringTreeArray : Symbol(StringTreeArray, Decl(interfaceDoesNotDependOnBaseTypes.ts, 6, 43))
->Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 >StringTree : Symbol(StringTree, Decl(interfaceDoesNotDependOnBaseTypes.ts, 4, 1))
 

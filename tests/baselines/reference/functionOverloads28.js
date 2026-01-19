@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloads28.ts] ////
-
 //// [functionOverloads28.ts]
 function foo():string;
 function foo(bar:string):number;

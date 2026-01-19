@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/enumsWithMultipleDeclarations3.ts] ////
-
 //// [enumsWithMultipleDeclarations3.ts]
-namespace E {
+module E {
 }
 
 enum E {

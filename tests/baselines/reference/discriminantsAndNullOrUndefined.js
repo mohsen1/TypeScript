@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminantsAndNullOrUndefined.ts] ////
-
 //// [discriminantsAndNullOrUndefined.ts]
 // Repro from #10228
 

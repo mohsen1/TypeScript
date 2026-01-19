@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classIndexer3.ts] ////
-
 //// [classIndexer3.ts]
 class C123 {
     [s: string]: number;

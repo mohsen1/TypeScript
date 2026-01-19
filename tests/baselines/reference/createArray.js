@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/createArray.ts] ////
-
 //// [createArray.ts]
 var na=new number[];
 

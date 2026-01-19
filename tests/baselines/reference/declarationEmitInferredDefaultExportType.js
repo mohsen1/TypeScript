@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitInferredDefaultExportType.ts] ////
-
 //// [declarationEmitInferredDefaultExportType.ts]
 // test.ts
 export default {
@@ -10,9 +8,9 @@ export default {
 
 //// [declarationEmitInferredDefaultExportType.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 // test.ts
-exports.default = {
+exports["default"] = {
     foo: [],
     bar: undefined,
     baz: null

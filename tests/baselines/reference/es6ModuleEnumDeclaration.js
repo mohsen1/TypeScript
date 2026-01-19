@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6ModuleEnumDeclaration.ts] ////
-
 //// [es6ModuleEnumDeclaration.ts]
 export enum e1 {
     a,
@@ -13,7 +11,7 @@ enum e2 {
 }
 var x = e1.a;
 var y = e2.x;
-export namespace m1 {
+export module m1 {
     export enum e3 {
         a,
         b,
@@ -29,7 +27,7 @@ export namespace m1 {
     var x2 = e3.a;
     var y2 = e4.x;
 }
-namespace m2 {
+module m2 {
     export enum e5 {
         a,
         b,

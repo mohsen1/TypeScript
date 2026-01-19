@@ -1,16 +1,16 @@
-augmentedTypesEnum3.ts(16,5): error TS2432: In an enum with multiple declarations, only one declaration can omit an initializer for its first enum element.
+tests/cases/compiler/augmentedTypesEnum3.ts(16,5): error TS2432: In an enum with multiple declarations, only one declaration can omit an initializer for its first enum element.
 
 
-==== augmentedTypesEnum3.ts (1 errors) ====
-    namespace E {
+==== tests/cases/compiler/augmentedTypesEnum3.ts (1 errors) ====
+    module E {
         var t;
     }
     enum E { }
     
     enum F { }
-    namespace F { var t; }
+    module F { var t; }
     
-    namespace A {
+    module A {
         var o;
     }
     enum A {
@@ -21,6 +21,6 @@ augmentedTypesEnum3.ts(16,5): error TS2432: In an enum with multiple declaration
         ~
 !!! error TS2432: In an enum with multiple declarations, only one declaration can omit an initializer for its first enum element.
     }
-    namespace A {
+    module A {
         var p;
     }

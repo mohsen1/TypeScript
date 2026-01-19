@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionExportsRequireAndFunction.ts] ////
-
 //// [collisionExportsRequireAndFunction.ts]
 export function exports() {
     return 1;
@@ -7,7 +5,7 @@ export function exports() {
 export function require() {
     return "require";
 }
-namespace m1 {
+module m1 {
     function exports() {
         return 1;
     }
@@ -15,7 +13,7 @@ namespace m1 {
         return "require";
     }
 }
-namespace m2 {
+module m2 {
     export function exports() {
         return 1;
     }
@@ -27,15 +25,16 @@ namespace m2 {
 //// [collisionExportsRequireAndFunction.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.exports = exports;
-    exports.require = require;
+    exports.__esModule = true;
+    exports.require = exports.exports = void 0;
     function exports() {
         return 1;
     }
+    exports.exports = exports;
     function require() {
         return "require";
     }
+    exports.require = require;
     var m1;
     (function (m1) {
         function exports() {

@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/interMixingModulesInterfaces2.ts] ////
-
 //// [interMixingModulesInterfaces2.ts]
-namespace A {
+module A {
 
     export interface B {
         name: string;
         value: number;
     }
 
-    namespace B {
+    module B {
         export function createB(): B {
             return null;
         }

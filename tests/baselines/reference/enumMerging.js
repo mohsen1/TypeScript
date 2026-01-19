@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/enums/enumMerging.ts] ////
-
 //// [enumMerging.ts]
 // Enum with only constant members across 2 declarations with the same root module
 // Enum with initializer in all declarations with constant members with the same root module
-namespace M1 {
+module M1 {
     enum EImpl1 {
         A, B, C
     }
@@ -24,7 +22,7 @@ namespace M1 {
 }
 
 // Enum with only computed members across 2 declarations with the same root module 
-namespace M2 {
+module M2 {
     export enum EComp2 {
         A = 'foo'.length, B = 'foo'.length, C = 'foo'.length
     }
@@ -37,7 +35,7 @@ namespace M2 {
 }
 
 // Enum with initializer in only one of two declarations with constant members with the same root module
-namespace M3 {
+module M3 {
     enum EInit {
         A,
         B
@@ -49,18 +47,18 @@ namespace M3 {
 }
 
 // Enums with same name but different root module
-namespace M4 {
+module M4 {
     export enum Color { Red, Green, Blue }
 }
-namespace M5 {
+module M5 {
     export enum Color { Red, Green, Blue }
 }
 
-namespace M6.A {
+module M6.A {
     export enum Color { Red, Green, Blue }
 }
-namespace M6 {
-    export namespace A {
+module M6 {
+    export module A {
         export enum Color { Yellow = 1 }
     }
     var t = A.Color.Yellow;

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/ambientModuleWithTemplateLiterals.ts] ////
-
 //// [ambientModuleWithTemplateLiterals.ts]
-declare namespace Foo {
+declare module Foo {
     enum Bar {
         a = `1`,
         b = '2',

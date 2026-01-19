@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractImportInstantiation.ts] ////
-
 //// [classAbstractImportInstantiation.ts]
-namespace M {
+module M {
     export abstract class A {}
     
     new A;

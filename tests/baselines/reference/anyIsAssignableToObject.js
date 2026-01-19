@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/anyIsAssignableToObject.ts] ////
-
 //// [anyIsAssignableToObject.ts]
 interface P {
     p: {};

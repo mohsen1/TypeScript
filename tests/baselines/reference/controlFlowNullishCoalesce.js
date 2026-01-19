@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowNullishCoalesce.ts] ////
-
 //// [controlFlowNullishCoalesce.ts]
 // assignments in shortcutting rhs
 let a: number;

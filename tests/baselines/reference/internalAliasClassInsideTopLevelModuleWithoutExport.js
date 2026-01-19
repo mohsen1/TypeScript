@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/internalAliasClassInsideTopLevelModuleWithoutExport.ts] ////
-
 //// [internalAliasClassInsideTopLevelModuleWithoutExport.ts]
-export namespace x {
+export module x {
     export class c {
         foo(a: number) {
             return a;
@@ -15,7 +13,7 @@ var cReturnVal = cProp.foo(10);
 
 //// [internalAliasClassInsideTopLevelModuleWithoutExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.cProp = exports.x = void 0;
 var x;
 (function (x) {
@@ -28,14 +26,14 @@ var x;
         return c;
     }());
     x.c = c;
-})(x || (exports.x = x = {}));
+})(x = exports.x || (exports.x = {}));
 var xc = x.c;
 exports.cProp = new xc();
 var cReturnVal = exports.cProp.foo(10);
 
 
 //// [internalAliasClassInsideTopLevelModuleWithoutExport.d.ts]
-export declare namespace x {
+export declare module x {
     class c {
         foo(a: number): number;
     }

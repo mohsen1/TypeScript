@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incompatibleAssignmentOfIdenticallyNamedTypes.ts] ////
-
 //// [incompatibleAssignmentOfIdenticallyNamedTypes.ts]
 interface T { }
 declare const a: T;

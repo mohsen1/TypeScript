@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeParameterLists/innerTypeParameterShadowingOuterOne2.ts] ////
-
 //// [innerTypeParameterShadowingOuterOne2.ts]
 // inner type parameters shadow outer ones of the same name
 // no errors expected

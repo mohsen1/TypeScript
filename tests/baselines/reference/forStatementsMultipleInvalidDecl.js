@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/forStatements/forStatementsMultipleInvalidDecl.ts] ////
-
 //// [forStatementsMultipleInvalidDecl.ts]
 interface I {
     id: number;
@@ -22,7 +20,7 @@ class D<T>{
 
 function F(x: string): number { return 42; }
 
-namespace M {
+module M {
     export class A {
         name: string;
     }

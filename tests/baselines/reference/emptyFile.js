@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emptyFile.ts] ////
-
 //// [emptyFile.ts]
 
 

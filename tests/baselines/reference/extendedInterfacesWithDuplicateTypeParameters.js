@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendedInterfacesWithDuplicateTypeParameters.ts] ////
-
 //// [extendedInterfacesWithDuplicateTypeParameters.ts]
 interface InterfaceWithMultipleTypars<A, A> { // should error
 	bar(): void;

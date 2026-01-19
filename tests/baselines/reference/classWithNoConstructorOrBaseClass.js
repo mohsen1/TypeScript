@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/constructorFunctionTypes/classWithNoConstructorOrBaseClass.ts] ////
-
 //// [classWithNoConstructorOrBaseClass.ts]
 class C {
     x: string;

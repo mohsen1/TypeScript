@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceStaticFuncOverridingAccessor.ts] ////
-
 //// [inheritanceStaticFuncOverridingAccessor.ts]
 class a {
     static get x() {

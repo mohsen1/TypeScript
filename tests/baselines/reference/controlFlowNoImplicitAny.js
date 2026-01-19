@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowNoImplicitAny.ts] ////
-
 //// [controlFlowNoImplicitAny.ts]
 declare let cond: boolean;
 

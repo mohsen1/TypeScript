@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedAndNonExportedClassesOfTheSameName.ts] ////
-
 //// [TwoInternalModulesThatMergeEachWithExportedAndNonExportedClassesOfTheSameName.ts]
-namespace A {
+module A {
     export class Point {
         x: number;
         y: number;
     }
 }
 
-namespace A {
+module A {
     class Point {
         fromCarthesian(p: A.Point) {
             return { x: p.x, y: p.y };
@@ -20,15 +18,15 @@ namespace A {
 var p: { x: number; y: number; };
 var p: A.Point;
 
-namespace X.Y.Z {
+module X.Y.Z {
     export class Line {
         length: number;
     }
 }
 
-namespace X {
-    export namespace Y {
-        export namespace Z {
+module X {
+    export module Y {
+        export module Z {
             class Line {
                 name: string;
             }

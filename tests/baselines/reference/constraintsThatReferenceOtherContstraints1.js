@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constraintsThatReferenceOtherContstraints1.ts] ////
-
 //// [constraintsThatReferenceOtherContstraints1.ts]
 interface Object { }
 

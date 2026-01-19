@@ -39,7 +39,7 @@ use(o);
 
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var use_1 = require("foo/use");
 var a_1 = require("a");
 (0, use_1.use)(a_1.o);

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/alwaysStrict.ts] ////
-
-=== alwaysStrict.ts ===
+=== tests/cases/compiler/alwaysStrict.ts ===
 function f() {
 >f : Symbol(f, Decl(alwaysStrict.ts, 0, 0))
 

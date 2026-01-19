@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/baseExpressionTypeParameters.ts] ////
-
-=== baseExpressionTypeParameters.ts ===
+=== tests/cases/compiler/baseExpressionTypeParameters.ts ===
 // Repro from #17829
 
 function base<T>() {

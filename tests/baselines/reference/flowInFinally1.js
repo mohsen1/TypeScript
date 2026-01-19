@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/flowInFinally1.ts] ////
-
 //// [flowInFinally1.ts]
 class A {
   constructor() { }

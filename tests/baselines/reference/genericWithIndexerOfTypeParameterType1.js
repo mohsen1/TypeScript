@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericWithIndexerOfTypeParameterType1.ts] ////
-
 //// [genericWithIndexerOfTypeParameterType1.ts]
 class LazyArray<T> {
     private objects = <{ [objectId: string]: T; }>{};

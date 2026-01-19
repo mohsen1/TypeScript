@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/initializedDestructuringAssignmentTypes.ts] ////
-
 //// [initializedDestructuringAssignmentTypes.ts]
 const [, a = ''] = ''.match('') || [];
 

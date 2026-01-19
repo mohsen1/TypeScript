@@ -1,76 +1,56 @@
-//// [tests/cases/conformance/internalModules/moduleDeclarations/invalidNestedModules.ts] ////
-
-=== invalidNestedModules.ts ===
-namespace A.B.C {
+=== tests/cases/conformance/internalModules/moduleDeclarations/invalidNestedModules.ts ===
+module A.B.C {
 >A : typeof A
->  : ^^^^^^^^
 >B : typeof B
->  : ^^^^^^^^
 >C : typeof C
->  : ^^^^^^^^
 
     export class Point {
 >Point : Point
->      : ^^^^^
 
         x: number;
 >x : number
->  : ^^^^^^
 
         y: number;
 >y : number
->  : ^^^^^^
     }
 }
 
-namespace A {
+module A {
 >A : typeof A
->  : ^^^^^^^^
 
-    export namespace B {
+    export module B {
 >B : typeof B
->  : ^^^^^^^^
 
         export class C { // Error
 >C : C
->  : ^
 
             name: string;
 >name : string
->     : ^^^^^^
         }
     }
 }
 
-namespace M2.X {
+module M2.X {
 >M2 : typeof M2
->   : ^^^^^^^^^
 >X : typeof X
->  : ^^^^^^^^
 
     export class Point {
 >Point : Point
->      : ^^^^^
 
         x: number; y: number;
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
     }
 }
 
-namespace M2 {
+module M2 {
 >M2 : typeof M2
->   : ^^^^^^^^^
 
-    export namespace X {
+    export module X {
 >X : typeof X
->  : ^^^^^^^^
 
         export var Point: number; // Error
 >Point : number
->      : ^^^^^^
     }
 }
 

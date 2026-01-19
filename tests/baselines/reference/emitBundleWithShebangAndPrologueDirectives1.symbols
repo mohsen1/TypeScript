@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emitBundleWithShebangAndPrologueDirectives1.ts] ////
-
-=== test.ts ===
+=== tests/cases/compiler/test.ts ===
 #!/usr/bin/env gjs
 "use strict"
 class Doo {}

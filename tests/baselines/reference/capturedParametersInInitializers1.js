@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedParametersInInitializers1.ts] ////
-
 //// [capturedParametersInInitializers1.ts]
 // ok - usage is deferred
 function foo1(y = class {c = x}, x = 1) {

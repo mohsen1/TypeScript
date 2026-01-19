@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/coAndContraVariantInferences.ts] ////
-
 //// [coAndContraVariantInferences.ts]
 type A = { kind: 'a' };
 type B = { kind: 'b' };
@@ -52,10 +50,10 @@ call(actionB, printFn);
 
 
 //// [coAndContraVariantInferences.d.ts]
-type A = {
+declare type A = {
     kind: 'a';
 };
-type B = {
+declare type B = {
     kind: 'b';
 };
 declare const a: A;

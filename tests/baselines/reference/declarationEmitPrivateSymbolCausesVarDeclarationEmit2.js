@@ -21,13 +21,13 @@ export class D extends C {
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 exports.x = Symbol();
 //// [b.js]
 "use strict";
 var _a;
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.C = void 0;
 var a_1 = require("./a");
 var C = /** @class */ (function () {
@@ -56,7 +56,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var _a;
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.D = void 0;
 var a_1 = require("./a");
 var b_1 = require("./b");

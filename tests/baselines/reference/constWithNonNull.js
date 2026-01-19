@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constWithNonNull.ts] ////
-
 //// [constWithNonNull.ts]
 // Fixes #21848
 

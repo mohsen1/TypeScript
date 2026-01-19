@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doNotEmitPinnedCommentNotOnTopOfFile.ts] ////
-
 //// [doNotEmitPinnedCommentNotOnTopOfFile.ts]
 var x = 10;
 

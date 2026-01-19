@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithGenericCallSignaturesWithOptionalParameters.ts] ////
-
 //// [assignmentCompatWithGenericCallSignaturesWithOptionalParameters.ts]
 // call signatures in derived types must have the same or fewer optional parameters as the target for assignment
 
-namespace ClassTypeParam {
+module ClassTypeParam {
     class Base<T> {
         a: () => T;
         a2: (x?: T) => T;
@@ -39,7 +37,7 @@ namespace ClassTypeParam {
     }
 }
 
-namespace GenericSignaturesInvalid {
+module GenericSignaturesInvalid {
 
     class Base2 {
         a: <T>() => T;
@@ -59,8 +57,8 @@ namespace GenericSignaturesInvalid {
 
 
     function foo<T>() {
-        var b!: Base2;
-        var t!: Target<T>;
+        var b: Base2;
+        var t: Target<T>;
 
         // all errors
         b.a = t.a;
@@ -95,7 +93,7 @@ namespace GenericSignaturesInvalid {
     }
 }
 
-namespace GenericSignaturesValid {
+module GenericSignaturesValid {
 
     class Base2 {
         a: <T>() => T;

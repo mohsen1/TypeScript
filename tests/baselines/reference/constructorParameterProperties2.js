@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/constructorParameterProperties2.ts] ////
-
 //// [constructorParameterProperties2.ts]
 class C {
     y: number;
     constructor(y: number) { } // ok
 }
 
-declare var c: C;
+var c: C;
 var r = c.y;
 
 class D {
@@ -14,7 +12,7 @@ class D {
     constructor(public y: number) { } // error
 }
 
-declare var d: D;
+var d: D;
 var r2 = d.y;
 
 class E {
@@ -22,7 +20,7 @@ class E {
     constructor(private y: number) { } // error
 }
 
-declare var e: E;
+var e: E;
 var r3 = e.y; // error
 
 class F {
@@ -30,7 +28,7 @@ class F {
     constructor(protected y: number) { } // error
 }
 
-declare var f: F;
+var f: F;
 var r4 = f.y; // error
 
 
@@ -40,6 +38,7 @@ var C = /** @class */ (function () {
     } // ok
     return C;
 }());
+var c;
 var r = c.y;
 var D = /** @class */ (function () {
     function D(y) {
@@ -47,6 +46,7 @@ var D = /** @class */ (function () {
     } // error
     return D;
 }());
+var d;
 var r2 = d.y;
 var E = /** @class */ (function () {
     function E(y) {
@@ -54,6 +54,7 @@ var E = /** @class */ (function () {
     } // error
     return E;
 }());
+var e;
 var r3 = e.y; // error
 var F = /** @class */ (function () {
     function F(y) {
@@ -61,4 +62,5 @@ var F = /** @class */ (function () {
     } // error
     return F;
 }());
+var f;
 var r4 = f.y; // error

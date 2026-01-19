@@ -13,13 +13,13 @@ export { v }
 
 //// [0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 {
     var obj = true;
 }
 //// [1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.v = void 0;
 var v = "str" || true;
 exports.v = v;

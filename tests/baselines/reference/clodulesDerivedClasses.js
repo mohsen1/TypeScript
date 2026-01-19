@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/clodulesDerivedClasses.ts] ////
-
 //// [clodulesDerivedClasses.ts]
 class Shape {
     id: number;
 }
 
-namespace Shape.Utils {
+module Shape.Utils {
     export function convert(): Shape { return null;}
 }
 
@@ -14,7 +12,7 @@ class Path extends Shape {
 
 }
 
-namespace Path.Utils {
+module Path.Utils {
     export function convert2(): Path {
         return null;
     }

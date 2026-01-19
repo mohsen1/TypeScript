@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/arrayLiterals/arrayLiterals2ES5.ts] ////
-
 //// [arrayLiterals2ES5.ts]
 // ElementList:  ( Modified )
 //      Elisionopt   AssignmentExpression

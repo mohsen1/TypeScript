@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportVariableWithInaccessibleTypeInTypeAnnotation.ts] ////
-
 //// [ExportVariableWithInaccessibleTypeInTypeAnnotation.ts]
-namespace A {
+module A {
 
     export interface Point {
         x: number;

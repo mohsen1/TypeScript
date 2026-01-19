@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionExportsRequireAndFunctionInGlobalFile.ts] ////
-
 //// [collisionExportsRequireAndFunctionInGlobalFile.ts]
 function exports() {
     return 1;
@@ -7,7 +5,7 @@ function exports() {
 function require() {
     return "require";
 }
-namespace m3 {
+module m3 {
     function exports() {
         return 1;
     }
@@ -15,7 +13,7 @@ namespace m3 {
         return "require";
     }
 }
-namespace m4 {
+module m4 {
     export function exports() {
         return 1;
     }

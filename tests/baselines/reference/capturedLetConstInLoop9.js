@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop9.ts] ////
-
 //// [capturedLetConstInLoop9.ts]
 for (let x = 0; x < 1; ++x) {
     let x;

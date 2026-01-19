@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/asOperator/asOperatorASI.ts] ////
-
 //// [asOperatorASI.ts]
 class Foo { }
 declare function as(...args: any[]);

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-ofStatements/ES5For-of24.ts] ////
-
 //// [ES5For-of24.ts]
 var a = [1, 2, 3];
 for (var v of a) {

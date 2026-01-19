@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/declFileAliasUseBeforeDeclaration2.ts] ////
-
 //// [declFileAliasUseBeforeDeclaration2.ts]
 declare module "test" {
-    namespace A {
+    module A {
         class C {
         }
     }
@@ -16,7 +14,7 @@ declare module "test" {
 
 //// [declFileAliasUseBeforeDeclaration2.d.ts]
 declare module "test" {
-    namespace A {
+    module A {
         class C {
         }
     }

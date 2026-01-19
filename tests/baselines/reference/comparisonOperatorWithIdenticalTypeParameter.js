@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithIdenticalTypeParameter.ts] ////
-
 //// [comparisonOperatorWithIdenticalTypeParameter.ts]
 function foo<T>(t: T) {
     var r1 = t < t;

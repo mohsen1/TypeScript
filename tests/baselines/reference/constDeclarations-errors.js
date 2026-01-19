@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarations-errors.ts] ////
-
 //// [constDeclarations-errors.ts]
 // error, missing intialicer
 const c1;

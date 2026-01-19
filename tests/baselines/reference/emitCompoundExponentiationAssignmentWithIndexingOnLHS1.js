@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/emitCompoundExponentiationAssignmentWithIndexingOnLHS1.ts] ////
-
 //// [emitCompoundExponentiationAssignmentWithIndexingOnLHS1.ts]
 var array0 = [1, 2, 3]
 var i0 = 0;

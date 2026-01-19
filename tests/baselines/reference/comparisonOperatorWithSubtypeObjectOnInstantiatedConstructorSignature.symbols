@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithSubtypeObjectOnInstantiatedConstructorSignature.ts] ////
-
-=== comparisonOperatorWithSubtypeObjectOnInstantiatedConstructorSignature.ts ===
+=== tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithSubtypeObjectOnInstantiatedConstructorSignature.ts ===
 class Base {
 >Base : Symbol(Base, Decl(comparisonOperatorWithSubtypeObjectOnInstantiatedConstructorSignature.ts, 0, 0))
 

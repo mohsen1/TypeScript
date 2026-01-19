@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendConstructSignatureInInterface.ts] ////
-
 //// [extendConstructSignatureInInterface.ts]
 interface C {
     new(x: number): C;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/instantiatedReturnTypeContravariance.ts] ////
-
 //// [instantiatedReturnTypeContravariance.ts]
 interface B<T> {
 

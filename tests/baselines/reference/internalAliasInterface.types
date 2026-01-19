@@ -1,25 +1,18 @@
-//// [tests/cases/compiler/internalAliasInterface.ts] ////
-
-=== internalAliasInterface.ts ===
-namespace a {
+=== tests/cases/compiler/internalAliasInterface.ts ===
+module a {
     export interface I {
     }
 }
 
-namespace c {
+module c {
 >c : typeof c
->  : ^^^^^^^^
 
     import b = a.I;
 >b : any
->  : ^^^
 >a : any
->  : ^^^
 >I : b
->  : ^
 
     export var x: b;
 >x : b
->  : ^
 }
 

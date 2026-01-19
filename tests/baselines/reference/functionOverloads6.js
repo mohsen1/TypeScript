@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloads6.ts] ////
-
 //// [functionOverloads6.ts]
 class foo { 
    static fnOverload();

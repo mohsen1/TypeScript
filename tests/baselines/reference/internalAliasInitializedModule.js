@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/internalAliasInitializedModule.ts] ////
-
 //// [internalAliasInitializedModule.ts]
-namespace a {
-    export namespace b {
+module a {
+    export module b {
         export class c {
         }
     }
 }
 
-namespace c {
+module c {
     import b = a.b;
     export var x: b.c = new b.c();
 }
@@ -34,13 +32,13 @@ var c;
 
 
 //// [internalAliasInitializedModule.d.ts]
-declare namespace a {
-    namespace b {
+declare module a {
+    module b {
         class c {
         }
     }
 }
-declare namespace c {
+declare module c {
     import b = a.b;
     var x: b.c;
 }

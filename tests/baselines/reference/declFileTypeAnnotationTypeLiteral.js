@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/declFileTypeAnnotationTypeLiteral.ts] ////
-
 //// [declFileTypeAnnotationTypeLiteral.ts]
 class c {
 }
 class g<T> {
 }
-namespace m {
+module m {
     export class c {
     }
 }
@@ -73,7 +71,7 @@ declare class c {
 }
 declare class g<T> {
 }
-declare namespace m {
+declare module m {
     class c {
     }
 }

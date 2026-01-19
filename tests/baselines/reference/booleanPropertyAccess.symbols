@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/primitives/boolean/booleanPropertyAccess.ts] ////
-
-=== booleanPropertyAccess.ts ===
+=== tests/cases/conformance/types/primitives/boolean/booleanPropertyAccess.ts ===
 var x = true;
 >x : Symbol(x, Decl(booleanPropertyAccess.ts, 0, 3))
 

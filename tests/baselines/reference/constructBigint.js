@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es2020/constructBigint.ts] ////
-
 //// [constructBigint.ts]
 BigInt(1);
 BigInt(1n);

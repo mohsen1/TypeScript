@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/functions/functionOverloadErrors.ts] ////
-
 //// [functionOverloadErrors.ts]
 //Function overload signature with initializer
 function fn1(x = 3);
@@ -74,7 +72,7 @@ class cls {
 }
 
 //Function overloads with differing export
-namespace M {
+module M {
     export function fn1();
     function fn1(n: string);
     function fn1() { } 

@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/es6ExportClauseInEs5.ts] ////
-
 //// [server.ts]
 class c {
 }
 interface i {
 }
-namespace m {
+module m {
     export var x = 10;
 }
 var x = 10;
-namespace uninstantiated {
+module uninstantiated {
 }
 export { c };
 export { c as c2 };
@@ -31,7 +29,8 @@ exports.c2 = c;
 var m;
 (function (m) {
     m.x = 10;
-})(m || (exports.instantiatedModule = m = {}));
+})(m || (m = {}));
+exports.instantiatedModule = m;
 var x = 10;
 exports.x = x;
 
@@ -41,11 +40,11 @@ declare class c {
 }
 interface i {
 }
-declare namespace m {
+declare module m {
     var x: number;
 }
 declare var x: number;
-declare namespace uninstantiated {
+declare module uninstantiated {
 }
 export { c };
 export { c as c2 };

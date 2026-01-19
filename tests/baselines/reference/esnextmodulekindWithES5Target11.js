@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/esnext/esnextmodulekindWithES5Target11.ts] ////
-
 //// [esnextmodulekindWithES5Target11.ts]
 declare function foo(...args: any[]): any;
 @foo

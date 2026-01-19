@@ -1,16 +1,14 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/constructSignatureAssignabilityInInheritance3.ts] ////
-
 //// [constructSignatureAssignabilityInInheritance3.ts]
 // checking subtype relations for function types as it relates to contextual signature instantiation
 // error cases
 
-namespace Errors {
+module Errors {
     class Base { foo: string; }
     class Derived extends Base { bar: string; }
     class Derived2 extends Derived { baz: string; }
     class OtherDerived extends Base { bing: string; }
 
-    namespace WithNonGenericSignaturesInBaseType {
+    module WithNonGenericSignaturesInBaseType {
         // base type with non-generic call signatures
         interface A {
             a2: new (x: number) => string[];
@@ -80,7 +78,7 @@ namespace Errors {
         }
     }
 
-    namespace WithGenericSignaturesInBaseType {
+    module WithGenericSignaturesInBaseType {
         // base type has generic call signature
         interface B {
             a2: new <T>(x: T) => T[];

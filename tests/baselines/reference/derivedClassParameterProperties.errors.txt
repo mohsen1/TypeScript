@@ -1,13 +1,15 @@
-derivedClassParameterProperties.ts(47,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-derivedClassParameterProperties.ts(56,5): error TS2376: A 'super' call must be the first statement in the constructor to refer to 'super' or 'this' when a derived class contains initialized properties, parameter properties, or private identifiers.
-derivedClassParameterProperties.ts(57,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-derivedClassParameterProperties.ts(58,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-derivedClassParameterProperties.ts(79,5): error TS2376: A 'super' call must be the first statement in the constructor to refer to 'super' or 'this' when a derived class contains initialized properties, parameter properties, or private identifiers.
-derivedClassParameterProperties.ts(80,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(15,5): error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(30,5): error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(47,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(56,5): error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(57,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(58,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(79,5): error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(80,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
+tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
 
 
-==== derivedClassParameterProperties.ts (7 errors) ====
+==== tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassParameterProperties.ts (9 errors) ====
     // ordering of super calls in derived constructors matters depending on other class contents
     
     class Base {
@@ -17,20 +19,25 @@ derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called 
     class Derived extends Base {
         constructor(y: string) {
             var a = 1;
-            super();
+            super(); // ok
         }
     }
     
     class Derived2 extends Base {
         constructor(public y: string) {
+        ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
             var a = 1;
-            super();
+    ~~~~~~~~~~~~~~~~~~
+            super(); // error
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
         }
+    ~~~~~
+!!! error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
     }
     
     class Derived3 extends Base {
         constructor(public y: string) {
-            super();
+            super(); // ok
             var a = 1;
         }
     }
@@ -38,15 +45,20 @@ derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called 
     class Derived4 extends Base {
         a = 1;
         constructor(y: string) {
+        ~~~~~~~~~~~~~~~~~~~~~~~~
             var b = 2;
-            super();
+    ~~~~~~~~~~~~~~~~~~
+            super(); // error
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
         }
+    ~~~~~
+!!! error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
     }
     
     class Derived5 extends Base {
         a = 1;
         constructor(y: string) {
-            super();
+            super(); // ok
             var b = 2;
         }
     }
@@ -58,7 +70,7 @@ derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called 
             ~~~~
 !!! error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
             var b = 2;
-            super();
+            super(); // error: "super" has to be called before "this" accessing
         }
     }
     
@@ -66,23 +78,27 @@ derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called 
         a = 1;
         b: number;
         constructor(y: string) {
-        ~~~~~~~~~~~
-!!! error TS2376: A 'super' call must be the first statement in the constructor to refer to 'super' or 'this' when a derived class contains initialized properties, parameter properties, or private identifiers.
+        ~~~~~~~~~~~~~~~~~~~~~~~~
             this.a = 3;
+    ~~~~~~~~~~~~~~~~~~~
             ~~~~
 !!! error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
             this.b = 3;
+    ~~~~~~~~~~~~~~~~~~~
             ~~~~
 !!! error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-            super();
+            super(); // error
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
         }
+    ~~~~~
+!!! error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
     }
     
     class Derived8 extends Base {
         a = 1;
         b: number;
         constructor(y: string) {
-            super();
+            super(); // ok
             this.a = 3;
             this.b = 3;        
         }
@@ -95,23 +111,27 @@ derivedClassParameterProperties.ts(81,9): error TS17009: 'super' must be called 
         a = 1;
         b: number;
         constructor(y: string) {
-        ~~~~~~~~~~~
-!!! error TS2376: A 'super' call must be the first statement in the constructor to refer to 'super' or 'this' when a derived class contains initialized properties, parameter properties, or private identifiers.
+        ~~~~~~~~~~~~~~~~~~~~~~~~
             this.a = 3;
+    ~~~~~~~~~~~~~~~~~~~
             ~~~~
 !!! error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
             this.b = 3;
+    ~~~~~~~~~~~~~~~~~~~
             ~~~~
 !!! error TS17009: 'super' must be called before accessing 'this' in the constructor of a derived class.
-            super();
+            super(); // error
+    ~~~~~~~~~~~~~~~~~~~~~~~~~
         }
+    ~~~~~
+!!! error TS2376: A 'super' call must be the first statement in the constructor when a class contains initialized properties, parameter properties, or private identifiers.
     }
     
     class Derived10<T> extends Base2<T> {
         a = 1;
         b: number;
         constructor(y: string) {
-            super();
+            super(); // ok
             this.a = 3;
             this.b = 3;
         }

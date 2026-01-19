@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericCallWithObjectTypeArgsAndConstraints3.ts] ////
-
 //// [genericCallWithObjectTypeArgsAndConstraints3.ts]
 // Generic call with constraints infering type parameter from object member properties
 
@@ -14,14 +12,14 @@ class Derived2 extends Base {
 }
 
 function f<T extends Base>(a: { x: T; y: T }) {
-    var r!: T;
+    var r: T;
     return r;
 }
 
 var r1 = f({ x: new Derived(), y: new Derived2() }); // error because neither is supertype of the other
 
 function f2<T extends Base, U extends { x: T; y: T }>(a: U) {
-    var r!: T;
+    var r: T;
     return r;
 }
 

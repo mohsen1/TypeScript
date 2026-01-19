@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/esnext/esnextmodulekindWithES5Target6.ts] ////
-
 //// [esnextmodulekindWithES5Target6.ts]
 export function f1(d = 0) {
 }

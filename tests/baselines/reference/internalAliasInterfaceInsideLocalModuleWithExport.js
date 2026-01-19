@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/internalAliasInterfaceInsideLocalModuleWithExport.ts] ////
-
 //// [internalAliasInterfaceInsideLocalModuleWithExport.ts]
-export namespace a {
+export module a {
     export interface I {
     }
 }
 
-export namespace c {
+export module c {
     export import b = a.I;
     export var x: b;
 }
@@ -15,20 +13,20 @@ export namespace c {
 //// [internalAliasInterfaceInsideLocalModuleWithExport.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.c = void 0;
     var c;
     (function (c) {
-    })(c || (exports.c = c = {}));
+    })(c = exports.c || (exports.c = {}));
 });
 
 
 //// [internalAliasInterfaceInsideLocalModuleWithExport.d.ts]
-export declare namespace a {
+export declare module a {
     interface I {
     }
 }
-export declare namespace c {
+export declare module c {
     export import b = a.I;
     var x: b;
 }

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/implicitAnyInAmbientDeclaration.ts] ////
-
 //// [implicitAnyInAmbientDeclaration.ts]
-namespace Test {
+module Test {
     declare class C {
         public publicMember;  // this should be an error
         private privateMember;  // this should not be an error

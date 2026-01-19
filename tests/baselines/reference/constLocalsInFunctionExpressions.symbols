@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/controlFlow/constLocalsInFunctionExpressions.ts] ////
-
-=== constLocalsInFunctionExpressions.ts ===
+=== tests/cases/conformance/controlFlow/constLocalsInFunctionExpressions.ts ===
 declare function getStringOrNumber(): string | number;
 >getStringOrNumber : Symbol(getStringOrNumber, Decl(constLocalsInFunctionExpressions.ts, 0, 0))
 

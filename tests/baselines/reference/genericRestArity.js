@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/rest/genericRestArity.ts] ////
-
 //// [genericRestArity.ts]
 // Repro from #25559
 

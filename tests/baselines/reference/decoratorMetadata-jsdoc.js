@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/decoratorMetadata-jsdoc.ts] ////
-
 //// [decoratorMetadata-jsdoc.ts]
 declare var decorator: any;
 

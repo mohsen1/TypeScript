@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericCloneReturnTypes2.ts] ////
-
 //// [genericCloneReturnTypes2.ts]
 class MyList<T> {
     public size: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorArgsErrors1.ts] ////
-
 //// [constructorArgsErrors1.ts]
 class foo {
     constructor (static a: number) {

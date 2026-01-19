@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportClassWithInaccessibleTypeInIndexerTypeAnnotations.ts] ////
-
 //// [ExportClassWithInaccessibleTypeInIndexerTypeAnnotations.ts]
-namespace A {
+module A {
 
     class Point {
         x: number;

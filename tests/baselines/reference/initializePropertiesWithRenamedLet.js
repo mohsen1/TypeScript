@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/initializePropertiesWithRenamedLet.ts] ////
-
 //// [initializePropertiesWithRenamedLet.ts]
 var x0;
 if (true) {

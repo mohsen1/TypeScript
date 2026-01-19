@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexerConstraints.ts] ////
-
 //// [indexerConstraints.ts]
 interface A { a: number; }
 interface B extends A { b: number; }

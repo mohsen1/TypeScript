@@ -4,51 +4,42 @@
     "version": "2.0.0",
     "tasks": [
         {
-            // Kept for backwards compat for old launch.json files so it's
-            // less annoying if moving up to the new build or going back to
-            // the old build.
-            //
-            // This is first because the acutal "npm: build:tests" task
-            // below has the same script value, and VS Code ignores labels
-            // and deduplicates them.
-            // https://github.com/microsoft/vscode/issues/93001
+            "type": "gulp",
+            "label": "gulp: local",
+            "task": "local",
+            "group": {
+                "kind": "build",
+                "isDefault": true
+            },
+            "problemMatcher": [
+                "$tsc"
+            ]
+        },
+        {
+            "type": "gulp",
+            "label": "gulp: tsc",
+            "task": "tsc",
+            "group": "build",
+            "problemMatcher": [
+                "$tsc"
+            ]
+        },
+        {
+            "type": "gulp",
             "label": "gulp: tests",
-            "type": "npm",
-            "script": "build:tests:notypecheck",
-            "group": "build",
-            "hide": true,
-            "problemMatcher": [
-                "$tsc"
-            ]
-        },
-        {
-            "label": "tsc: watch ./src",
-            "type": "shell",
-            "command": "node",
-            "args": ["${workspaceFolder}/node_modules/typescript/lib/tsc.js", "--build", "${workspaceFolder}/src", "--watch"],
-            "group": "build",
-            "isBackground": true,
-            "problemMatcher": [
-                "$tsc-watch"
-            ]
-        },
-        {
-            "label": "npm: build:compiler",
-            "type": "npm",
-            "script": "build:compiler",
+            "task": "tests",
             "group": "build",
             "problemMatcher": [
                 "$tsc"
             ]
         },
         {
-            "label": "npm: build:tests",
-            "type": "npm",
-            "script": "build:tests:notypecheck",
-            "group": "build",
+            "type": "gulp",
+            "task": "services",
+            "label": "gulp: services",
             "problemMatcher": [
                 "$tsc"
-            ]
+            ],
         }
     ]
 }

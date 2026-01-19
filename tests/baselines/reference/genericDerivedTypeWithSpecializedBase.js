@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericDerivedTypeWithSpecializedBase.ts] ////
-
 //// [genericDerivedTypeWithSpecializedBase.ts]
 class A<T> {
     x: T;
@@ -9,8 +7,8 @@ class B<U> extends A<string> {
     y: U;
 }
 
-declare var x: A<number>;
-declare var y: B<number>;
+var x: A<number>;
+var y: B<number>;
 x = y;  // error
 
 
@@ -42,4 +40,6 @@ var B = /** @class */ (function (_super) {
     }
     return B;
 }(A));
+var x;
+var y;
 x = y; // error

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/constEnumMergingWithValues2.ts] ////
-
 //// [m1.ts]
 class foo {}
-namespace foo {
+module foo {
     const enum E { X }
 }
 

@@ -1,22 +1,20 @@
-//// [tests/cases/conformance/internalModules/importDeclarations/exportImportAlias.ts] ////
-
 //// [exportImportAlias.ts]
 // expect no errors here
 
-namespace A {
+module A {
 
     export var x = 'hello world'
     export class Point {
         constructor(public x: number, public y: number) { }
     }
-    export namespace B {
+    export module B {
         export interface Id {
             name: string;
         }
     }
 }
 
-namespace C {
+module C {
     export import a = A;
 }
 
@@ -25,19 +23,19 @@ var b: { x: number; y: number; } = new C.a.Point(0, 0);
 var c: { name: string };
 var c: C.a.B.Id;
 
-namespace X {
+module X {
     export function Y() {
         return 42;
     }
 
-    export namespace Y {
+    export module Y {
         export class Point {
             constructor(public x: number, public y: number) { }
         }
     }
 }
 
-namespace Z {
+module Z {
 
     // 'y' should be a fundule here
     export import y = X.Y;
@@ -46,12 +44,12 @@ namespace Z {
 var m: number = Z.y();
 var n: { x: number; y: number; } = new Z.y.Point(0, 0);
 
-namespace K {
+module K {
     export class L {
         constructor(public name: string) { }
     }
 
-    export namespace L {
+    export module L {
         export var y = 12;
         export interface Point {
             x: number;
@@ -60,7 +58,7 @@ namespace K {
     }
 }
 
-namespace M {
+module M {
     export import D = K.L;
 }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6ModuleWithModuleGenTargetAmd.ts] ////
-
 //// [es6ModuleWithModuleGenTargetAmd.ts]
 export class A
 {

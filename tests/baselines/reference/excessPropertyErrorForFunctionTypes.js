@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/excessPropertyErrorForFunctionTypes.ts] ////
-
 //// [excessPropertyErrorForFunctionTypes.ts]
 type FunctionType = () => any;
 type DoesntWork = { a: number, c: number } | FunctionType;

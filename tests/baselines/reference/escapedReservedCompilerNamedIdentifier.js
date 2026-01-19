@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/escapedReservedCompilerNamedIdentifier.ts] ////
-
 //// [escapedReservedCompilerNamedIdentifier.ts]
 // double underscores
 var __proto__ = 10;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularOptionalityRemoval.ts] ////
-
 //// [circularOptionalityRemoval.ts]
 // Constructed repro
 function fn1(x: number | undefined = x > 0 ? x : 0) { }

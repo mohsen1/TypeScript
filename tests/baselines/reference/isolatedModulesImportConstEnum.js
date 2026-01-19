@@ -12,14 +12,14 @@ export const enum Foo {
 
 //// [file2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Foo = void 0;
 var Foo;
 (function (Foo) {
     Foo[Foo["BAR"] = 0] = "BAR";
-})(Foo || (exports.Foo = Foo = {}));
+})(Foo = exports.Foo || (exports.Foo = {}));
 //// [file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var file2_1 = require("./file2");
 console.log(file2_1.Foo.BAR);

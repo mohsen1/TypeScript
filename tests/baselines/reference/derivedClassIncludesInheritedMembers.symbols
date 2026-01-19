@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassIncludesInheritedMembers.ts] ////
-
-=== derivedClassIncludesInheritedMembers.ts ===
+=== tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassIncludesInheritedMembers.ts ===
 class Base {
 >Base : Symbol(Base, Decl(derivedClassIncludesInheritedMembers.ts, 0, 0))
 
@@ -99,7 +97,7 @@ class Base2 {
 
     [x: number]: Date;
 >x : Symbol(x, Decl(derivedClassIncludesInheritedMembers.ts, 29, 5))
->Date : Symbol(Date, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.scripthost.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Date : Symbol(Date, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.scripthost.d.ts, --, --))
 }
 
 class Derived2 extends Base2 {

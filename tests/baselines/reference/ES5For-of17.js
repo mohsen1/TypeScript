@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/for-ofStatements/ES5For-of17.ts] ////
-
 //// [ES5For-of17.ts]
 for (let v of []) {
     v;

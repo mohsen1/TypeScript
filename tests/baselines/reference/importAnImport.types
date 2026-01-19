@@ -1,24 +1,15 @@
-//// [tests/cases/compiler/importAnImport.ts] ////
-
-=== importAnImport.ts ===
-namespace c.a.b {
+=== tests/cases/compiler/importAnImport.ts ===
+module c.a.b {
     import ma = a;
 >ma : any
->   : ^^^
 >a : any
->  : ^^^
 }
 
-namespace m0 {
+module m0 {
     import m8 = c.a.b.ma;
 >m8 : any
->   : ^^^
 >c : any
->  : ^^^
 >a : any
->  : ^^^
 >b : any
->  : ^^^
 >ma : any
->   : ^^^
 }

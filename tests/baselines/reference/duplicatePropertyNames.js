@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/duplicatePropertyNames.ts] ////
-
 //// [duplicatePropertyNames.ts]
 // duplicate property names are an error in all types
 

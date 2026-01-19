@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericCallTypeArgumentInference.ts] ////
-
-=== genericCallTypeArgumentInference.ts ===
+=== tests/cases/conformance/types/typeRelationships/typeInference/genericCallTypeArgumentInference.ts ===
 // Basic type inference with generic calls, no errors expected
 
 function foo<T>(t: T) {

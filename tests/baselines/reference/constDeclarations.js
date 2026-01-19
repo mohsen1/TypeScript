@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constDeclarations.ts] ////
-
 //// [constDeclarations.ts]
 // No error
 const c1 = false;

@@ -6,7 +6,7 @@
     "modifierFlagsCache": 0,
     "transformFlags": 1,
     "typeName": {
-        "kind": "QualifiedName",
+        "kind": "FirstNode",
         "pos": 1,
         "end": 11,
         "flags": "JSDoc",
@@ -17,6 +17,7 @@
             "pos": 1,
             "end": 2,
             "flags": "JSDoc",
+            "modifierFlagsCache": 0,
             "transformFlags": 0,
             "escapedText": "a"
         },
@@ -25,7 +26,9 @@
             "pos": 3,
             "end": 11,
             "flags": "JSDoc",
+            "modifierFlagsCache": 0,
             "transformFlags": 0,
+            "originalKeywordKind": "FunctionKeyword",
             "escapedText": "function"
         }
     }

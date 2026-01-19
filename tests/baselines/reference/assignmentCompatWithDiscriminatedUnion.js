@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithDiscriminatedUnion.ts] ////
-
 //// [assignmentCompatWithDiscriminatedUnion.ts]
 // see 'typeRelatedToDiscriminatedType' in checker.ts:
 
@@ -101,7 +99,7 @@ namespace GH14865 {
     }
 
     const a: Style2 = { type: "A", data: "whatevs" };
-    declare let b: Style1;
+    let b: Style1;
     a.type; // "A" | "B"
     b.type; // "A" | "B"
     b = a; // should be assignable
@@ -203,30 +201,6 @@ namespace GH39357 {
     const a: A = b === "a" || b === "b" ? [b, 1] : ["c", ""];
 }
 
-// https://github.com/microsoft/TypeScript/issues/58603
-namespace GH58603 {
-    enum MyEnum { A = 1, B = 2 }
-
-    type TypeA = { kind: MyEnum.A, id?: number };
-    
-    type TypeB = { kind: MyEnum.B } & ({ id?: undefined } | { id: number });
-    
-    type MyType = TypeA | TypeB;
-    
-    function something(a: MyType): void {}
-    
-    function indirect(kind: MyEnum, id?: number): void {
-        something({ kind, id });
-    }
-    
-    type Foo = { kind: "a" | "b", value: number } | { kind: "a", value: undefined } | { kind: "b", value: undefined };
-    
-    function test(obj: { kind: "a" | "b", value: number | undefined }) {
-        let x1: Foo = obj;
-        let x2: Foo = { kind: obj.kind, value: obj.value };
-    }
-}
-
 
 //// [assignmentCompatWithDiscriminatedUnion.js]
 // see 'typeRelatedToDiscriminatedType' in checker.ts:
@@ -270,6 +244,7 @@ var Example5;
 var GH14865;
 (function (GH14865) {
     var a = { type: "A", data: "whatevs" };
+    var b;
     a.type; // "A" | "B"
     b.type; // "A" | "B"
     b = a; // should be assignable
@@ -328,20 +303,3 @@ var GH39357;
 (function (GH39357) {
     var a = b === "a" || b === "b" ? [b, 1] : ["c", ""];
 })(GH39357 || (GH39357 = {}));
-// https://github.com/microsoft/TypeScript/issues/58603
-var GH58603;
-(function (GH58603) {
-    var MyEnum;
-    (function (MyEnum) {
-        MyEnum[MyEnum["A"] = 1] = "A";
-        MyEnum[MyEnum["B"] = 2] = "B";
-    })(MyEnum || (MyEnum = {}));
-    function something(a) { }
-    function indirect(kind, id) {
-        something({ kind: kind, id: id });
-    }
-    function test(obj) {
-        var x1 = obj;
-        var x2 = { kind: obj.kind, value: obj.value };
-    }
-})(GH58603 || (GH58603 = {}));

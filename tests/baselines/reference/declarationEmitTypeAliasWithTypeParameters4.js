@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitTypeAliasWithTypeParameters4.ts] ////
-
 //// [declarationEmitTypeAliasWithTypeParameters4.ts]
 type Foo<T, Y> = {
     foo<U, J>(): Foo<U, J>
@@ -18,8 +16,8 @@ function foo() {
 
 
 //// [declarationEmitTypeAliasWithTypeParameters4.d.ts]
-type Foo<T, Y> = {
+declare type Foo<T, Y> = {
     foo<U, J>(): Foo<U, J>;
 };
-type SubFoo<R> = Foo<string, R>;
+declare type SubFoo<R> = Foo<string, R>;
 declare function foo(): SubFoo<number>;

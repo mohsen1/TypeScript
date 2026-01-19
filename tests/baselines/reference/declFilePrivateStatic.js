@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFilePrivateStatic.ts] ////
-
 //// [declFilePrivateStatic.ts]
 class C {
     private static x = 1;

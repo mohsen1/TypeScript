@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportAssignmentWithoutAllowSyntheticDefaultImportsError.ts] ////
-
 === /bar.ts ===
 export = bar;
 >bar : Symbol(bar, Decl(bar.ts, 0, 13))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileImportedTypeUseInTypeArgPosition.ts] ////
-
 //// [declFileImportedTypeUseInTypeArgPosition.ts]
 class List<T> { }
 declare module 'mod1' {

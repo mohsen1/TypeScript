@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeAliases/genericTypeAliases.ts] ////
-
 //// [genericTypeAliases.ts]
 type Tree<T> = T | { left: Tree<T>, right: Tree<T> };
 
@@ -83,7 +81,7 @@ var tree = {
         right: {
             left: 1,
             right: 2
-        },
+        }
     },
     right: 3
 };

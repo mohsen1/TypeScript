@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/bigint64ArraySubarray.ts] ////
-
 //// [bigint64ArraySubarray.ts]
 function bigInt64ArraySubarray() {
     var arr = new BigInt64Array(10);

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileObjectLiteralWithAccessors.ts] ////
-
 //// [declFileObjectLiteralWithAccessors.ts]
 function /*1*/makePoint(x: number) { 
     return {

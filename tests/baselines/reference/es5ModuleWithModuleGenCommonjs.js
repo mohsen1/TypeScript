@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5ModuleWithModuleGenCommonjs.ts] ////
-
 //// [es5ModuleWithModuleGenCommonjs.ts]
 export class A
 {

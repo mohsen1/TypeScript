@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportInterfaceWithInaccessibleTypeInIndexerTypeAnnotations.ts] ////
-
 //// [ExportInterfaceWithInaccessibleTypeInIndexerTypeAnnotations.ts]
-namespace A {
+module A {
 
     interface Point {
         x: number;

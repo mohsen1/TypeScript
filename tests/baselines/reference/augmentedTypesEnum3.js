@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/augmentedTypesEnum3.ts] ////
-
 //// [augmentedTypesEnum3.ts]
-namespace E {
+module E {
     var t;
 }
 enum E { }
 
 enum F { }
-namespace F { var t; }
+module F { var t; }
 
-namespace A {
+module A {
     var o;
 }
 enum A {
@@ -18,7 +16,7 @@ enum A {
 enum A {
     c
 }
-namespace A {
+module A {
     var p;
 }
 

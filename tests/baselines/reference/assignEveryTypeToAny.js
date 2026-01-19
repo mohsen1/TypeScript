@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/any/assignEveryTypeToAny.ts] ////
-
 //// [assignEveryTypeToAny.ts]
 // all of these are valid
 

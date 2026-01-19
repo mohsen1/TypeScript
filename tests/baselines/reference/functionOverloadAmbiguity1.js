@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloadAmbiguity1.ts] ////
-
 //// [functionOverloadAmbiguity1.ts]
 function callb(lam: (l: number) => void );
 function callb(lam: (n: string) => void );

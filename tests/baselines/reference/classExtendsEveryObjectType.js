@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classHeritageSpecification/classExtendsEveryObjectType.ts] ////
-
 //// [classExtendsEveryObjectType.ts]
 interface I {
     foo: string;
@@ -7,10 +5,10 @@ interface I {
 class C extends I { } // error
 
 class C2 extends { foo: string; } { } // error
-declare var x: { foo: string; }
+var x: { foo: string; }
 class C3 extends x { } // error
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 class C4 extends M { } // error
 
 function foo() { }
@@ -48,6 +46,7 @@ var C2 = /** @class */ (function (_super) {
     }
     return C2;
 }({ foo: string })); // error
+var x;
 var C3 = /** @class */ (function (_super) {
     __extends(C3, _super);
     function C3() {

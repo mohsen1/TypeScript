@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/classTypes/genericSetterInClassTypeJsDoc.ts] ////
-
 //// [genericSetterInClassTypeJsDoc.js]
 /**
  * @template T
@@ -53,7 +51,7 @@ new Box(3).value = 3;
 declare class Box<T> {
     /** @param {T} initialValue */
     constructor(initialValue: T);
-    set value(value: T);
+    set value(arg: T);
     /** @type {T} */
     get value(): T;
     #private;

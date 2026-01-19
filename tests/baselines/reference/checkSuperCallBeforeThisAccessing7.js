@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkSuperCallBeforeThisAccessing7.ts] ////
-
 //// [checkSuperCallBeforeThisAccessing7.ts]
 class Base {
     constructor(func: ()=>Base) {
@@ -35,7 +33,7 @@ var Base = /** @class */ (function () {
 var Super = /** @class */ (function (_super) {
     __extends(Super, _super);
     function Super() {
-        var _this = _super.call(this, (function () { return _this; })) || this; // No error
+        var _this = _super.call(this, (function () { return _this; })) || this;
         return _this;
     }
     return Super;

@@ -23,7 +23,7 @@ class V extends types.C {} // Error
 
 //// [types.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.C = void 0;
 var C = /** @class */ (function () {
     function C() {
@@ -33,7 +33,7 @@ var C = /** @class */ (function () {
 exports.C = C;
 //// [ns.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [index.js]
 "use strict";
 var __extends = (this && this.__extends) || (function () {
@@ -51,7 +51,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var U = /** @class */ (function (_super) {
     __extends(U, _super);
     function U() {

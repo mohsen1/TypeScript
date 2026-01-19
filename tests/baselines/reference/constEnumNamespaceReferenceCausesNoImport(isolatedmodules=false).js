@@ -19,16 +19,17 @@ function check(x: Foo.ConstFooEnum): void {
 
 //// [foo.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.fooFunc = fooFunc;
+exports.__esModule = true;
+exports.fooFunc = void 0;
 ;
 function fooFunc() { }
+exports.fooFunc = fooFunc;
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 function check(x) {
     switch (x) {
-        case 0 /* Foo.ConstFooEnum.Some */:
+        case 0 /* Some */:
             break;
     }
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/accessibility/classPropertyAsPrivate.ts] ////
-
 //// [classPropertyAsPrivate.ts]
 class C {
     private x: string;
@@ -13,7 +11,7 @@ class C {
     private static foo() { }
 }
 
-declare var c: C;
+var c: C;
 // all errors
 c.x;
 c.y;
@@ -45,6 +43,7 @@ var C = /** @class */ (function () {
     C.foo = function () { };
     return C;
 }());
+var c;
 // all errors
 c.x;
 c.y;

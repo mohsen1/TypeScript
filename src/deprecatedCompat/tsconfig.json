@@ -1,9 +1,12 @@
 {
     "extends": "../tsconfig-base",
     "compilerOptions": {
+        "outFile": "../../built/local/deprecatedCompat.js"
     },
     "references": [
         { "path": "../compiler" }
     ],
-    "include": ["**/*"]
+    "files": [
+        "deprecations.ts"
+    ]
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferenceDoesntCompareAgainstUninstantiatedTypeParameter.ts] ////
-
 //// [inferenceDoesntCompareAgainstUninstantiatedTypeParameter.ts]
 class ClassA<TEntityClass>  {
     constructor(private entity?: TEntityClass, public settings?: SettingsInterface<TEntityClass>) {
@@ -37,7 +35,7 @@ var thisIsOk = new ClassA<ConcreteClass>(new ConcreteClass(), {
 
 //// [inferenceDoesntCompareAgainstUninstantiatedTypeParameter.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var ClassA = /** @class */ (function () {
     function ClassA(entity, settings) {
         this.entity = entity;

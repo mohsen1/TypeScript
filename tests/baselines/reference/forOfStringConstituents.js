@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forOfStringConstituents.ts] ////
-
 //// [forOfStringConstituents.ts]
 interface A { x: 0; y: C[]; }
 interface B { x: 1; y: CD[]; }

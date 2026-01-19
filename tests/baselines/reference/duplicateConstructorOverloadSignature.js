@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateConstructorOverloadSignature.ts] ////
-
 //// [duplicateConstructorOverloadSignature.ts]
 class C {
     constructor(x: number);

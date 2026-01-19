@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericPrototypeProperty2.ts] ////
-
 //// [genericPrototypeProperty2.ts]
 interface EventTarget { x } 
 class BaseEvent {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularlyConstrainedMappedTypeContainingConditionalNoInfiniteInstantiationDepth.ts] ////
-
 //// [circularlyConstrainedMappedTypeContainingConditionalNoInfiniteInstantiationDepth.ts]
 declare class Component<P> {
     constructor(props: Readonly<P>);
@@ -68,4 +66,4 @@ export type InferableComponentEnhancerWithProps<TInjectedProps, TNeedsProps> =
 
 //// [circularlyConstrainedMappedTypeContainingConditionalNoInfiniteInstantiationDepth.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

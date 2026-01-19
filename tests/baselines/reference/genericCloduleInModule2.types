@@ -1,53 +1,37 @@
-//// [tests/cases/compiler/genericCloduleInModule2.ts] ////
-
-=== genericCloduleInModule2.ts ===
-namespace A {
+=== tests/cases/compiler/genericCloduleInModule2.ts ===
+module A {
 >A : typeof A
->  : ^^^^^^^^
 
     export class B<T> {
 >B : B<T>
->  : ^^^^
 
         foo() { }
 >foo : () => void
->    : ^^^^^^^^^^
 
         static bar() { }
 >bar : () => void
->    : ^^^^^^^^^^
     }
 }
 
-namespace A {
+module A {
 >A : typeof A
->  : ^^^^^^^^
 
-    export namespace B {
+    export module B {
 >B : typeof B
->  : ^^^^^^^^
 
         export var x = 1;
 >x : number
->  : ^^^^^^
 >1 : 1
->  : ^
     }
 }
 
 var b: A.B;
 >b : any
->  : ^^^
 >A : any
->  : ^^^
 
 b.foo();
 >b.foo() : any
->        : ^^^
 >b.foo : any
->      : ^^^
 >b : any
->  : ^^^
 >foo : any
->    : ^^^
 

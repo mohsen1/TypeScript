@@ -10,15 +10,11 @@ export type RowToColumns<TColumns> = {
 
 //// [Helpers.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [FromFactor.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 
 
 //// [Helpers.d.ts]
-export type StringKeyOf<TObj> = Extract<string, keyof TObj>;
-//// [FromFactor.d.ts]
-export type RowToColumns<TColumns> = {
-    [TName in StringKeyOf<TColumns>]: any;
-};
+export declare type StringKeyOf<TObj> = Extract<string, keyof TObj>;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/augmentedTypesClass2a.ts] ////
-
 //// [augmentedTypesClass2a.ts]
 //// class then function
 class c2 { public foo() { } } // error

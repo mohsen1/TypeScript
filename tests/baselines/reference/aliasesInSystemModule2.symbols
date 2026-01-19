@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/aliasesInSystemModule2.ts] ////
-
-=== aliasesInSystemModule2.ts ===
+=== tests/cases/compiler/aliasesInSystemModule2.ts ===
 import {alias} from "foo";
 >alias : Symbol(alias, Decl(aliasesInSystemModule2.ts, 0, 8))
 
@@ -26,11 +24,11 @@ let z = new cls2();
 >z : Symbol(z, Decl(aliasesInSystemModule2.ts, 6, 3))
 >cls2 : Symbol(cls2, Decl(aliasesInSystemModule2.ts, 1, 25))
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(aliasesInSystemModule2.ts, 6, 19))
 
   export import cls = alias.Class;
->cls : Symbol(cls, Decl(aliasesInSystemModule2.ts, 8, 13))
+>cls : Symbol(cls, Decl(aliasesInSystemModule2.ts, 8, 10))
 >alias : Symbol(alias, Decl(aliasesInSystemModule2.ts, 0, 8))
 >Class : Symbol(cls)
 
@@ -40,7 +38,7 @@ namespace M {
 
   let y = new cls(); 
 >y : Symbol(y, Decl(aliasesInSystemModule2.ts, 11, 5))
->cls : Symbol(cls, Decl(aliasesInSystemModule2.ts, 8, 13))
+>cls : Symbol(cls, Decl(aliasesInSystemModule2.ts, 8, 10))
 
   let z = new cls2();
 >z : Symbol(z, Decl(aliasesInSystemModule2.ts, 12, 5))

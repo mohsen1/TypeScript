@@ -1,9 +1,8 @@
 //// [tests/cases/compiler/APISample_watcher.ts] ////
 
-//// [package.json]
-{
-    "name": "typescript",
-    "types": "/.ts/typescript.d.ts"
+//// [index.d.ts]
+declare module "typescript" {
+    export = ts;
 }
 
 //// [APISample_watcher.ts]
@@ -48,8 +47,6 @@ function watch(rootFileNames: string[], options: ts.CompilerOptions) {
         getCurrentDirectory: () => process.cwd(),
         getCompilationSettings: () => options,
         getDefaultLibFileName: (options) => ts.getDefaultLibFilePath(options),
-        fileExists: fileName => fs.existsSync(fileName),
-        readFile: fileName => fs.readFileSync(fileName),
     };
 
     // Create the language service files
@@ -126,41 +123,8 @@ watch(currentDirectoryFiles, { module: ts.ModuleKind.CommonJS });
  *       at: https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API#incremental-build-support-using-the-language-services
  *       Please log a "breaking change" issue for any API breaking change affecting this issue
  */
-var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
-}) : (function(o, m, k, k2) {
-    if (k2 === undefined) k2 = k;
-    o[k2] = m[k];
-}));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
-Object.defineProperty(exports, "__esModule", { value: true });
-var ts = __importStar(require("typescript"));
+exports.__esModule = true;
+var ts = require("typescript");
 function watch(rootFileNames, options) {
     var files = {};
     // initialize the list of files
@@ -179,9 +143,7 @@ function watch(rootFileNames, options) {
         },
         getCurrentDirectory: function () { return process.cwd(); },
         getCompilationSettings: function () { return options; },
-        getDefaultLibFileName: function (options) { return ts.getDefaultLibFilePath(options); },
-        fileExists: function (fileName) { return fs.existsSync(fileName); },
-        readFile: function (fileName) { return fs.readFileSync(fileName); },
+        getDefaultLibFileName: function (options) { return ts.getDefaultLibFilePath(options); }
     };
     // Create the language service files
     var services = ts.createLanguageService(servicesHost, ts.createDocumentRegistry());

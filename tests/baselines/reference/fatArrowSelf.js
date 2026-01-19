@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/fatArrowSelf.ts] ////
-
 //// [fatArrowSelf.ts]
-namespace Events {
+module Events {
     export interface ListenerCallback {
         (value:any):void;
     }
@@ -11,7 +9,7 @@ namespace Events {
     }
 }
 
-namespace Consumer {
+module Consumer {
     class EventEmitterConsummer {
         constructor (private emitter: Events.EventEmitter) { }
 

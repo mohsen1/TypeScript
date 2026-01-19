@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/callExpressionWithTypeParameterConstrainedToOuterTypeParameter.ts] ////
-
 //// [callExpressionWithTypeParameterConstrainedToOuterTypeParameter.ts]
 interface I<T> {
     <U extends T>(u: U): U;

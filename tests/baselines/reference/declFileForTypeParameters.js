@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileForTypeParameters.ts] ////
-
 //// [declFileForTypeParameters.ts]
 class C<T> {
     x: T;

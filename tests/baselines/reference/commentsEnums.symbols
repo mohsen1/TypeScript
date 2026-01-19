@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/commentsEnums.ts] ////
-
-=== commentsEnums.ts ===
+=== tests/cases/compiler/commentsEnums.ts ===
 /** Enum of colors*/
 enum Colors {
 >Colors : Symbol(Colors, Decl(commentsEnums.ts, 0, 0))

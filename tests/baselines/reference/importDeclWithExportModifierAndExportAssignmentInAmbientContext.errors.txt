@@ -1,9 +1,9 @@
-importDeclWithExportModifierAndExportAssignmentInAmbientContext.ts(7,5): error TS2309: An export assignment cannot be used in a module with other exported elements.
+tests/cases/compiler/importDeclWithExportModifierAndExportAssignmentInAmbientContext.ts(7,5): error TS2309: An export assignment cannot be used in a module with other exported elements.
 
 
-==== importDeclWithExportModifierAndExportAssignmentInAmbientContext.ts (1 errors) ====
+==== tests/cases/compiler/importDeclWithExportModifierAndExportAssignmentInAmbientContext.ts (1 errors) ====
     declare module "m" {
-        namespace x {
+        module x {
             interface c {
             }
         }

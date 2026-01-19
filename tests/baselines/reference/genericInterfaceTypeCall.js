@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericInterfaceTypeCall.ts] ////
-
 //// [genericInterfaceTypeCall.ts]
 interface Foo<T> {
     reject(arg: T): void;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfArrayLiterals1.ts] ////
-
 //// [contextualTypingOfArrayLiterals1.ts]
 interface I {
    [x: number]: Date;

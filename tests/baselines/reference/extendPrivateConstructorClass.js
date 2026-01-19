@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendPrivateConstructorClass.ts] ////
-
 //// [extendPrivateConstructorClass.ts]
 declare namespace abc {
     class XYZ {

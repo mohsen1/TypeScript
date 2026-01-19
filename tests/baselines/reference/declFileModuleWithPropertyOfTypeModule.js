@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declFileModuleWithPropertyOfTypeModule.ts] ////
-
 //// [declFileModuleWithPropertyOfTypeModule.ts]
-namespace m {
+module m {
     export class c {
     }
 
@@ -22,7 +20,7 @@ var m;
 
 
 //// [declFileModuleWithPropertyOfTypeModule.d.ts]
-declare namespace m {
+declare module m {
     class c {
     }
     var a: typeof m;
