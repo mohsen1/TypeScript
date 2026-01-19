@@ -1,0 +1,25 @@
+# Clippy configuration for the Zang TypeScript compiler
+
+# Allow complex types for AST nodes
+type-complexity-threshold = 500
+
+# Allow longer functions for parsing logic
+too-many-lines-threshold = 200
+
+# Allow more arguments for complex constructors
+too-many-arguments-threshold = 10
+
+# Cognitive complexity threshold
+cognitive-complexity-threshold = 50
+
+# Allow larger enums for AST
+enum-variant-size-threshold = 500
+
+# Documentation requirements
+missing-docs-in-private-items = false
+
+# Allow module inception (mod.rs pattern)
+allow-unwrap-in-tests = true
+
+# Performance hints
+trivial-copy-size-limit = 16

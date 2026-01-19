@@ -1,0 +1,19 @@
+[package]
+name = "zang_parser"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "TypeScript parser for Zang compiler"
+
+[dependencies]
+zang_core = { path = "../zang_core" }
+bumpalo.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "parser"
+# harness = false

@@ -1,0 +1,22 @@
+[package]
+name = "zang_core"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Core types and utilities for Zang TypeScript compiler"
+
+[dependencies]
+bumpalo.workspace = true
+dashmap.workspace = true
+parking_lot.workspace = true
+rustc-hash.workspace = true
+string_cache.workspace = true
+thiserror.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
+
+# Benchmarks will be added later
+# [[bench]]
+# name = "interner"
+# harness = false

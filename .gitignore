@@ -98,3 +98,24 @@ tests/cases/user/puppeteer/puppeteer
 tests/cases/user/axios-src/axios-src
 tests/cases/user/prettier/prettier
 .eslintcache
+
+# Rust
+target/
+Cargo.lock
+*.rs.bk
+
+# WASM build output
+pkg/
+crates/zang_wasm/pkg/
+
+# Rust IDE
+.cargo/
+*.rlib
+
+# Profiling
+perf.data
+perf.data.old
+flamegraph.svg
+
+# Benchmarks
+criterion/

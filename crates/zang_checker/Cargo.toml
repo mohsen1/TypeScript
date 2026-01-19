@@ -1,0 +1,18 @@
+[package]
+name = "zang_checker"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+description = "Type checker for the Zang TypeScript compiler"
+
+[dependencies]
+zang_core = { path = "../zang_core" }
+zang_parser = { path = "../zang_parser" }
+dashmap.workspace = true
+parking_lot.workspace = true
+rayon.workspace = true
+thiserror.workspace = true
+rustc-hash.workspace = true
+
+[dev-dependencies]
+criterion.workspace = true
