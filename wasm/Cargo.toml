@@ -30,6 +30,11 @@ smallvec = "1.13"
 ena = "0.14"  # Union-Find for type unification
 indexmap = "2.6"  # Deterministic iteration for structural keys (preserves insertion order)
 bitflags = "2.6"  # Efficient TypeFlags for fast rejection
+# High-performance interner dependencies
+bumpalo = { version = "3.14", features = ["collections"] }  # Arena allocator for string storage
+dashmap = "5.5"  # Lock-free concurrent hash map for interning
+ahash = "0.8"  # Fast non-cryptographic hash function
+parking_lot = "0.12"  # Faster synchronization primitives
 
 [dev-dependencies]
 criterion = "0.5"

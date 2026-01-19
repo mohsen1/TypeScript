@@ -412,3 +412,280 @@ impl Default for ShardedInterner {
         Self::new()
     }
 }
+
+// =============================================================================
+// Arena-backed Interner with DashMap for High-Performance Concurrent Access
+// =============================================================================
+
+use ahash::AHasher;
+use bumpalo::Bump;
+use dashmap::DashMap;
+use parking_lot::RwLock as ParkingLotRwLock;
+
+/// High-performance arena-backed string interner with concurrent access support.
+///
+/// This interner uses:
+/// - Bumpalo arena for efficient memory allocation (strings are never deallocated)
+/// - DashMap (sharded concurrent hash map) for O(1) concurrent lookups
+/// - Zero-allocation lookup path for already-interned strings
+///
+/// # Performance Characteristics
+/// - Interning: O(1) amortized, single allocation for new strings
+/// - Lookup: O(1), zero allocations
+/// - Resolve: O(1), zero allocations
+/// - Memory: Strings stored contiguously in arena with excellent cache locality
+///
+/// # Thread Safety
+/// This interner is fully thread-safe. Multiple threads can concurrently:
+/// - Look up existing strings (zero-allocation fast path)
+/// - Intern new strings (lock-free via DashMap sharding)
+/// - Resolve atoms to strings
+pub struct ArenaInterner {
+    /// DashMap for concurrent string->atom lookups
+    /// Key: hash of string, Value: atom
+    map: DashMap<u64, Atom, ahash::RandomState>,
+
+    /// Arena allocator for string storage
+    /// Protected by RwLock for rare growth operations
+    arena: ParkingLotRwLock<Bump>,
+
+    /// Vector of interned string pointers (atom index -> &str)
+    /// Protected by RwLock for thread-safe growth
+    strings: ParkingLotRwLock<Vec<(*const u8, usize)>>,
+
+    /// Counter for generating unique atom IDs
+    next_id: std::sync::atomic::AtomicU32,
+}
+
+// SAFETY: The arena contains only string data which is immutable after allocation.
+// The pointers in `strings` are valid for the lifetime of the arena.
+unsafe impl Send for ArenaInterner {}
+unsafe impl Sync for ArenaInterner {}
+
+impl ArenaInterner {
+    /// Create a new arena-backed interner.
+    pub fn new() -> Self {
+        Self::with_capacity(4096)
+    }
+
+    /// Create a new arena-backed interner with the specified initial capacity.
+    pub fn with_capacity(capacity: usize) -> Self {
+        let interner = ArenaInterner {
+            map: DashMap::with_capacity_and_hasher(capacity, ahash::RandomState::new()),
+            arena: ParkingLotRwLock::new(Bump::with_capacity(capacity * 16)), // ~16 bytes per string average
+            strings: ParkingLotRwLock::new(Vec::with_capacity(capacity)),
+            next_id: std::sync::atomic::AtomicU32::new(1), // Start at 1, 0 is reserved for NONE
+        };
+
+        // Pre-intern empty string at index 0
+        {
+            let arena = interner.arena.write();
+            let empty_str: &str = arena.alloc_str("");
+            let ptr = empty_str.as_ptr();
+            let len = empty_str.len();
+            drop(arena);
+
+            let mut strings = interner.strings.write();
+            strings.push((ptr, len));
+        }
+
+        // Pre-intern common strings for better cache locality
+        for s in COMMON_STRINGS {
+            let _ = interner.intern(s);
+        }
+
+        interner
+    }
+
+    /// Compute a hash for the string using ahash.
+    #[inline]
+    fn hash_string(s: &str) -> u64 {
+        let mut hasher = AHasher::default();
+        hasher.write(s.as_bytes());
+        hasher.finish()
+    }
+
+    /// Intern a string, returning its Atom handle.
+    ///
+    /// If the string is already interned, returns the existing Atom without allocation.
+    /// This is the zero-allocation fast path that makes repeated interning efficient.
+    #[inline]
+    pub fn intern(&self, s: &str) -> Atom {
+        if s.is_empty() {
+            return Atom::NONE;
+        }
+
+        let hash = Self::hash_string(s);
+
+        // Fast path: check if already interned (zero allocation)
+        if let Some(entry) = self.map.get(&hash) {
+            let atom = *entry;
+            // Verify string match to handle hash collisions
+            if self.resolve_unchecked(atom) == s {
+                return atom;
+            }
+        }
+
+        // Slow path: need to intern the string
+        self.intern_slow(s, hash)
+    }
+
+    /// Slow path for interning a new string.
+    #[cold]
+    fn intern_slow(&self, s: &str, hash: u64) -> Atom {
+        // Use entry API for atomic insert-or-get
+        let entry = self.map.entry(hash);
+
+        match entry {
+            dashmap::mapref::entry::Entry::Occupied(e) => {
+                let atom = *e.get();
+                // Verify string match (hash collision case)
+                if self.resolve_unchecked(atom) == s {
+                    return atom;
+                }
+                // Hash collision - use secondary probing
+                self.intern_with_collision(s, hash)
+            }
+            dashmap::mapref::entry::Entry::Vacant(e) => {
+                let atom = self.allocate_string(s);
+                e.insert(atom);
+                atom
+            }
+        }
+    }
+
+    /// Handle hash collisions with linear probing.
+    fn intern_with_collision(&self, s: &str, original_hash: u64) -> Atom {
+        let mut probe = original_hash.wrapping_add(1);
+        loop {
+            match self.map.entry(probe) {
+                dashmap::mapref::entry::Entry::Occupied(e) => {
+                    let atom = *e.get();
+                    if self.resolve_unchecked(atom) == s {
+                        return atom;
+                    }
+                    probe = probe.wrapping_add(1);
+                }
+                dashmap::mapref::entry::Entry::Vacant(e) => {
+                    let atom = self.allocate_string(s);
+                    e.insert(atom);
+                    return atom;
+                }
+            }
+        }
+    }
+
+    /// Allocate a string in the arena and return its Atom.
+    fn allocate_string(&self, s: &str) -> Atom {
+        // Allocate in arena
+        let arena = self.arena.write();
+        let allocated: &str = arena.alloc_str(s);
+        let ptr = allocated.as_ptr();
+        let len = allocated.len();
+        drop(arena);
+
+        // Get next atom ID
+        let index = self
+            .next_id
+            .fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+
+        // Store pointer
+        let mut strings = self.strings.write();
+        if strings.len() <= index as usize {
+            strings.resize(index as usize + 1, (std::ptr::null(), 0));
+        }
+        strings[index as usize] = (ptr, len);
+
+        Atom(index)
+    }
+
+    /// Resolve an Atom to its string slice without bounds checking.
+    #[inline]
+    fn resolve_unchecked(&self, atom: Atom) -> &str {
+        let strings = self.strings.read();
+        let (ptr, len) = strings[atom.0 as usize];
+        // SAFETY: ptr and len came from a valid &str allocated in our arena
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) }
+    }
+
+    /// Resolve an Atom back to its string value.
+    ///
+    /// Returns empty string if atom is out of bounds (safety for error recovery).
+    #[inline]
+    pub fn resolve(&self, atom: Atom) -> &str {
+        if atom.is_none() {
+            return "";
+        }
+        let strings = self.strings.read();
+        if (atom.0 as usize) >= strings.len() {
+            return "";
+        }
+        let (ptr, len) = strings[atom.0 as usize];
+        if ptr.is_null() {
+            return "";
+        }
+        // SAFETY: ptr and len came from a valid &str allocated in our arena
+        unsafe { std::str::from_utf8_unchecked(std::slice::from_raw_parts(ptr, len)) }
+    }
+
+    /// Look up a string without interning it (zero allocation).
+    ///
+    /// Returns `Some(Atom)` if the string is already interned, `None` otherwise.
+    /// This never allocates memory.
+    #[inline]
+    pub fn lookup(&self, s: &str) -> Option<Atom> {
+        if s.is_empty() {
+            return Some(Atom::NONE);
+        }
+
+        let hash = Self::hash_string(s);
+
+        if let Some(entry) = self.map.get(&hash) {
+            let atom = *entry;
+            if self.resolve_unchecked(atom) == s {
+                return Some(atom);
+            }
+        }
+
+        // Check collision chain
+        let mut probe = hash.wrapping_add(1);
+        for _ in 0..16 {
+            // Limit probing to avoid infinite loops
+            if let Some(entry) = self.map.get(&probe) {
+                let atom = *entry;
+                if self.resolve_unchecked(atom) == s {
+                    return Some(atom);
+                }
+                probe = probe.wrapping_add(1);
+            } else {
+                break;
+            }
+        }
+
+        None
+    }
+
+    /// Get the number of interned strings (including empty string).
+    pub fn len(&self) -> usize {
+        self.next_id
+            .load(std::sync::atomic::Ordering::Relaxed) as usize
+    }
+
+    /// Check if the interner is empty (only has the empty string).
+    pub fn is_empty(&self) -> bool {
+        self.len() <= 1
+    }
+
+    /// Pre-intern common TypeScript keywords and identifiers.
+    pub fn intern_common(&self) {
+        for s in COMMON_STRINGS {
+            self.intern(s);
+        }
+    }
+}
+
+impl Default for ArenaInterner {
+    fn default() -> Self {
+        Self::new()
+    }
+}
