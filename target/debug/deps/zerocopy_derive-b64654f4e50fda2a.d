@@ -1,0 +1,8 @@
+/private/var/folders/57/xp3brw212ygckhkk_ml783fr0000gn/T/cco-workspace-TypeScript-1768787246814/worktrees/worker-3/target/debug/deps/zerocopy_derive-b64654f4e50fda2a.d: /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/lib.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/enum.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/ext.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/repr.rs
+
+/private/var/folders/57/xp3brw212ygckhkk_ml783fr0000gn/T/cco-workspace-TypeScript-1768787246814/worktrees/worker-3/target/debug/deps/libzerocopy_derive-b64654f4e50fda2a.dylib: /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/lib.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/enum.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/ext.rs /Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/repr.rs
+
+/Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/lib.rs:
+/Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/enum.rs:
+/Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/ext.rs:
+/Users/mohsenazimi/.cargo/registry/src/index.crates.io-1949cf8c6b5b557f/zerocopy-derive-0.8.33/src/repr.rs:
