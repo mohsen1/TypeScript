@@ -41,7 +41,7 @@ function getTestFiles(dir, maxFiles) {
 }
 
 async function main() {
-  const testFiles = getTestFiles(CONFIG.conformanceDir, 200);
+  const testFiles = getTestFiles(CONFIG.conformanceDir, 1000);
   const extraTS1109Files = [];
 
   console.log(`Analyzing ${testFiles.length} test files for extra TS1109 errors...`);
