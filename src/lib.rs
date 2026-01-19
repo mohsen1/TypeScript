@@ -5,12 +5,24 @@
 //! - Zero-copy parsing using &str references
 //! - Iterative algorithms to avoid stack overflow
 //! - Proper error recovery without budget resets
+//! - Enum and namespace type checking
+//! - JavaScript transform/emit
 
+pub mod binder;
+pub mod checker;
 pub mod parser;
 pub mod thin_parser;
+pub mod transforms;
 
+pub use binder::{EnumBinder, EnumBindingError, EnumMemberSymbol, EnumSymbol};
+pub use checker::{
+    EnumChecker, EnumDeclaration, EnumError, EnumMember, EnumMemberValue, EnumType,
+    ExportVisibility, NamespaceChecker, NamespaceDeclaration, NamespaceError,
+    NamespaceMember, NamespaceMemberKind, ResolvedNamespace,
+};
 pub use parser::error_recovery::{ErrorRecovery, RecoveryStrategy, SyncPoint};
 pub use thin_parser::{AstNode, ParseError, Scanner, ThinParser, Token, TokenKind};
+pub use transforms::{EnumTransformOptions, EnumTransformer, JsOutput};
 
 /// Parse TypeScript source code and return the AST
 ///
