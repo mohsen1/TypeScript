@@ -10,6 +10,8 @@
 //! - Override modifier checking
 //! - Constructor parameter properties
 //! - Accessor properties (get/set)
+//! - Polymorphic 'this' type for method chaining
+//! - This parameter checking
 //!
 //! # Example
 //!
@@ -33,8 +35,13 @@ pub mod modifiers;
 pub mod members;
 pub mod inheritance;
 pub mod class;
+pub mod this_type;
 
 pub use modifiers::{AccessModifier, ModifierFlags, ModifierContext, ModifierError};
 pub use members::{ClassMember, MemberKind, MemberTable, ParameterInfo, TypeId, MemberId, MemberError};
 pub use inheritance::{ClassType, InterfaceType, TypeRegistry, InheritanceChecker, TypeParameterInfo};
 pub use class::{ClassChecker, ClassCheckOptions, ClassDiagnostic, AccessContext};
+pub use this_type::{
+    ThisTypeChecker, ThisTypeDiagnostic, ThisCheckContext, ThisBindingKind,
+    MethodThisInfo, ThisParameterInfo, ThisParameterType, FluentApiChecker,
+};

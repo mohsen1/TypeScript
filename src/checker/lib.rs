@@ -10,6 +10,8 @@
 //! - **Override Modifier**: Ensures proper use of the override keyword
 //! - **Parameter Properties**: Validates constructor parameter properties
 //! - **Accessors**: Checks get/set accessor pairs
+//! - **This Type**: Polymorphic 'this' type for fluent APIs
+//! - **This Parameter**: Explicit this parameter checking
 //!
 //! # Quick Start
 //!
@@ -39,6 +41,7 @@ pub mod modifiers;
 pub mod members;
 pub mod inheritance;
 pub mod class;
+pub mod this_type;
 
 // Re-export all public types
 pub use modifiers::{
@@ -75,4 +78,15 @@ pub use class::{
     ClassCheckOptions,
     ClassDiagnostic,
     AccessContext,
+};
+
+pub use this_type::{
+    ThisTypeChecker,
+    ThisTypeDiagnostic,
+    ThisCheckContext,
+    ThisBindingKind,
+    MethodThisInfo,
+    ThisParameterInfo,
+    ThisParameterType,
+    FluentApiChecker,
 };
