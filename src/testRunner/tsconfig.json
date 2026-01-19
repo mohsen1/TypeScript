@@ -30,6 +30,7 @@
     "files": [
         "compilerRef.ts",
         "evaluatorRef.ts",
+        "solverRef.ts",
         "fakesRef.ts",
         "vpathRef.ts",
         "vfsRef.ts",
@@ -235,6 +236,7 @@
         "unittests/tsserver/versionCache.ts",
         "unittests/tsserver/watchEnvironment.ts",
         "unittests/tsserver/webServer.ts",
-        "unittests/debugDeprecation.ts"
+        "unittests/debugDeprecation.ts",
+        "unittests/solver.ts"
     ]
 }

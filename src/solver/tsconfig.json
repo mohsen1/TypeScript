@@ -1,0 +1,16 @@
+{
+    "extends": "../tsconfig-base",
+    "compilerOptions": {
+        "outFile": "../../built/local/solver.js",
+        "types": ["node"]
+    },
+    "references": [
+        { "path": "../shims" },
+        { "path": "../compiler" }
+    ],
+    "files": [
+        "types.ts",
+        "evaluator.ts",
+        "mod.ts"
+    ]
+}
