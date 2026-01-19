@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 use zang_core::{InternedString, Span};
 use zang_parser::{
-    Expression, Statement, BinaryOperator, UnaryOperator, Identifier,
+    Expression, BinaryOperator, UnaryOperator, Identifier,
 };
 use crate::types::{ResolvedType, LiteralType, ObjectType};
 
@@ -417,7 +417,7 @@ impl<'a> TypeNarrower<'a> {
 
     /// Narrows based on instanceof
     fn narrow_by_instanceof(&mut self, left: &Expression, _right: &Expression, assume_true: bool) {
-        if let Expression::Identifier(ident) = left {
+        if let Expression::Identifier(_ident) = left {
             // TODO: Look up the constructor type and narrow to its instance type
             // For now, we just keep the current type
             if assume_true {
@@ -427,8 +427,8 @@ impl<'a> TypeNarrower<'a> {
     }
 
     /// Narrows based on in operator
-    fn narrow_by_in_operator(&mut self, left: &Expression, right: &Expression, assume_true: bool) {
-        if let Expression::Identifier(obj_ident) = right {
+    fn narrow_by_in_operator(&mut self, left: &Expression, right: &Expression, _assume_true: bool) {
+        if let Expression::Identifier(_obj_ident) = right {
             if let Expression::StringLiteral(_prop_name) = left {
                 // "prop" in x - could narrow x to include that property
                 // TODO: Implement discriminated union narrowing
@@ -437,7 +437,7 @@ impl<'a> TypeNarrower<'a> {
     }
 
     /// Narrows based on a call expression (type predicates)
-    fn narrow_by_call(&mut self, call: &zang_parser::CallExpression, assume_true: bool) {
+    fn narrow_by_call(&mut self, _call: &zang_parser::CallExpression, _assume_true: bool) {
         // TODO: Implement type predicate narrowing
         // e.g., if (isString(x)) where isString is (x: any) => x is string
     }

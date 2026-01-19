@@ -395,6 +395,9 @@ pub enum Statement {
     Return(ReturnStatement),
     Function(FunctionDeclaration),
     Class(ClassDeclaration),
+    Import(ImportDeclaration),
+    Export(ExportDeclaration),
+    ExportAssignment(ExportAssignment),
     // ... more statement types
     Empty(Span),
 }
@@ -409,6 +412,9 @@ impl Node for Statement {
             Statement::Return(_) => SyntaxKind::ReturnStatement,
             Statement::Function(_) => SyntaxKind::FunctionDeclaration,
             Statement::Class(_) => SyntaxKind::ClassDeclaration,
+            Statement::Import(_) => SyntaxKind::ImportDeclaration,
+            Statement::Export(_) => SyntaxKind::ExportDeclaration,
+            Statement::ExportAssignment(_) => SyntaxKind::ExportAssignment,
             Statement::Empty(_) => SyntaxKind::EmptyStatement,
         }
     }
@@ -422,6 +428,9 @@ impl Node for Statement {
             Statement::Return(s) => s.span,
             Statement::Function(s) => s.span,
             Statement::Class(s) => s.span,
+            Statement::Import(s) => s.span,
+            Statement::Export(s) => s.span,
+            Statement::ExportAssignment(s) => s.span,
             Statement::Empty(span) => *span,
         }
     }
@@ -1173,6 +1182,211 @@ pub struct ClassExpression {
     pub type_parameters: Option<Vec<TypeParameterNode>>,
     pub heritage_clauses: Vec<HeritageClause>,
     pub members: Vec<ClassMember>,
+}
+
+// ============================================================================
+// Import/Export Declarations
+// ============================================================================
+
+/// Import declaration
+/// Handles: import x from "mod", import { x } from "mod", import * as x from "mod", import "mod"
+#[derive(Clone, Debug)]
+pub struct ImportDeclaration {
+    pub span: Span,
+    /// The import clause (if any)
+    pub import_clause: Option<ImportClause>,
+    /// The module specifier (e.g., "./module" or "lodash")
+    pub module_specifier: StringLiteral,
+    /// Whether this is a type-only import (import type { ... })
+    pub is_type_only: bool,
+}
+
+/// Import clause - the part between "import" and "from"
+#[derive(Clone, Debug)]
+pub struct ImportClause {
+    pub span: Span,
+    /// Default import binding (import X from "mod")
+    pub name: Option<Identifier>,
+    /// Named or namespace bindings
+    pub named_bindings: Option<NamedImportBindings>,
+    /// Whether this is a type-only import
+    pub is_type_only: bool,
+}
+
+/// Named import bindings - either namespace import or named imports
+#[derive(Clone, Debug)]
+pub enum NamedImportBindings {
+    /// Namespace import (import * as ns from "mod")
+    Namespace(NamespaceImport),
+    /// Named imports (import { a, b as c } from "mod")
+    Named(NamedImports),
+}
+
+/// Namespace import (import * as ns from "mod")
+#[derive(Clone, Debug)]
+pub struct NamespaceImport {
+    pub span: Span,
+    /// The local binding name (ns in `import * as ns`)
+    pub name: Identifier,
+}
+
+/// Named imports (import { a, b as c } from "mod")
+#[derive(Clone, Debug)]
+pub struct NamedImports {
+    pub span: Span,
+    /// The individual import specifiers
+    pub elements: Vec<ImportSpecifier>,
+}
+
+/// An individual import specifier (a or b as c in `import { a, b as c }`)
+#[derive(Clone, Debug)]
+pub struct ImportSpecifier {
+    pub span: Span,
+    /// The exported name from the module (might be "default")
+    pub property_name: Option<Identifier>,
+    /// The local binding name
+    pub name: Identifier,
+    /// Whether this is a type-only import (import { type X })
+    pub is_type_only: bool,
+}
+
+/// Export declaration
+/// Handles: export { x }, export { x } from "mod", export * from "mod", export const/function/class
+#[derive(Clone, Debug)]
+pub struct ExportDeclaration {
+    pub span: Span,
+    /// The export clause (for re-exports and named exports)
+    pub export_clause: Option<NamedExportBindings>,
+    /// The module specifier (for re-exports: export { x } from "mod")
+    pub module_specifier: Option<StringLiteral>,
+    /// Whether this is a type-only export (export type { ... })
+    pub is_type_only: bool,
+    /// The declaration being exported (export const x = 1)
+    pub declaration: Option<Box<ExportableDeclaration>>,
+}
+
+/// Named export bindings - either namespace export or named exports
+#[derive(Clone, Debug)]
+pub enum NamedExportBindings {
+    /// Namespace export (export * from "mod" or export * as ns from "mod")
+    Namespace(NamespaceExport),
+    /// Named exports (export { a, b as c })
+    Named(NamedExports),
+}
+
+/// Namespace export (export * as ns from "mod")
+#[derive(Clone, Debug)]
+pub struct NamespaceExport {
+    pub span: Span,
+    /// The export name (ns in `export * as ns`), None for bare `export *`
+    pub name: Option<Identifier>,
+}
+
+/// Named exports (export { a, b as c })
+#[derive(Clone, Debug)]
+pub struct NamedExports {
+    pub span: Span,
+    /// The individual export specifiers
+    pub elements: Vec<ExportSpecifier>,
+}
+
+/// An individual export specifier (a or b as c in `export { a, b as c }`)
+#[derive(Clone, Debug)]
+pub struct ExportSpecifier {
+    pub span: Span,
+    /// The local name (b in `export { b as c }`)
+    pub property_name: Option<Identifier>,
+    /// The exported name (c in `export { b as c }`, or a in `export { a }`)
+    pub name: Identifier,
+    /// Whether this is a type-only export (export { type X })
+    pub is_type_only: bool,
+}
+
+/// Declarations that can be exported directly
+#[derive(Clone, Debug)]
+pub enum ExportableDeclaration {
+    Variable(VariableStatement),
+    Function(FunctionDeclaration),
+    Class(ClassDeclaration),
+    Interface(InterfaceDeclaration),
+    TypeAlias(TypeAliasDeclaration),
+    Enum(EnumDeclaration),
+}
+
+/// Export assignment (export = expr or export default expr)
+#[derive(Clone, Debug)]
+pub struct ExportAssignment {
+    pub span: Span,
+    /// The expression being exported
+    pub expression: Expression,
+    /// True for `export default`, false for `export =`
+    pub is_export_equals: bool,
+}
+
+/// Interface declaration
+#[derive(Clone, Debug)]
+pub struct InterfaceDeclaration {
+    pub span: Span,
+    pub name: Identifier,
+    pub type_parameters: Option<Vec<TypeParameterNode>>,
+    pub heritage_clauses: Vec<HeritageClause>,
+    pub members: Vec<TypeElement>,
+}
+
+/// Type alias declaration
+#[derive(Clone, Debug)]
+pub struct TypeAliasDeclaration {
+    pub span: Span,
+    pub name: Identifier,
+    pub type_parameters: Option<Vec<TypeParameterNode>>,
+    pub type_node: TypeNode,
+}
+
+/// Enum declaration
+#[derive(Clone, Debug)]
+pub struct EnumDeclaration {
+    pub span: Span,
+    pub name: Identifier,
+    pub members: Vec<EnumMemberNode>,
+    pub is_const: bool,
+}
+
+/// Enum member node
+#[derive(Clone, Debug)]
+pub struct EnumMemberNode {
+    pub span: Span,
+    pub name: PropertyName,
+    pub initializer: Option<Expression>,
+}
+
+/// Module declaration (for module augmentation)
+#[derive(Clone, Debug)]
+pub struct ModuleDeclaration {
+    pub span: Span,
+    pub name: ModuleName,
+    pub body: Option<ModuleBody>,
+    pub modifiers: Modifiers,
+}
+
+/// Module name
+#[derive(Clone, Debug)]
+pub enum ModuleName {
+    Identifier(Identifier),
+    StringLiteral(StringLiteral),
+}
+
+/// Module body
+#[derive(Clone, Debug)]
+pub enum ModuleBody {
+    Block(ModuleBlock),
+    Declaration(Box<ModuleDeclaration>),
+}
+
+/// Module block
+#[derive(Clone, Debug)]
+pub struct ModuleBlock {
+    pub span: Span,
+    pub statements: Vec<Statement>,
 }
 
 #[cfg(test)]

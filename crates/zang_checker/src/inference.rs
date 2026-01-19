@@ -3,12 +3,12 @@
 //! Infers types from expressions and declarations.
 
 use std::collections::HashMap;
-use zang_core::{InternedString, Span};
+use zang_core::InternedString;
 use zang_parser::{
-    Expression, Statement, VariableDeclaration, BindingName, TypeNode, BinaryOperator,
+    Expression, Statement, BindingName, TypeNode, BinaryOperator,
     Identifier, SyntaxKind, KeywordTypeNode,
 };
-use crate::types::{ResolvedType, TypeId, ObjectType, PropertySignature, FunctionType, ParameterType, LiteralType, TypeParameterType};
+use crate::types::{ResolvedType, TypeId, ObjectType, PropertySignature, FunctionType, ParameterType, LiteralType};
 
 /// Type inference context
 pub struct InferenceContext {
@@ -105,7 +105,7 @@ impl<'a> TypeInferrer<'a> {
     pub fn infer_expression(&mut self, expr: &Expression) -> ResolvedType {
         match expr {
             Expression::Identifier(ident) => self.infer_identifier(ident),
-            Expression::StringLiteral(lit) => {
+            Expression::StringLiteral(_lit) => {
                 ResolvedType::Literal(LiteralType::String(
                     // For now, we'll return a simple string type
                     // In a full implementation, we'd get the actual string value
@@ -482,7 +482,7 @@ impl<'a> TypeInferrer<'a> {
     pub fn type_from_type_node(&self, node: &TypeNode) -> ResolvedType {
         match node {
             TypeNode::Keyword(kw) => self.type_from_keyword(kw),
-            TypeNode::Reference(ref_node) => {
+            TypeNode::Reference(_ref_node) => {
                 // TODO: Look up the referenced type
                 ResolvedType::Any
             }
@@ -540,7 +540,7 @@ impl<'a> TypeInferrer<'a> {
             }
             TypeNode::Literal(lit) => {
                 match &lit.literal {
-                    zang_parser::LiteralExpression::String(s) => {
+                    zang_parser::LiteralExpression::String(_s) => {
                         ResolvedType::Literal(LiteralType::String(String::new())) // TODO: Get actual value
                     }
                     zang_parser::LiteralExpression::Numeric(n) => {

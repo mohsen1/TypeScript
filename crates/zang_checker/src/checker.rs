@@ -225,6 +225,10 @@ impl<'a> TypeChecker<'a> {
                 }
             }
             Statement::Empty(_) => {}
+            // Import/Export declarations are handled by the module system
+            Statement::Import(_) => {}
+            Statement::Export(_) => {}
+            Statement::ExportAssignment(_) => {}
         }
     }
 

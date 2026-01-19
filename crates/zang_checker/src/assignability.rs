@@ -3,8 +3,7 @@
 //! Implements type compatibility checking according to TypeScript's rules.
 
 use crate::types::{
-    ResolvedType, ObjectType, FunctionType, TypeParameterType, LiteralType,
-    PropertySignature, ParameterType, IndexSignature,
+    ResolvedType, ObjectType, FunctionType, LiteralType,
 };
 use zang_core::InternedString;
 use std::collections::HashMap;
@@ -267,7 +266,7 @@ impl AssignabilityChecker {
 
             // Intersection target: source must be assignable to all members
             (_, ResolvedType::Intersection(target_types)) => {
-                for (i, member) in target_types.iter().enumerate() {
+                for (_i, member) in target_types.iter().enumerate() {
                     if !self.is_assignable_to(source, member).is_assignable() {
                         return AssignabilityResult::NotAssignable(AssignabilityError {
                             source: format!("{:?}", source),
@@ -447,7 +446,7 @@ impl AssignabilityChecker {
     ) -> AssignabilityResult {
         // Target can have fewer parameters than source (excess parameters are allowed)
         // But target cannot require more parameters than source provides
-        let required_source = source.parameters.iter().filter(|p| !p.optional).count();
+        let _required_source = source.parameters.iter().filter(|p| !p.optional).count();
         let required_target = target.parameters.iter().filter(|p| !p.optional).count();
 
         if required_target > source.parameters.len() {

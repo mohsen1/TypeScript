@@ -47,6 +47,23 @@ pub enum DiagnosticKind {
     Declaration,
     /// Module resolution error
     Module,
+    // Import/Export specific errors
+    /// Module not found
+    ModuleNotFound,
+    /// No default export in module
+    NoDefaultExport,
+    /// Export not found in module
+    ExportNotFound,
+    /// Type-only import used as value
+    TypeOnlyUsedAsValue,
+    /// Duplicate identifier
+    DuplicateIdentifier,
+    /// Undeclared identifier
+    UndeclaredIdentifier,
+    /// Duplicate export
+    DuplicateExport,
+    /// Invalid export
+    InvalidExport,
 }
 
 /// Related diagnostic information
