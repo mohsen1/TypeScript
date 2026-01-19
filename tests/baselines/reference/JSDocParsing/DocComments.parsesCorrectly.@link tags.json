@@ -1,5 +1,5 @@
 {
-    "kind": "JSDoc",
+    "kind": "JSDocComment",
     "pos": 0,
     "end": 674,
     "flags": "JSDoc",
@@ -24,6 +24,7 @@
                 "kind": "Identifier",
                 "pos": 14,
                 "end": 19,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "first"
             },
@@ -47,6 +48,7 @@
                 "kind": "Identifier",
                 "pos": 39,
                 "end": 43,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "link"
             },
@@ -77,6 +79,7 @@
                 "kind": "Identifier",
                 "pos": 60,
                 "end": 65,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "param"
             },
@@ -96,7 +99,7 @@
                     "modifierFlagsCache": 0,
                     "transformFlags": 0,
                     "name": {
-                        "kind": "QualifiedName",
+                        "kind": "FirstNode",
                         "pos": 86,
                         "end": 97,
                         "modifierFlagsCache": 0,
@@ -105,6 +108,7 @@
                             "kind": "Identifier",
                             "pos": 86,
                             "end": 87,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "A"
                         },
@@ -112,6 +116,7 @@
                             "kind": "Identifier",
                             "pos": 88,
                             "end": 97,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "Reference"
                         }
@@ -128,6 +133,7 @@
                 "kind": "Identifier",
                 "pos": 66,
                 "end": 69,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "foo"
             },
@@ -144,6 +150,7 @@
                 "kind": "Identifier",
                 "pos": 103,
                 "end": 108,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "param"
             },
@@ -166,6 +173,7 @@
                         "kind": "Identifier",
                         "pos": 127,
                         "end": 131,
+                        "modifierFlagsCache": 0,
                         "transformFlags": 0,
                         "escapedText": "http"
                     },
@@ -186,7 +194,7 @@
                     "modifierFlagsCache": 0,
                     "transformFlags": 0,
                     "name": {
-                        "kind": "QualifiedName",
+                        "kind": "FirstNode",
                         "pos": 163,
                         "end": 181,
                         "modifierFlagsCache": 0,
@@ -195,6 +203,7 @@
                             "kind": "Identifier",
                             "pos": 163,
                             "end": 173,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "Standalone"
                         },
@@ -202,6 +211,7 @@
                             "kind": "Identifier",
                             "pos": 174,
                             "end": 181,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "Complex"
                         }
@@ -242,6 +252,7 @@
                         "kind": "Identifier",
                         "pos": 252,
                         "end": 259,
+                        "modifierFlagsCache": 0,
                         "transformFlags": 0,
                         "escapedText": "doubled"
                     },
@@ -262,7 +273,7 @@
                     "modifierFlagsCache": 0,
                     "transformFlags": 0,
                     "name": {
-                        "kind": "QualifiedName",
+                        "kind": "FirstNode",
                         "pos": 333,
                         "end": 338,
                         "modifierFlagsCache": 0,
@@ -271,6 +282,7 @@
                             "kind": "Identifier",
                             "pos": 333,
                             "end": 335,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "oh"
                         },
@@ -278,6 +290,7 @@
                             "kind": "Identifier",
                             "pos": 336,
                             "end": 338,
+                            "modifierFlagsCache": 0,
                             "transformFlags": 0,
                             "escapedText": "no"
                         }
@@ -302,6 +315,7 @@
                         "kind": "Identifier",
                         "pos": 376,
                         "end": 381,
+                        "modifierFlagsCache": 0,
                         "transformFlags": 0,
                         "escapedText": "https"
                     },
@@ -341,6 +355,7 @@
                 "kind": "Identifier",
                 "pos": 109,
                 "end": 112,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "bar"
             },
@@ -357,6 +372,7 @@
                 "kind": "Identifier",
                 "pos": 590,
                 "end": 596,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "author"
             },
@@ -387,6 +403,7 @@
                         "kind": "Identifier",
                         "pos": 650,
                         "end": 655,
+                        "modifierFlagsCache": 0,
                         "transformFlags": 0,
                         "escapedText": "https"
                     },

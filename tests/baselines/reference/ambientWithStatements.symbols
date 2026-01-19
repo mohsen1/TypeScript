@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/ambientWithStatements.ts] ////
-
-=== ambientWithStatements.ts ===
-declare namespace M {
+=== tests/cases/compiler/ambientWithStatements.ts ===
+declare module M {
 >M : Symbol(M, Decl(ambientWithStatements.ts, 0, 0))
 
     break;

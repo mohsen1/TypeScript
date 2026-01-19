@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/ambientModuleWithClassDeclarationWithExtends.ts] ////
-
 //// [ambientModuleWithClassDeclarationWithExtends.ts]
-declare namespace foo {
+declare module foo {
     class A { }
     class B extends A { }
 }

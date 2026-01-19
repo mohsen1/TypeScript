@@ -1,9 +1,8 @@
 //// [tests/cases/compiler/APISample_WatchWithOwnWatchHost.ts] ////
 
-//// [package.json]
-{
-    "name": "typescript",
-    "types": "/.ts/typescript.d.ts"
+//// [index.d.ts]
+declare module "typescript" {
+    export = ts;
 }
 
 //// [APISample_WatchWithOwnWatchHost.ts]
@@ -69,7 +68,7 @@ watchMain();
  * Note: This test is a public API sample. This sample verifies creating abstract builder to watch list of root files
  *       Please log a "breaking change" issue for any API breaking change affecting this issue
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var ts = require("typescript");
 function watchMain() {
     // get list of files and compiler options somehow

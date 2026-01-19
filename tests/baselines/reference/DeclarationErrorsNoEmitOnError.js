@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/DeclarationErrorsNoEmitOnError.ts] ////
-
 //// [DeclarationErrorsNoEmitOnError.ts]
 type T = { x : number }
 export interface I {
@@ -8,11 +6,11 @@ export interface I {
 
 //// [DeclarationErrorsNoEmitOnError.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 
 
 //// [DeclarationErrorsNoEmitOnError.d.ts]
-type T = {
+declare type T = {
     x: number;
 };
 export interface I {

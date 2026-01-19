@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/addMoreCallSignaturesToBaseSignature.ts] ////
-
 //// [addMoreCallSignaturesToBaseSignature.ts]
 interface Foo {
     (): string;

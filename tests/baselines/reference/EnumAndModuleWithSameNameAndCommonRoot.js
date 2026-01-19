@@ -1,11 +1,9 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/EnumAndModuleWithSameNameAndCommonRoot.ts] ////
-
 //// [EnumAndModuleWithSameNameAndCommonRoot.ts]
 enum enumdule {
     Red, Blue
 }
 
-namespace enumdule {
+module enumdule {
 
     export class Point {
         constructor(public x: number, public y: number) { }

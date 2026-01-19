@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsReferenceInObjectLiteral_Js.ts] ////
-
 //// [a.js]
 const a = () => {
     return {

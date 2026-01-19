@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/accessorsOverrideProperty5.ts] ////
-
 //// [accessorsOverrideProperty5.ts]
 interface I {
     p: number

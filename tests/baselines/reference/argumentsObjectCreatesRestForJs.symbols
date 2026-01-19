@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/argumentsObjectCreatesRestForJs.ts] ////
-
-=== main.js ===
+=== tests/cases/compiler/main.js ===
 function allRest() { arguments; }
 >allRest : Symbol(allRest, Decl(main.js, 0, 0))
 >arguments : Symbol(arguments)

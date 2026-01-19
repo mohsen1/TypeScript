@@ -3,7 +3,7 @@
 //// [aliasOnMergedModuleInterface_0.ts]
 declare module "foo"
 {
-    namespace B {
+    module B {
         export interface A {
         }
     }
@@ -16,7 +16,7 @@ declare module "foo"
 //// [aliasOnMergedModuleInterface_1.ts]
 ///<reference path='aliasOnMergedModuleInterface_0.ts' />
 import foo = require("foo")
-declare var z: foo;
+var z: foo;
 z.bar("hello"); // This should be ok
 var x: foo.A = foo.bar("hello"); // foo.A should be ok but foo.bar should be error
 
@@ -24,6 +24,7 @@ var x: foo.A = foo.bar("hello"); // foo.A should be ok but foo.bar should be err
 //// [aliasOnMergedModuleInterface_0.js]
 //// [aliasOnMergedModuleInterface_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
+var z;
 z.bar("hello"); // This should be ok
 var x = foo.bar("hello"); // foo.A should be ok but foo.bar should be error

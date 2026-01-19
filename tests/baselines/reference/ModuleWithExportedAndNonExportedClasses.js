@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ModuleWithExportedAndNonExportedClasses.ts] ////
-
 //// [ModuleWithExportedAndNonExportedClasses.ts]
-namespace A {
+module A {
     export class A {
         id: number;
         name: string;

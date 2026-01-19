@@ -1,7 +1,7 @@
 //// [tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleWithSameNameAndCommonRoot.ts] ////
 
 //// [class.ts]
-namespace X.Y {
+module X.Y {
     export class Point {
         constructor(x: number, y: number) {
             this.x = x;
@@ -13,8 +13,8 @@ namespace X.Y {
 }
 
 //// [module.ts]
-namespace X.Y {
-    export namespace Point {
+module X.Y {
+    export module Point {
         export var Origin = new Point(0, 0);
     }
 }
@@ -30,7 +30,7 @@ class A {
     id: string;
 }
 
-namespace A {
+module A {
     export var Instance = new A();
 }
 

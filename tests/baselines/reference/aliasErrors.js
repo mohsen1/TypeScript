@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/aliasErrors.ts] ////
-
 //// [aliasErrors.ts]
-namespace foo {    
+module foo {    
     export class Provide {
     }
-    export namespace bar { export namespace baz {export class boo {}}}
+    export module bar { export module baz {export class boo {}}}
 }
 
 import provide = foo;

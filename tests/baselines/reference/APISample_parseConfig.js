@@ -1,9 +1,8 @@
 //// [tests/cases/compiler/APISample_parseConfig.ts] ////
 
-//// [package.json]
-{
-    "name": "typescript",
-    "types": "/.ts/typescript.d.ts"
+//// [index.d.ts]
+declare module "typescript" {
+    export = ts;
 }
 
 //// [APISample_parseConfig.ts]
@@ -43,7 +42,6 @@ export function createProgram(rootFiles: string[], compilerOptionsJson: string):
     return ts.createProgram(rootFiles, settings.options);
 }
 
-
 //// [APISample_parseConfig.js]
 "use strict";
 /*
@@ -51,8 +49,8 @@ export function createProgram(rootFiles: string[], compilerOptionsJson: string):
  *       at: https://github.com/Microsoft/TypeScript/wiki/Using-the-Compiler-API#a-minimal-compiler
  *       Please log a "breaking change" issue for any API breaking change affecting this issue
  */
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.createProgram = createProgram;
+exports.__esModule = true;
+exports.createProgram = void 0;
 var ts = require("typescript");
 function printError(error) {
     if (!error) {
@@ -77,3 +75,4 @@ function createProgram(rootFiles, compilerOptionsJson) {
     }
     return ts.createProgram(rootFiles, settings.options);
 }
+exports.createProgram = createProgram;

@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportObjectLiteralAndObjectTypeLiteralWithAccessibleTypesInNestedMemberTypeAnnotations.ts] ////
-
 //// [ExportObjectLiteralAndObjectTypeLiteralWithAccessibleTypesInNestedMemberTypeAnnotations.ts]
-namespace A {
+module A {
 
     class Point {
         constructor(public x: number, public y: number) { }

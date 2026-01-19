@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/2dArrays.ts] ////
-
 //// [2dArrays.ts]
 class Cell {
 }
 
 class Ship {
-    isSunk: boolean = false;
+    isSunk: boolean;
 }
 
 class Board {
-    ships: Ship[] = [];
-    cells: Cell[] = [];
+    ships: Ship[];
+    cells: Cell[];
 
     private allShipsSunk() {
         return this.ships.every(function (val) { return val.isSunk; });
@@ -25,14 +23,11 @@ var Cell = /** @class */ (function () {
 }());
 var Ship = /** @class */ (function () {
     function Ship() {
-        this.isSunk = false;
     }
     return Ship;
 }());
 var Board = /** @class */ (function () {
     function Board() {
-        this.ships = [];
-        this.cells = [];
     }
     Board.prototype.allShipsSunk = function () {
         return this.ships.every(function (val) { return val.isSunk; });

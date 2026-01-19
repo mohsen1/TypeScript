@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsReferenceInMethod6_Js.ts] ////
-
 //// [a.js]
 class A {
 	m() {

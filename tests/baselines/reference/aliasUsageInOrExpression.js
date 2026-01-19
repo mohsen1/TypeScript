@@ -17,7 +17,7 @@ import moduleA = require("./aliasUsageInOrExpression_moduleA");
 interface IHasVisualizationModel {
     VisualizationModel: typeof Backbone.Model;
 }
-declare var i: IHasVisualizationModel;
+var i: IHasVisualizationModel;
 var d1 = i || moduleA;
 var d2: IHasVisualizationModel = i || moduleA;
 var d2: IHasVisualizationModel = moduleA || i;
@@ -26,7 +26,7 @@ var f: { x: IHasVisualizationModel } = <{ x: IHasVisualizationModel }>null ? { x
 
 //// [aliasUsageInOrExpression_backbone.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Model = void 0;
 var Model = /** @class */ (function () {
     function Model() {
@@ -51,7 +51,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.VisualizationModel = void 0;
 var Backbone = require("./aliasUsageInOrExpression_backbone");
 var VisualizationModel = /** @class */ (function (_super) {
@@ -64,8 +64,9 @@ var VisualizationModel = /** @class */ (function (_super) {
 exports.VisualizationModel = VisualizationModel;
 //// [aliasUsageInOrExpression_main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var moduleA = require("./aliasUsageInOrExpression_moduleA");
+var i;
 var d1 = i || moduleA;
 var d2 = i || moduleA;
 var d2 = moduleA || i;

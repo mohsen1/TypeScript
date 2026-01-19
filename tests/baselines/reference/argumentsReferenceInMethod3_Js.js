@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsReferenceInMethod3_Js.ts] ////
-
 //// [a.js]
 class A {
 	get arguments() {

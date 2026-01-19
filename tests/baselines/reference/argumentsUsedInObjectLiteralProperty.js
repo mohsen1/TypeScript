@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsUsedInObjectLiteralProperty.ts] ////
-
 //// [argumentsUsedInObjectLiteralProperty.ts]
 class A {
     public static createSelectableViewModel(initialState?: any, selectedValue?: any) {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/any/anyPropertyAccess.ts] ////
-
 //// [anyPropertyAccess.ts]
 var x: any;
 var a = x.foo;

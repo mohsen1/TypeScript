@@ -1,15 +1,15 @@
 //// [tests/cases/conformance/internalModules/DeclarationMerging/FunctionAndModuleWithSameNameAndDifferentCommonRoot.ts] ////
 
 //// [function.ts]
-namespace A {
+module A {
     export function Point() {
         return { x: 0, y: 0 };
     }
 }
 
 //// [module.ts]
-namespace B {
-    export namespace Point {
+module B {
+    export module Point {
         export var Origin = { x: 0, y: 0 };
     }
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/anyIdenticalToItself.ts] ////
-
 //// [anyIdenticalToItself.ts]
 function foo(x: any);
 function foo(x: any);

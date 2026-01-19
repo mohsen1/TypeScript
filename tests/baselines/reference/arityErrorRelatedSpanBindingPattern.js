@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arityErrorRelatedSpanBindingPattern.ts] ////
-
 //// [arityErrorRelatedSpanBindingPattern.ts]
 function foo(a, b, {c}): void {}
 

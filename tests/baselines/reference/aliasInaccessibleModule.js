@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/aliasInaccessibleModule.ts] ////
-
 //// [aliasInaccessibleModule.ts]
-namespace M {
-    namespace N {
+module M {
+    module N {
     }
     export import X = N;
 }
@@ -14,8 +12,8 @@ var M;
 
 
 //// [aliasInaccessibleModule.d.ts]
-declare namespace M {
-    namespace N {
+declare module M {
+    module N {
     }
     export import X = N;
     export {};

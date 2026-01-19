@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedClassesOfTheSameName.ts] ////
-
 //// [TwoInternalModulesThatMergeEachWithExportedClassesOfTheSameName.ts]
-namespace A {
+module A {
     export class Point {
         x: number;
         y: number;
     }
 }
 
-namespace A{
+module A{
     // expected error
     export class Point {
         origin: number;
@@ -16,15 +14,15 @@ namespace A{
     }
 }
 
-namespace X.Y.Z {
+module X.Y.Z {
     export class Line {
         length: number;
     }
 }
 
-namespace X {
-    export namespace Y {
-        export namespace Z {
+module X {
+    export module Y {
+        export module Z {
             // expected error
             export class Line {
                 name: string;

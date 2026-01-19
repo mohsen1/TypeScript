@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/typeGuards/TypeGuardWithEnumUnion.ts] ////
-
 //// [TypeGuardWithEnumUnion.ts]
 enum Color { R, G, B }
 

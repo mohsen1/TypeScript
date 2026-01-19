@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/ambientModuleExports.ts] ////
-
 //// [ambientModuleExports.ts]
-declare namespace Foo {
+declare module Foo {
 	function a():void;
 	var b:number;
 	class C {}
@@ -11,7 +9,7 @@ Foo.a();
 Foo.b;
 var c = new Foo.C();
 
-declare namespace Foo2 {
+declare module Foo2 {
     export function a(): void;
     export var b: number;
     export class C { }

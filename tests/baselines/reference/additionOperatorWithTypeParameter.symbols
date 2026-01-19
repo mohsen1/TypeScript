@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithTypeParameter.ts] ////
-
-=== additionOperatorWithTypeParameter.ts ===
+=== tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithTypeParameter.ts ===
 // type parameter type is not a valid operand of addition operator
 enum E { a, b }
 >E : Symbol(E, Decl(additionOperatorWithTypeParameter.ts, 0, 0))
@@ -16,27 +14,27 @@ function foo<T, U>(t: T, u: U) {
 >u : Symbol(u, Decl(additionOperatorWithTypeParameter.ts, 3, 24))
 >U : Symbol(U, Decl(additionOperatorWithTypeParameter.ts, 3, 15))
 
-    let a!: any;
+    var a: any;
 >a : Symbol(a, Decl(additionOperatorWithTypeParameter.ts, 4, 7))
 
-    let b!: boolean;
+    var b: boolean;
 >b : Symbol(b, Decl(additionOperatorWithTypeParameter.ts, 5, 7))
 
-    let c!: number;
+    var c: number;
 >c : Symbol(c, Decl(additionOperatorWithTypeParameter.ts, 6, 7))
 
-    let d!: string;
+    var d: string;
 >d : Symbol(d, Decl(additionOperatorWithTypeParameter.ts, 7, 7))
 
-    let e!: Object;
+    var e: Object;
 >e : Symbol(e, Decl(additionOperatorWithTypeParameter.ts, 8, 7))
 >Object : Symbol(Object, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 
-    let g!: E;
+    var g: E;
 >g : Symbol(g, Decl(additionOperatorWithTypeParameter.ts, 9, 7))
 >E : Symbol(E, Decl(additionOperatorWithTypeParameter.ts, 0, 0))
 
-    let f!: void;
+    var f: void;
 >f : Symbol(f, Decl(additionOperatorWithTypeParameter.ts, 10, 7))
 
     // type parameter as left operand

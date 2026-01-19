@@ -1,10 +1,6 @@
-import * as evaluator from "../../_namespaces/evaluator.js";
-import * as ts from "../../_namespaces/ts.js";
-
 describe("unittests:: evaluation:: superInStaticInitializer", () => {
     it("super-property-get in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 class Base {
                     static x = 1;
@@ -17,16 +13,13 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     Derived
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Base, Derived] = result.main();
         assert.strictEqual(Base.x, 1);
         assert.strictEqual(Derived.y, 1);
     });
     it("super-property-set in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 class Base {
                     static x = 1;
@@ -39,17 +32,14 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     Derived
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Base, Derived] = result.main();
         assert.strictEqual(Base.x, 1);
         assert.strictEqual(Derived.x, 2);
         assert.strictEqual(Derived.y, 1);
     });
     it("super-accessor-get in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 let thisInBase;
                 class Base {
@@ -68,17 +58,14 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     thisInBase
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Base, Derived, thisInBase] = result.main();
         assert.strictEqual(Base._x, 1);
         assert.strictEqual(Derived.y, 1);
         assert.strictEqual(thisInBase, Derived);
     });
     it("super-accessor-set in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 let thisInBaseGet;
                 let thisInBaseSet;
@@ -103,9 +90,7 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     thisInBaseSet
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Base, Derived, thisInBaseGet, thisInBaseSet] = result.main();
         assert.strictEqual(Base._x, 1);
         assert.strictEqual(Derived._x, 2);
@@ -114,8 +99,7 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
         assert.strictEqual(thisInBaseSet, Derived);
     });
     it("super-call in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 let thisInBase;
                 class Base {
@@ -132,16 +116,13 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     thisInBase,
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Derived, thisInBase] = result.main();
         assert.strictEqual(Derived.y, 1);
         assert.strictEqual(thisInBase, Derived);
     });
     it("super-call in es5", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 let thisInBase;
                 class Base {
@@ -158,16 +139,13 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     thisInBase,
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES5 },
-        );
+        `, { target: ts.ScriptTarget.ES5 });
         const [Derived, thisInBase] = result.main();
         assert.strictEqual(Derived.y, 1);
         assert.strictEqual(thisInBase, Derived);
     });
     it("super- and this-call in es2015", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 class Base {
                     static x() {
@@ -184,15 +162,12 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     Derived,
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Derived] = result.main();
         assert.strictEqual(Derived.y, 2);
     });
     it("super- and this-call in es5", () => {
-        const result = evaluator.evaluateTypeScript(
-            `
+        const result = evaluator.evaluateTypeScript(`
             export function main() {
                 class Base {
                     static x() {
@@ -209,9 +184,7 @@ describe("unittests:: evaluation:: superInStaticInitializer", () => {
                     Derived,
                 ];
             }
-        `,
-            { target: ts.ScriptTarget.ES2015 },
-        );
+        `, { target: ts.ScriptTarget.ES2015 });
         const [Derived] = result.main();
         assert.strictEqual(Derived.y, 2);
     });

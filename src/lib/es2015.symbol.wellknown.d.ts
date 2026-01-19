@@ -56,7 +56,7 @@ interface SymbolConstructor {
     readonly toStringTag: unique symbol;
 
     /**
-     * An Object whose truthy properties are properties that are excluded from the 'with'
+     * An Object whose own property names are property names that are excluded from the 'with'
      * environment bindings of the associated objects.
      */
     readonly unscopables: unique symbol;
@@ -73,21 +73,17 @@ interface Symbol {
 
 interface Array<T> {
     /**
-     * Is an object whose properties have the value 'true'
+     * Returns an object whose properties have the value 'true'
      * when they will be absent when used in a 'with' statement.
      */
-    readonly [Symbol.unscopables]: {
-        [K in keyof any[]]?: boolean;
-    };
-}
-
-interface ReadonlyArray<T> {
-    /**
-     * Is an object whose properties have the value 'true'
-     * when they will be absent when used in a 'with' statement.
-     */
-    readonly [Symbol.unscopables]: {
-        [K in keyof readonly any[]]?: boolean;
+    [Symbol.unscopables](): {
+        copyWithin: boolean;
+        entries: boolean;
+        fill: boolean;
+        find: boolean;
+        findIndex: boolean;
+        keys: boolean;
+        values: boolean;
     };
 }
 
@@ -119,7 +115,7 @@ interface Map<K, V> {
     readonly [Symbol.toStringTag]: string;
 }
 
-interface WeakMap<K extends WeakKey, V> {
+interface WeakMap<K extends object, V> {
     readonly [Symbol.toStringTag]: string;
 }
 
@@ -127,7 +123,7 @@ interface Set<T> {
     readonly [Symbol.toStringTag]: string;
 }
 
-interface WeakSet<T extends WeakKey> {
+interface WeakSet<T extends object> {
     readonly [Symbol.toStringTag]: string;
 }
 
@@ -223,9 +219,9 @@ interface String {
     match(matcher: { [Symbol.match](string: string): RegExpMatchArray | null; }): RegExpMatchArray | null;
 
     /**
-     * Passes a string and {@linkcode replaceValue} to the `[Symbol.replace]` method on {@linkcode searchValue}. This method is expected to implement its own replacement algorithm.
-     * @param searchValue An object that supports searching for and replacing matches within a string.
-     * @param replaceValue The replacement text.
+     * Replaces first match with string or all matches with RegExp.
+     * @param searchValue A string or RegExp search value.
+     * @param replaceValue A string containing the text to replace for match.
      */
     replace(searchValue: { [Symbol.replace](string: string, replaceValue: string): string; }, replaceValue: string): string;
 
@@ -251,46 +247,46 @@ interface String {
 }
 
 interface ArrayBuffer {
-    readonly [Symbol.toStringTag]: "ArrayBuffer";
-}
-
-interface DataView<TArrayBuffer extends ArrayBufferLike> {
     readonly [Symbol.toStringTag]: string;
 }
 
-interface Int8Array<TArrayBuffer extends ArrayBufferLike> {
+interface DataView {
+    readonly [Symbol.toStringTag]: string;
+}
+
+interface Int8Array {
     readonly [Symbol.toStringTag]: "Int8Array";
 }
 
-interface Uint8Array<TArrayBuffer extends ArrayBufferLike> {
+interface Uint8Array {
     readonly [Symbol.toStringTag]: "Uint8Array";
 }
 
-interface Uint8ClampedArray<TArrayBuffer extends ArrayBufferLike> {
+interface Uint8ClampedArray {
     readonly [Symbol.toStringTag]: "Uint8ClampedArray";
 }
 
-interface Int16Array<TArrayBuffer extends ArrayBufferLike> {
+interface Int16Array {
     readonly [Symbol.toStringTag]: "Int16Array";
 }
 
-interface Uint16Array<TArrayBuffer extends ArrayBufferLike> {
+interface Uint16Array {
     readonly [Symbol.toStringTag]: "Uint16Array";
 }
 
-interface Int32Array<TArrayBuffer extends ArrayBufferLike> {
+interface Int32Array {
     readonly [Symbol.toStringTag]: "Int32Array";
 }
 
-interface Uint32Array<TArrayBuffer extends ArrayBufferLike> {
+interface Uint32Array {
     readonly [Symbol.toStringTag]: "Uint32Array";
 }
 
-interface Float32Array<TArrayBuffer extends ArrayBufferLike> {
+interface Float32Array {
     readonly [Symbol.toStringTag]: "Float32Array";
 }
 
-interface Float64Array<TArrayBuffer extends ArrayBufferLike> {
+interface Float64Array {
     readonly [Symbol.toStringTag]: "Float64Array";
 }
 

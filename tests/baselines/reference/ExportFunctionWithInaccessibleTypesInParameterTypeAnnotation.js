@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportFunctionWithInaccessibleTypesInParameterTypeAnnotation.ts] ////
-
 //// [ExportFunctionWithInaccessibleTypesInParameterTypeAnnotation.ts]
-namespace A {
+module A {
 
     class Point {
         x: number;

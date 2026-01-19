@@ -19,7 +19,7 @@ declare module "M" {
 //// [ambientExternalModuleMerging_use.js]
 define(["require", "exports", "M"], function (require, exports, M) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     // Should be strings
     var x = M.x;
     var y = M.y;

@@ -14,13 +14,13 @@ export const A = styled();
 
 //// [color.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [file2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A = void 0;
 var file1_1 = require("./file1");
 exports.A = (0, file1_1.styled)();

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/aliasesInSystemModule1.ts] ////
-
 //// [aliasesInSystemModule1.ts]
 import alias = require('foo');
 import cls = alias.Class;
@@ -9,7 +7,7 @@ let x = new alias.Class();
 let y = new cls();
 let z = new cls2();
 
-namespace M {
+module M {
   export import cls = alias.Class;
   let x = new alias.Class();
   let y = new cls(); 

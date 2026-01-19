@@ -1,13 +1,23 @@
 {
-    "extends": "../tsconfig-base",
-
+    "extends": "../tsconfig-noncomposite-base",
+ 
     "compilerOptions": {
+        "outFile": "../../built/local/tsserver.js",
         "types": [
             "node"
         ]
     },
-    "references": [
-        { "path": "../typescript" }
+    "files": [
+        "nodeServer.ts",
+        "webServer.ts",
+        "server.ts"
     ],
-    "include": ["**/*"]
+    "references": [
+        { "path": "../compiler", "prepend": true },
+        { "path": "../services", "prepend": true },
+        { "path": "../jsTyping", "prepend": true },
+        { "path": "../server", "prepend": true },
+        { "path": "../webServer", "prepend": true },
+        { "path": "../deprecatedCompat", "prepend": true }
+    ]
 }

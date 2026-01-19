@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ambiguousCallsWhereReturnTypesAgree.ts] ////
-
 //// [ambiguousCallsWhereReturnTypesAgree.ts]
 class TestClass {
     public bar(x: string): void;

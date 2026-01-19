@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/Symbols/ES5SymbolProperty5.ts] ////
-
 //// [ES5SymbolProperty5.ts]
-declare var Symbol: { iterator: symbol };
+var Symbol: { iterator: symbol };
 
 class C {
     [Symbol.iterator]() { }
@@ -10,6 +8,7 @@ class C {
 (new C)[Symbol.iterator](0) // Should error
 
 //// [ES5SymbolProperty5.js]
+var Symbol;
 var C = /** @class */ (function () {
     function C() {
     }

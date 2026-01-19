@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/abstractClassInLocalScope.ts] ////
-
-=== abstractClassInLocalScope.ts ===
+=== tests/cases/compiler/abstractClassInLocalScope.ts ===
 (() => {
     abstract class A {}
 >A : Symbol(A, Decl(abstractClassInLocalScope.ts, 0, 8))

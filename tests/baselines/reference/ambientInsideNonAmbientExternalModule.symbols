@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/ambient/ambientInsideNonAmbientExternalModule.ts] ////
-
-=== ambientInsideNonAmbientExternalModule.ts ===
+=== tests/cases/conformance/ambient/ambientInsideNonAmbientExternalModule.ts ===
 export declare var x;
 >x : Symbol(x, Decl(ambientInsideNonAmbientExternalModule.ts, 0, 18))
 
@@ -13,6 +11,6 @@ export declare class C { }
 export declare enum E { }
 >E : Symbol(E, Decl(ambientInsideNonAmbientExternalModule.ts, 2, 26))
 
-export declare namespace M { }
+export declare module M { }
 >M : Symbol(M, Decl(ambientInsideNonAmbientExternalModule.ts, 3, 25))
 

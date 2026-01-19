@@ -1,9 +1,8 @@
 //// [tests/cases/compiler/APISample_Watch.ts] ////
 
-//// [package.json]
-{
-    "name": "typescript",
-    "types": "/.ts/typescript.d.ts"
+//// [index.d.ts]
+declare module "typescript" {
+    export = ts;
 }
 
 //// [APISample_Watch.ts]
@@ -51,7 +50,7 @@ function watchMain() {
     // You can technically override any given hook on the host, though you probably don't need to.
     // Note that we're assuming `origCreateProgram` and `origPostProgramCreate` doesn't use `this` at all.
     const origCreateProgram = host.createProgram;
-    host.createProgram = (rootNames: ReadonlyArray<string> | undefined, options, host, oldProgram) => {
+    host.createProgram = (rootNames: ReadonlyArray<string>, options, host, oldProgram) => {
         console.log("** We're about to create the program! **");
         return origCreateProgram(rootNames, options, host, oldProgram);
     }
@@ -90,12 +89,12 @@ watchMain();
  *       at: https://github.com/Microsoft/TypeScript-wiki/blob/master/Using-the-Compiler-API.md#writing-an-incremental-program-watcher
  *       Please log a "breaking change" issue for any API breaking change affecting this issue
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var ts = require("typescript");
 var formatHost = {
     getCanonicalFileName: function (path) { return path; },
     getCurrentDirectory: ts.sys.getCurrentDirectory,
-    getNewLine: function () { return ts.sys.newLine; },
+    getNewLine: function () { return ts.sys.newLine; }
 };
 function watchMain() {
     var configPath = ts.findConfigFile(/*searchPath*/ "./", ts.sys.fileExists, "tsconfig.json");

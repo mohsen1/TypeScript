@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/aliasOfGenericFunctionWithRestBehavedSameAsUnaliased.ts] ////
-
 //// [aliasOfGenericFunctionWithRestBehavedSameAsUnaliased.ts]
 // the type printback for every `test` below should be "y"
 

@@ -1,17 +1,15 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithTypeParameter.ts] ////
-
 //// [additionOperatorWithTypeParameter.ts]
 // type parameter type is not a valid operand of addition operator
 enum E { a, b }
 
 function foo<T, U>(t: T, u: U) {
-    let a!: any;
-    let b!: boolean;
-    let c!: number;
-    let d!: string;
-    let e!: Object;
-    let g!: E;
-    let f!: void;
+    var a: any;
+    var b: boolean;
+    var c: number;
+    var d: string;
+    var e: Object;
+    var g: E;
+    var f: void;
 
     // type parameter as left operand
     var r1: any = t + a; // ok, one operand is any

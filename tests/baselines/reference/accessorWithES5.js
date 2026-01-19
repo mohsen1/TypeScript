@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberAccessorDeclarations/accessorWithES5.ts] ////
-
 //// [accessorWithES5.ts]
 class C {
     get x() {

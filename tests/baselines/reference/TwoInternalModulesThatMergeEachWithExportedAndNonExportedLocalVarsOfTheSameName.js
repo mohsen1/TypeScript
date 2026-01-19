@@ -1,13 +1,13 @@
 //// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedAndNonExportedLocalVarsOfTheSameName.ts] ////
 
 //// [part1.ts]
-namespace A {
+module A {
     export interface Point {
         x: number;
         y: number;
     }
 
-    export namespace Utils {
+    export module Utils {
         export function mirror<T extends Point>(p: T) {
             return { x: p.y, y: p.x };
         }
@@ -16,11 +16,11 @@ namespace A {
 }
 
 //// [part2.ts]
-namespace A {
+module A {
     // not a collision, since we don't export
     var Origin: string = "0,0";
 
-    export namespace Utils {
+    export module Utils {
         export class Plane {
             constructor(public tl: Point, public br: Point) { }
         }

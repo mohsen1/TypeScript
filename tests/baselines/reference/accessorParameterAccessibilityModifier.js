@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/accessorParameterAccessibilityModifier.ts] ////
-
 //// [accessorParameterAccessibilityModifier.ts]
 class C {
     set X(public v) { }

@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithUndefinedValueAndInvalidOperands.ts] ////
-
 //// [additionOperatorWithUndefinedValueAndInvalidOperands.ts]
 // If one operand is the null or undefined value, it is treated as having the type of the other operand.
 
 function foo(): void { return undefined }
 
-declare var a: boolean;
-declare var b: Object;
-declare var c: void;
-declare var d: Number;
+var a: boolean;
+var b: Object;
+var c: void;
+var d: Number;
 
 // undefined + boolean/Object
 var r1 = undefined + a;
@@ -28,6 +26,10 @@ var r11 = undefined + (() => { });
 //// [additionOperatorWithUndefinedValueAndInvalidOperands.js]
 // If one operand is the null or undefined value, it is treated as having the type of the other operand.
 function foo() { return undefined; }
+var a;
+var b;
+var c;
+var d;
 // undefined + boolean/Object
 var r1 = undefined + a;
 var r2 = undefined + b;

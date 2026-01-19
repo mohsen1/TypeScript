@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/accessorWithInitializer.ts] ////
-
 //// [accessorWithInitializer.ts]
 class C {
     set X(v = 0) { }

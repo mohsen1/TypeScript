@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/TwoInternalModulesThatMergeEachWithExportedModulesOfTheSameName.ts] ////
-
 //// [TwoInternalModulesThatMergeEachWithExportedModulesOfTheSameName.ts]
-namespace A.B {
+module A.B {
     export var x: number;
 }
 
-namespace A{ 
-    namespace B {
+module A{ 
+    module B {
         export var x: string;
     }
 }
@@ -15,15 +13,15 @@ namespace A{
 var x: number;
 var x = A.B.x;
 
-namespace X.Y.Z {
+module X.Y.Z {
     export class Line {
         length: number;
     }
 }
 
-namespace X {
-    export namespace Y {
-        namespace Z {
+module X {
+    export module Y {
+        module Z {
             export class Line {
                 name: string;
             }

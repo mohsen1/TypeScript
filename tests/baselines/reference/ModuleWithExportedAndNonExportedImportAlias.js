@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ModuleWithExportedAndNonExportedImportAlias.ts] ////
-
 //// [ModuleWithExportedAndNonExportedImportAlias.ts]
-namespace A {
+module A {
     export interface Point {
         x: number;
         y: number;
@@ -12,13 +10,13 @@ namespace A {
     }
 }
 
-namespace B {
+module B {
     export class Line {
         constructor(public start: A.Point, public end: A.Point) { }
     }
 }
 
-namespace Geometry {
+module Geometry {
     export import Points = A;
     import Lines = B;
 

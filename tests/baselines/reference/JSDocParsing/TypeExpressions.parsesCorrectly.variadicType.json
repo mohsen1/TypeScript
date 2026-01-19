@@ -10,6 +10,7 @@
         "pos": 4,
         "end": 10,
         "flags": "JSDoc",
+        "modifierFlagsCache": 0,
         "transformFlags": 1
     }
 }

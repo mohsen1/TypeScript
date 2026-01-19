@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/abstractClassInLocalScope.ts] ////
-
 //// [abstractClassInLocalScope.ts]
 (() => {
     abstract class A {}

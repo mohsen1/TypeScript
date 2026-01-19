@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/anyPlusAny1.ts] ////
-
 //// [anyPlusAny1.ts]
 var x: any;
 x.name = "hello";

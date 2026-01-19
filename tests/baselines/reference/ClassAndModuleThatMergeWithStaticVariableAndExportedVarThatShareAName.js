@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/internalModules/DeclarationMerging/ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts] ////
-
 //// [ClassAndModuleThatMergeWithStaticVariableAndExportedVarThatShareAName.ts]
 class Point {
     constructor(public x: number, public y: number) { }
@@ -7,19 +5,19 @@ class Point {
     static Origin: Point = { x: 0, y: 0 };
 }
 
-namespace Point {
+module Point {
     export var Origin = ""; //expected duplicate identifier error
 }
 
 
-namespace A {
+module A {
     export class Point {
         constructor(public x: number, public y: number) { }
 
         static Origin: Point = { x: 0, y: 0 };
     }
 
-    export namespace Point {
+    export module Point {
         export var Origin = ""; //expected duplicate identifier error
     }
 }

@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/NonInitializedExportInInternalModule.ts] ////
-
 //// [NonInitializedExportInInternalModule.ts]
-namespace Inner {
+module Inner {
     var;
     let;
     const;
@@ -19,7 +17,7 @@ namespace Inner {
         export let x, y, z;
     }
     
-    namespace C {
+    module C {
         export var a = 1, b, c = 2;
         export var x, y, z;
     }

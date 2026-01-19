@@ -1,8 +1,8 @@
-ModuleWithExportedAndNonExportedImportAlias.ts(37,21): error TS2339: Property 'Lines' does not exist on type 'typeof Geometry'.
+tests/cases/conformance/internalModules/exportDeclarations/ModuleWithExportedAndNonExportedImportAlias.ts(37,21): error TS2339: Property 'Lines' does not exist on type 'typeof Geometry'.
 
 
-==== ModuleWithExportedAndNonExportedImportAlias.ts (1 errors) ====
-    namespace A {
+==== tests/cases/conformance/internalModules/exportDeclarations/ModuleWithExportedAndNonExportedImportAlias.ts (1 errors) ====
+    module A {
         export interface Point {
             x: number;
             y: number;
@@ -13,13 +13,13 @@ ModuleWithExportedAndNonExportedImportAlias.ts(37,21): error TS2339: Property 'L
         }
     }
     
-    namespace B {
+    module B {
         export class Line {
             constructor(public start: A.Point, public end: A.Point) { }
         }
     }
     
-    namespace Geometry {
+    module Geometry {
         export import Points = A;
         import Lines = B;
     

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/argumentsPropertyNameInJsMode1.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 const foo = {
 >foo : Symbol(foo, Decl(a.js, 0, 5))
 

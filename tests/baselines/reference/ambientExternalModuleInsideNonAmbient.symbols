@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/ambient/ambientExternalModuleInsideNonAmbient.ts] ////
-
-=== ambientExternalModuleInsideNonAmbient.ts ===
-namespace M {
+=== tests/cases/conformance/ambient/ambientExternalModuleInsideNonAmbient.ts ===
+module M {
 >M : Symbol(M, Decl(ambientExternalModuleInsideNonAmbient.ts, 0, 0))
 
     export declare module "M" { }
->"M" : Symbol("M", Decl(ambientExternalModuleInsideNonAmbient.ts, 0, 13))
+>"M" : Symbol("M", Decl(ambientExternalModuleInsideNonAmbient.ts, 0, 10))
 }

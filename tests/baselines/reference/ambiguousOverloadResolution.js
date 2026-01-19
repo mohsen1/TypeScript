@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ambiguousOverloadResolution.ts] ////
-
 //// [ambiguousOverloadResolution.ts]
 class A { }
 class B extends A { x: number; }

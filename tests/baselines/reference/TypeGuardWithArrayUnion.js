@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/typeGuards/TypeGuardWithArrayUnion.ts] ////
-
 //// [TypeGuardWithArrayUnion.ts]
 class Message {
     value: string;

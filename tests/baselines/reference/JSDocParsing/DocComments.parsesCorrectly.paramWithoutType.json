@@ -1,5 +1,5 @@
 {
-    "kind": "JSDoc",
+    "kind": "JSDocComment",
     "pos": 0,
     "end": 23,
     "flags": "JSDoc",
@@ -16,6 +16,7 @@
                 "kind": "Identifier",
                 "pos": 9,
                 "end": 14,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "param"
             },
@@ -23,6 +24,7 @@
                 "kind": "Identifier",
                 "pos": 15,
                 "end": 18,
+                "modifierFlagsCache": 0,
                 "transformFlags": 0,
                 "escapedText": "foo"
             },

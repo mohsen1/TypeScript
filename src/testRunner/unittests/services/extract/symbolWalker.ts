@@ -1,41 +1,30 @@
-import * as Harness from "../../../_namespaces/Harness.js";
-import * as ts from "../../../_namespaces/ts.js";
-
-describe("unittests:: services:: extract:: Symbol Walker", () => {
-    function test(description: string, source: string, verifier: (file: ts.SourceFile, checker: ts.TypeChecker, program: ts.Program) => void) {
-        it(description, () => {
-            const result = Harness.Compiler.compileFiles(
-                [{
+namespace ts {
+    describe("unittests:: services:: extract:: Symbol Walker", () => {
+        function test(description: string, source: string, verifier: (file: SourceFile, checker: TypeChecker) => void) {
+            it(description, () => {
+                const result = Harness.Compiler.compileFiles([{
                     unitName: "main.ts",
-                    content: source,
-                }],
-                [],
-                {},
-                {},
-                "/",
-            );
-            const file = result.program!.getSourceFile("main.ts")!;
-            const checker = result.program!.getTypeChecker();
-            verifier(file, checker, result.program!);
-        });
-    }
+                    content: source
+                }], [], {}, {}, "/");
+                const file = result.program!.getSourceFile("main.ts")!;
+                const checker = result.program!.getTypeChecker();
+                verifier(file, checker);
+            });
+        }
 
-    test(
-        "can be created",
-        `
+        test("can be created", `
 interface Bar {
     x: number;
     y: number;
     history: Bar[];
 }
-export default function foo(a: number, b: Bar): void {}`,
-        (file, checker, program) => {
+export default function foo(a: number, b: Bar): void {}`, (file, checker) => {
             let foundCount = 0;
             let stdLibRefSymbols = 0;
             const expectedSymbols = ["default", "a", "b", "Bar", "x", "y", "history"];
             const walker = checker.getSymbolWalker(symbol => {
-                const isStdLibSymbol = ts.forEach(symbol.declarations, d => {
-                    return program.isSourceFileDefaultLibrary(ts.getSourceFileOfNode(d));
+                const isStdLibSymbol = forEach(symbol.declarations, d => {
+                    return getSourceFileOfNode(d).hasNoDefaultLib;
                 });
                 if (isStdLibSymbol) {
                     stdLibRefSymbols++;
@@ -51,6 +40,6 @@ export default function foo(a: number, b: Bar): void {}`,
             }
             assert.equal(foundCount, expectedSymbols.length);
             assert.equal(stdLibRefSymbols, 1); // Expect 1 stdlib entry symbol - the implicit Array referenced by Bar.history
-        },
-    );
-});
+        });
+    });
+}

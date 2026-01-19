@@ -2,7 +2,7 @@
 
 //// [ambientExternalModuleWithoutInternalImportDeclaration_0.ts]
 declare module 'M' {
-    namespace C {
+    module C {
         export var f: number;
     }
     class C {
@@ -21,6 +21,6 @@ var c = new A();
 //// [ambientExternalModuleWithoutInternalImportDeclaration_1.js]
 define(["require", "exports", "M"], function (require, exports, A) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var c = new A();
 });

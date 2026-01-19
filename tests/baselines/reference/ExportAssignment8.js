@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ExportAssignment8.ts] ////
-
 //// [ExportAssignment8.ts]
 export = B;
 

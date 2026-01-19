@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/alwaysStrictModule.ts] ////
-
 //// [alwaysStrictModule.ts]
-namespace M {
+module M {
     export function f() {
         var arguments = [];
     }

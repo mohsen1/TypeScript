@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/accessOverriddenBaseClassMember1.ts] ////
-
 //// [accessOverriddenBaseClassMember1.ts]
 class Point {
     constructor(public x: number, public y: number) { }

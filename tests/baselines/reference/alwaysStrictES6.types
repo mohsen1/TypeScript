@@ -1,13 +1,8 @@
-//// [tests/cases/compiler/alwaysStrictES6.ts] ////
-
-=== alwaysStrictES6.ts ===
+=== tests/cases/compiler/alwaysStrictES6.ts ===
 function f() {
 >f : () => void
->  : ^^^^^^^^^^
 
     var arguments = [];
 >arguments : any[]
->          : ^^^^^
 >[] : undefined[]
->   : ^^^^^^^^^^^
 }

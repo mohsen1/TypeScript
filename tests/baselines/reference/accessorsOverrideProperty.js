@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/accessorsOverrideProperty.ts] ////
-
 //// [accessorsOverrideProperty.ts]
 class A {
     p = 'yep'

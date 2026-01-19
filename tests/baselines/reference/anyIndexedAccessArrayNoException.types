@@ -1,7 +1,4 @@
-//// [tests/cases/compiler/anyIndexedAccessArrayNoException.ts] ////
-
-=== anyIndexedAccessArrayNoException.ts ===
+=== tests/cases/compiler/anyIndexedAccessArrayNoException.ts ===
 var x: any[[]];
 >x : any
->  : ^^^
 

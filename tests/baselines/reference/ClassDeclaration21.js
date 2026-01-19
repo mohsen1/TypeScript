@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ClassDeclaration21.ts] ////
-
 //// [ClassDeclaration21.ts]
 class C {
     0();

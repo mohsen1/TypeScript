@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/exportDeclarations/ExportInterfaceWithInaccessibleTypeInTypeParameterConstraint.ts] ////
-
 //// [ExportInterfaceWithInaccessibleTypeInTypeParameterConstraint.ts]
-namespace A {
+module A {
 
     interface Point {
         x: number;

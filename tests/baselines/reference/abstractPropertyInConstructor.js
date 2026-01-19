@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/abstractPropertyInConstructor.ts] ////
-
 //// [abstractPropertyInConstructor.ts]
 abstract class AbstractClass {
     constructor(str: string, other: AbstractClass) {

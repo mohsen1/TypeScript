@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ClassDeclaration24.ts] ////
-
 //// [ClassDeclaration24.ts]
 class any {
 }

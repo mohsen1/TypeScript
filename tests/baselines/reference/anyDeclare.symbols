@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/anyDeclare.ts] ////
-
-=== anyDeclare.ts ===
+=== tests/cases/compiler/anyDeclare.ts ===
 declare var x: any;
 >x : Symbol(x, Decl(anyDeclare.ts, 0, 11))
 
-namespace myMod {
+module myMod {
 >myMod : Symbol(myMod, Decl(anyDeclare.ts, 0, 19))
 
     var myFn;

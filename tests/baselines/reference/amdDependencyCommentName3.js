@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/amdDependencyCommentName3.ts] ////
-
 //// [amdDependencyCommentName3.ts]
 ///<amd-dependency path='bar' name='b'/>
 ///<amd-dependency path='foo'/>
@@ -14,6 +12,6 @@ m1.f();
 ///<amd-dependency path='goo' name='c'/>
 define(["require", "exports", "bar", "goo", "m2", "foo"], function (require, exports, b, c, m1) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     m1.f();
 });

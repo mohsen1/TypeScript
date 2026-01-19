@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/argumentsPropertyNameInJsMode2.ts] ////
-
 //// [a.js]
 function f(x) {
   arguments;

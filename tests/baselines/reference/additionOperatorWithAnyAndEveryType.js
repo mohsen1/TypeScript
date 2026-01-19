@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/additionOperator/additionOperatorWithAnyAndEveryType.ts] ////
-
 //// [additionOperatorWithAnyAndEveryType.ts]
 function foo() { }
 class C {
@@ -7,7 +5,7 @@ class C {
     static foo() { }
 }
 enum E { a, b, c }
-namespace M { export var a }
+module M { export var a }
 
 var a: any;
 var b: boolean;

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/acceptableAlias1.ts] ////
-
 //// [acceptableAlias1.ts]
-namespace M {
-    export namespace N {
+module M {
+    export module N {
     }
     export import X = N;
 }

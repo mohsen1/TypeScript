@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ambientExternalModuleReopen.ts] ////
-
 //// [ambientExternalModuleReopen.ts]
 declare module "fs" {
     var x: string;
