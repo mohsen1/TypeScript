@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deleteOperatorInStrictMode.ts] ////
-
 //// [deleteOperatorInStrictMode.ts]
 "use strict"
 var a;

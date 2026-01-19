@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/newOperator.ts] ////
-
 //// [newOperator.ts]
 interface ifc { }
 // Attempting to 'new' an interface yields poor error
@@ -48,7 +46,7 @@ new ctorUnion("");
 declare const ctorUnion2: (new <T extends number>(a: T) => void) | (new <T>(a: string) => void)
 new ctorUnion2("");
 
-namespace M {
+module M {
     export class T {
         x: number;
     }

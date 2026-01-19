@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/namedFunctionExpressionCall.ts] ////
-
 //// [namedFunctionExpressionCall.ts]
 var recurser = function foo() {
     // using the local name

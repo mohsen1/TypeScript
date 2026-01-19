@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveAsProperty.ts] ////
-
 //// [nonPrimitiveAsProperty.ts]
 interface WithNonPrimitive {
     foo: object

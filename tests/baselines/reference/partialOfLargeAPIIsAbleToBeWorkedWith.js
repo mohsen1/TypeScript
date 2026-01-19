@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/partialOfLargeAPIIsAbleToBeWorkedWith.ts] ////
-
 //// [partialOfLargeAPIIsAbleToBeWorkedWith.ts]
 interface MyAPI {
     0: (x: 0) => string;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorOnInitializerInObjectTypeLiteralProperty.ts] ////
-
 //// [errorOnInitializerInObjectTypeLiteralProperty.ts]
 var Foo: {
     bar: number = 5;

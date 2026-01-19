@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberFunctionDeclarations/memberFunctionsWithPrivateOverloads.ts] ////
-
 //// [memberFunctionsWithPrivateOverloads.ts]
 class C {
     private foo(x: number);
@@ -42,10 +40,10 @@ class D<T> {
 
 }
 
-declare var c: C;
+var c: C;
 var r = c.foo(1); // error
 
-declare var d: D<number>;
+var d: D<number>;
 var r2 = d.foo(2); // error
 
 var r3 = C.foo(1); // error
@@ -70,7 +68,9 @@ var D = /** @class */ (function () {
     D.bar = function (x, y) { };
     return D;
 }());
+var c;
 var r = c.foo(1); // error
+var d;
 var r2 = d.foo(2); // error
 var r3 = C.foo(1); // error
 var r4 = D.bar(''); // error

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/global.ts] ////
-
 //// [global.ts]
-namespace M {
+module M {
     export function f(y:number) {
         return x+y;
     }

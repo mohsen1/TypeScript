@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocBindingInUnreachableCode.ts] ////
-
-=== bug27341.js ===
+=== tests/cases/conformance/jsdoc/bug27341.js ===
 if (false) {
     /**
      * @param {string} s

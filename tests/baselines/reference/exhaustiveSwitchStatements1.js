@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/exhaustiveSwitchStatements1.ts] ////
-
 //// [exhaustiveSwitchStatements1.ts]
 function f1(x: 1 | 2): string {
     if (!!true) {
@@ -503,7 +501,7 @@ interface Triangle {
     kind: "triangle";
     side: number;
 }
-type Shape = Square | Rectangle | Circle | Triangle;
+declare type Shape = Square | Rectangle | Circle | Triangle;
 declare function area(s: Shape): number;
 declare function areaWrapped(s: Shape): number;
 declare enum MyEnum {
@@ -526,7 +524,7 @@ interface Circle2 {
     kind: "circle";
     radius: number;
 }
-type Shape2 = Square2 | Circle2;
+declare type Shape2 = Square2 | Circle2;
 declare function withDefault(s1: Shape2, s2: Shape2): string;
 declare function withoutDefault(s1: Shape2, s2: Shape2): string;
 declare function test4(value: 1 | 2): string;
@@ -539,13 +537,13 @@ declare const zoo: {
 } | undefined;
 declare function expression(): Animal;
 declare function foo(): void;
-type O = {
+declare type O = {
     a: number;
     b: number;
 };
-type K = keyof O | 'c';
+declare type K = keyof O | 'c';
 declare function ff(o: O, k: K): number;
-type A = {
+declare type A = {
     kind: "abc";
 } | {
     kind: "def";

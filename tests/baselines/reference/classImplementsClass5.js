@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classImplementsClass5.ts] ////
-
 //// [classImplementsClass5.ts]
 class A {
     private x = 1;
@@ -14,8 +12,8 @@ class C implements A {
 
 class C2 extends A {}
 
-declare var c: C;
-declare var c2: C2;
+var c: C;
+var c2: C2;
 c = c2;
 c2 = c;
 
@@ -58,5 +56,7 @@ var C2 = /** @class */ (function (_super) {
     }
     return C2;
 }(A));
+var c;
+var c2;
 c = c2;
 c2 = c;

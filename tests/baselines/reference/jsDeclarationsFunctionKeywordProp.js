@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsFunctionKeywordProp.ts] ////
-
 //// [source.js]
 function foo() {}
 foo.null = true;
@@ -26,18 +24,18 @@ baz.normal = false;
 //// [source.d.ts]
 declare function foo(): void;
 declare namespace foo {
-    let _null: boolean;
+    const _null: boolean;
     export { _null as null };
 }
 declare function bar(): void;
 declare namespace bar {
-    let async: boolean;
-    let normal: boolean;
+    const async: boolean;
+    const normal: boolean;
 }
 declare function baz(): void;
 declare namespace baz {
-    let _class: boolean;
+    const _class: boolean;
     export { _class as class };
-    let normal_1: boolean;
+    const normal_1: boolean;
     export { normal_1 as normal };
 }

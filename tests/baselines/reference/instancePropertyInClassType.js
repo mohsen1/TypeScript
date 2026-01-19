@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/members/classTypes/instancePropertyInClassType.ts] ////
-
 //// [instancePropertyInClassType.ts]
-namespace NonGeneric {
+module NonGeneric {
     class C {
         x: string;
         get y() {
@@ -21,7 +19,7 @@ namespace NonGeneric {
 
 }
 
-namespace Generic {
+module Generic {
     class C<T,U> {
         x: T;
         get y() {

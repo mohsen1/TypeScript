@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es5/asyncMethodWithSuper_es5.ts] ////
-
 //// [asyncMethodWithSuper_es5.ts]
 class A {
     x() {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeAndMemberIdentity/objectTypesIdentityWithGenericCallSignaturesDifferingTypeParameterCounts.ts] ////
-
 //// [objectTypesIdentityWithGenericCallSignaturesDifferingTypeParameterCounts.ts]
 // object types are identical structurally
 

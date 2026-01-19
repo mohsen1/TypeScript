@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericCallWithObjectLiteralArguments1.ts] ////
-
 //// [genericCallWithObjectLiteralArguments1.ts]
 function foo<T>(n: { x: T; y: T }, m: T) { return m; }
 // these are all errors

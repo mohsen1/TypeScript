@@ -34,14 +34,15 @@ var A;
         var Something = require("fs").Something;
         var thing = new Something();
     })(B = A.B || (A.B = {}));
-})(A || (exports.A = A = {}));
+})(A = exports.A || (exports.A = {}));
 
 
 //// [index.d.ts]
+/// <reference types="node" />
 export const Something: 2;
 export namespace A {
     namespace B {
         export { thing };
-        export let thing: import("fs").Something;
+        export const thing: import("fs").Something;
     }
 }

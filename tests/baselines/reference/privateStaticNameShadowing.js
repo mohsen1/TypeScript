@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateStaticNameShadowing.ts] ////
-
 //// [privateStaticNameShadowing.ts]
 class X {
     static #f = X.#m();
@@ -24,7 +22,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _b, _X_f, _X_m;
 class X {
     constructor() {
-        __classPrivateFieldGet(_b, _b, "m", _X_m).call(_b);
+        __classPrivateFieldGet(X, _b, "m", _X_m).call(X);
     }
 }
 _b = X, _X_m = function _X_m() {
@@ -33,4 +31,4 @@ _b = X, _X_m = function _X_m() {
     __classPrivateFieldGet(X, _b, "m", _X_m).call(X); // Should check with X as the receiver with _b as the class constructor 
     return 1;
 };
-_X_f = { value: __classPrivateFieldGet(_b, _b, "m", _X_m).call(_b) };
+_X_f = { value: __classPrivateFieldGet(X, _b, "m", _X_m).call(X) };

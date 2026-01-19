@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/override/overrideParameterProperty.ts] ////
-
-=== overrideParameterProperty.ts ===
+=== tests/cases/conformance/override/overrideParameterProperty.ts ===
 class Base {
 >Base : Symbol(Base, Decl(overrideParameterProperty.ts, 0, 0))
 

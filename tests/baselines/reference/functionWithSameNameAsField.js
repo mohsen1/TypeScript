@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionWithSameNameAsField.ts] ////
-
 //// [functionWithSameNameAsField.ts]
 class TestProgressBar {
     public total: number;

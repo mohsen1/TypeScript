@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/union/contextualTypeWithUnionTypeMembers.ts] ////
-
 //// [contextualTypeWithUnionTypeMembers.ts]
 //When used as a contextual type, a union type U has those members that are present in any of 
 // its constituent types, with types that are unions of the respective members in the constituent types. 
@@ -133,14 +131,14 @@ var i1Ori2 = {
     commonMethodType: function (a) { return a; },
     commonMethodWithTypeParameter: function (a) { return a; },
     methodOnlyInI1: function (a) { return a; },
-    propertyOnlyInI1: "Hello",
+    propertyOnlyInI1: "Hello"
 };
 var i1Ori2 = {
     commonPropertyType: "hello",
     commonMethodType: function (a) { return a; },
     commonMethodWithTypeParameter: function (a) { return a; },
     methodOnlyInI2: function (a) { return a; },
-    propertyOnlyInI2: "Hello",
+    propertyOnlyInI2: "Hello"
 };
 var i1Ori2 = {
     commonPropertyType: "hello",
@@ -149,21 +147,21 @@ var i1Ori2 = {
     methodOnlyInI1: function (a) { return a; },
     propertyOnlyInI1: "Hello",
     methodOnlyInI2: function (a) { return a; },
-    propertyOnlyInI2: "Hello",
+    propertyOnlyInI2: "Hello"
 };
 var arrayI1OrI2 = [i1, i2, {
         commonPropertyType: "hello",
         commonMethodType: function (a) { return a; },
         commonMethodWithTypeParameter: function (a) { return a; },
         methodOnlyInI1: function (a) { return a; },
-        propertyOnlyInI1: "Hello",
+        propertyOnlyInI1: "Hello"
     },
     {
         commonPropertyType: "hello",
         commonMethodType: function (a) { return a; },
         commonMethodWithTypeParameter: function (a) { return a; },
         methodOnlyInI2: function (a) { return a; },
-        propertyOnlyInI2: "Hello",
+        propertyOnlyInI2: "Hello"
     }, {
         commonPropertyType: "hello",
         commonMethodType: function (a) { return a; },
@@ -171,7 +169,7 @@ var arrayI1OrI2 = [i1, i2, {
         methodOnlyInI1: function (a) { return a; },
         propertyOnlyInI1: "Hello",
         methodOnlyInI2: function (a) { return a; },
-        propertyOnlyInI2: "Hello",
+        propertyOnlyInI2: "Hello"
     }];
 var i11;
 var i21;
@@ -183,7 +181,7 @@ var i11Ori21 = {
         var z = a.charAt(b);
         return z;
     },
-    commonPropertyDifferentType: "hello",
+    commonPropertyDifferentType: "hello"
 };
 var i11Ori21 = {
     // Like i2
@@ -191,7 +189,7 @@ var i11Ori21 = {
         var z = a.charCodeAt(b);
         return z;
     },
-    commonPropertyDifferentType: 10,
+    commonPropertyDifferentType: 10
 };
 var arrayOrI11OrI21 = [i11, i21, i11 || i21, {
         // Like i1
@@ -199,12 +197,12 @@ var arrayOrI11OrI21 = [i11, i21, i11 || i21, {
             var z = a.charAt(b);
             return z;
         },
-        commonPropertyDifferentType: "hello",
+        commonPropertyDifferentType: "hello"
     }, {
         // Like i2
         commonMethodDifferentReturnType: function (a, b) {
             var z = a.charCodeAt(b);
             return z;
         },
-        commonPropertyDifferentType: 10,
+        commonPropertyDifferentType: 10
     }];

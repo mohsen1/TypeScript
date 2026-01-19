@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/stringLiteralsWithEqualityChecks03.ts] ////
-
 //// [stringLiteralsWithEqualityChecks03.ts]
 interface Runnable {
     isRunning: boolean;
@@ -9,8 +7,8 @@ interface Refrigerator extends Runnable {
     makesFoodGoBrrr: boolean;
 }
 
-declare let x: string;
-declare let y: "foo" | Refrigerator;
+let x: string;
+let y: "foo" | Refrigerator;
 
 let b: boolean;
 b = x === y;
@@ -33,6 +31,8 @@ b = "bar" !== y;
 
 
 //// [stringLiteralsWithEqualityChecks03.js]
+var x;
+var y;
 var b;
 b = x === y;
 b = "foo" === y;

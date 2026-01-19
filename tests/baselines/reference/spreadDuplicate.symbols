@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/spread/spreadDuplicate.ts] ////
-
-=== spreadDuplicate.ts ===
+=== tests/cases/conformance/types/spread/spreadDuplicate.ts ===
 // Repro from #44438
 
 declare let a: { a: string };

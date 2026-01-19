@@ -1,12 +1,12 @@
-propertyAccessOnTypeParameterWithConstraints5.ts(15,32): error TS2339: Property 'notHere' does not exist on type 'U'.
-propertyAccessOnTypeParameterWithConstraints5.ts(25,16): error TS2339: Property 'notHere' does not exist on type 'B'.
-propertyAccessOnTypeParameterWithConstraints5.ts(32,22): error TS2339: Property 'notHere' does not exist on type 'A'.
-propertyAccessOnTypeParameterWithConstraints5.ts(38,9): error TS2322: Type 'string' is not assignable to type 'U'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts(15,32): error TS2339: Property 'notHere' does not exist on type 'U'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts(25,16): error TS2339: Property 'notHere' does not exist on type 'B'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts(32,22): error TS2339: Property 'notHere' does not exist on type 'A'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts(38,9): error TS2322: Type 'string' is not assignable to type 'U'.
   'U' could be instantiated with an arbitrary type which could be unrelated to 'string'.
-propertyAccessOnTypeParameterWithConstraints5.ts(38,22): error TS2339: Property 'notHere' does not exist on type 'U'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts(38,22): error TS2339: Property 'notHere' does not exist on type 'U'.
 
 
-==== propertyAccessOnTypeParameterWithConstraints5.ts (5 errors) ====
+==== tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts (5 errors) ====
     class A {
         foo(): string { return ''; }
     }
@@ -19,7 +19,7 @@ propertyAccessOnTypeParameterWithConstraints5.ts(38,22): error TS2339: Property 
     
     class C<U extends T, T extends A> {
         f() {
-            var x: U = {} as any;
+            var x: U;
             var a = x['foo'](); // should be string
             return a + x.foo() + x.notHere();
                                    ~~~~~~~
@@ -32,13 +32,13 @@ propertyAccessOnTypeParameterWithConstraints5.ts(38,22): error TS2339: Property 
     interface I<U extends T, T extends A> {
         foo: U;
     }
-    declare var i: I<B, A>;
+    var i: I<B, A>;
     var r2 = i.foo.notHere();
                    ~~~~~~~
 !!! error TS2339: Property 'notHere' does not exist on type 'B'.
     var r2b = i.foo['foo']();
     
-    declare var a: {
+    var a: {
         <U extends T, T extends A>(): U;
     }
     // BUG 794164
@@ -51,7 +51,7 @@ propertyAccessOnTypeParameterWithConstraints5.ts(38,22): error TS2339: Property 
         foo: <U extends T, T extends A>(x: U): U => {
             var a = x['foo'](); // should be string
             return a + x.notHere();
-            ~~~~~~
+            ~~~~~~~~~~~~~~~~~~~~~~~
 !!! error TS2322: Type 'string' is not assignable to type 'U'.
 !!! error TS2322:   'U' could be instantiated with an arbitrary type which could be unrelated to 'string'.
                          ~~~~~~~

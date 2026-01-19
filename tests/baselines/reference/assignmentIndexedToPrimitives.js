@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentIndexedToPrimitives.ts] ////
-
 //// [assignmentIndexedToPrimitives.ts]
 const n1: number = [0];
 const n2: number = ["0"];

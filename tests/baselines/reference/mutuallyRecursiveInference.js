@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mutuallyRecursiveInference.ts] ////
-
 //// [mutuallyRecursiveInference.ts]
 class T<A> {
     a: A;

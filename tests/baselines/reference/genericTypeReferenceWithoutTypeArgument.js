@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/specifyingTypes/typeReferences/genericTypeReferenceWithoutTypeArgument.ts] ////
-
 //// [genericTypeReferenceWithoutTypeArgument.ts]
 // it is an error to use a generic type without type arguments
 // all of these are errors 
@@ -25,7 +23,7 @@ class D extends C {
 
 interface I extends C {}
 
-namespace M {
+module M {
     export class E<T> { foo: T }
 }
 

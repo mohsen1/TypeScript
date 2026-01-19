@@ -14,7 +14,7 @@ export { x }
 
 //// [ch.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 var x = {
     grey: {}
@@ -30,7 +30,7 @@ x.x.grey;
 
 //// [ch.d.ts]
 export namespace x {
-    let grey: {};
+    const grey: {};
 }
 //// [main.d.ts]
 export {};

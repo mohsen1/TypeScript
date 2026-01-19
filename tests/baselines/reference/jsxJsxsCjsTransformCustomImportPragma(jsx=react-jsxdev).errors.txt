@@ -1,7 +1,7 @@
-preact.tsx(3,11): error TS2875: This JSX tag requires the module path 'preact/jsx-dev-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
+tests/cases/conformance/jsx/jsxs/preact.tsx(3,11): error TS2307: Cannot find module 'preact/jsx-dev-runtime' or its corresponding type declarations.
 
 
-==== react.tsx (0 errors) ====
+==== tests/cases/conformance/jsx/jsxs/react.tsx (0 errors) ====
     /// <reference path="/.lib/react16.d.ts" />
     /* @jsxImportSource react */
     import "./preact";
@@ -12,12 +12,12 @@ preact.tsx(3,11): error TS2875: This JSX tag requires the module path 'preact/js
     </>
     
     export {};
-==== preact.tsx (1 errors) ====
+==== tests/cases/conformance/jsx/jsxs/preact.tsx (1 errors) ====
     /// <reference path="/.lib/react16.d.ts" />
     /* @jsxImportSource preact */
     const a = <>
               ~~
-!!! error TS2875: This JSX tag requires the module path 'preact/jsx-dev-runtime' to exist, but none could be found. Make sure you have types for the appropriate package installed.
+!!! error TS2307: Cannot find module 'preact/jsx-dev-runtime' or its corresponding type declarations.
       <p></p>
       text
       <div className="foo"></div>

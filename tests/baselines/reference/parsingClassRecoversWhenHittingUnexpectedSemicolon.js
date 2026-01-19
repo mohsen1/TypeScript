@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parsingClassRecoversWhenHittingUnexpectedSemicolon.ts] ////
-
 //// [parsingClassRecoversWhenHittingUnexpectedSemicolon.ts]
 class C {
     public f() { };

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/extendsTag2.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/foo.js ===
 /**
  * @constructor
  */

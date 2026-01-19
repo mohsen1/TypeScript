@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/es6/es6modulekindWithES2015Target.ts] ////
-
 //// [es6modulekindWithES2015Target.ts]
 export default class A
 {

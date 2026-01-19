@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedLoopWithOnlyInnerLetCaptured.ts] ////
-
 //// [nestedLoopWithOnlyInnerLetCaptured.ts]
 declare let doSomething;
 

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserParenthesizedVariableAndFunctionInTernary.ts] ////
-
-=== parserParenthesizedVariableAndFunctionInTernary.ts ===
+=== tests/cases/conformance/parser/ecmascript5/parserParenthesizedVariableAndFunctionInTernary.ts ===
 let a: any;
 >a : Symbol(a, Decl(parserParenthesizedVariableAndFunctionInTernary.ts, 0, 3))
 

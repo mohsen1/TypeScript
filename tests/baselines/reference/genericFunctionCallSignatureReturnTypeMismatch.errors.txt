@@ -1,14 +1,14 @@
-genericFunctionCallSignatureReturnTypeMismatch.ts(6,1): error TS2322: Type '<S>() => S[]' is not assignable to type '<T>(x: T) => T'.
+tests/cases/compiler/genericFunctionCallSignatureReturnTypeMismatch.ts(6,1): error TS2322: Type '<S>() => S[]' is not assignable to type '<T>(x: T) => T'.
   Type 'unknown[]' is not assignable to type 'T'.
     'T' could be instantiated with an arbitrary type which could be unrelated to 'unknown[]'.
 
 
-==== genericFunctionCallSignatureReturnTypeMismatch.ts (1 errors) ====
+==== tests/cases/compiler/genericFunctionCallSignatureReturnTypeMismatch.ts (1 errors) ====
     interface Array<T> {}
     
-    declare var f : { <T>(x:T): T; }
+    var f : { <T>(x:T): T; }
     
-    declare var g : { <S>() : S[]; };
+    var g : { <S>() : S[]; };
     f = g;
     ~
 !!! error TS2322: Type '<S>() => S[]' is not assignable to type '<T>(x: T) => T'.

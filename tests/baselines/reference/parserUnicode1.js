@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserUnicode1.ts] ////
-
 //// [parserUnicode1.ts]
 try {
   var \u0078x = 6;

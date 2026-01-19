@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritance1.ts] ////
-
 //// [inheritance1.ts]
 class Control {
     private state: any;
@@ -24,40 +22,40 @@ class Locations implements SelectableControl {
 class Locations1 {
     select() { }
 }
-declare var sc: SelectableControl;
-declare var c: Control;
+var sc: SelectableControl;
+var c: Control;
 
-declare var b: Button;
+var b: Button;
 sc = b;
 c = b;
 b = sc;
 b = c;
 
-declare var t: TextBox;
+var t: TextBox;
 sc = t;
 c = t;
 t = sc;
 t = c;
 
-declare var i: ImageBase;
+var i: ImageBase;
 sc = i;
 c = i;
 i = sc;
 i = c;
 
-declare var i1: Image1;
+var i1: Image1;
 sc = i1;
 c = i1;
 i1 = sc;
 i1 = c;
 
-declare var l: Locations;
+var l: Locations;
 sc = l;
 c = l;
 l = sc;
 l = c;
 
-declare var l1: Locations1;
+var l1: Locations1;
 sc = l1;
 c = l1;
 l1 = sc;
@@ -126,26 +124,34 @@ var Locations1 = /** @class */ (function () {
     Locations1.prototype.select = function () { };
     return Locations1;
 }());
+var sc;
+var c;
+var b;
 sc = b;
 c = b;
 b = sc;
 b = c;
+var t;
 sc = t;
 c = t;
 t = sc;
 t = c;
+var i;
 sc = i;
 c = i;
 i = sc;
 i = c;
+var i1;
 sc = i1;
 c = i1;
 i1 = sc;
 i1 = c;
+var l;
 sc = l;
 c = l;
 l = sc;
 l = c;
+var l1;
 sc = l1;
 c = l1;
 l1 = sc;

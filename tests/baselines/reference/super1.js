@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/super1.ts] ////
-
 //// [super1.ts]
 // Case 1
 class Base1 {
@@ -47,7 +45,7 @@ class SubE3 extends Base3 {
 }
 
 // Case 4
-namespace Base4 {
+module Base4 {
     class Sub4 {
         public x(){
             return "hello";
@@ -109,7 +107,7 @@ var SubSub1 = /** @class */ (function (_super) {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     SubSub1.prototype.bar = function () {
-        return _super.prototype.super.foo;
+        return _super.prototype["super"].foo;
     };
     return SubSub1;
 }(Sub1));

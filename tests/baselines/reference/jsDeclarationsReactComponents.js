@@ -1,7 +1,7 @@
 //// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsReactComponents.ts] ////
 
 //// [jsDeclarationsReactComponents1.jsx]
-/// <reference path="/.lib/react16.d.ts" preserve="true" />
+/// <reference path="/.lib/react16.d.ts" />
 import React from "react";
 import PropTypes from "prop-types"
 
@@ -101,7 +101,7 @@ var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
 Object.defineProperty(exports, "__esModule", { value: true });
-/// <reference path="react16.d.ts" preserve="true" />
+/// <reference path="react16.d.ts" />
 var react_1 = __importDefault(require("react"));
 var prop_types_1 = __importDefault(require("prop-types"));
 var TabbedShowLayout = function (_a) {
@@ -185,19 +185,20 @@ exports.default = Tree;
 
 
 //// [jsDeclarationsReactComponents1.d.ts]
-/// <reference path="../..react16.d.ts" preserve="true" />
+/// <reference path="../..react16.d.ts" />
 export default TabbedShowLayout;
 declare function TabbedShowLayout({}: {}): JSX.Element;
 declare namespace TabbedShowLayout {
     namespace propTypes {
-        let version: PropTypes.Requireable<number>;
+        const version: PropTypes.Requireable<number>;
     }
     namespace defaultProps {
-        let tabs: undefined;
+        const tabs: undefined;
     }
 }
 import PropTypes from "prop-types";
 //// [jsDeclarationsReactComponents2.d.ts]
+/// <reference path="../..react16.d.ts" />
 export default TabbedShowLayout;
 /**
  * @type {React.SFC}
@@ -215,7 +216,7 @@ declare const TabbedShowLayout: {
     };
 } & ((props?: {
     elem: string;
-}) => JSX.Element);
+} | undefined) => JSX.Element);
 //// [jsDeclarationsReactComponents4.d.ts]
 export default TabbedShowLayout;
 declare function TabbedShowLayout(prop: {
@@ -223,22 +224,23 @@ declare function TabbedShowLayout(prop: {
 }): JSX.Element;
 declare namespace TabbedShowLayout {
     namespace defaultProps {
-        let tabs: string;
+        const tabs: string;
     }
 }
 //// [jsDeclarationsReactComponents5.d.ts]
+/// <reference path="../..react16.d.ts" />
 export default Tree;
 declare function Tree({ allowDropOnRoot }: {
     allowDropOnRoot: any;
 }): JSX.Element;
 declare namespace Tree {
     namespace propTypes {
-        let classes: PropTypes.Requireable<object>;
+        const classes: PropTypes.Requireable<object>;
     }
     namespace defaultProps {
-        let classes_1: {};
+        const classes_1: {};
         export { classes_1 as classes };
-        export let parentSource: string;
+        export const parentSource: string;
     }
 }
-import PropTypes from 'prop-types';
+import PropTypes from "prop-types";

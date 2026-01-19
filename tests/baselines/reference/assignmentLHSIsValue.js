@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/assignmentOperator/assignmentLHSIsValue.ts] ////
-
 //// [assignmentLHSIsValue.ts]
 // expected error for all the LHS of assignments
 var value: any;
@@ -16,7 +14,7 @@ function foo() { this = value; }
 this = value;
 
 // identifiers: module, class, enum, function
-namespace M { export var a; }
+module M { export var a; }
 M = value;
 
 C = value;

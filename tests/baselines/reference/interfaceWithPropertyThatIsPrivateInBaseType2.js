@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceWithPropertyThatIsPrivateInBaseType2.ts] ////
-
 //// [interfaceWithPropertyThatIsPrivateInBaseType2.ts]
 class Base {
     private x() {}

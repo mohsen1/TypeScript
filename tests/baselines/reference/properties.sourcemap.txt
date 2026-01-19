@@ -5,7 +5,7 @@ sourceRoot:
 sources: properties.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:properties.js
+emittedFile:tests/cases/compiler/properties.js
 sourceFile:properties.ts
 -------------------------------------------------------------------
 >>>var MyClass = /** @class */ (function () {

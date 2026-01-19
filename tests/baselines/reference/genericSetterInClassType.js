@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/members/classTypes/genericSetterInClassType.ts] ////
-
 //// [genericSetterInClassType.ts]
-namespace Generic {
+module Generic {
     class C<T> {
         get y(): T {
             return 1 as never;

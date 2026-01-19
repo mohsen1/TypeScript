@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationDebugger.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationDebugger.js
+emittedFile:tests/cases/compiler/sourceMapValidationDebugger.js
 sourceFile:sourceMapValidationDebugger.ts
 -------------------------------------------------------------------
 >>>debugger;

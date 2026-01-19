@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/exportDefaultFunctionInNamespace.ts] ////
-
-=== exportDefaultFunctionInNamespace.ts ===
+=== tests/cases/compiler/exportDefaultFunctionInNamespace.ts ===
 namespace ns_function {
 >ns_function : Symbol(ns_function, Decl(exportDefaultFunctionInNamespace.ts, 0, 0))
 

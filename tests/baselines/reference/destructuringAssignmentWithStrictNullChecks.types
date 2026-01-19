@@ -1,19 +1,11 @@
-//// [tests/cases/compiler/destructuringAssignmentWithStrictNullChecks.ts] ////
-
-=== destructuringAssignmentWithStrictNullChecks.ts ===
+=== tests/cases/compiler/destructuringAssignmentWithStrictNullChecks.ts ===
 let bar: {};
 >bar : {}
->    : ^^
 
 ({ ...bar } = {});
 >({ ...bar } = {}) : {}
->                  : ^^
 >{ ...bar } = {} : {}
->                : ^^
 >{ ...bar } : {}
->           : ^^
 >bar : {}
->    : ^^
 >{} : {}
->   : ^^
 

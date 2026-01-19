@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock15.ts] ////
-
 //// [classStaticBlock15.ts]
 var _C__1;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classInConvertedLoopES5.ts] ////
-
 //// [classInConvertedLoopES5.ts]
 const classesByRow: Record<string, object> = {};
 for (const row of ['1', '2', '3', '4', '5']) {

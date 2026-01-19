@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/rest/objectRestNegative.ts] ////
-
 //// [objectRestNegative.ts]
 let o = { a: 1, b: 'no' };
 var { ...mustBeLast, a } = o;
@@ -16,7 +14,7 @@ function generic<T extends { x, y }>(t: T) {
     return rest;
 }
 
-let rest: { b: string } = { b: "" };
+let rest: { b: string }
 ({a, ...rest.b + rest.b} = o);
 
 
@@ -44,5 +42,5 @@ function generic(t) {
     var x = t.x, rest = __rest(t, ["x"]);
     return rest;
 }
-var rest = { b: "" };
+var rest;
 (a = o.a, rest.b + rest.b = __rest(o, ["a"]));

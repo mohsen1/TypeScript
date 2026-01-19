@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseChaining.ts] ////
-
 //// [promiseChaining.ts]
 class Chain<T> {
     constructor(public value: T) { }

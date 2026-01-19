@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/emitExponentiationOperator3.ts] ////
-
 //// [emitExponentiationOperator3.ts]
 var temp = 10;
 

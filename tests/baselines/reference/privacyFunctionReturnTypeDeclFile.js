@@ -229,7 +229,7 @@ function privateFunctionWithPrivateModuleParameterTypes1() {
 }
 declare function privateAmbientFunctionWithPrivateModuleParameterTypes(): privateModule.publicClass; 
 
-export namespace publicModule {
+export module publicModule {
     class privateClass {
     }
 
@@ -459,7 +459,7 @@ export namespace publicModule {
     declare function privateAmbientFunctionWithPrivateModuleParameterTypes(): privateModule.publicClass; 
 }
 
-namespace privateModule {
+module privateModule {
     class privateClass {
     }
 
@@ -732,14 +732,14 @@ function publicFunctionWithPublicParmeterTypesInGlobal1() {
 }
 declare function publicAmbientFunctionWithPublicParmeterTypesInGlobal(): publicClassInGlobal;
 
-namespace publicModuleInGlobal {
+module publicModuleInGlobal {
     class privateClass {
     }
 
     export class publicClass {
     }
 
-    namespace privateModule {
+    module privateModule {
         class privateClass {
         }
 
@@ -1194,14 +1194,8 @@ namespace publicModuleInGlobal {
 
 //// [privacyFunctionReturnTypeDeclFile_externalModule.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.publicModule = exports.publicClassWithPrivateModuleParameterTypes = exports.publicClassWithWithPublicParmeterTypes = exports.publicClassWithWithPrivateParmeterTypes = exports.publicClass = void 0;
-exports.publicFunctionWithPrivateParmeterTypes = publicFunctionWithPrivateParmeterTypes;
-exports.publicFunctionWithPublicParmeterTypes = publicFunctionWithPublicParmeterTypes;
-exports.publicFunctionWithPrivateParmeterTypes1 = publicFunctionWithPrivateParmeterTypes1;
-exports.publicFunctionWithPublicParmeterTypes1 = publicFunctionWithPublicParmeterTypes1;
-exports.publicFunctionWithPrivateModuleParameterTypes = publicFunctionWithPrivateModuleParameterTypes;
-exports.publicFunctionWithPrivateModuleParameterTypes1 = publicFunctionWithPrivateModuleParameterTypes1;
+exports.__esModule = true;
+exports.publicModule = exports.publicFunctionWithPrivateModuleParameterTypes1 = exports.publicFunctionWithPrivateModuleParameterTypes = exports.publicClassWithPrivateModuleParameterTypes = exports.publicFunctionWithPublicParmeterTypes1 = exports.publicFunctionWithPrivateParmeterTypes1 = exports.publicFunctionWithPublicParmeterTypes = exports.publicFunctionWithPrivateParmeterTypes = exports.publicClassWithWithPublicParmeterTypes = exports.publicClassWithWithPrivateParmeterTypes = exports.publicClass = void 0;
 var privateClass = /** @class */ (function () {
     function privateClass() {
     }
@@ -1334,9 +1328,11 @@ var privateClassWithWithPublicParmeterTypes = /** @class */ (function () {
 function publicFunctionWithPrivateParmeterTypes() {
     return null;
 }
+exports.publicFunctionWithPrivateParmeterTypes = publicFunctionWithPrivateParmeterTypes;
 function publicFunctionWithPublicParmeterTypes() {
     return null;
 }
+exports.publicFunctionWithPublicParmeterTypes = publicFunctionWithPublicParmeterTypes;
 function privateFunctionWithPrivateParmeterTypes() {
     return null;
 }
@@ -1346,9 +1342,11 @@ function privateFunctionWithPublicParmeterTypes() {
 function publicFunctionWithPrivateParmeterTypes1() {
     return new privateClass();
 }
+exports.publicFunctionWithPrivateParmeterTypes1 = publicFunctionWithPrivateParmeterTypes1;
 function publicFunctionWithPublicParmeterTypes1() {
     return new publicClass();
 }
+exports.publicFunctionWithPublicParmeterTypes1 = publicFunctionWithPublicParmeterTypes1;
 function privateFunctionWithPrivateParmeterTypes1() {
     return new privateClass();
 }
@@ -1376,9 +1374,11 @@ exports.publicClassWithPrivateModuleParameterTypes = publicClassWithPrivateModul
 function publicFunctionWithPrivateModuleParameterTypes() {
     return null;
 }
+exports.publicFunctionWithPrivateModuleParameterTypes = publicFunctionWithPrivateModuleParameterTypes;
 function publicFunctionWithPrivateModuleParameterTypes1() {
     return new privateModule.publicClass();
 }
+exports.publicFunctionWithPrivateModuleParameterTypes1 = publicFunctionWithPrivateModuleParameterTypes1;
 var privateClassWithPrivateModuleParameterTypes = /** @class */ (function () {
     function privateClassWithPrivateModuleParameterTypes() {
     }
@@ -1610,7 +1610,7 @@ var publicModule;
     function privateFunctionWithPrivateModuleParameterTypes1() {
         return new privateModule.publicClass();
     }
-})(publicModule || (exports.publicModule = publicModule = {}));
+})(publicModule = exports.publicModule || (exports.publicModule = {}));
 var privateModule;
 (function (privateModule) {
     var privateClass = /** @class */ (function () {
@@ -2339,7 +2339,7 @@ export declare class publicClassWithPrivateModuleParameterTypes {
 export declare function publicFunctionWithPrivateModuleParameterTypes(): privateModule.publicClass;
 export declare function publicFunctionWithPrivateModuleParameterTypes1(): privateModule.publicClass;
 export declare function publicAmbientFunctionWithPrivateModuleParameterTypes(): privateModule.publicClass;
-export declare namespace publicModule {
+export declare module publicModule {
     class privateClass {
     }
     export class publicClass {
@@ -2399,7 +2399,7 @@ export declare namespace publicModule {
     export function publicAmbientFunctionWithPrivateModuleParameterTypes(): privateModule.publicClass;
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     class privateClass {
     }
     export class publicClass {
@@ -2482,12 +2482,12 @@ declare class publicClassWithWithPublicParmeterTypesInGlobal {
 declare function publicFunctionWithPublicParmeterTypesInGlobal(): publicClassInGlobal;
 declare function publicFunctionWithPublicParmeterTypesInGlobal1(): publicClassInGlobal;
 declare function publicAmbientFunctionWithPublicParmeterTypesInGlobal(): publicClassInGlobal;
-declare namespace publicModuleInGlobal {
+declare module publicModuleInGlobal {
     class privateClass {
     }
     export class publicClass {
     }
-    namespace privateModule {
+    module privateModule {
         class privateClass {
         }
         export class publicClass {

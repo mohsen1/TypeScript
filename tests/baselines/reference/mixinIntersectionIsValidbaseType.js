@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mixinIntersectionIsValidbaseType.ts] ////
-
 //// [mixinIntersectionIsValidbaseType.ts]
 export type Constructor<T extends object = object> = new (...args: any[]) => T;
 
@@ -46,7 +44,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Serializable = void 0;
 /**
  * Plain mixin where the superclass must be Initable

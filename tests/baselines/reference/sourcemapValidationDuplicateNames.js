@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/sourcemapValidationDuplicateNames.ts] ////
-
 //// [sourcemapValidationDuplicateNames.ts]
-namespace m1 {
+module m1 {
     var x = 10;
     export class c {
     }
 }
-namespace m1 {
+module m1 {
     var b = new m1.c();
 }
 

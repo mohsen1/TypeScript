@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/nullishCoalescingOperator/nullishCoalescingOperatorInAsyncGenerator.ts] ////
-
 //// [nullishCoalescingOperatorInAsyncGenerator.ts]
 // https://github.com/microsoft/TypeScript/issues/37686
 async function* f(a: { b?: number }) {
@@ -13,8 +11,8 @@ async function* f(a: { b?: number }) {
 //// [nullishCoalescingOperatorInAsyncGenerator.js]
 // https://github.com/microsoft/TypeScript/issues/37686
 function f(a) {
+    var _a;
     return __asyncGenerator(this, arguments, function* f_1() {
-        var _a;
         let c = (_a = a.b) !== null && _a !== void 0 ? _a : 10;
         while (c) {
             yield yield __await(c--);

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inDoesNotOperateOnPrimitiveTypes.ts] ////
-
 //// [inDoesNotOperateOnPrimitiveTypes.ts]
 const validHasKey = <T extends object>(
   thing: T,

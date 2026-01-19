@@ -21,7 +21,7 @@ import type Foo = ns.Foo;
 
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [c.js]
 var ns;
 (function (ns) {

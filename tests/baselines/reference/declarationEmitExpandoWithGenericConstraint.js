@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitExpandoWithGenericConstraint.ts] ////
-
 //// [declarationEmitExpandoWithGenericConstraint.ts]
 export interface Point {
     readonly x: number;
@@ -18,7 +16,7 @@ Point.zero = (): Point => Point(0, 0);
 
 //// [declarationEmitExpandoWithGenericConstraint.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Rect = exports.Point = void 0;
 var Point = function (x, y) { return ({ x: x, y: y }); };
 exports.Point = Point;

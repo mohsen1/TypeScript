@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/localImportNameVsGlobalName.ts] ////
-
 //// [localImportNameVsGlobalName.ts]
-namespace Keyboard {
+module Keyboard {
   export enum Key { UP, DOWN, LEFT, RIGHT }
 }
 
-namespace App {
+module App {
   import Key = Keyboard.Key;
 
   export function foo(key: Key): void {}

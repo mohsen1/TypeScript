@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMap-LineBreaks.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMap-LineBreaks.js
+emittedFile:tests/cases/compiler/sourceMap-LineBreaks.js
 sourceFile:sourceMap-LineBreaks.ts
 -------------------------------------------------------------------
 >>>var endsWithlineSeparator = 10;

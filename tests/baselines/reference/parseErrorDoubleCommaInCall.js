@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parseErrorDoubleCommaInCall.ts] ////
-
 //// [parseErrorDoubleCommaInCall.ts]
 Boolean({
     x: 0,,
@@ -8,5 +6,5 @@ Boolean({
 
 //// [parseErrorDoubleCommaInCall.js]
 Boolean({
-    x: 0,
+    x: 0
 });

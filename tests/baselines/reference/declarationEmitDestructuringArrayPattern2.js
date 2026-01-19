@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuringArrayPattern2.ts] ////
-
 //// [declarationEmitDestructuringArrayPattern2.ts]
 var [x10, [y10, [z10]]] = [1, ["hello", [true]]];
 

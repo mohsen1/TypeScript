@@ -1,6 +1,8 @@
 //// [tests/cases/conformance/references/library-reference-5.ts] ////
 
 //// [index.d.ts]
+// Secondary references may not be duplicated if they disagree in content
+
 /// <reference types="alpha" />
 declare var foo: any;
 

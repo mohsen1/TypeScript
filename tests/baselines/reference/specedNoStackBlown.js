@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/specedNoStackBlown.ts] ////
-
 //// [specedNoStackBlown.ts]
 // Type definitions for spected 0.7
 // Project: https://github.com/25th-floor/spected
@@ -45,5 +43,5 @@ export default spected;
 // Definitions by: Benjamin Makus <https://github.com/benneq>
 // Definitions: https://github.com/DefinitelyTyped/DefinitelyTyped
 // TypeScript Version: 2.8
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = spected;
+exports.__esModule = true;
+exports["default"] = spected;

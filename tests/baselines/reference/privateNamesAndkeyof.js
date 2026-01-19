@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesAndkeyof.ts] ////
-
 //// [privateNamesAndkeyof.ts]
 class A {
     #fooField = 3;

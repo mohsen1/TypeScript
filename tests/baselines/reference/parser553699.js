@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/RegressionTests/parser553699.ts] ////
-
 //// [parser553699.ts]
 class Foo {
   constructor() { }

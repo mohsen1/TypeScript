@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorsOnComputedProperties.ts] ////
-
 //// [decoratorsOnComputedProperties.ts]
 function x(o: object, k: PropertyKey) { }
 let i = 0;

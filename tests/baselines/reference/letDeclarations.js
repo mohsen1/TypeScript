@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations.ts] ////
-
 //// [letDeclarations.ts]
 let l1;
 let l2: number;

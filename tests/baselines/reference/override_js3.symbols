@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/override/override_js3.ts] ////
-
-=== a.js ===
+=== tests/cases/conformance/override/a.js ===
 class B {
 >B : Symbol(B, Decl(a.js, 0, 0))
 

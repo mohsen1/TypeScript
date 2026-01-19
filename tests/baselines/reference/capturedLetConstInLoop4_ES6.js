@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop4_ES6.ts] ////
-
 //// [capturedLetConstInLoop4_ES6.ts]
 //======let
 export function exportedFoo() {

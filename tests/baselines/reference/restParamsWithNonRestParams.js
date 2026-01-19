@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restParamsWithNonRestParams.ts] ////
-
 //// [restParamsWithNonRestParams.ts]
 function foo(...b:number[]){}
 foo(); // ok

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/valuesAndReferences/assignments.ts] ////
-
 //// [assignments.ts]
 // In this file:
 //  Assign to a module
@@ -10,7 +8,7 @@
 //  Assign to a parameter
 //  Assign to an interface
 
-namespace M { }
+module M { }
 M = null; // Error
 
 class C { }

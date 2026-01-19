@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDefaultExportWithTempVarName.ts] ////
-
 //// [pi.ts]
 export default 3.14159;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parenthesizedExpressionInternalComments.ts] ////
-
 //// [parenthesizedExpressionInternalComments.ts]
 /*1*/(/*2*/ "foo" /*3*/)/*4*/
 ;

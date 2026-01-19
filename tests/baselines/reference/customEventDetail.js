@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/customEventDetail.ts] ////
-
 //// [customEventDetail.ts]
 var x: CustomEvent;
 

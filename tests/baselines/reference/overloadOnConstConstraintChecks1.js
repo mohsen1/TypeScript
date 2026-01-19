@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstConstraintChecks1.ts] ////
-
 //// [overloadOnConstConstraintChecks1.ts]
 class Base { foo() { } }
 class Derived1 extends Base { bar() { } }

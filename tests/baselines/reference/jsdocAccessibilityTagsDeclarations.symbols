@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocAccessibilityTagsDeclarations.ts] ////
-
-=== jsdocAccessibilityTagDeclarations.js ===
+=== tests/cases/conformance/jsdoc/jsdocAccessibilityTagDeclarations.js ===
 class Protected {
 >Protected : Symbol(Protected, Decl(jsdocAccessibilityTagDeclarations.js, 0, 0))
 
@@ -91,4 +89,3 @@ class C {
 >z : Symbol(z, Decl(jsdocAccessibilityTagDeclarations.js, 34, 54))
     }
 }
-

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/styledComponentsInstantiaionLimitNotReached.ts] ////
-
 //// [styledComponentsInstantiaionLimitNotReached.ts]
 /// <reference path="/.lib/react16.d.ts" />
 import * as React from "react";
@@ -200,4 +198,4 @@ export type StyledComponentPropsWithRef<
 
 //// [styledComponentsInstantiaionLimitNotReached.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

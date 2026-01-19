@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorWithUnderscoreMethod.ts] ////
-
 //// [decoratorWithUnderscoreMethod.ts]
 declare var console : { log(arg: string): void };
 function dec(): Function {
@@ -33,6 +31,6 @@ var A = /** @class */ (function () {
     };
     __decorate([
         dec()
-    ], A.prototype, "__foo", null);
+    ], A.prototype, "__foo");
     return A;
 }());

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceWithConstructSignaturesThatHidesBaseSignature2.ts] ////
-
 //// [interfaceWithConstructSignaturesThatHidesBaseSignature2.ts]
 interface Foo {
     new (): { a: number; b: number };

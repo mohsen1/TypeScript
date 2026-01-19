@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ClassDeclarations/parserClassDeclaration25.ts] ////
-
 //// [parserClassDeclaration25.ts]
 interface IList<T> {
     data(): T;

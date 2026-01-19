@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/importDeclRefereingExternalModuleWithNoResolve.ts] ////
-
 //// [importDeclRefereingExternalModuleWithNoResolve.ts]
 import b = require("externalModule");
 declare module "m1" {
@@ -9,4 +7,4 @@ declare module "m1" {
 
 //// [importDeclRefereingExternalModuleWithNoResolve.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

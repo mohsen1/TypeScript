@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/modKeyword.ts] ////
-
 //// [modKeyword.ts]
 var module:any;
 var foo:any;

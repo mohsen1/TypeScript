@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/instanceOf/narrowingConstrainedTypeVariable.ts] ////
-
 //// [narrowingConstrainedTypeVariable.ts]
 // Repro from #20138
 

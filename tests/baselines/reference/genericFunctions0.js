@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericFunctions0.ts] ////
-
 //// [genericFunctions0.ts]
 function foo<T > (x: T) { return x; }
 

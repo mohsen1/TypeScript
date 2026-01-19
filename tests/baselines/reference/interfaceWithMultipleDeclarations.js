@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceWithMultipleDeclarations.ts] ////
-
 //// [interfaceWithMultipleDeclarations.ts]
 interface I1<V> {
 }

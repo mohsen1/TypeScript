@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Statements/ReturnStatements/parserReturnStatement3.ts] ////
-
 //// [parserReturnStatement3.ts]
 function f() {
    return;

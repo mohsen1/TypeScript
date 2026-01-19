@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsAfterFunctionExpression1.ts] ////
-
 //// [commentsAfterFunctionExpression1.ts]
 var v = {
     f: a => 0 /*t1*/,

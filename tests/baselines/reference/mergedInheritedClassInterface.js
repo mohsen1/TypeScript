@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/mergedInheritedClassInterface.ts] ////
-
 //// [mergedInheritedClassInterface.ts]
 interface BaseInterface {
     required: number;

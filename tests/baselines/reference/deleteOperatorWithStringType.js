@@ -1,8 +1,6 @@
-//// [tests/cases/conformance/expressions/unaryOperators/deleteOperator/deleteOperatorWithStringType.ts] ////
-
 //// [deleteOperatorWithStringType.ts]
 // delete  operator on string type
-declare var STRING: string;
+var STRING: string;
 var STRING1: string[] = ["", "abc"];
 
 function foo(): string { return "abc"; }
@@ -11,7 +9,7 @@ class A {
     public a: string;
     static foo() { return ""; }
 }
-namespace M {
+module M {
     export var n: string;
 }
 
@@ -47,6 +45,8 @@ delete foo();
 delete objA.a,M.n;
 
 //// [deleteOperatorWithStringType.js]
+// delete  operator on string type
+var STRING;
 var STRING1 = ["", "abc"];
 function foo() { return "abc"; }
 var A = /** @class */ (function () {

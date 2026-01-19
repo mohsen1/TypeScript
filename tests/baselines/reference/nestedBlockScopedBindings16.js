@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedBlockScopedBindings16.ts] ////
-
 //// [nestedBlockScopedBindings16.ts]
 var x;
 for (; false;) {

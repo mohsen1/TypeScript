@@ -1,8 +1,7 @@
-//// [tests/cases/compiler/propertyAccess3.ts] ////
-
 //// [propertyAccess3.ts]
-declare var foo: boolean;
+var foo: boolean;
 foo.toBAZ();
 
 //// [propertyAccess3.js]
+var foo;
 foo.toBAZ();

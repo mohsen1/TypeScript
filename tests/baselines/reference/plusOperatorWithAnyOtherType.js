@@ -1,27 +1,25 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithAnyOtherType.ts] ////
-
 //// [plusOperatorWithAnyOtherType.ts]
 // + operator on any type
 
-declare var ANY: any;
-declare var ANY1: any;
+var ANY: any;
+var ANY1;
 var ANY2: any[] = ["", ""];
-declare var obj: () => {}
+var obj: () => {}
 var obj1 = { x: (s: string) => { }, y: (s1) => { }};
 
 function foo(): any {
-    var a = undefined;
+    var a;
     return a;
 }
 class A {
-    public a!: any;
+    public a: any;
     static foo() {
-        var a: any = undefined;
+        var a;
         return a;
     }
 }
-namespace M {
-    export var n: any = undefined;
+module M {
+    export var n: any;
 }
 var objA = new A();
 
@@ -60,24 +58,26 @@ var ResultIsNumber19 = +(undefined + undefined);
 
 //// [plusOperatorWithAnyOtherType.js]
 // + operator on any type
+var ANY;
+var ANY1;
 var ANY2 = ["", ""];
+var obj;
 var obj1 = { x: function (s) { }, y: function (s1) { } };
 function foo() {
-    var a = undefined;
+    var a;
     return a;
 }
 var A = /** @class */ (function () {
     function A() {
     }
     A.foo = function () {
-        var a = undefined;
+        var a;
         return a;
     };
     return A;
 }());
 var M;
 (function (M) {
-    M.n = undefined;
 })(M || (M = {}));
 var objA = new A();
 // any other type var

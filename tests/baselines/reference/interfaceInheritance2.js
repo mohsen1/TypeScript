@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceInheritance2.ts] ////
-
 //// [interfaceInheritance2.ts]
 interface I6 {
  ():void;

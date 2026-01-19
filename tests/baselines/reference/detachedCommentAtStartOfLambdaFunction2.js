@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/detachedCommentAtStartOfLambdaFunction2.ts] ////
-
 //// [detachedCommentAtStartOfLambdaFunction2.ts]
 class TestFile {
     name: string;

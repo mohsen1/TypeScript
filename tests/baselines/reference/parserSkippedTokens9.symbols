@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/parser/ecmascript5/SkippedTokens/parserSkippedTokens9.ts] ////
-
-=== parserSkippedTokens9.ts ===
-
+=== tests/cases/conformance/parser/ecmascript5/SkippedTokens/parserSkippedTokens9.ts ===
 ; // existing trivia
-/*foo*/ \ /*bar*/
+No type information for this code./*foo*/ \ /*bar*/
+No type information for this code.

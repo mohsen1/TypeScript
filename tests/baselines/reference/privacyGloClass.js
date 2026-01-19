@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privacyGloClass.ts] ////
-
 //// [privacyGloClass.ts]
-namespace m1 {
+module m1 {
     export interface m1_i_public {
     }
 

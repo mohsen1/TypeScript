@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/paramTagBracketsAddOptionalUndefined.ts] ////
-
-=== a.js ===
+=== tests/cases/conformance/jsdoc/a.js ===
 /**
  * @param {number} [p]
  * @param {number=} q

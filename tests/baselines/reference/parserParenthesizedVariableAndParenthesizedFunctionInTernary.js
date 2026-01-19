@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserParenthesizedVariableAndParenthesizedFunctionInTernary.ts] ////
-
 //// [parserParenthesizedVariableAndParenthesizedFunctionInTernary.ts]
 let a: any;
 const c = true ? (a) : (function() {});

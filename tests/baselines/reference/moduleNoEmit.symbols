@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleNoEmit.ts] ////
-
-=== moduleNoEmit.ts ===
-namespace Foo {
+=== tests/cases/compiler/moduleNoEmit.ts ===
+module Foo {
 >Foo : Symbol(Foo, Decl(moduleNoEmit.ts, 0, 0))
 
 	1+1;

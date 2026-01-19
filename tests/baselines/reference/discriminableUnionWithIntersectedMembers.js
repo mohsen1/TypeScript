@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminableUnionWithIntersectedMembers.ts] ////
-
 //// [discriminableUnionWithIntersectedMembers.ts]
 // regression test for https://github.com/microsoft/TypeScript/issues/33243
 type X = 

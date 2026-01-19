@@ -1,29 +1,19 @@
-//// [tests/cases/compiler/classOrderBug.ts] ////
-
-=== classOrderBug.ts ===
+=== tests/cases/compiler/classOrderBug.ts ===
 class bar {
 >bar : bar
->    : ^^^
 
     public baz: foo;
 >baz : foo
->    : ^^^
 
     constructor() {
 
         this.baz = new foo();
 >this.baz = new foo() : foo
->                     : ^^^
 >this.baz : foo
->         : ^^^
 >this : this
->     : ^^^^
 >baz : foo
->    : ^^^
 >new foo() : foo
->          : ^^^
 >foo : typeof foo
->    : ^^^^^^^^^^
 
     }
 
@@ -31,13 +21,10 @@ class bar {
 
 class baz {}
 >baz : baz
->    : ^^^
 
 class foo extends baz {}
 >foo : foo
->    : ^^^
 >baz : baz
->    : ^^^
 
 
 

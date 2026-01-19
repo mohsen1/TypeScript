@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/propertyOverridesAccessors3.ts] ////
-
 //// [propertyOverridesAccessors3.ts]
 class Animal {
     _sound = 'rustling noise in the bushes'

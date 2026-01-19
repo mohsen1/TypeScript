@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/readonlyReadonly.ts] ////
-
 //// [readonlyReadonly.ts]
 class C {
     readonly readonly x: number;

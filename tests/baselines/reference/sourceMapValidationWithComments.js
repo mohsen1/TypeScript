@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationWithComments.ts] ////
-
 //// [sourceMapValidationWithComments.ts]
 class DebugClass {
 

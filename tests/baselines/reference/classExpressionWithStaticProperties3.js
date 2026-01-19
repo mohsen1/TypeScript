@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExpressionWithStaticProperties3.ts] ////
-
 //// [classExpressionWithStaticProperties3.ts]
 declare var console: any;
 const arr: {y(): number}[] = [];

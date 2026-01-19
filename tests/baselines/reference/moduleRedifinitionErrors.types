@@ -1,10 +1,7 @@
-//// [tests/cases/compiler/moduleRedifinitionErrors.ts] ////
-
-=== moduleRedifinitionErrors.ts ===
+=== tests/cases/compiler/moduleRedifinitionErrors.ts ===
 class A {
 >A : A
->  : ^
 }
-namespace A {
+module A {
 }
 

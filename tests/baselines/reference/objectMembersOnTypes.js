@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectMembersOnTypes.ts] ////
-
 //// [objectMembersOnTypes.ts]
 interface I {}
 class AAA implements I { }

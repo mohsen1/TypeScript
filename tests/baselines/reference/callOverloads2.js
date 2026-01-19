@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/callOverloads2.ts] ////
-
 //// [callOverloads2.ts]
 class Foo { // error
     bar1() { /*WScript.Echo("bar1");*/ }

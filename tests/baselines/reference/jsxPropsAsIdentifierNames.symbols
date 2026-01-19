@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxPropsAsIdentifierNames.tsx] ////
-
-=== index.tsx ===
+=== tests/cases/compiler/index.tsx ===
 declare namespace JSX {
 >JSX : Symbol(JSX, Decl(index.tsx, 0, 0))
 

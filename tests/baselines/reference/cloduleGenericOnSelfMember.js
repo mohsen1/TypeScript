@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/cloduleGenericOnSelfMember.ts] ////
-
 //// [cloduleGenericOnSelfMember.ts]
 class ServiceBase<T> {
     field: T;

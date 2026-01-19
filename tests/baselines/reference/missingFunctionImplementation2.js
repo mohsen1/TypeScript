@@ -11,7 +11,7 @@ export function f(a?, b?);
 
 //// [missingFunctionImplementation2_a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [missingFunctionImplementation2_b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

@@ -1,16 +1,13 @@
-//// [tests/cases/compiler/moduleAugmentationDoesInterfaceMergeOfReexport.ts] ////
-
-=== file.ts ===
+=== tests/cases/compiler/file.ts ===
 export interface Foo {
 >Foo : Symbol(Foo, Decl(file.ts, 0, 0), Decl(augment.ts, 2, 29))
 
     x: number;
 >x : Symbol(Foo.x, Decl(file.ts, 0, 22))
 }
-=== reexport.ts ===
-
+=== tests/cases/compiler/reexport.ts ===
 export * from "./file";
-=== augment.ts ===
+No type information for this code.=== tests/cases/compiler/augment.ts ===
 import * as ns from "./reexport";
 >ns : Symbol(ns, Decl(augment.ts, 0, 6))
 

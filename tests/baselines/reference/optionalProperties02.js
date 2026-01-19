@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/comparable/optionalProperties02.ts] ////
-
 //// [optionalProperties02.ts]
 interface Foo {
     a?: string;

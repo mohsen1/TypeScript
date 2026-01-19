@@ -1,7 +1,7 @@
 //// [tests/cases/conformance/jsx/jsxParsingError3.tsx] ////
 
 //// [file.tsx]
-declare namespace JSX {
+declare module JSX {
   interface Element {}
   interface IntrinsicElements {
     [s: string]: any;

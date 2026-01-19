@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/structuralTypeInDeclareFileForModule.ts] ////
-
 //// [structuralTypeInDeclareFileForModule.ts]
-namespace M { export var x; }
+module M { export var x; }
 var m = M;
 
 //// [structuralTypeInDeclareFileForModule.js]
@@ -12,7 +10,7 @@ var m = M;
 
 
 //// [structuralTypeInDeclareFileForModule.d.ts]
-declare namespace M {
+declare module M {
     var x: any;
 }
 declare var m: typeof M;

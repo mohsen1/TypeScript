@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/modularizeLibrary_ErrorFromUsingES6ArrayWithOnlyES6ArrayLib.ts] ////
-
 //// [modularizeLibrary_ErrorFromUsingES6ArrayWithOnlyES6ArrayLib.ts]
 // Error missing basic JavaScript objects
 function f(x: number, y: number, z: number) {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentToObjectAndFunction.ts] ////
-
 //// [assignmentToObjectAndFunction.ts]
 var errObj: Object = { toString: 0 }; // Error, incompatible toString
 var goodObj: Object = {
@@ -11,21 +9,21 @@ var goodObj: Object = {
 var errFun: Function = {}; // Error for no call signature
 
 function foo() { }
-namespace foo {
+module foo {
     export var boom = 0;
 }
 
 var goodFundule: Function = foo; // ok
 
 function bar() { }
-namespace bar {
+module bar {
     export function apply(thisArg: string, argArray?: string) { }
 }
 
 var goodFundule2: Function = bar; // ok
 
 function bad() { }
-namespace bad {
+module bad {
     export var apply = 0;
 }
 

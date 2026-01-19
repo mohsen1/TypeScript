@@ -1,13 +1,9 @@
-//// [tests/cases/compiler/jsFileCompilationWithDeclarationEmitPathSameAsInput.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class c {
 >c : c
->  : ^
 }
 
-=== a.d.ts ===
+=== tests/cases/compiler/a.d.ts ===
 declare function isC(): boolean;
 >isC : () => boolean
->    : ^^^^^^       
 

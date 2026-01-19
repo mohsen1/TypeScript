@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticAndMemberFunctions.ts] ////
-
 //// [staticAndMemberFunctions.ts]
 class T {
     static x() { }

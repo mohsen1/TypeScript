@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mixedStaticAndInstanceClassMembers.ts] ////
-
 //// [mixedStaticAndInstanceClassMembers.ts]
 class A {
     f() {}

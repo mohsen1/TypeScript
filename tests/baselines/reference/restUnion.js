@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restUnion.ts] ////
-
 //// [restUnion.ts]
 var union: { a: number, c: boolean } | { a: string, b: string };
 

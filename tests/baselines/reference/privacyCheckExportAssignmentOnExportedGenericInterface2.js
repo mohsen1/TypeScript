@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privacyCheckExportAssignmentOnExportedGenericInterface2.ts] ////
-
 //// [privacyCheckExportAssignmentOnExportedGenericInterface2.ts]
 export = Foo;
 
@@ -10,7 +8,7 @@ function Foo<T>(array: T[]): Foo<T> {
     return undefined;
 }
 
-namespace Foo {
+module Foo {
     export var x = "hello";
 }
 
@@ -33,6 +31,6 @@ export = Foo;
 interface Foo<T> {
 }
 declare function Foo<T>(array: T[]): Foo<T>;
-declare namespace Foo {
+declare module Foo {
     var x: string;
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/logicalOrOperator/logicalOrOperatorWithTypeParameters.ts] ////
-
 //// [logicalOrOperatorWithTypeParameters.ts]
 function fn1<T, U>(t: T, u: U) {
     var r1 = t || t;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/scopeCheckClassProperty.ts] ////
-
 //// [scopeCheckClassProperty.ts]
 class C {
   constructor() {

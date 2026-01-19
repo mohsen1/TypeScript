@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/arrowFunction/emitArrowFunctionWhenUsingArguments01.ts] ////
-
 //// [emitArrowFunctionWhenUsingArguments01.ts]
 var a = () => {
     var arg = arguments[0];  // error

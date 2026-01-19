@@ -1,19 +1,17 @@
-//// [tests/cases/compiler/moduleVariables.ts] ////
-
 //// [moduleVariables.ts]
 declare var console: any;
  
 var x = 1;
-namespace M {
+module M {
     export var x = 2;
     console.log(x); // 2
 }
  
-namespace M {
+module M {
     console.log(x); // 2
 }
  
-namespace M {
+module M {
     var x = 3;
     console.log(x); // 3
 }

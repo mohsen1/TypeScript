@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericConstructSignatureInInterface.ts] ////
-
 //// [genericConstructSignatureInInterface.ts]
 interface C {
     new <T>(x: T);

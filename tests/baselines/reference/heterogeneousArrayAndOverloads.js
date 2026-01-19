@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/heterogeneousArrayAndOverloads.ts] ////
-
 //// [heterogeneousArrayAndOverloads.ts]
 class arrTest {
     test(arg1: number[]);

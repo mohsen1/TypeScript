@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/deeplyDependentLargeArrayMutation.ts] ////
-
-=== foo.js ===
+=== tests/cases/compiler/foo.js ===
 // repro from #26031
 function build() {
 >build : Symbol(build, Decl(foo.js, 0, 0))

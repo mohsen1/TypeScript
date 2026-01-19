@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/objectSpreadComputedProperty.ts] ////
-
 //// [objectSpreadComputedProperty.ts]
 // fixes #12200
 function f() {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/staticIndexSignature/staticIndexSignature5.ts] ////
-
 //// [staticIndexSignature5.ts]
 class B {
     static readonly [s: string]: number;

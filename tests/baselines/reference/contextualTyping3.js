@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTyping3.ts] ////
-
 //// [contextualTyping3.ts]
 class foo { public bar:{id:number;} = {id:5}; }
 

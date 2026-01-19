@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/missingTypeArguments3.ts] ////
-
 //// [missingTypeArguments3.ts]
-declare namespace linq {
+declare module linq {
 
     interface Enumerable<T> {
         OrderByDescending(keySelector?: string): OrderedEnumerable<T>;

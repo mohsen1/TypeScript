@@ -1,7 +1,7 @@
-switchStatementsWithMultipleDefaults.ts(25,13): error TS1260: Keywords cannot contain escape characters.
+tests/cases/compiler/switchStatementsWithMultipleDefaults.ts(25,13): error TS1260: Keywords cannot contain escape characters.
 
 
-==== switchStatementsWithMultipleDefaults.ts (1 errors) ====
+==== tests/cases/compiler/switchStatementsWithMultipleDefaults.ts (1 errors) ====
     var x = 10;
     
     switch (x) {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/never/neverInference.ts] ////
-
 //// [neverInference.ts]
 declare function f1<T>(x: T[]): T;
 

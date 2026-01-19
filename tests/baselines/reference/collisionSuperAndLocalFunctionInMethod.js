@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndLocalFunctionInMethod.ts] ////
-
 //// [collisionSuperAndLocalFunctionInMethod.ts]
 function _super() { // No error
 } 

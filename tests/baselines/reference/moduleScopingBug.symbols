@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleScopingBug.ts] ////
-
-=== moduleScopingBug.ts ===
-namespace M
+=== tests/cases/compiler/moduleScopingBug.ts ===
+module M
 >M : Symbol(M, Decl(moduleScopingBug.ts, 0, 0))
 
 {
@@ -29,7 +27,7 @@ namespace M
 
     }
 
-    namespace X {
+    module X {
 >X : Symbol(X, Decl(moduleScopingBug.ts, 18, 5))
 
         var inner = outer;   // Error: outer not visible

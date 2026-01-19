@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxLocalNamespaceIndexSignatureNoCrash.tsx] ////
-
 //// [index.tsx]
 export class X {
     static jsx() {
@@ -21,7 +19,7 @@ function A() {
 
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.X = void 0;
 var X = /** @class */ (function () {
     function X() {

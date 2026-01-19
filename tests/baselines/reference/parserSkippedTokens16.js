@@ -1,10 +1,8 @@
-//// [tests/cases/conformance/parser/ecmascript5/SkippedTokens/parserSkippedTokens16.ts] ////
-
 //// [parserSkippedTokens16.ts]
 foo(): Bar { }
 function Foo      () ¬   { }
 4+:5
-namespace M {
+module M {
 function a(
     : T) { }
 }

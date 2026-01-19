@@ -1,10 +1,6 @@
-//// [tests/cases/compiler/jsdocUnexpectedCharacter.ts] ////
-
 === /a.js ===
 /** @x # */
 var UI = {};
 >UI : {}
->   : ^^
 >{} : {}
->   : ^^
 

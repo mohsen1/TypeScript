@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/primitiveTypeAsmoduleName.ts] ////
-
-=== primitiveTypeAsmoduleName.ts ===
-
-namespace string {}
+=== tests/cases/compiler/primitiveTypeAsmoduleName.ts ===
+module string {}
+No type information for this code.

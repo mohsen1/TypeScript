@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/mapped/recursiveMappedTypes.ts] ////
-
-=== recursiveMappedTypes.ts ===
+=== tests/cases/conformance/types/mapped/recursiveMappedTypes.ts ===
 // Recursive mapped types simply appear empty
 
 type Recurse = {

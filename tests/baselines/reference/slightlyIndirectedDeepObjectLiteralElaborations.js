@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/slightlyIndirectedDeepObjectLiteralElaborations.ts] ////
-
 //// [slightlyIndirectedDeepObjectLiteralElaborations.ts]
 interface Foo {
     a: {

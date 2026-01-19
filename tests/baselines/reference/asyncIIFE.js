@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asyncIIFE.ts] ////
-
 //// [asyncIIFE.ts]
 function f1() {
     (async () => {

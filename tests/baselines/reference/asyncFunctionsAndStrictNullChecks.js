@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asyncFunctionsAndStrictNullChecks.ts] ////
-
 //// [asyncFunctionsAndStrictNullChecks.ts]
 declare namespace Windows.Foundation {
     interface IPromise<TResult> {

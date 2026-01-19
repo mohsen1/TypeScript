@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/bitwiseNotOperator/bitwiseNotOperatorWithNumberType.ts] ////
-
 //// [bitwiseNotOperatorWithNumberType.ts]
 // ~ operator on number type
 var NUMBER: number;
@@ -11,7 +9,7 @@ class A {
     public a: number;
     static foo() { return 1; }
 }
-namespace M {
+module M {
     export var n: number;
 }
 

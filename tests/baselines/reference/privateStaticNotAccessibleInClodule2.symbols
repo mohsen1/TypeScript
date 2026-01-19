@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/accessibility/privateStaticNotAccessibleInClodule2.ts] ////
-
-=== privateStaticNotAccessibleInClodule2.ts ===
+=== tests/cases/conformance/classes/members/accessibility/privateStaticNotAccessibleInClodule2.ts ===
 // Any attempt to access a private property member outside the class body that contains its declaration results in a compile-time error.
 
 class C {
@@ -21,7 +19,7 @@ class D extends C {
 >baz : Symbol(D.baz, Decl(privateStaticNotAccessibleInClodule2.ts, 7, 19))
 }
 
-namespace D {
+module D {
 >D : Symbol(D, Decl(privateStaticNotAccessibleInClodule2.ts, 5, 1), Decl(privateStaticNotAccessibleInClodule2.ts, 9, 1))
 
     export var y = D.bar; // error

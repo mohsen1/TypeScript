@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/narrowingIntersection.ts] ////
-
 //// [narrowingIntersection.ts]
 // Somehow this being an intersection matters.
 type FooAndBaz = { foo: unknown } & { baz: unknown };

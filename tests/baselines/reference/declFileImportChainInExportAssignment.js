@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/declFileImportChainInExportAssignment.ts] ////
-
 //// [declFileImportChainInExportAssignment.ts]
-namespace m {
-    export namespace c {
+module m {
+    export module c {
         export class c {
         }
     }
@@ -31,8 +29,8 @@ module.exports = b;
 
 
 //// [declFileImportChainInExportAssignment.d.ts]
-declare namespace m {
-    namespace c {
+declare module m {
+    module c {
         class c {
         }
     }

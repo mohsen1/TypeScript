@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/controlFlow/controlFlowAssignmentPatternOrder.ts] ////
-
-=== controlFlowAssignmentPatternOrder.ts ===
+=== tests/cases/conformance/controlFlow/controlFlowAssignmentPatternOrder.ts ===
 // https://github.com/microsoft/TypeScript/pull/41094#issuecomment-716044363
 declare function f(): void;
 >f : Symbol(f, Decl(controlFlowAssignmentPatternOrder.ts, 0, 0))

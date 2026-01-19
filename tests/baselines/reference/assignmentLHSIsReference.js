@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/assignmentOperator/assignmentLHSIsReference.ts] ////
-
 //// [assignmentLHSIsReference.ts]
 var value: any;
 

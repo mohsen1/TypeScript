@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxFactoryQualifiedNameWithEs5.ts] ////
-
 //// [index.tsx]
 import "./jsx";
 

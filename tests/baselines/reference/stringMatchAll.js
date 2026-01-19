@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringMatchAll.ts] ////
-
 //// [stringMatchAll.ts]
 const matches = "matchAll".matchAll(/\w/g);
 const array = [...matches];

@@ -1,20 +1,18 @@
-//// [tests/cases/compiler/mixedExports.ts] ////
-
 //// [mixedExports.ts]
-declare namespace M {
+declare module M {
      function foo();
      export function foo();
      function foo();
 }
 
-declare namespace M1 {
+declare module M1 {
      export interface Foo {}
      interface Foo {}
 }
 
-namespace A {
+module A {
      interface X {x}
-     export namespace X {}
+     export module X {}
      interface X {y}
 }
 

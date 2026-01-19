@@ -1,18 +1,16 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithStringType.ts] ////
-
 //// [plusOperatorWithStringType.ts]
 // + operator on string type
-declare var STRING: string;
+var STRING: string;
 var STRING1: string[] = ["", "abc"];
 
 function foo(): string { return "abc"; }
 
 class A {
-    public a!: string;
+    public a: string;
     static foo() { return ""; }
 }
-namespace M {
-    export var n: string = "";
+module M {
+    export var n: string;
 }
 
 var objA = new A();
@@ -43,6 +41,8 @@ var ResultIsNumber12 = +STRING.charAt(0);
 +objA.a,M.n;
 
 //// [plusOperatorWithStringType.js]
+// + operator on string type
+var STRING;
 var STRING1 = ["", "abc"];
 function foo() { return "abc"; }
 var A = /** @class */ (function () {
@@ -53,7 +53,6 @@ var A = /** @class */ (function () {
 }());
 var M;
 (function (M) {
-    M.n = "";
 })(M || (M = {}));
 var objA = new A();
 // string type var

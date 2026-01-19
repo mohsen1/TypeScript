@@ -1,18 +1,16 @@
-//// [tests/cases/conformance/internalModules/codeGeneration/nameCollision.ts] ////
-
 //// [nameCollision.ts]
-namespace A {
+module A {
     // these 2 statements force an underscore before the 'A' 
     // in the generated function call.
     var A = 12;
     var _A = '';
 }
 
-namespace B {
+module B {
     var A = 12;
 }
 
-namespace B {
+module B {
     // re-opened module with colliding name
     // this should add an underscore.
     class B {
@@ -20,11 +18,11 @@ namespace B {
     }
 }
 
-namespace X {
+module X {
     var X = 13;
-    export namespace Y {
+    export module Y {
         var Y = 13;
-        export namespace Z {
+        export module Z {
             var X = 12;
             var Y = 12;
             var Z = 12;
@@ -32,7 +30,7 @@ namespace X {
     }
 }
 
-namespace Y.Y {
+module Y.Y {
     export enum Y {
         Red, Blue
     }
@@ -40,7 +38,7 @@ namespace Y.Y {
 
 // no collision, since interface doesn't
 // generate code.
-namespace D {
+module D {
     export interface D {
         id: number;
     }

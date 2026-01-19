@@ -1,14 +1,10 @@
-//// [tests/cases/compiler/jsFileCompilationWithOut.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class c {
 >c : c
->  : ^
 }
 
-=== b.js ===
+=== tests/cases/compiler/b.js ===
 function foo() {
 >foo : () => void
->    : ^^^^^^^^^^
 }
 

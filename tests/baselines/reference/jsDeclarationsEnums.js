@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsEnums.ts] ////
-
 //// [index.js]
 // Pretty much all of this should be an error, (since enums are forbidden in js),
 // but we should be able to synthesize declarations from the symbols regardless
@@ -72,40 +70,44 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.K = exports.I = exports.H = exports.G = exports.F = exports.FF = exports.EE = exports.E = exports.D = exports.C = exports.B = exports.A = void 0;
 var A;
 (function (A) {
-})(A || (exports.A = A = {}));
+})(A = exports.A || (exports.A = {}));
 var B;
 (function (B) {
     B[B["Member"] = 0] = "Member";
-})(B || (exports.B = B = {}));
+})(B = exports.B || (exports.B = {}));
 var C;
 (function (C) {
-})(C || (exports.C = C = {}));
+})(C || (C = {}));
+exports.C = C;
 var DD;
 (function (DD) {
-})(DD || (exports.D = DD = {}));
+})(DD || (DD = {}));
+exports.D = DD;
 var E;
 (function (E) {
-})(E || (exports.EE = exports.E = E = {}));
+})(E = exports.E || (exports.E = {}));
+exports.EE = E;
 var F;
 (function (F) {
-})(F || (exports.F = exports.FF = F = {}));
+})(F = exports.F || (exports.F = {}));
+exports.FF = F;
 var G;
 (function (G) {
     G[G["A"] = 1] = "A";
     G[G["B"] = 2] = "B";
     G[G["C"] = 3] = "C";
-})(G || (exports.G = G = {}));
+})(G = exports.G || (exports.G = {}));
 var H;
 (function (H) {
     H["A"] = "a";
     H["B"] = "b";
-})(H || (exports.H = H = {}));
+})(H = exports.H || (exports.H = {}));
 var I;
 (function (I) {
     I["A"] = "a";
     I[I["B"] = 0] = "B";
     I[I["C"] = 1] = "C";
-})(I || (exports.I = I = {}));
+})(I = exports.I || (exports.I = {}));
 var K;
 (function (K) {
     K[K["None"] = 0] = "None";
@@ -113,7 +115,7 @@ var K;
     K[K["B"] = 2] = "B";
     K[K["C"] = 4] = "C";
     K[K["Mask"] = 7] = "Mask";
-})(K || (exports.K = K = {}));
+})(K = exports.K || (exports.K = {}));
 
 
 //// [index.d.ts]

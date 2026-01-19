@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameNestedClassMethodShadowing.ts] ////
-
 //// [privateNameNestedClassMethodShadowing.ts]
 class Base {
     #x() { };
@@ -25,7 +23,6 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 };
 var _Base_instances, _Base_x;
 class Base {
-    ;
     constructor() {
         var _Derived_instances, _Derived_x;
         _Base_instances.add(this);
@@ -43,5 +40,6 @@ class Base {
         }
         _Derived_instances = new WeakSet(), _Derived_x = function _Derived_x() { };
     }
+    ;
 }
 _Base_instances = new WeakSet(), _Base_x = function _Base_x() { };

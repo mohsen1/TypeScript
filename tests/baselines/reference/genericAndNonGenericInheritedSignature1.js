@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericAndNonGenericInheritedSignature1.ts] ////
-
 //// [genericAndNonGenericInheritedSignature1.ts]
 interface Foo {
     f(x: any): any;

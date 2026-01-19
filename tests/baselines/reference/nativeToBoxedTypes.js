@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nativeToBoxedTypes.ts] ////
-
 //// [nativeToBoxedTypes.ts]
 var N = new Number();
 var n = 100;

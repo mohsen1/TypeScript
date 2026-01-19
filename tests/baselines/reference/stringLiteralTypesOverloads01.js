@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesOverloads01.ts] ////
-
 //// [stringLiteralTypesOverloads01.ts]
 type PrimitiveName = 'string' | 'number' | 'boolean';
 
@@ -94,7 +92,7 @@ var Consts2;
 
 
 //// [stringLiteralTypesOverloads01.d.ts]
-type PrimitiveName = 'string' | 'number' | 'boolean';
+declare type PrimitiveName = 'string' | 'number' | 'boolean';
 declare function getFalsyPrimitive(x: "string"): string;
 declare function getFalsyPrimitive(x: "number"): number;
 declare function getFalsyPrimitive(x: "boolean"): boolean;

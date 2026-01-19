@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/decorators/class/decoratorOnClass7.es6.ts] ////
-
 //// [decoratorOnClass7.es6.ts]
 declare function dec<T>(target: T): T;
 

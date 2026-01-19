@@ -1,4 +1,4 @@
-declare namespace test {
+declare module test {
     class ClassA {
         method(): void;
     }

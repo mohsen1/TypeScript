@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameComputedPropertyName2.ts] ////
-
 //// [privateNameComputedPropertyName2.ts]
 let getX: (a: A) => number;
 
@@ -23,6 +21,6 @@ class A {
     constructor() {
         _A_x.set(this, 100);
     }
-    [(_A_x = new WeakMap(), getX = (a) => __classPrivateFieldGet(a, _A_x, "f"), "_")]() { }
+    [(_A_x = new WeakMap(), (getX = (a) => __classPrivateFieldGet(a, _A_x, "f"), "_"))]() { }
 }
 console.log(getX(new A));

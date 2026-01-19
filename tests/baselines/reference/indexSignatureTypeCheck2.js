@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureTypeCheck2.ts] ////
-
 //// [indexSignatureTypeCheck2.ts]
 class IPropertySet {
     [index: string]: any

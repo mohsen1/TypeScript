@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/contextualTypes/jsxAttributes/contextuallyTypedStringLiteralsInJsxAttributes02.tsx] ////
-
 //// [file.tsx]
 import React = require('react')
 
@@ -40,24 +38,26 @@ const d1 = <NoOverload1 {...{goTo:"home"}} extra  />;  // goTo has type "home" |
 
 
 //// [file.jsx]
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MainButton = MainButton;
-exports.NoOverload = NoOverload;
-exports.NoOverload1 = NoOverload1;
-var React = require("react");
-function MainButton(props) {
-    var linkProps = props;
-    if (linkProps.goTo) {
-        return this._buildMainLink(props);
+define(["require", "exports", "react"], function (require, exports, React) {
+    "use strict";
+    exports.__esModule = true;
+    exports.NoOverload1 = exports.NoOverload = exports.MainButton = void 0;
+    function MainButton(props) {
+        var linkProps = props;
+        if (linkProps.goTo) {
+            return this._buildMainLink(props);
+        }
+        return this._buildMainButton(props);
     }
-    return this._buildMainButton(props);
-}
-var b0 = <MainButton {...{ onClick: function (k) { console.log(k); } }} extra/>; // k has type "left" | "right"
-var b2 = <MainButton onClick={function (k) { console.log(k); }} extra/>; // k has type "left" | "right"
-var b3 = <MainButton {...{ goTo: "home" }} extra/>; // goTo has type"home" | "contact"
-var b4 = <MainButton goTo="home" extra/>; // goTo has type "home" | "contact"
-function NoOverload(buttonProps) { return undefined; }
-var c1 = <NoOverload {...{ onClick: function (k) { console.log(k); } }} extra/>; // k has type any
-function NoOverload1(linkProps) { return undefined; }
-var d1 = <NoOverload1 {...{ goTo: "home" }} extra/>; // goTo has type "home" | "contact"
+    exports.MainButton = MainButton;
+    var b0 = <MainButton {...{ onClick: function (k) { console.log(k); } }} extra/>; // k has type "left" | "right"
+    var b2 = <MainButton onClick={function (k) { console.log(k); }} extra/>; // k has type "left" | "right"
+    var b3 = <MainButton {...{ goTo: "home" }} extra/>; // goTo has type"home" | "contact"
+    var b4 = <MainButton goTo="home" extra/>; // goTo has type "home" | "contact"
+    function NoOverload(buttonProps) { return undefined; }
+    exports.NoOverload = NoOverload;
+    var c1 = <NoOverload {...{ onClick: function (k) { console.log(k); } }} extra/>; // k has type any
+    function NoOverload1(linkProps) { return undefined; }
+    exports.NoOverload1 = NoOverload1;
+    var d1 = <NoOverload1 {...{ goTo: "home" }} extra/>; // goTo has type "home" | "contact"
+});

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emptyArgumentsListComment.ts] ////
-
-=== emptyArgumentsListComment.ts ===
+=== tests/cases/compiler/emptyArgumentsListComment.ts ===
 declare var a;
 >a : any
 

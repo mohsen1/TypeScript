@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/classDeclaration/emitClassDeclarationOverloadInES6.ts] ////
-
 //// [emitClassDeclarationOverloadInES6.ts]
 class C {
     constructor(y: any)

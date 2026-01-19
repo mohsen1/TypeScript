@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/moduleRedifinitionErrors.ts] ////
-
 //// [moduleRedifinitionErrors.ts]
 class A {
 }
-namespace A {
+module A {
 }
 
 

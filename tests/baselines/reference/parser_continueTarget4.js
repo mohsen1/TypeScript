@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Statements/ContinueStatements/parser_continueTarget4.ts] ////
-
 //// [parser_continueTarget4.ts]
 target1:
 target2:

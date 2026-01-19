@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/parser/ecmascript5/ModuleDeclarations/parserModuleDeclaration7.ts] ////
-
-=== parserModuleDeclaration7.ts ===
-
-namespace number.a {
-}
+=== tests/cases/conformance/parser/ecmascript5/ModuleDeclarations/parserModuleDeclaration7.ts ===
+module number.a {
+No type information for this code.}
+No type information for this code.

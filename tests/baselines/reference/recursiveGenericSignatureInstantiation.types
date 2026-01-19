@@ -1,18 +1,11 @@
-//// [tests/cases/compiler/recursiveGenericSignatureInstantiation.ts] ////
-
-=== recursiveGenericSignatureInstantiation.ts ===
+=== tests/cases/compiler/recursiveGenericSignatureInstantiation.ts ===
 function f6<T>(x: T) {
->f6 : <T>(x: T) => never
->   : ^ ^^ ^^ ^^^^^^^^^^
+>f6 : <T>(x: T) => any
 >x : T
->  : ^
 
     return f6(x);
->f6(x) : never
->      : ^^^^^
->f6 : <T>(x: T) => never
->   : ^ ^^ ^^ ^^^^^^^^^^
+>f6(x) : any
+>f6 : <T>(x: T) => any
 >x : T
->  : ^
 }
 

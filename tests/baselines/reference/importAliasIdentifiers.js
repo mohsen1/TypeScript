@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/importDeclarations/importAliasIdentifiers.ts] ////
-
 //// [importAliasIdentifiers.ts]
-namespace moduleA {
+module moduleA {
     export class Point {
         constructor(public x: number, public y: number) { }
     }
@@ -17,7 +15,7 @@ class clodule {
     name: string;
 }
 
-namespace clodule {
+module clodule {
     export interface Point {
         x: number; y: number;
     }
@@ -35,7 +33,7 @@ function fundule() {
     return { x: 0, y: 0 };
 }
 
-namespace fundule {
+module fundule {
     export interface Point {
         x: number; y: number;
     }

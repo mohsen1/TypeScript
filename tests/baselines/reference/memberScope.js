@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/memberScope.ts] ////
-
 //// [memberScope.ts]
-namespace Salt {
+module Salt {
   export class Pepper {}
-  export namespace Basil { }
+  export module Basil { }
   var z = Basil.Pepper;
 }
 

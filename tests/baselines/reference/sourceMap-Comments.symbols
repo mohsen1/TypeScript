@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/sourceMap-Comments.ts] ////
-
-=== sourceMap-Comments.ts ===
-namespace sas.tools {
+=== tests/cases/compiler/sourceMap-Comments.ts ===
+module sas.tools {
 >sas : Symbol(sas, Decl(sourceMap-Comments.ts, 0, 0))
->tools : Symbol(tools, Decl(sourceMap-Comments.ts, 0, 14))
+>tools : Symbol(tools, Decl(sourceMap-Comments.ts, 0, 11))
 
     export class Test {
->Test : Symbol(Test, Decl(sourceMap-Comments.ts, 0, 21))
+>Test : Symbol(Test, Decl(sourceMap-Comments.ts, 0, 18))
 
         public doX(): void {
 >doX : Symbol(Test.doX, Decl(sourceMap-Comments.ts, 1, 23))

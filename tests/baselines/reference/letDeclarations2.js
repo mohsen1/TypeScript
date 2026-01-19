@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/letDeclarations2.ts] ////
-
 //// [letDeclarations2.ts]
-namespace M {
+module M {
     let l1 = "s";
     export let l2 = 0;
 }
@@ -15,6 +13,6 @@ var M;
 
 
 //// [letDeclarations2.d.ts]
-declare namespace M {
+declare module M {
     let l2: number;
 }

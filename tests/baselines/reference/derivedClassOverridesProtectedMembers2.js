@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassOverridesProtectedMembers2.ts] ////
-
 //// [derivedClassOverridesProtectedMembers2.ts]
 var x: { foo: string; }
 var y: { foo: string; bar: string; }

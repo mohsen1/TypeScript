@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nonContextuallyTypedLogicalOr.ts] ////
-
 //// [nonContextuallyTypedLogicalOr.ts]
 interface Contextual {
     dummy;

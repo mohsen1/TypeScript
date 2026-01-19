@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/statements/continueStatements/invalidWhileContinueStatements.ts] ////
-
-=== invalidWhileContinueStatements.ts ===
+=== tests/cases/conformance/statements/continueStatements/invalidWhileContinueStatements.ts ===
 // All errors
 
 // naked continue not allowed

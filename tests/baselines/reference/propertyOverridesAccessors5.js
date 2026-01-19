@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/propertyOverridesAccessors5.ts] ////
-
 //// [propertyOverridesAccessors5.ts]
 class A {
     get p() { return 'oh no' }

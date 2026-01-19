@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/namespaceDisambiguationInUnion.ts] ////
-
 //// [namespaceDisambiguationInUnion.ts]
 namespace Foo {
   export type Yep = { type: "foo.yep" };

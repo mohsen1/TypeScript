@@ -1,15 +1,10 @@
-//// [tests/cases/compiler/partiallyAmbientFundule.ts] ////
-
-=== partiallyAmbientFundule.ts ===
-declare namespace foo {
+=== tests/cases/compiler/partiallyAmbientFundule.ts ===
+declare module foo {
 >foo : typeof foo
->    : ^^^^^^^^^^
 
     export function x(): any;
 >x : () => any
->  : ^^^^^^   
 }
 function foo () { } // Legal, because module is ambient
 >foo : typeof foo
->    : ^^^^^^^^^^
 

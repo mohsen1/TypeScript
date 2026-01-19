@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithStringIndexer.ts] ////
-
 //// [subtypingWithStringIndexer.ts]
 // Derived type indexer must be subtype of base type indexer
 
@@ -19,7 +17,7 @@ class B2 extends A {
     [x: string]: Derived2; // ok
 }
 
-namespace Generics {
+module Generics {
     class A<T extends Base> {
         [x: string]: T;
     }

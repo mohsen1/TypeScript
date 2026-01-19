@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/callbackTag2.ts] ////
-
-=== cb.js ===
+=== tests/cases/conformance/jsdoc/cb.js ===
 /** @template T
  * @callback Id
  * @param {T} t

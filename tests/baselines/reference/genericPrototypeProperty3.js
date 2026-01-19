@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericPrototypeProperty3.ts] ////
-
 //// [genericPrototypeProperty3.ts]
 class BaseEvent {
     target: {};

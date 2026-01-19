@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nonNullParameterExtendingStringAssignableToString.ts] ////
-
 //// [nonNullParameterExtendingStringAssignableToString.ts]
 declare function foo(p: string): void;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infinitelyExpandingOverloads.ts] ////
-
 //// [infinitelyExpandingOverloads.ts]
 interface KnockoutSubscription2<T> {
     target: KnockoutObservableBase2<T>;

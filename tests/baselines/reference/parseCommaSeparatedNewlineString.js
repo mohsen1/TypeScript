@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parseCommaSeparatedNewlineString.ts] ////
-
 //// [parseCommaSeparatedNewlineString.ts]
 (a,
 '')

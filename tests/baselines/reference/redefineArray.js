@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/redefineArray.ts] ////
-
 //// [redefineArray.ts]
 Array = function (n:number, s:string) {return n;};
 

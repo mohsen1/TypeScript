@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericInterfaceImplementation.ts] ////
-
 //// [genericInterfaceImplementation.ts]
 interface IOption<A> {
     get(): A;

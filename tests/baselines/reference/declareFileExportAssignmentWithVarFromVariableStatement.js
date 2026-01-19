@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declareFileExportAssignmentWithVarFromVariableStatement.ts] ////
-
 //// [declareFileExportAssignmentWithVarFromVariableStatement.ts]
-namespace m2 {
+module m2 {
     export interface connectModule {
         (res, req, next): void;
     }
@@ -27,7 +25,7 @@ module.exports = m2;
 
 
 //// [declareFileExportAssignmentWithVarFromVariableStatement.d.ts]
-declare namespace m2 {
+declare module m2 {
     interface connectModule {
         (res: any, req: any, next: any): void;
     }

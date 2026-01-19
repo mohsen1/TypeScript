@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classCannotExtendVar.ts] ////
-
 //// [classCannotExtendVar.ts]
 var Markup;
 

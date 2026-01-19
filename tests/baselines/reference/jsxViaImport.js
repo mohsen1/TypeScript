@@ -1,10 +1,10 @@
 //// [tests/cases/compiler/jsxViaImport.tsx] ////
 
 //// [component.d.ts]
-declare namespace JSX {
+declare module JSX {
   interface ElementAttributesProperty { props; }
 }
-declare namespace React {
+declare module React {
   class Component<T, U> { }
 }
 declare module "BaseComponent" {
@@ -39,7 +39,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 /// <reference path="component.d.ts" />
 var BaseComponent = require("BaseComponent");
 var TestComponent = /** @class */ (function (_super) {

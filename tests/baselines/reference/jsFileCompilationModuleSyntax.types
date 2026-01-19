@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsFileCompilationModuleSyntax.ts] ////
-
-=== a.js ===
-
-namespace M { }
+=== tests/cases/compiler/a.js ===
+module M { }
+No type information for this code.

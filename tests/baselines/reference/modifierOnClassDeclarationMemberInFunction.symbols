@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/classDeclarations/modifierOnClassDeclarationMemberInFunction.ts] ////
-
-=== modifierOnClassDeclarationMemberInFunction.ts ===
+=== tests/cases/conformance/classes/classDeclarations/modifierOnClassDeclarationMemberInFunction.ts ===
 function f() {
 >f : Symbol(f, Decl(modifierOnClassDeclarationMemberInFunction.ts, 0, 0))
 

@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/genericRecursiveImplicitConstructorErrors3.ts] ////
-
 //// [genericRecursiveImplicitConstructorErrors3.ts]
-namespace TypeScript {
+module TypeScript {
     export class MemberName <A,B,C>{
         static create<A,B,C>(arg1: any, arg2?: any, arg3?: any): MemberName {
         }
     }
 }
  
-namespace TypeScript {
+module TypeScript {
     export class PullSymbol <A,B,C>{
         public type: PullTypeSymbol = null;
     }

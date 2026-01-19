@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/maxConstraints.ts] ////
-
 //// [maxConstraints.ts]
 interface Comparable<T> {
     compareTo(other: T): number;

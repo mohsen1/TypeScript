@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticMemberExportAccess.ts] ////
-
 //// [staticMemberExportAccess.ts]
 class Sammy {
    foo() { return "hi"; }
@@ -7,13 +5,13 @@ class Sammy {
     return -1;
    }
 }
-namespace Sammy {
+module Sammy {
     export var x = 1;
 }
 interface JQueryStatic {
     sammy: Sammy; // class instance
 }
-declare var $: JQueryStatic;
+var $: JQueryStatic;
 var instanceOfClassSammy: Sammy = new $.sammy(); // should be error
 var r1 = instanceOfClassSammy.foo(); // r1 is string
 var r2 = $.sammy.foo();
@@ -35,6 +33,7 @@ var Sammy = /** @class */ (function () {
 (function (Sammy) {
     Sammy.x = 1;
 })(Sammy || (Sammy = {}));
+var $;
 var instanceOfClassSammy = new $.sammy(); // should be error
 var r1 = instanceOfClassSammy.foo(); // r1 is string
 var r2 = $.sammy.foo();

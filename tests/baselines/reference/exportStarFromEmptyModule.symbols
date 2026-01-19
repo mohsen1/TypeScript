@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/exportStarFromEmptyModule.ts] ////
-
-=== exportStarFromEmptyModule_module1.ts ===
+=== tests/cases/compiler/exportStarFromEmptyModule_module1.ts ===
 export class A {
 >A : Symbol(A, Decl(exportStarFromEmptyModule_module1.ts, 0, 0))
 
@@ -8,11 +6,10 @@ export class A {
 >r : Symbol(A.r, Decl(exportStarFromEmptyModule_module1.ts, 0, 16))
 }
 
-=== exportStarFromEmptyModule_module2.ts ===
-
+=== tests/cases/compiler/exportStarFromEmptyModule_module2.ts ===
 // empty
-
-=== exportStarFromEmptyModule_module3.ts ===
+No type information for this code.
+No type information for this code.=== tests/cases/compiler/exportStarFromEmptyModule_module3.ts ===
 export * from "./exportStarFromEmptyModule_module2";
 export * from "./exportStarFromEmptyModule_module1";
 
@@ -23,7 +20,7 @@ export class A {
 >q : Symbol(A.q, Decl(exportStarFromEmptyModule_module3.ts, 3, 16))
 }
 
-=== exportStarFromEmptyModule_module4.ts ===
+=== tests/cases/compiler/exportStarFromEmptyModule_module4.ts ===
 import * as X from "./exportStarFromEmptyModule_module3";
 >X : Symbol(X, Decl(exportStarFromEmptyModule_module4.ts, 0, 6))
 

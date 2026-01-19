@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsdocTypedefNoCrash.ts] ////
-
-=== export.js ===
+=== tests/cases/compiler/export.js ===
 /**
  * @typedef {{
  * }}

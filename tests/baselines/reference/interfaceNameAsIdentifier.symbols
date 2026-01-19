@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/interfaceNameAsIdentifier.ts] ////
-
-=== interfaceNameAsIdentifier.ts ===
+=== tests/cases/compiler/interfaceNameAsIdentifier.ts ===
 interface C {
 >C : Symbol(C, Decl(interfaceNameAsIdentifier.ts, 0, 0))
 
@@ -8,11 +6,11 @@ interface C {
 }
 C();
 
-namespace m2 {
+module m2 {
 >m2 : Symbol(m2, Decl(interfaceNameAsIdentifier.ts, 3, 4))
 
     export interface C {
->C : Symbol(C, Decl(interfaceNameAsIdentifier.ts, 5, 14))
+>C : Symbol(C, Decl(interfaceNameAsIdentifier.ts, 5, 11))
 
         (): void;
     }

@@ -11,9 +11,9 @@ export const a: import("./test") = null;
 
 //// [test.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a = void 0;
 exports.a = null;

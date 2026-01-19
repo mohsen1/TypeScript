@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithoutAnnotationsOrBody.ts] ////
-
 //// [callSignatureWithoutAnnotationsOrBody.ts]
 // Call signatures without a return type annotation and function body return 'any'
 

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/spellingSuggestionModule.ts] ////
-
-=== spellingSuggestionModule.ts ===
+=== tests/cases/compiler/spellingSuggestionModule.ts ===
 declare module "foobar" { export const x: number; }
 >"foobar" : Symbol("foobar", Decl(spellingSuggestionModule.ts, 0, 0))
 >x : Symbol(x, Decl(spellingSuggestionModule.ts, 0, 38))
@@ -13,9 +11,9 @@ declare module 'barfoo' { export const x: number; }
 
 barfoo;
 
-declare namespace farboo { export const x: number; }
+declare module farboo { export const x: number; }
 >farboo : Symbol(farboo, Decl(spellingSuggestionModule.ts, 4, 7))
->x : Symbol(x, Decl(spellingSuggestionModule.ts, 6, 39))
+>x : Symbol(x, Decl(spellingSuggestionModule.ts, 6, 36))
 
 faroo;
 

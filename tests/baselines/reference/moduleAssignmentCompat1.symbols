@@ -1,17 +1,15 @@
-//// [tests/cases/compiler/moduleAssignmentCompat1.ts] ////
-
-=== moduleAssignmentCompat1.ts ===
-namespace A {
+=== tests/cases/compiler/moduleAssignmentCompat1.ts ===
+module A {
 >A : Symbol(A, Decl(moduleAssignmentCompat1.ts, 0, 0))
 
     export class C { }
->C : Symbol(C, Decl(moduleAssignmentCompat1.ts, 0, 13))
+>C : Symbol(C, Decl(moduleAssignmentCompat1.ts, 0, 10))
 }
-namespace B {
+module B {
 >B : Symbol(B, Decl(moduleAssignmentCompat1.ts, 2, 1))
 
     export class C { }
->C : Symbol(C, Decl(moduleAssignmentCompat1.ts, 3, 13))
+>C : Symbol(C, Decl(moduleAssignmentCompat1.ts, 3, 10))
 
     class D { }
 >D : Symbol(D, Decl(moduleAssignmentCompat1.ts, 4, 22))

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/statements/breakStatements/switchBreakStatements.ts] ////
-
-=== switchBreakStatements.ts ===
+=== tests/cases/conformance/statements/breakStatements/switchBreakStatements.ts ===
 switch ('') {
     case 'a':
         break;

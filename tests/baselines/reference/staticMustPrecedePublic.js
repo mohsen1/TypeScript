@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticMustPrecedePublic.ts] ////
-
 //// [staticMustPrecedePublic.ts]
 class Outer {
     static public intI: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/mixinAbstractClasses.ts] ////
-
 //// [mixinAbstractClasses.ts]
 interface Mixin {
     mixinMethod(): void;

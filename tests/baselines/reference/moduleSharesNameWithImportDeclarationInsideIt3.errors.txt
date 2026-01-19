@@ -1,17 +1,17 @@
-moduleSharesNameWithImportDeclarationInsideIt3.ts(10,12): error TS2300: Duplicate identifier 'M'.
-moduleSharesNameWithImportDeclarationInsideIt3.ts(11,12): error TS2300: Duplicate identifier 'M'.
+tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt3.ts(10,12): error TS2300: Duplicate identifier 'M'.
+tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt3.ts(11,12): error TS2300: Duplicate identifier 'M'.
 
 
-==== moduleSharesNameWithImportDeclarationInsideIt3.ts (2 errors) ====
-    namespace Z {
-        export namespace M {
+==== tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt3.ts (2 errors) ====
+    module Z {
+        export module M {
             export function bar() {
                 return "";
             }
         }
         export interface I { }
     }
-    namespace A.M {
+    module A.M {
         import M = Z.M;
                ~
 !!! error TS2300: Duplicate identifier 'M'.

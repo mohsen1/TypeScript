@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/internalAliasUninitializedModuleInsideLocalModuleWithoutExport.ts] ////
-
 //// [internalAliasUninitializedModuleInsideLocalModuleWithoutExport.ts]
-export namespace a {
-    export namespace b {
+export module a {
+    export module b {
         export interface I {
             foo();
         }
     }
 }
 
-export namespace c {
+export module c {
     import b = a.b;
     export var x: b.I;
     x.foo();
@@ -17,23 +15,23 @@ export namespace c {
 
 //// [internalAliasUninitializedModuleInsideLocalModuleWithoutExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.c = void 0;
 var c;
 (function (c) {
     c.x.foo();
-})(c || (exports.c = c = {}));
+})(c = exports.c || (exports.c = {}));
 
 
 //// [internalAliasUninitializedModuleInsideLocalModuleWithoutExport.d.ts]
-export declare namespace a {
-    namespace b {
+export declare module a {
+    module b {
         interface I {
             foo(): any;
         }
     }
 }
-export declare namespace c {
+export declare module c {
     import b = a.b;
     var x: b.I;
 }

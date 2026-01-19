@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsx/jsxs/jsxJsxsCjsTransformCustomImportPragma.tsx] ////
-
-=== react.tsx ===
+=== tests/cases/conformance/jsx/jsxs/react.tsx ===
 /// <reference path="react16.d.ts" />
 /* @jsxImportSource react */
 import "./preact";
@@ -20,7 +18,7 @@ const a = <>
 </>
 
 export {};
-=== preact.tsx ===
+=== tests/cases/conformance/jsx/jsxs/preact.tsx ===
 /// <reference path="react16.d.ts" />
 /* @jsxImportSource preact */
 const a = <>

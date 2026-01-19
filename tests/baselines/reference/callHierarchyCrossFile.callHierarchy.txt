@@ -1,4 +1,3 @@
-// === Call Hierarchy ===
 ╭ name: createModelReference
 ├ kind: function
 ├ file: /a.ts

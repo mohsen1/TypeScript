@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignToPrototype1.ts] ////
-
 //// [assignToPrototype1.ts]
 declare class Point {
   add(dx: number, dy: number): void;

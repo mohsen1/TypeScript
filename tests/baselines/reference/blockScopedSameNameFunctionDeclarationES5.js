@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/blockScopedSameNameFunctionDeclarationES5.ts] ////
-
 //// [blockScopedSameNameFunctionDeclarationES5.ts]
 function foo(a: number) {
     if (a === 1) {

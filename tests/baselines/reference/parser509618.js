@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/parser/ecmascript5/RegressionTests/parser509618.ts] ////
-
 //// [parser509618.ts]
-declare namespace ambiModule {
+declare module ambiModule {
    interface i1 { };
 }
 

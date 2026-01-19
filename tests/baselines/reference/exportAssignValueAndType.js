@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/exportAssignValueAndType.ts] ////
-
 //// [exportAssignValueAndType.ts]
-declare namespace http {
+declare module http {
 	export interface Server { openPort: number; }
 }
 

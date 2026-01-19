@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowDestructuringDeclaration.ts] ////
-
 //// [controlFlowDestructuringDeclaration.ts]
 function f1() {
     let x: string | number = 1;

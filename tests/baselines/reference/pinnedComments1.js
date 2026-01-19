@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/pinnedComments1.ts] ////
-
 //// [pinnedComments1.ts]
 /*!=========
     Keep this pinned comment

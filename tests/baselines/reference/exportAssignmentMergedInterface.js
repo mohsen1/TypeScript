@@ -25,12 +25,12 @@ z = x.d;
 //// [foo_0.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });
 //// [foo_1.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var x;
     x("test");
     x(42);

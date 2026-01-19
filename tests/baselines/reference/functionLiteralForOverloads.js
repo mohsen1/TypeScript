@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/specifyingTypes/typeLiterals/functionLiteralForOverloads.ts] ////
-
 //// [functionLiteralForOverloads.ts]
 // basic uses of function literals with overloads
 

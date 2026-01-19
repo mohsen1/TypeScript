@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/declFileTypeAnnotationTupleType.ts] ////
-
 //// [declFileTypeAnnotationTupleType.ts]
 class c {
 }
-namespace m {
+module m {
     export class c {
     }
     export class g<T> {
@@ -55,7 +53,7 @@ var y = x;
 //// [declFileTypeAnnotationTupleType.d.ts]
 declare class c {
 }
-declare namespace m {
+declare module m {
     class c {
     }
     class g<T> {

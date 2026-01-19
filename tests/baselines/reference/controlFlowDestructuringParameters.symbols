@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/controlFlowDestructuringParameters.ts] ////
-
-=== controlFlowDestructuringParameters.ts ===
+=== tests/cases/compiler/controlFlowDestructuringParameters.ts ===
 // Repro for #8376
 
 

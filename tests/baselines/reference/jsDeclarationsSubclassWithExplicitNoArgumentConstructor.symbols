@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsSubclassWithExplicitNoArgumentConstructor.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/jsdoc/declarations/index.js ===
 export class Super {
 >Super : Symbol(Super, Decl(index.js, 0, 0))
 

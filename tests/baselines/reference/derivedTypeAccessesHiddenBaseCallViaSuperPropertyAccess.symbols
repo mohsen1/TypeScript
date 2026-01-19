@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberFunctionDeclarations/derivedTypeAccessesHiddenBaseCallViaSuperPropertyAccess.ts] ////
-
-=== derivedTypeAccessesHiddenBaseCallViaSuperPropertyAccess.ts ===
+=== tests/cases/conformance/classes/propertyMemberDeclarations/memberFunctionDeclarations/derivedTypeAccessesHiddenBaseCallViaSuperPropertyAccess.ts ===
 class Base {
 >Base : Symbol(Base, Decl(derivedTypeAccessesHiddenBaseCallViaSuperPropertyAccess.ts, 0, 0))
 

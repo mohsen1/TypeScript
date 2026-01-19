@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/shorthand-property-es5-es6.ts] ////
-
-=== test.ts ===
+=== tests/cases/compiler/test.ts ===
 import {foo} from './foo';
 >foo : Symbol(foo, Decl(test.ts, 0, 8))
 

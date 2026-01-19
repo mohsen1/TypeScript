@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceOfGenericConstructorMethod1.ts] ////
-
 //// [inheritanceOfGenericConstructorMethod1.ts]
 class A<T> { }
 class B<T> extends A<T> {}

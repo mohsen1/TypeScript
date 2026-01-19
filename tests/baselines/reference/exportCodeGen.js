@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/internalModules/codeGeneration/exportCodeGen.ts] ////
-
 //// [exportCodeGen.ts]
 // should replace all refs to 'x' in the body,
 // with fully qualified
-namespace A {
+module A {
     export var x = 12;
     function lt12() {
         return x < 12;
@@ -11,7 +9,7 @@ namespace A {
 } 
 
 // should not fully qualify 'x'
-namespace B {
+module B {
     var x = 12;
     function lt12() {
         return x < 12;
@@ -19,38 +17,38 @@ namespace B {
 }
 
 // not copied, since not exported
-namespace C {
+module C {
     function no() {
         return false;
     }
 }
 
 // copies, since exported
-namespace D {
+module D {
     export function yes() {
         return true;
     }
 }
 
 // validate all exportable statements
-namespace E {
+module E {
     export enum Color { Red }
     export function fn() { }
     export interface I { id: number }
     export class C { name: string }
-    export namespace M {
+    export module M {
         export var x = 42;
     }
 }
 
 // validate all exportable statements,
 // which are not exported
-namespace F {
+module F {
     enum Color { Red }
     function fn() { }
     interface I { id: number }
     class C { name: string }
-    namespace M {
+    module M {
         var x = 42;
     }
 }

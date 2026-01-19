@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/privacyCheckTypeOfInvisibleModuleNoError.ts] ////
-
 //// [privacyCheckTypeOfInvisibleModuleNoError.ts]
-namespace Outer {
-    namespace Inner {
+module Outer {
+    module Inner {
         export var m: number;
     }
 
@@ -20,8 +18,8 @@ var Outer;
 
 
 //// [privacyCheckTypeOfInvisibleModuleNoError.d.ts]
-declare namespace Outer {
-    namespace Inner {
+declare module Outer {
+    module Inner {
         var m: number;
     }
     export var f: typeof Inner;

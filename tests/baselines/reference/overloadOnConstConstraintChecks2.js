@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstConstraintChecks2.ts] ////
-
 //// [overloadOnConstConstraintChecks2.ts]
 class A {} 
 class B extends A {}

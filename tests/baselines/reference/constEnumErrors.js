@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/constEnumErrors.ts] ////
-
 //// [constEnumErrors.ts]
 const enum E {
     A
 }
 
-namespace E {
+module E {
     var x = 1;
 }
 

@@ -1,4 +1,3 @@
-// === Smart Selection ===
 const a = 'a';
 const b = /**/'b';
 

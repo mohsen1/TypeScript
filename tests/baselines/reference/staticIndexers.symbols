@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/indexMemberDeclarations/staticIndexers.ts] ////
-
-=== staticIndexers.ts ===
+=== tests/cases/conformance/classes/indexMemberDeclarations/staticIndexers.ts ===
 // static indexers not allowed
 
 class C {

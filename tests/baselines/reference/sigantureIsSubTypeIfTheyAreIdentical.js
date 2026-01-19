@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sigantureIsSubTypeIfTheyAreIdentical.ts] ////
-
 //// [sigantureIsSubTypeIfTheyAreIdentical.ts]
 interface ICache {
     get<T>(key: string): T;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentCompatBug3.ts] ////
-
 //// [assignmentCompatBug3.ts]
 function makePoint(x: number, y: number) {
     return {
@@ -30,8 +28,8 @@ foo(x + y);
 //// [assignmentCompatBug3.js]
 function makePoint(x, y) {
     return {
-        get x() { return x; }, // shouldn't be "void"
-        get y() { return y; }, // shouldn't be "void"
+        get x() { return x; },
+        get y() { return y; },
         //x: "yo",
         //y: "boo",
         dist: function () {

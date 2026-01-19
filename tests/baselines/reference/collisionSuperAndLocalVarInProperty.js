@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndLocalVarInProperty.ts] ////
-
 //// [collisionSuperAndLocalVarInProperty.ts]
 var _super = 10; // No Error
 class Foo {

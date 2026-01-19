@@ -1,37 +1,35 @@
-//// [tests/cases/compiler/mergedDeclarations3.ts] ////
-
 //// [mergedDeclarations3.ts]
-namespace M {
+module M {
  export enum Color {
    Red, Green
  }
 }
-namespace M {
- export namespace Color {
+module M {
+ export module Color {
    export var Blue = 4;
   }
 }
 var p = M.Color.Blue; // ok
 
-namespace M {
+module M {
     export function foo() {
     }
 }
 
-namespace M {
-    namespace foo {
+module M {
+    module foo {
         export var x = 1;
     }
 }
 
-namespace M {
-    export namespace foo {
+module M {
+    export module foo {
         export var y = 2
     }
 }
 
-namespace M {
-    namespace foo {
+module M {
+    module foo {
         export var z = 1;
     }
 }

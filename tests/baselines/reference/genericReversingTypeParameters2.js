@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericReversingTypeParameters2.ts] ////
-
 //// [genericReversingTypeParameters2.ts]
 class BiMap<K, V> {
     private inverseBiMap: BiMap<V, K>;

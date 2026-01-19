@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/strictModeReservedWordInImportEqualDeclaration.ts] ////
-
-=== strictModeReservedWordInImportEqualDeclaration.ts ===
+=== tests/cases/compiler/strictModeReservedWordInImportEqualDeclaration.ts ===
 "use strict"
 import public = require("1");
 >public : Symbol(public, Decl(strictModeReservedWordInImportEqualDeclaration.ts, 0, 12))

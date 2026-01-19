@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/instanceMemberInitialization.ts] ////
-
 //// [instanceMemberInitialization.ts]
 class C {
     x = 1;

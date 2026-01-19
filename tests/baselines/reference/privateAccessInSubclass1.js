@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateAccessInSubclass1.ts] ////
-
 //// [privateAccessInSubclass1.ts]
 class Base {
   private options: any;

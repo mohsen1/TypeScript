@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/deleteOperator1.ts] ////
-
 //// [deleteOperator1.ts]
 var a;
 var x: boolean = delete a;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateVisibles.ts] ////
-
 //// [privateVisibles.ts]
 class Foo {
 	private pvar = 0;

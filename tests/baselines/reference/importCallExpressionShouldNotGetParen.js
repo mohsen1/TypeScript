@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/dynamicImport/importCallExpressionShouldNotGetParen.ts] ////
-
 //// [importCallExpressionShouldNotGetParen.ts]
 const localeName = "zh-CN";
 import(`./locales/${localeName}.js`).then(bar => {

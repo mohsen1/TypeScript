@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsExportSubAssignments.ts] ////
-
 //// [cls.js]
 const Strings = {
     a: "A",
@@ -31,6 +29,6 @@ declare namespace Foo {
     export { Strings };
 }
 declare namespace Strings {
-    let a: string;
-    let b: string;
+    const a: string;
+    const b: string;
 }

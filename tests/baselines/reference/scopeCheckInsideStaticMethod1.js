@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/scopeCheckInsideStaticMethod1.ts] ////
-
 //// [scopeCheckInsideStaticMethod1.ts]
 class C {
    private v;

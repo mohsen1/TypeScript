@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeModifiers.ts] ////
-
-=== mappedTypeModifiers.ts ===
+=== tests/cases/conformance/types/mapped/mappedTypeModifiers.ts ===
 type T = { a: number, b: string };
 >T : Symbol(T, Decl(mappedTypeModifiers.ts, 0, 0))
 >a : Symbol(a, Decl(mappedTypeModifiers.ts, 0, 10))

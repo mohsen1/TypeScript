@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadOverwritesPropertyStrict.ts] ////
-
 //// [spreadOverwritesPropertyStrict.ts]
 declare var ab: { a: number, b: number };
 declare var abq: { a: number, b?: number };

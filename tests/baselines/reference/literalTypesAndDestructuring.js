@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/literalTypesAndDestructuring.ts] ////
-
 //// [literalTypesAndDestructuring.ts]
 declare let x: { a: 0 | 1 | undefined };
 

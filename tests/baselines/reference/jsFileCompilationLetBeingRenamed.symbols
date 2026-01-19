@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationLetBeingRenamed.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 function foo(a) {
 >foo : Symbol(foo, Decl(a.js, 0, 0))
 >a : Symbol(a, Decl(a.js, 0, 13))
@@ -13,4 +11,3 @@ function foo(a) {
         // do something
     }
 }
-

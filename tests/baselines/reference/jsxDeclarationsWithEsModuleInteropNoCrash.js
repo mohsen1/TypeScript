@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/jsxDeclarationsWithEsModuleInteropNoCrash.tsx] ////
-
 //// [jsxDeclarationsWithEsModuleInteropNoCrash.jsx]
-/// <reference path="/.lib/react16.d.ts" preserve="true" />
+/// <reference path="/.lib/react16.d.ts" />
 import PropTypes from 'prop-types';
 import React from 'react';
 
@@ -25,7 +23,7 @@ export default Foo;
 
 
 //// [jsxDeclarationsWithEsModuleInteropNoCrash.d.ts]
-/// <reference path="..react16.d.ts" preserve="true" />
+/// <reference path="../../../..react16.d.ts" />
 export default Foo;
 declare function Foo({ bar }: {
     bar: any;
@@ -35,10 +33,10 @@ declare namespace Foo {
     export { defaultProps };
 }
 declare namespace propTypes {
-    let bar: PropTypes.Requireable<boolean>;
+    const bar: PropTypes.Requireable<boolean>;
 }
 declare namespace defaultProps {
-    let bar_1: boolean;
+    const bar_1: boolean;
     export { bar_1 as bar };
 }
-import PropTypes from 'prop-types';
+import PropTypes from "prop-types";

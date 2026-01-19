@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/stringLiteral/stringLiteralType.ts] ////
-
 //// [stringLiteralType.ts]
 var x: 'hi';
 

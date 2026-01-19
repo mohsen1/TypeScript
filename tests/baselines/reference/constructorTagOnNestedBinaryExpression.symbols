@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/constructorTagOnNestedBinaryExpression.ts] ////
-
-=== constructorTagOnNestedBinaryExpression.js ===
+=== tests/cases/conformance/jsdoc/constructorTagOnNestedBinaryExpression.js ===
 // Fixes #35021
 /** @constructor */
 a = b = function c () {

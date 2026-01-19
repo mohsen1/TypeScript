@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nonMergedDeclarationsAndOverloads.ts] ////
-
 //// [nonMergedDeclarationsAndOverloads.ts]
 class A {
     m1: string;

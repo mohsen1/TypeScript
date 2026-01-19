@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserParenthesizedVariableAndParenthesizedFunctionInTernary.ts] ////
-
-=== parserParenthesizedVariableAndParenthesizedFunctionInTernary.ts ===
+=== tests/cases/conformance/parser/ecmascript5/parserParenthesizedVariableAndParenthesizedFunctionInTernary.ts ===
 let a: any;
 >a : any
 
@@ -8,25 +6,18 @@ const c = true ? (a) : (function() {});
 >c : any
 >true ? (a) : (function() {}) : any
 >true : true
->     : ^^^^
 >(a) : any
 >a : any
 >(function() {}) : () => void
->                : ^^^^^^^^^^
 >function() {} : () => void
->              : ^^^^^^^^^^
 
 const d = true ? (a) : ((function() {}));
 >d : any
 >true ? (a) : ((function() {})) : any
 >true : true
->     : ^^^^
 >(a) : any
 >a : any
 >((function() {})) : () => void
->                  : ^^^^^^^^^^
 >(function() {}) : () => void
->                : ^^^^^^^^^^
 >function() {} : () => void
->              : ^^^^^^^^^^
 

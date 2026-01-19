@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualSignatureInstantiation1.ts] ////
-
 //// [contextualSignatureInstantiation1.ts]
 declare function map<S, T>(f: (x: S) => T): (a: S[]) => T[];
 var e = <K>(x: string, y?: K) => x.length;

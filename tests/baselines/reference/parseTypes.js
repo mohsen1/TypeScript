@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parseTypes.ts] ////
-
 //// [parseTypes.ts]
 var x = <() => number>null;
 var y = <{(): number; }>null;

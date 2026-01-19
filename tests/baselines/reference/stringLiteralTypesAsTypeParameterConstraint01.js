@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesAsTypeParameterConstraint01.ts] ////
-
 //// [stringLiteralTypesAsTypeParameterConstraint01.ts]
 function foo<T extends "foo">(f: (x: T) => T) {
     return f;

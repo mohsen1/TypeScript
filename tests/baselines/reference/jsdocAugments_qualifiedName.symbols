@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocAugments_qualifiedName.ts] ////
-
 === /a.js ===
 export class A {}
 >A : Symbol(A, Decl(a.js, 0, 0))

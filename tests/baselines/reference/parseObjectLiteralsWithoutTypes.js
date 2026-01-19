@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parseObjectLiteralsWithoutTypes.ts] ////
-
 //// [parseObjectLiteralsWithoutTypes.ts]
 let x: { foo, bar }
 let y: { foo: number, bar }

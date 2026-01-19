@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource4.ts] ////
-
 //// [parserRealSource4.ts]
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
 
     export class BlockIntrinsics {
         public prototype = undefined;
@@ -545,7 +543,7 @@ var TypeScript;
                 if (searchArray[i] == key) {
                     return {
                         key: this.keys[i],
-                        data: this.values[i],
+                        data: this.values[i]
                     };
                 }
             }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionReturnTypeQuery.ts] ////
-
 //// [functionReturnTypeQuery.ts]
 declare let foo: number;
 

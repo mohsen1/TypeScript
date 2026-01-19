@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations-access.ts] ////
-
 //// [letDeclarations-access.ts]
 let x = 0
 

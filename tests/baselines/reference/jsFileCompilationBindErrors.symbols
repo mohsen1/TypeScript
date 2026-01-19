@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationBindErrors.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 let C = "sss";
 >C : Symbol(C, Decl(a.js, 0, 3))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classDeclarationLoop.ts] ////
-
 //// [classDeclarationLoop.ts]
 const arr = [];
 for (let i = 0; i < 10; ++i) {

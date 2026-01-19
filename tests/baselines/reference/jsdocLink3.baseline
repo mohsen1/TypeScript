@@ -1,27 +1,3 @@
-// === QuickInfo ===
-=== /module1.ts ===
-// import { C } from './jsdocLink3'
-// /**
-//  * {@link C}
-//  * @wat Makes a {@link C}. A default one.
-//  * {@link C()}
-//  * {@link C|postfix text}
-//  * {@link unformatted postfix text}
-//  * @see {@link C} its great
-//  */
-// function CC() {
-//          ^^
-// | ----------------------------------------------------------------------
-// | function CC(): void
-// | {@link C}
-// | @wat Makes a {@link C}. A default one.
-// | {@link C()}
-// | {@link Cpostfix text}
-// | {@link unformatted postfix text}
-// | @see {@link C} its great
-// | ----------------------------------------------------------------------
-// }
-
 [
   {
     "marker": {
@@ -29,7 +5,7 @@
       "position": 210,
       "name": ""
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {
@@ -165,7 +141,7 @@
               }
             },
             {
-              "text": "postfix text",
+              "text": "|postfix text",
               "kind": "linkText"
             },
             {

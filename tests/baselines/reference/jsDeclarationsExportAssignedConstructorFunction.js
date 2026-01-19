@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsExportAssignedConstructorFunction.ts] ////
-
 //// [jsDeclarationsExportAssignedConstructorFunction.js]
 /** @constructor */
 module.exports.MyClass = function() {

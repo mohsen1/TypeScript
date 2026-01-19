@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restParameters.ts] ////
-
 //// [restParameters.ts]
 function f18(a?:string, ...b:number[]){}
  

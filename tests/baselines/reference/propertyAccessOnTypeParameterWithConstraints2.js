@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints2.ts] ////
-
 //// [propertyAccessOnTypeParameterWithConstraints2.ts]
 // generic types should behave as if they have properties of their constraint type
 

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocTypeTagRequiredParameters.ts] ////
-
-=== a.js ===
+=== tests/cases/conformance/jsdoc/a.js ===
 /** @type {function(string): void} */
 const f = (value) => {
 >f : Symbol(f, Decl(a.js, 1, 5))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restArgMissingName.ts] ////
-
 //// [restArgMissingName.ts]
 function sum (...) {} 
 

@@ -13,8 +13,6 @@
     ],
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "decl.d.ts",
         "useModule.ts"
     ]

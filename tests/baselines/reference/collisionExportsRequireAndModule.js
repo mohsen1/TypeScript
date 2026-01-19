@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/collisionExportsRequireAndModule.ts] ////
 
 //// [collisionExportsRequireAndModule_externalmodule.ts]
-export namespace require {
+export module require {
     export interface I {
     }
     export class C {
@@ -10,7 +10,7 @@ export namespace require {
 export function foo(): require.I {
     return null;
 }
-export namespace exports {
+export module exports {
     export interface I {
     }
     export class C {
@@ -19,28 +19,28 @@ export namespace exports {
 export function foo2(): exports.I {
     return null;
 }
-namespace m1 {
-    namespace require {
+module m1 {
+    module require {
         export interface I {
         }
         export class C {
         }
     }
-    namespace exports {
+    module exports {
         export interface I {
         }
         export class C {
         }
     }
 }
-namespace m2 {
-    export namespace require {
+module m2 {
+    export module require {
         export interface I {
         }
         export class C {
         }
     }
-    export namespace exports {
+    export module exports {
         export interface I {
         }
         export class C {
@@ -49,40 +49,40 @@ namespace m2 {
 }
 
 //// [collisionExportsRequireAndModule_globalFile.ts]
-namespace require {
+module require {
     export interface I {
     }
     export class C {
     }
 }
-namespace exports {
+module exports {
     export interface I {
     }
     export class C {
     }
 }
-namespace m3 {
-    namespace require {
+module m3 {
+    module require {
         export interface I {
         }
         export class C {
         }
     }
-    namespace exports {
+    module exports {
         export interface I {
         }
         export class C {
         }
     }
 }
-namespace m4 {
-    export namespace require {
+module m4 {
+    export module require {
         export interface I {
         }
         export class C {
         }
     }
-    export namespace exports {
+    export module exports {
         export interface I {
         }
         export class C {
@@ -94,10 +94,8 @@ namespace m4 {
 //// [collisionExportsRequireAndModule_externalmodule.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.exports = exports.require = void 0;
-    exports.foo = foo;
-    exports.foo2 = foo2;
+    exports.__esModule = true;
+    exports.foo2 = exports.exports = exports.foo = exports.require = void 0;
     var require;
     (function (require) {
         var C = /** @class */ (function () {
@@ -106,10 +104,11 @@ define(["require", "exports"], function (require, exports) {
             return C;
         }());
         require.C = C;
-    })(require || (exports.require = require = {}));
+    })(require = exports.require || (exports.require = {}));
     function foo() {
         return null;
     }
+    exports.foo = foo;
     var exports;
     (function (exports) {
         var C = /** @class */ (function () {
@@ -118,10 +117,11 @@ define(["require", "exports"], function (require, exports) {
             return C;
         }());
         exports.C = C;
-    })(exports || (exports.exports = exports = {}));
+    })(exports = exports.exports || (exports.exports = {}));
     function foo2() {
         return null;
     }
+    exports.foo2 = foo2;
     var m1;
     (function (m1) {
         var require;

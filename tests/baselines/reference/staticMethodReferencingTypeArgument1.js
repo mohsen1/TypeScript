@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/staticMethodReferencingTypeArgument1.ts] ////
-
 //// [staticMethodReferencingTypeArgument1.ts]
-namespace Editor {
+module Editor {
     export class List<T> {
         next: List<T>;
         prev: List<T>;

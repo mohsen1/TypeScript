@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/outModuleTripleSlashRefs.ts] ////
-
-=== ref/a.ts ===
+=== tests/cases/compiler/ref/a.ts ===
 /// <reference path="./b.ts" />
 export class A {
 >A : Symbol(A, Decl(a.ts, 0, 0))
@@ -10,7 +8,7 @@ export class A {
 >GlobalFoo : Symbol(GlobalFoo, Decl(b.ts, 4, 11))
 }
 
-=== ref/b.ts ===
+=== tests/cases/compiler/ref/b.ts ===
 /// <reference path="./c.d.ts" />
 class Foo {
 >Foo : Symbol(Foo, Decl(b.ts, 0, 0))
@@ -23,7 +21,7 @@ declare var GlobalFoo: Foo;
 >GlobalFoo : Symbol(GlobalFoo, Decl(b.ts, 4, 11))
 >Foo : Symbol(Foo, Decl(b.ts, 0, 0))
 
-=== ref/c.d.ts ===
+=== tests/cases/compiler/ref/c.d.ts ===
 /// <reference path="./d.d.ts" />
 declare class Bar {
 >Bar : Symbol(Bar, Decl(c.d.ts, 0, 0))
@@ -33,7 +31,7 @@ declare class Bar {
 >Baz : Symbol(Baz, Decl(d.d.ts, 0, 0))
 }
 
-=== ref/d.d.ts ===
+=== tests/cases/compiler/ref/d.d.ts ===
 declare class Baz {
 >Baz : Symbol(Baz, Decl(d.d.ts, 0, 0))
 
@@ -41,7 +39,7 @@ declare class Baz {
 >member : Symbol(Baz.member, Decl(d.d.ts, 0, 19))
 }
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 import {A} from "./ref/a";
 >A : Symbol(A, Decl(b.ts, 0, 8))
 

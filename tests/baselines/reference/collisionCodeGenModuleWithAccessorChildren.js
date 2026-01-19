@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithAccessorChildren.ts] ////
-
 //// [collisionCodeGenModuleWithAccessorChildren.ts]
-namespace M {
+module M {
     export var x = 3;
     class c {
         private y;
@@ -11,7 +9,7 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
     class d {
         private y;
         set Z(p) {
@@ -21,7 +19,7 @@ namespace M {
     }
 }
 
-namespace M { // Shouldnt be _M
+module M { // Shouldnt be _M
     class e {
         private y;
         set M(p) {
@@ -30,7 +28,7 @@ namespace M { // Shouldnt be _M
     }
 }
 
-namespace M {
+module M {
     class f {
         get Z() {
             var M = 10;
@@ -39,7 +37,7 @@ namespace M {
     }
 }
 
-namespace M { // Shouldnt be _M
+module M { // Shouldnt be _M
     class e {
         get M() {
             return x;

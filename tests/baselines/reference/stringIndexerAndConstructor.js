@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringIndexerAndConstructor.ts] ////
-
 //// [stringIndexerAndConstructor.ts]
 class C {
     [s: string]: number;

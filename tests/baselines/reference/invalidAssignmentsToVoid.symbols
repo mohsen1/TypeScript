@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/primitives/void/invalidAssignmentsToVoid.ts] ////
-
-=== invalidAssignmentsToVoid.ts ===
+=== tests/cases/conformance/types/primitives/void/invalidAssignmentsToVoid.ts ===
 var x: void;
 >x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 0, 3))
 
@@ -16,12 +14,12 @@ x = '';
 x = {}
 >x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 0, 3))
 
-class C { foo!: string; }
+class C { foo: string; }
 >C : Symbol(C, Decl(invalidAssignmentsToVoid.ts, 4, 6))
 >foo : Symbol(C.foo, Decl(invalidAssignmentsToVoid.ts, 6, 9))
 
-declare var c: C;
->c : Symbol(c, Decl(invalidAssignmentsToVoid.ts, 7, 11))
+var c: C;
+>c : Symbol(c, Decl(invalidAssignmentsToVoid.ts, 7, 3))
 >C : Symbol(C, Decl(invalidAssignmentsToVoid.ts, 4, 6))
 
 x = C;
@@ -30,23 +28,23 @@ x = C;
 
 x = c;
 >x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 0, 3))
->c : Symbol(c, Decl(invalidAssignmentsToVoid.ts, 7, 11))
+>c : Symbol(c, Decl(invalidAssignmentsToVoid.ts, 7, 3))
 
 interface I { foo: string; }
 >I : Symbol(I, Decl(invalidAssignmentsToVoid.ts, 9, 6))
 >foo : Symbol(I.foo, Decl(invalidAssignmentsToVoid.ts, 11, 13))
 
-declare var i: I;
->i : Symbol(i, Decl(invalidAssignmentsToVoid.ts, 12, 11))
+var i: I;
+>i : Symbol(i, Decl(invalidAssignmentsToVoid.ts, 12, 3))
 >I : Symbol(I, Decl(invalidAssignmentsToVoid.ts, 9, 6))
 
 x = i;
 >x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 0, 3))
->i : Symbol(i, Decl(invalidAssignmentsToVoid.ts, 12, 11))
+>i : Symbol(i, Decl(invalidAssignmentsToVoid.ts, 12, 3))
 
-namespace M { export var x = 1; }
+module M { export var x = 1; }
 >M : Symbol(M, Decl(invalidAssignmentsToVoid.ts, 13, 6))
->x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 15, 24))
+>x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 15, 21))
 
 x = M;
 >x : Symbol(x, Decl(invalidAssignmentsToVoid.ts, 0, 3))

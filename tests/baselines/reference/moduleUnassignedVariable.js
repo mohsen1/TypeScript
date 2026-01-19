@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleUnassignedVariable.ts] ////
-
 //// [moduleUnassignedVariable.ts]
-namespace Bar {
+module Bar {
     export var a = 1;
     function fooA() { return a; } // Correct: return Bar.a
 

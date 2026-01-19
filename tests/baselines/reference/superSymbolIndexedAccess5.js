@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superPropertyAccess/superSymbolIndexedAccess5.ts] ////
-
 //// [superSymbolIndexedAccess5.ts]
 var symbol: any;
 

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxFactoryQualifiedNameWithEs5.ts] ////
-
-=== index.tsx ===
+=== tests/cases/compiler/index.tsx ===
 import "./jsx";
 
 var skate: any;

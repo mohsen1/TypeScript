@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exhaustiveSwitchWithWideningLiteralTypes.ts] ////
-
 //// [exhaustiveSwitchWithWideningLiteralTypes.ts]
 // Repro from #12529
 

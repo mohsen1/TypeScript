@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexingTypesWithNever.ts] ////
-
 //// [indexingTypesWithNever.ts]
 type TestObj = {
   a: string;

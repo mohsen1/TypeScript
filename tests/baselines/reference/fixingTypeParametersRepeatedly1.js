@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/fixingTypeParametersRepeatedly1.ts] ////
-
 //// [fixingTypeParametersRepeatedly1.ts]
 declare function f<T>(x: T, y: (p: T) => T, z: (p: T) => T): T;
 f("", x => null, x => x.toLowerCase());

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/breakTarget6.ts] ////
-
 //// [breakTarget6.ts]
 while (true) {
   break target;

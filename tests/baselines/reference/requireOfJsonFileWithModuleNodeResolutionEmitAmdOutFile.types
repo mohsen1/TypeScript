@@ -1,24 +1,16 @@
-//// [tests/cases/compiler/requireOfJsonFileWithModuleNodeResolutionEmitAmdOutFile.ts] ////
-
-=== file1.ts ===
+=== tests/cases/compiler/file1.ts ===
 import * as b from './b.json';
 >b : { a: boolean; b: string; }
->  : ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
-=== b.json ===
+=== tests/cases/compiler/b.json ===
 {
 >{    "a": true,    "b": "hello"} : { a: boolean; b: string; }
->                                 : ^^^^^^^^^^^^^^^^^^^^^^^^^^
 
     "a": true,
 >"a" : boolean
->    : ^^^^^^^
 >true : true
->     : ^^^^
 
     "b": "hello"
 >"b" : string
->    : ^^^^^^
 >"hello" : "hello"
->        : ^^^^^^^
 }

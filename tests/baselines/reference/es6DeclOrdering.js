@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6DeclOrdering.ts] ////
-
 //// [es6DeclOrdering.ts]
 class Bar {
 

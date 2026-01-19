@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noTypeArgumentOnReturnType1.ts] ////
-
 //// [noTypeArgumentOnReturnType1.ts]
 class A<T>{
  

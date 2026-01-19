@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadObjectOrFalsy.ts] ////
-
 //// [spreadObjectOrFalsy.ts]
 function f1<T>(a: T & undefined) {
     return { ...a };  // Error
@@ -113,7 +111,7 @@ declare function f5<S, T extends undefined>(a: S | T): S | T;
 declare function f6<T extends object | undefined>(a: T): T;
 declare function g1<T extends {}, A extends {
     z: (T | undefined) & T;
-}>(a: A): T;
+}>(a: A): (T | undefined) & T;
 interface DatafulFoo<T> {
     data: T;
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportNonInitializedVariablesAMD.ts] ////
-
 //// [exportNonInitializedVariablesAMD.ts]
 var;
 let;
@@ -18,7 +16,7 @@ namespace B {
     export let x, y, z;
 }
 
-namespace C {
+module C {
     export var a = 1, b, c = 2;
     export var x, y, z;
 }
@@ -38,7 +36,7 @@ export let h1: D = new D;
 //// [exportNonInitializedVariablesAMD.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.h1 = exports.g1 = exports.f1 = exports.e1 = exports.d1 = exports.c1 = exports.b1 = exports.a1 = exports.f = exports.e = exports.d = exports.c = exports.b = exports.a = void 0;
     var ;
     let;

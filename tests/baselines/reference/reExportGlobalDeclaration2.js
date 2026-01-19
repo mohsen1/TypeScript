@@ -17,4 +17,4 @@ export {I2 as III2};
 
 //// [file2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

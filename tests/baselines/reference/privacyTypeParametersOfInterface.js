@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privacyTypeParametersOfInterface.ts] ////
-
 //// [privacyTypeParametersOfInterface.ts]
 class privateClass {
 }
@@ -62,7 +60,7 @@ interface privateInterfaceWithPublicTypeParametersWithoutExtends<T> {
 
 //// [privacyTypeParametersOfInterface.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.publicClassT = exports.publicClass = void 0;
 var privateClass = /** @class */ (function () {
     function privateClass() {

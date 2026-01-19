@@ -1,14 +1,11 @@
-//// [tests/cases/compiler/libTypeScriptSubfileResolving.ts] ////
-
 === /node_modules/@typescript/lib-dom/index.d.ts ===
-
 // NOOP
-=== /node_modules/@typescript/lib-dom/iterable.d.ts ===
+No type information for this code.=== /node_modules/@typescript/lib-dom/iterable.d.ts ===
 interface DOMIterable { abc: string }
 >DOMIterable : Symbol(DOMIterable, Decl(iterable.d.ts, 0, 0))
 >abc : Symbol(DOMIterable.abc, Decl(iterable.d.ts, 0, 23))
 
-=== index.ts ===
+=== tests/cases/compiler/index.ts ===
 /// <reference lib="dom.iterable" />
 const a: DOMIterable = { abc: "Hello" }
 >a : Symbol(a, Decl(index.ts, 1, 5))
@@ -18,4 +15,3 @@ const a: DOMIterable = { abc: "Hello" }
 // This should fail because libdom has been replaced
 // by the module above ^
 window.localStorage
-

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleNewExportBug.ts] ////
-
 //// [moduleNewExportBug.ts]
-namespace mod1 {
+module mod1 {
 	interface mInt {
 		new (bar:any):any;
         foo (bar:any):any;

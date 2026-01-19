@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/downlevelLetConst14.ts] ////
-
 //// [downlevelLetConst14.ts]
 'use strict'
 declare function use(a: any);

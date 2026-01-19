@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveProperties.ts] ////
-
 //// [recursiveProperties.ts]
 class A {
     get testProp() { return this.testProp; }

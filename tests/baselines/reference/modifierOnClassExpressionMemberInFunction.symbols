@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/classExpressions/modifierOnClassExpressionMemberInFunction.ts] ////
-
-=== modifierOnClassExpressionMemberInFunction.ts ===
+=== tests/cases/conformance/classes/classExpressions/modifierOnClassExpressionMemberInFunction.ts ===
 function g() {
 >g : Symbol(g, Decl(modifierOnClassExpressionMemberInFunction.ts, 0, 0))
 

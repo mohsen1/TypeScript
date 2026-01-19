@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateVisibility.ts] ////
-
 //// [privateVisibility.ts]
 class Foo {
 	public pubMeth() {this.privMeth();}
@@ -15,7 +13,7 @@ f.privProp; // should not work
 f.pubMeth(); // should work
 f.pubProp; // should work
 
-namespace M {
+module M {
     export class C { public pub = 0; private priv = 1; }
     export var V = 0;
 }

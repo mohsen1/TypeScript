@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringIncludes.ts] ////
-
 //// [stringIncludes.ts]
 var includes: boolean;
 includes = "abcde".includes("cd");

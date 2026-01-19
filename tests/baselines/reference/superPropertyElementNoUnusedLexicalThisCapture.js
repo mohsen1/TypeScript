@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superPropertyElementNoUnusedLexicalThisCapture.ts] ////
-
 //// [superPropertyElementNoUnusedLexicalThisCapture.ts]
 class A { x() {} }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNamesDeclarationEmit2_ES6.ts] ////
-
 //// [computedPropertyNamesDeclarationEmit2_ES6.ts]
 class C {
     static ["" + ""]() { }

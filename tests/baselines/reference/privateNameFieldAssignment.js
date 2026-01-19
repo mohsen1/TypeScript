@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameFieldAssignment.ts] ////
-
 //// [privateNameFieldAssignment.ts]
 class A {
     #field = 0;

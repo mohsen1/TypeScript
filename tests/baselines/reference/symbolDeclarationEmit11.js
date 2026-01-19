@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/Symbols/symbolDeclarationEmit11.ts] ////
-
 //// [symbolDeclarationEmit11.ts]
 class C {
     static [Symbol.iterator] = 0;

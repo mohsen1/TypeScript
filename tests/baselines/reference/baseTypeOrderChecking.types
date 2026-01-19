@@ -1,15 +1,11 @@
-//// [tests/cases/compiler/baseTypeOrderChecking.ts] ////
-
-=== baseTypeOrderChecking.ts ===
+=== tests/cases/compiler/baseTypeOrderChecking.ts ===
 var someVariable: Class4<Class2>;
 >someVariable : Class4<Class2>
->             : ^^^^^^^^^^^^^^
 
  
 
 class Class1
 >Class1 : Class1
->       : ^^^^^^
 
 {
 
@@ -19,9 +15,7 @@ class Class1
 
 class Class2 extends Class1
 >Class2 : Class2
->       : ^^^^^^
 >Class1 : Class1
->       : ^^^^^^
 
 {
 
@@ -31,13 +25,11 @@ class Class2 extends Class1
 
 class Class3<T>
 >Class3 : Class3<T>
->       : ^^^^^^^^^
 
 {
 
                public memberVariable: Class2;
 >memberVariable : Class2
->               : ^^^^^^
 
 }
 
@@ -45,9 +37,7 @@ class Class3<T>
 
 class Class4<T> extends Class3<T>
 >Class4 : Class4<T>
->       : ^^^^^^^^^
 >Class3 : Class3<T>
->       : ^^^^^^^^^
 
 {
 

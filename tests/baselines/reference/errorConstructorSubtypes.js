@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorConstructorSubtypes.ts] ////
-
 //// [errorConstructorSubtypes.ts]
 // In Node, ErrorConstructor is augmented with extra properties. Excerpted below.
 interface ErrorConstructor {

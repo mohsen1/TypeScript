@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/duplicateAnonymousInners1.ts] ////
-
 //// [duplicateAnonymousInners1.ts]
-namespace Foo {
+module Foo {
 
     class Helper {
 
@@ -14,7 +12,7 @@ namespace Foo {
 }
 
 
-namespace Foo {
+module Foo {
     
     // Should not be an error
     class Helper {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript6/ComputedPropertyNames/parserComputedPropertyName16.ts] ////
-
 //// [parserComputedPropertyName16.ts]
 enum E {
   [e] = 1

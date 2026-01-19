@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/es6/for-ofStatements/for-of26.ts] ////
-
 //// [for-of26.ts]
-class MyStringIterator {
+class StringIterator {
     next() {
         return x;
     }
@@ -11,10 +9,10 @@ class MyStringIterator {
 }
 
 var x: any;
-for (var v of new MyStringIterator) { }
+for (var v of new StringIterator) { }
 
 //// [for-of26.js]
-class MyStringIterator {
+class StringIterator {
     next() {
         return x;
     }
@@ -23,4 +21,4 @@ class MyStringIterator {
     }
 }
 var x;
-for (var v of new MyStringIterator) { }
+for (var v of new StringIterator) { }

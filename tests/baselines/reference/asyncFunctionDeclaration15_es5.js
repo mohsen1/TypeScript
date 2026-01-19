@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es5/functionDeclarations/asyncFunctionDeclaration15_es5.ts] ////
-
 //// [asyncFunctionDeclaration15_es5.ts]
 declare class Thenable { then(): void; }
 declare let a: any;

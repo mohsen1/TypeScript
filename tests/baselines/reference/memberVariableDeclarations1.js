@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/memberVariableDeclarations1.ts] ////
-
 //// [memberVariableDeclarations1.ts]
 // from spec
 

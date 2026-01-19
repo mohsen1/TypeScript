@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/noImplicitAnyModule.ts] ////
-
 //// [noImplicitAnyModule.ts]
-declare namespace Module {
+declare module Module {
     interface Interface {
         // Should return error for implicit any on return type.
         new ();

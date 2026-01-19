@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declFileTypeAnnotationVisibilityErrorVariableDeclaration.ts] ////
-
 //// [declFileTypeAnnotationVisibilityErrorVariableDeclaration.ts]
-namespace m {
+module m {
     class private1 {
     }
 
@@ -21,7 +19,7 @@ namespace m {
     export var k2: public1;
     export var l2 = new public1();
 
-    namespace m2 {
+    module m2 {
         export class public2 {
         }
     }
@@ -71,7 +69,7 @@ var m;
 
 
 //// [declFileTypeAnnotationVisibilityErrorVariableDeclaration.d.ts]
-declare namespace m {
+declare module m {
     class private1 {
     }
     export class public1 {
@@ -80,7 +78,7 @@ declare namespace m {
     export var l: private1;
     export var k2: public1;
     export var l2: public1;
-    namespace m2 {
+    module m2 {
         class public2 {
         }
     }

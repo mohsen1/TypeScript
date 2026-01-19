@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop13.ts] ////
-
 //// [capturedLetConstInLoop13.ts]
 class Main {
 

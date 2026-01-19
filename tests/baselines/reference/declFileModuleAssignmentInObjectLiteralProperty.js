@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declFileModuleAssignmentInObjectLiteralProperty.ts] ////
-
 //// [declFileModuleAssignmentInObjectLiteralProperty.ts]
-namespace m1 {
+module m1 {
     export class c {
     }
 }
@@ -22,12 +20,12 @@ var m1;
 })(m1 || (m1 = {}));
 var d = {
     m1: { m: m1 },
-    m2: { c: m1.c },
+    m2: { c: m1.c }
 };
 
 
 //// [declFileModuleAssignmentInObjectLiteralProperty.d.ts]
-declare namespace m1 {
+declare module m1 {
     class c {
     }
 }

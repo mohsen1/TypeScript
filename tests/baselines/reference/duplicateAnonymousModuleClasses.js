@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/duplicateAnonymousModuleClasses.ts] ////
-
 //// [duplicateAnonymousModuleClasses.ts]
-namespace F {
+module F {
 
     class Helper {
 
@@ -10,7 +8,7 @@ namespace F {
 }
 
 
-namespace F {
+module F {
     
     // Should not be an error
     class Helper {
@@ -19,7 +17,7 @@ namespace F {
 
 }
 
-namespace Foo {
+module Foo {
 
     class Helper {
 
@@ -28,7 +26,7 @@ namespace Foo {
 }
 
 
-namespace Foo {
+module Foo {
     
     // Should not be an error
     class Helper {
@@ -37,8 +35,8 @@ namespace Foo {
 
 }
 
-namespace Gar {
-    namespace Foo {
+module Gar {
+    module Foo {
 
         class Helper {
 
@@ -47,7 +45,7 @@ namespace Gar {
     }
 
 
-    namespace Foo {
+    module Foo {
     
         // Should not be an error
         class Helper {

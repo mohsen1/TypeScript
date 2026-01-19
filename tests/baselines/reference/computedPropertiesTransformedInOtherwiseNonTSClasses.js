@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/computedPropertiesTransformedInOtherwiseNonTSClasses.ts] ////
-
 //// [computedPropertiesTransformedInOtherwiseNonTSClasses.ts]
 namespace NS { 
     export const x = Symbol();

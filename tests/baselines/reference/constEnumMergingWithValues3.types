@@ -1,21 +1,14 @@
-//// [tests/cases/compiler/constEnumMergingWithValues3.ts] ////
-
-=== m1.ts ===
+=== tests/cases/compiler/m1.ts ===
 enum foo { A }
 >foo : foo
->    : ^^^
 >A : foo.A
->  : ^^^^^
 
-namespace foo {
+module foo {
     const enum E { X }
 >E : E
->  : ^
 >X : E.X
->  : ^^^
 }
 
 export = foo
 >foo : foo
->    : ^^^
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsRestArgsWithThisTypeInJSDocFunction.ts] ////
-
 //// [bug38550.js]
 export class Clazz {
   /**

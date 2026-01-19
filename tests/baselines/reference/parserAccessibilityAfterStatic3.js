@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ErrorRecovery/AccessibilityAfterStatic/parserAccessibilityAfterStatic3.ts] ////
-
 //// [parserAccessibilityAfterStatic3.ts]
 class Outer
 {

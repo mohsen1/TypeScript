@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsdocIllegalTags.ts] ////
-
 === /a.js ===
 class C {
 >C : Symbol(C, Decl(a.js, 0, 0))

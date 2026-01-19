@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infinitelyExpandingBaseTypes1.ts] ////
-
 //// [infinitelyExpandingBaseTypes1.ts]
 interface A<T>
 {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/awaitInNonAsyncFunction.ts] ////
-
 //// [awaitInNonAsyncFunction.ts]
 // https://github.com/Microsoft/TypeScript/issues/26586
 

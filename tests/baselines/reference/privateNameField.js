@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameField.ts] ////
-
 //// [privateNameField.ts]
 class A {
     #name: string;

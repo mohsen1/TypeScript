@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/assign1.ts] ////
-
 //// [assign1.ts]
-namespace M {
+module M {
     interface I {
         salt:number;
         pepper:number;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/invalidUseOfTypeAsNamespace.ts] ////
-
 //// [invalidUseOfTypeAsNamespace.ts]
 interface OhNo {
 }

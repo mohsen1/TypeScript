@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertyAccessExpressionInnerComments.ts] ////
-
 //// [propertyAccessExpressionInnerComments.ts]
 /*1*/Array/*2*/./*3*/toString/*4*/
 

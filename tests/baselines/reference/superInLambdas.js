@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superInLambdas.ts] ////
-
 //// [superInLambdas.ts]
 class User {
     name: string = "Bob";

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/SuperExpressions/parserSuperExpression4.ts] ////
-
 //// [parserSuperExpression4.ts]
 class C {
     private foo() {
@@ -7,7 +5,7 @@ class C {
     }
 }
 
-namespace M1.M2 {
+module M1.M2 {
     class C {
         private foo() {
             super.foo = 1

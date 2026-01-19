@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumAssignmentCompat3.ts] ////
-
 //// [enumAssignmentCompat3.ts]
 namespace First {
     export enum E {
@@ -52,33 +50,33 @@ namespace Merged2 {
     export enum E {
         a, b, c
     }
-    export namespace E {
+    export module E {
         export let d = 5;
     }
 }
 
-declare var abc: First.E;
-declare var secondAbc: Abc.E;
-declare var secondAbcd: Abcd.E;
-declare var secondAb: Ab.E;
-declare var secondCd: Cd.E;
-declare var nope: Abc.Nope;
-declare var k: Const.E;
-declare var decl: Decl.E;
-declare var merged: Merged.E;
-declare var merged2: Merged2.E;
+var abc: First.E;
+var secondAbc: Abc.E;
+var secondAbcd: Abcd.E;
+var secondAb: Ab.E;
+var secondCd: Cd.E;
+var nope: Abc.Nope;
+var k: Const.E;
+var decl: Decl.E;
+var merged: Merged.E;
+var merged2: Merged2.E;
 abc = secondAbc; // ok
 abc = secondAbcd; // missing 'd'
 abc = secondAb; // ok
 abc = secondCd; // missing 'd'
 abc = nope; // nope!
-abc = decl; // bad - value of 'c' differs between these enums
+abc = decl; // ok
 secondAbc = abc; // ok
 secondAbcd = abc; // ok
 secondAb = abc; // missing 'c'
 secondCd = abc; // missing 'a' and 'b'
 nope = abc; // nope!
-decl = abc; // bad - value of 'c' differs between these enums
+decl = abc; // ok
 
 // const is only assignable to itself
 k = k;
@@ -87,7 +85,7 @@ k = abc;
 
 // merged enums compare all their members
 abc = merged; // missing 'd'
-merged = abc; // bad - value of 'c' differs between these enums
+merged = abc; // ok
 abc = merged2; // ok
 merged2 = abc; // ok
 
@@ -169,24 +167,34 @@ var Merged2;
         E.d = 5;
     })(E = Merged2.E || (Merged2.E = {}));
 })(Merged2 || (Merged2 = {}));
+var abc;
+var secondAbc;
+var secondAbcd;
+var secondAb;
+var secondCd;
+var nope;
+var k;
+var decl;
+var merged;
+var merged2;
 abc = secondAbc; // ok
 abc = secondAbcd; // missing 'd'
 abc = secondAb; // ok
 abc = secondCd; // missing 'd'
 abc = nope; // nope!
-abc = decl; // bad - value of 'c' differs between these enums
+abc = decl; // ok
 secondAbc = abc; // ok
 secondAbcd = abc; // ok
 secondAb = abc; // missing 'c'
 secondCd = abc; // missing 'a' and 'b'
 nope = abc; // nope!
-decl = abc; // bad - value of 'c' differs between these enums
+decl = abc; // ok
 // const is only assignable to itself
 k = k;
 abc = k; // error
 k = abc;
 // merged enums compare all their members
 abc = merged; // missing 'd'
-merged = abc; // bad - value of 'c' differs between these enums
+merged = abc; // ok
 abc = merged2; // ok
 merged2 = abc; // ok

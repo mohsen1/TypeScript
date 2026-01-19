@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/constEnumOnlyModuleMerging.ts] ////
-
 //// [constEnumOnlyModuleMerging.ts]
-namespace Outer {
+module Outer {
     export var x = 1;
 }
 
-namespace Outer {
+module Outer {
     export const enum A { X }
 }
 
-namespace B {
+module B {
     import O = Outer;
     var x = O.A.X;
     var y = O.x;
@@ -23,6 +21,6 @@ var Outer;
 var B;
 (function (B) {
     var O = Outer;
-    var x = 0 /* O.A.X */;
+    var x = 0 /* X */;
     var y = O.x;
 })(B || (B = {}));

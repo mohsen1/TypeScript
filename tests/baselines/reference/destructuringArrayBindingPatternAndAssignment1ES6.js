@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringArrayBindingPatternAndAssignment1ES6.ts] ////
-
 //// [destructuringArrayBindingPatternAndAssignment1ES6.ts]
 /* AssignmentPattern:
  *      ObjectAssignmentPattern

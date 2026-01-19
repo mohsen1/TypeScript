@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractSuperCalls.ts] ////
-
 //// [classAbstractSuperCalls.ts]
 class A {
     foo() { return 1; }

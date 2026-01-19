@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classImplementsMergedClassInterface.ts] ////
-
 //// [classImplementsMergedClassInterface.ts]
 declare class C1 {
     x : number;

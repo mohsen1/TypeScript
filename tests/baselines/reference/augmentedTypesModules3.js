@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/augmentedTypesModules3.ts] ////
-
 //// [augmentedTypesModules3.ts]
 //// module then class
-namespace m3 { }
+module m3 { }
 class m3 { } // ok since the module is not instantiated
 
-namespace m3a { var y = 2; }
+module m3a { var y = 2; }
 class m3a { foo() { } } // error, class isn't ambient or declared before the module
 
 //// [augmentedTypesModules3.js]

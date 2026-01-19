@@ -5,7 +5,7 @@ sourceRoot:
 sources: ../optionsInlineSourceMapMapRoot.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:optionsInlineSourceMapMapRoot.js
+emittedFile:tests/cases/compiler/optionsInlineSourceMapMapRoot.js
 sourceFile:../optionsInlineSourceMapMapRoot.ts
 -------------------------------------------------------------------
 >>>var a = 10;

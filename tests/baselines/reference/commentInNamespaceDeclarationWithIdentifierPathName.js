@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentInNamespaceDeclarationWithIdentifierPathName.ts] ////
-
 //// [commentInNamespaceDeclarationWithIdentifierPathName.ts]
 namespace hello.hi.world
 {

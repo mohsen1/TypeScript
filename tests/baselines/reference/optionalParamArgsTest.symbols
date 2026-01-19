@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/optionalParamArgsTest.ts] ////
-
-=== optionalParamArgsTest.ts ===
+=== tests/cases/compiler/optionalParamArgsTest.ts ===
 // Optional parameter and default argument tests
 
 // Key:

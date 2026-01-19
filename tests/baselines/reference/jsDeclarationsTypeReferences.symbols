@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsTypeReferences.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/jsdoc/declarations/index.js ===
 /// <reference types="node" />
 
 const Something = require("fs").Something;
@@ -24,7 +22,7 @@ module.exports = {
 
 };
 
-=== node_modules/@types/node/index.d.ts ===
+=== tests/cases/conformance/jsdoc/declarations/node_modules/@types/node/index.d.ts ===
 declare module "fs" {
 >"fs" : Symbol("fs", Decl(index.d.ts, 0, 0))
 

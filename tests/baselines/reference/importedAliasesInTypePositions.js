@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/importedAliasesInTypePositions.ts] ////
 
 //// [file1.ts]
-export namespace elaborate.nested.mod.name {
+export module elaborate.nested.mod.name {
     export class ReferredTo {
         doSomething(): void {
         }
@@ -12,7 +12,7 @@ export namespace elaborate.nested.mod.name {
 import RT_ALIAS = require("file1");
 import ReferredTo = RT_ALIAS.elaborate.nested.mod.name.ReferredTo;
 
-export namespace ImportingModule {
+export module ImportingModule {
     class UsesReferredType {
         constructor(private referred: ReferredTo) { }
     }
@@ -21,7 +21,7 @@ export namespace ImportingModule {
 //// [file1.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.elaborate = void 0;
     var elaborate;
     (function (elaborate) {
@@ -42,12 +42,12 @@ define(["require", "exports"], function (require, exports) {
                 })(name = mod.name || (mod.name = {}));
             })(mod = nested.mod || (nested.mod = {}));
         })(nested = elaborate.nested || (elaborate.nested = {}));
-    })(elaborate || (exports.elaborate = elaborate = {}));
+    })(elaborate = exports.elaborate || (exports.elaborate = {}));
 });
 //// [file2.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.ImportingModule = void 0;
     var ImportingModule;
     (function (ImportingModule) {
@@ -57,5 +57,5 @@ define(["require", "exports"], function (require, exports) {
             }
             return UsesReferredType;
         }());
-    })(ImportingModule || (exports.ImportingModule = ImportingModule = {}));
+    })(ImportingModule = exports.ImportingModule || (exports.ImportingModule = {}));
 });

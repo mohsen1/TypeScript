@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedBlockScopedBindings9.ts] ////
-
 //// [nestedBlockScopedBindings9.ts]
 {
     let x;

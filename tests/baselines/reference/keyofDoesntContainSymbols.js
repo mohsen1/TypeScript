@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/keyofDoesntContainSymbols.ts] ////
-
 //// [keyofDoesntContainSymbols.ts]
 const sym = Symbol();
 const num = 0;

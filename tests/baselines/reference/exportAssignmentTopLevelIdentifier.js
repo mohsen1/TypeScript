@@ -1,7 +1,7 @@
 //// [tests/cases/conformance/externalModules/exportAssignmentTopLevelIdentifier.ts] ////
 
 //// [foo_0.ts]
-namespace Foo {
+module Foo {
 	export var answer = 42;
 }
 export = Foo;
@@ -25,7 +25,7 @@ define(["require", "exports"], function (require, exports) {
 //// [foo_1.js]
 define(["require", "exports", "./foo_0"], function (require, exports, foo) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     if (foo.answer === 42) {
     }
 });

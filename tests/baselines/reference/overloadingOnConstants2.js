@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadingOnConstants2.ts] ////
-
 //// [overloadingOnConstants2.ts]
 class C {
    private x = 1;

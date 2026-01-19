@@ -1,31 +1,29 @@
-//// [tests/cases/compiler/restInvalidArgumentType.ts] ////
-
 //// [restInvalidArgumentType.ts]
 enum E { v1, v2 };
 
 function f<T extends { b: string }>(p1: T, p2: T[]) {
-    var t!: T;
+    var t: T;
 
-    var i!: T["b"];
-    var k!: keyof T;
+    var i: T["b"];
+    var k: keyof T;
 
-    var mapped_generic!: {[P in keyof T]: T[P]};
-    var mapped!: {[P in "b"]: T[P]};
+    var mapped_generic: {[P in keyof T]: T[P]};
+    var mapped: {[P in "b"]: T[P]};
 
-    var union_generic!: T | { a: number };
-    var union_primitive!: { a: number } | number;
-    var intersection_generic!: T & { a: number };
-    var intersection_primitive!: { a: number } & string;
-    var num!: number;
-    var str!: string;
-    var literal_string: "string" = "string";
-    var literal_number: 42 = 42;
+    var union_generic: T | { a: number };
+    var union_primitive: { a: number } | number;
+    var intersection_generic: T & { a: number };
+    var intersection_primitive: { a: number } & string;
+    var num: number;
+    var str: string;
+    var literal_string: "string";
+    var literal_number: 42;
     var e: E;
 
-    var u: undefined = undefined;
-    var n: null = null;
+    var u: undefined;
+    var n: null;
 
-    var a: any = 0;
+    var a: any;
 
     var {...r1} = p1;   // Error, generic type paramterre
     var {...r2} = p2;   // OK
@@ -87,12 +85,12 @@ function f(p1, p2) {
     var intersection_primitive;
     var num;
     var str;
-    var literal_string = "string";
-    var literal_number = 42;
+    var literal_string;
+    var literal_number;
     var e;
-    var u = undefined;
-    var n = null;
-    var a = 0;
+    var u;
+    var n;
+    var a;
     var r1 = __rest(p1, []); // Error, generic type paramterre
     var r2 = __rest(p2, []); // OK
     var r3 = __rest(t, []); // Error, generic type paramter

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock20.ts] ////
-
 //// [classStaticBlock20.ts]
 class C {
     async static {

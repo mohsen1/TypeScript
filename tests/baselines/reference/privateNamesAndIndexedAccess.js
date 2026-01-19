@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesAndIndexedAccess.ts] ////
-
 //// [privateNamesAndIndexedAccess.ts]
 class C {
     foo = 3;

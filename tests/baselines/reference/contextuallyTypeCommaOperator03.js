@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/contextualTypes/commaOperator/contextuallyTypeCommaOperator03.ts] ////
-
 //// [contextuallyTypeCommaOperator03.ts]
 let x: (a: string) => string;
 

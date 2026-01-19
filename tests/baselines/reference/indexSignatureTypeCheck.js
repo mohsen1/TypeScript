@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureTypeCheck.ts] ////
-
 //// [indexSignatureTypeCheck.ts]
 interface IPropertySet {
 

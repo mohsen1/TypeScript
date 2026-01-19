@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constEnumSyntheticNodesComments.ts] ////
-
 //// [constEnumSyntheticNodesComments.ts]
 const enum En { A, B, C, D }
 
@@ -26,13 +24,13 @@ function assert(x) {
 }
 function verify(a) {
     switch (a) {
-        case 0 /* En.A */:
+        case 0 /* A */:
             return assert(a);
-        case 1 /* En["B"] */:
+        case 1 /* "B" */:
             return assert(a);
-        case 2 /* En[`C`] */:
+        case 2 /* `C` */:
             return assert(a);
-        case 3 /* En["\u{44}"] */:
+        case 3 /* "\u{44}" */:
             return assert(a);
     }
 }

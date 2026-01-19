@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/staticAndNonStaticPropertiesSameName.ts] ////
-
 //// [staticAndNonStaticPropertiesSameName.ts]
 class C {
     x: number;

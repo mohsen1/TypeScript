@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superCalls/superCalls.ts] ////
-
 //// [superCalls.ts]
 class Base {
     x = 43;
@@ -76,8 +74,10 @@ var OtherBase = /** @class */ (function () {
 var OtherDerived = /** @class */ (function (_super) {
     __extends(OtherDerived, _super);
     function OtherDerived() {
+        var _this = this;
         var p = '';
-        return _super.call(this) || this;
+        _this = _super.call(this) || this;
+        return _this;
     }
     return OtherDerived;
 }(OtherBase));

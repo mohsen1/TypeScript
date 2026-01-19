@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/convertClassExpressionToFunctionFromObjectProperty1.ts] ////
-
 //// [convertClassExpressionToFunctionFromObjectProperty1.ts]
 const foo: any = {};
 

@@ -1,17 +1,15 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource13.ts] ////
-
-=== parserRealSource13.ts ===
+=== tests/cases/conformance/parser/ecmascript5/parserRealSource13.ts ===
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript.AstWalkerWithDetailCallback {
+module TypeScript.AstWalkerWithDetailCallback {
 >TypeScript : Symbol(TypeScript, Decl(parserRealSource13.ts, 0, 0))
->AstWalkerWithDetailCallback : Symbol(AstWalkerWithDetailCallback, Decl(parserRealSource13.ts, 5, 21))
+>AstWalkerWithDetailCallback : Symbol(AstWalkerWithDetailCallback, Decl(parserRealSource13.ts, 5, 18))
 
     export interface AstWalkerDetailCallback {
->AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 50))
+>AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 47))
 
         EmptyCallback? (pre, ast: AST): boolean;
 >EmptyCallback : Symbol(AstWalkerDetailCallback.EmptyCallback, Decl(parserRealSource13.ts, 6, 46))
@@ -661,7 +659,7 @@ namespace TypeScript.AstWalkerWithDetailCallback {
 >script : Symbol(script, Decl(parserRealSource13.ts, 116, 25))
 >Script : Symbol(Script)
 >callback : Symbol(callback, Decl(parserRealSource13.ts, 116, 40))
->AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 50))
+>AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 47))
 
         var pre = (cur: AST, parent: AST) => {
 >pre : Symbol(pre, Decl(parserRealSource13.ts, 117, 11))
@@ -713,7 +711,7 @@ namespace TypeScript.AstWalkerWithDetailCallback {
 >ast : Symbol(ast, Decl(parserRealSource13.ts, 131, 44))
 >AST : Symbol(AST)
 >callback : Symbol(callback, Decl(parserRealSource13.ts, 131, 54))
->AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 50))
+>AstWalkerDetailCallback : Symbol(AstWalkerDetailCallback, Decl(parserRealSource13.ts, 5, 47))
 
         // See if the Callback needs to be handled using specific one or default one
         var nodeType = ast.nodeType;

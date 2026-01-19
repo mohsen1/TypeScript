@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/exportImportAndClodule.ts] ////
-
 //// [exportImportAndClodule.ts]
-namespace K {
+module K {
     export class L {
         constructor(public name: string) { }
     }
-    export namespace L {
+    export module L {
         export var y = 12;
         export interface Point {
             x: number;
@@ -13,7 +11,7 @@ namespace K {
         }
     }
 }
-namespace M {
+module M {
     export import D = K.L;
 }
 var o: { name: string };

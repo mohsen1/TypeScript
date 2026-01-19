@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lastPropertyInLiteralWins.ts] ////
-
 //// [lastPropertyInLiteralWins.ts]
 interface Thing {
     thunk: (str: string) => void;

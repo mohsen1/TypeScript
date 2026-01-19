@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesOverloadAssignability03.ts] ////
-
 //// [stringLiteralTypesOverloadAssignability03.ts]
 function f(x: "foo"): number;
 function f(x: string): number {

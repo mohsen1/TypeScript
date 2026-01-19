@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/rest/objectRestParameter.ts] ////
-
 //// [objectRestParameter.ts]
 function cloneAgain({ a, ...clone }: { a: number, b: string }): void {
 }

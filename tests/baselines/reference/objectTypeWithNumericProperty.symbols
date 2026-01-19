@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/members/objectTypeWithNumericProperty.ts] ////
-
-=== objectTypeWithNumericProperty.ts ===
+=== tests/cases/conformance/types/members/objectTypeWithNumericProperty.ts ===
 // no errors here
 
 class C {

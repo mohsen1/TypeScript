@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/qualifiedName_entity-name-resolution-does-not-affect-class-heritage.ts] ////
-
 //// [qualifiedName_entity-name-resolution-does-not-affect-class-heritage.ts]
-namespace Alpha {
+module Alpha {
     export var x = 100;
 }
 

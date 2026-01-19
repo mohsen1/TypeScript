@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/salsa/plainJSReservedStrict.ts] ////
-
 //// [plainJSReservedStrict.js]
 "use strict"
 const eval = 1

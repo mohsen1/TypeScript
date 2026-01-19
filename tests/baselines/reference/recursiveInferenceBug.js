@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveInferenceBug.ts] ////
-
 //// [recursiveInferenceBug.ts]
 function f(x: number) {
     var z = f(x);
@@ -20,5 +18,5 @@ function f(x) {
 }
 var zz = {
     g: function () { },
-    get f() { return "abc"; },
+    get f() { return "abc"; }
 };

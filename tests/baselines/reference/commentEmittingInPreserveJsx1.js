@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/commentEmittingInPreserveJsx1.tsx] ////
-
 //// [file.tsx]
 import React = require('react');
 
@@ -34,7 +32,7 @@ import React = require('react');
 
 //// [file.jsx]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var React = require("react");
 <div>
     // Not Comment

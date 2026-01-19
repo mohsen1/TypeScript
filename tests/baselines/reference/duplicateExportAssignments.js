@@ -13,7 +13,7 @@ export = x;
 export = y;
 
 //// [foo3.ts]
-namespace x {
+module x {
 	export var x = 10;
 }
 class y {

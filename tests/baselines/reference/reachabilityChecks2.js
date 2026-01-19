@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/reachabilityChecks2.ts] ////
-
 //// [reachabilityChecks2.ts]
 while (true) { }
 const enum E { X }
 
-namespace A4 {
+module A4 {
     while (true);
-    namespace A {
+    module A {
         const enum E { X }
     }
 }

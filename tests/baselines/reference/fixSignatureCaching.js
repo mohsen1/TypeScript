@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/fixSignatureCaching.ts] ////
-
 //// [fixSignatureCaching.ts]
 // Repro from #10697
 

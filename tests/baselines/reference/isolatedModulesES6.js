@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/isolatedModulesES6.ts] ////
-
 //// [file1.ts]
 export var x;
 

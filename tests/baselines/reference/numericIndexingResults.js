@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/indexSignatures/numericIndexingResults.ts] ////
-
 //// [numericIndexingResults.ts]
 class C {
     [x: number]: string;

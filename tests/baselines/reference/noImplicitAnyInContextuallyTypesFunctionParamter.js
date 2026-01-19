@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyInContextuallyTypesFunctionParamter.ts] ////
-
 //// [noImplicitAnyInContextuallyTypesFunctionParamter.ts]
 var regexMatchList = ['', ''];
 regexMatchList.forEach(match => ''.replace(match, ''));

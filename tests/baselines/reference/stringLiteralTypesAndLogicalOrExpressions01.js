@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesAndLogicalOrExpressions01.ts] ////
-
 //// [stringLiteralTypesAndLogicalOrExpressions01.ts]
 declare function myRandBool(): boolean;
 

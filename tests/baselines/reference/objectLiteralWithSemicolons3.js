@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLiteralWithSemicolons3.ts] ////
-
 //// [objectLiteralWithSemicolons3.ts]
 var v = {
   a;

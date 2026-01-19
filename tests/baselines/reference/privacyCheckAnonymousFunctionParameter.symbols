@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/privacyCheckAnonymousFunctionParameter.ts] ////
-
-=== privacyCheckAnonymousFunctionParameter.ts ===
+=== tests/cases/compiler/privacyCheckAnonymousFunctionParameter.ts ===
 export var x = 1;  // Makes this an external module
 >x : Symbol(x, Decl(privacyCheckAnonymousFunctionParameter.ts, 0, 10))
 
@@ -9,11 +7,11 @@ interface Iterator<T> {
 >T : Symbol(T, Decl(privacyCheckAnonymousFunctionParameter.ts, 1, 19))
 }
 
-namespace Query {
+module Query {
 >Query : Symbol(Query, Decl(privacyCheckAnonymousFunctionParameter.ts, 2, 1))
 
     export function fromDoWhile<T>(doWhile: (test: Iterator<T>) => boolean): Iterator<T> {
->fromDoWhile : Symbol(fromDoWhile, Decl(privacyCheckAnonymousFunctionParameter.ts, 4, 17))
+>fromDoWhile : Symbol(fromDoWhile, Decl(privacyCheckAnonymousFunctionParameter.ts, 4, 14))
 >T : Symbol(T, Decl(privacyCheckAnonymousFunctionParameter.ts, 5, 32))
 >doWhile : Symbol(doWhile, Decl(privacyCheckAnonymousFunctionParameter.ts, 5, 35))
 >test : Symbol(test, Decl(privacyCheckAnonymousFunctionParameter.ts, 5, 45))
@@ -29,7 +27,7 @@ namespace Query {
 >fromOrderBy : Symbol(fromOrderBy, Decl(privacyCheckAnonymousFunctionParameter.ts, 7, 5))
 
         return fromDoWhile(test => {
->fromDoWhile : Symbol(fromDoWhile, Decl(privacyCheckAnonymousFunctionParameter.ts, 4, 17))
+>fromDoWhile : Symbol(fromDoWhile, Decl(privacyCheckAnonymousFunctionParameter.ts, 4, 14))
 >test : Symbol(test, Decl(privacyCheckAnonymousFunctionParameter.ts, 10, 27))
 
             return true;

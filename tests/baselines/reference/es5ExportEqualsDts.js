@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5ExportEqualsDts.ts] ////
-
 //// [es5ExportEqualsDts.ts]
 class A {
     foo() {
@@ -8,7 +6,7 @@ class A {
     }
 }
 
-namespace A {
+module A {
     export interface B { }
 }
 
@@ -32,7 +30,7 @@ module.exports = A;
 declare class A {
     foo(): A.B;
 }
-declare namespace A {
+declare module A {
     interface B {
     }
 }

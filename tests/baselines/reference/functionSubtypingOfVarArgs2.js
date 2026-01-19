@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionSubtypingOfVarArgs2.ts] ////
-
 //// [functionSubtypingOfVarArgs2.ts]
 class EventBase {
     private _listeners: { (...args: any[]): void; }[] = [];

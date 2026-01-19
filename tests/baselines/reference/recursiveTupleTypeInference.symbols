@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/recursiveTupleTypeInference.ts] ////
-
-=== recursiveTupleTypeInference.ts ===
+=== tests/cases/compiler/recursiveTupleTypeInference.ts ===
 // Repro from #37475
 
 export type A = "number" | "null" | A[];

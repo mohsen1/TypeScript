@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parameterInitializerBeforeDestructuringEmit.ts] ////
-
 //// [parameterInitializerBeforeDestructuringEmit.ts]
 interface Foo {
     bar?: any;

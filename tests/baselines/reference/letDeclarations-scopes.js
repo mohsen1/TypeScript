@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations-scopes.ts] ////
-
 //// [letDeclarations-scopes.ts]
 // global
 let l = "string";
@@ -110,7 +108,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
     let l = 0;
     n = l;
 

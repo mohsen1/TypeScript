@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/recursiveCloduleReference.ts] ////
-
 //// [recursiveCloduleReference.ts]
-namespace M
+module M
 {
   export class C {
   }
-  export namespace C {
+  export module C {
     export var C = M.C
   };
 };

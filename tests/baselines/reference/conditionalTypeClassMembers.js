@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalTypeClassMembers.ts] ////
-
 //// [conditionalTypeClassMembers.ts]
 declare class MyRecord {
     private a();

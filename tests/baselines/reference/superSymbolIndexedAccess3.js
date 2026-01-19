@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superPropertyAccess/superSymbolIndexedAccess3.ts] ////
-
 //// [superSymbolIndexedAccess3.ts]
 var symbol = Symbol.for('myThing');
 

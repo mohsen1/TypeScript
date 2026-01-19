@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/primaryExpressionMods.ts] ////
-
-=== primaryExpressionMods.ts ===
-namespace M
+=== tests/cases/compiler/primaryExpressionMods.ts ===
+module M
 >M : Symbol(M, Decl(primaryExpressionMods.ts, 0, 0))
 {
     export interface P { x: number; y: number; }

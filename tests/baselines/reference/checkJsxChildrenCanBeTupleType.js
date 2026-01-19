@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/checkJsxChildrenCanBeTupleType.tsx] ////
-
 //// [checkJsxChildrenCanBeTupleType.tsx]
 /// <reference path="/.lib/react16.d.ts" />
 
@@ -44,7 +42,7 @@ var __extends = (this && this.__extends) || (function () {
 var __importDefault = (this && this.__importDefault) || function (mod) {
     return (mod && mod.__esModule) ? mod : { "default": mod };
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var react_1 = __importDefault(require("react"));
 var ResizablePanel = /** @class */ (function (_super) {
     __extends(ResizablePanel, _super);
@@ -52,11 +50,11 @@ var ResizablePanel = /** @class */ (function (_super) {
         return _super !== null && _super.apply(this, arguments) || this;
     }
     return ResizablePanel;
-}(react_1.default.Component));
-var test = react_1.default.createElement(ResizablePanel, null,
-    react_1.default.createElement("div", null),
-    react_1.default.createElement("div", null));
-var testErr = react_1.default.createElement(ResizablePanel, null,
-    react_1.default.createElement("div", null),
-    react_1.default.createElement("div", null),
-    react_1.default.createElement("div", null));
+}(react_1["default"].Component));
+var test = react_1["default"].createElement(ResizablePanel, null,
+    react_1["default"].createElement("div", null),
+    react_1["default"].createElement("div", null));
+var testErr = react_1["default"].createElement(ResizablePanel, null,
+    react_1["default"].createElement("div", null),
+    react_1["default"].createElement("div", null),
+    react_1["default"].createElement("div", null));

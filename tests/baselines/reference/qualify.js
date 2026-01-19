@@ -1,26 +1,24 @@
-//// [tests/cases/compiler/qualify.ts] ////
-
 //// [qualify.ts]
-namespace M {
+module M {
     export var m=0;
-    export namespace N {
+    export module N {
         export var n=1;
     }
 }
 
-namespace M {
-    export namespace N {
+module M {
+    export module N {
         var y=m;
         var x=n+y;
     }
 }
 
 
-namespace T {
+module T {
     export interface I {
         p;
     }
-    export namespace U {
+    export module U {
         var z:I=3;
         export interface I2 {
             q;
@@ -28,23 +26,23 @@ namespace T {
     }
 }
 
-namespace Peer {
-    export namespace U2 {
+module Peer {
+    export module U2 {
         var z:T.U.I2=3;
     }
 }
 
-namespace Everest {
-    export namespace K1 {
+module Everest {
+    export module K1 {
         export interface I3 {
             zeep;
         }
     }
-    export namespace K2 {
+    export module K2 {
         export interface I4 {
             z;
         }
-        var v1:I4 = undefined as any;
+        var v1:I4;
         var v2:K1.I3=v1;
         var v3:K1.I3[]=v1;
         var v4:()=>K1.I3=v1;
@@ -57,7 +55,7 @@ interface I {
     k;
 }
 
-var y:I = undefined as any;
+var y:I;
 var x:T.I=y;
 
 
@@ -96,7 +94,7 @@ var Everest;
 (function (Everest) {
     var K2;
     (function (K2) {
-        var v1 = undefined;
+        var v1;
         var v2 = v1;
         var v3 = v1;
         var v4 = v1;
@@ -104,5 +102,5 @@ var Everest;
         var v6 = v1;
     })(K2 = Everest.K2 || (Everest.K2 = {}));
 })(Everest || (Everest = {}));
-var y = undefined;
+var y;
 var x = y;

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/commentEmitWithCommentOnLastLine.ts] ////
-
-=== commentEmitWithCommentOnLastLine.ts ===
+=== tests/cases/compiler/commentEmitWithCommentOnLastLine.ts ===
 var x: any;
 >x : any
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/RegressionTests/parser509546.ts] ////
-
 //// [parser509546.ts]
 export class Logger { 
      public
@@ -8,7 +6,7 @@ export class Logger {
 
 //// [parser509546.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Logger = void 0;
 var Logger = /** @class */ (function () {
     function Logger() {

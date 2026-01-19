@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeAliases/asiPreventsParsingAsTypeAlias02.ts] ////
-
-=== asiPreventsParsingAsTypeAlias02.ts ===
+=== tests/cases/conformance/types/typeAliases/asiPreventsParsingAsTypeAlias02.ts ===
 var type;
 >type : any
 
@@ -12,7 +10,6 @@ var Foo;
 
 namespace container {
 >container : typeof container
->          : ^^^^^^^^^^^^^^^^
 
     type
 >type : any

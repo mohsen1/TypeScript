@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/literalTypeWidening.ts] ////
-
 //// [literalTypeWidening.ts]
 // Widening vs. non-widening literal types
 
@@ -171,10 +169,8 @@ var __rest = (this && this.__rest) || function (s, e) {
         }
     return t;
 };
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.langCodes = void 0;
-exports.Set = Set;
-exports.keys = keys;
+exports.__esModule = true;
+exports.langCodes = exports.keys = exports.Set = void 0;
 function f1() {
     var c1 = "hello"; // Widening type "hello"
     var v1 = c1; // Type string
@@ -266,9 +262,11 @@ function Set() {
     keys.forEach(function (key) { return result[key] = true; });
     return result;
 }
+exports.Set = Set;
 function keys(obj) {
     return Object.keys(obj);
 }
+exports.keys = keys;
 var langCodeSet = Set('fr', 'en', 'es', 'it', 'nl');
 exports.langCodes = keys(langCodeSet);
 var arr = exports.langCodes.map(function (code) { return ({ code: code }); });

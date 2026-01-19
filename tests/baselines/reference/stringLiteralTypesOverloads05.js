@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesOverloads05.ts] ////
-
 //// [stringLiteralTypesOverloads05.ts]
 interface Animal { animal: {} };
 interface Dog extends Animal { dog: {} }

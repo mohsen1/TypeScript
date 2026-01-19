@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorInvalidOperations.ts] ////
-
 //// [plusOperatorInvalidOperations.ts]
 // Unary operator +
 var b;

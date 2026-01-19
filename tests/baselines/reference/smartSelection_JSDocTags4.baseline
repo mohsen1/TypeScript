@@ -1,4 +1,3 @@
-// === Smart Selection ===
 /**
  * @typedef {object} Foo
  * @property {string} a

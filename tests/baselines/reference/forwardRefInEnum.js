@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forwardRefInEnum.ts] ////
-
 //// [forwardRefInEnum.ts]
 enum E1 {
     // illegal case

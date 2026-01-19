@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/specifyingTypes/typeLiterals/arrayTypeOfFunctionTypes2.ts] ////
-
 //// [arrayTypeOfFunctionTypes2.ts]
 // valid uses of arrays of function types
 

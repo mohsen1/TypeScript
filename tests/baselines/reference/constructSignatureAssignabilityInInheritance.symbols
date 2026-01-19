@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/constructSignatureAssignabilityInInheritance.ts] ////
-
-=== constructSignatureAssignabilityInInheritance.ts ===
+=== tests/cases/conformance/types/typeRelationships/assignmentCompatibility/constructSignatureAssignabilityInInheritance.ts ===
 // Checking basic subtype relations with construct signatures
 
-namespace ConstructSignature {
+module ConstructSignature {
 >ConstructSignature : Symbol(ConstructSignature, Decl(constructSignatureAssignabilityInInheritance.ts, 0, 0))
 
     interface Base { // T
->Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 2, 30))
+>Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 2, 27))
 
         // M's
         new (x: number): void; // BUG 842221
@@ -21,7 +19,7 @@ namespace ConstructSignature {
     // S's
     interface I extends Base {
 >I : Symbol(I, Decl(constructSignatureAssignabilityInInheritance.ts, 7, 5))
->Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 2, 30))
+>Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 2, 27))
 
         // N's
         new (x: number): number; // satisfies subtype for both of base's call signatures
@@ -63,11 +61,11 @@ namespace ConstructSignature {
     }
 }
 
-namespace MemberWithConstructSignature {
+module MemberWithConstructSignature {
 >MemberWithConstructSignature : Symbol(MemberWithConstructSignature, Decl(constructSignatureAssignabilityInInheritance.ts, 32, 1))
 
     interface Base { // T
->Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 40))
+>Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 37))
 
         // M's
         a: new (x: number) => void;
@@ -86,20 +84,20 @@ namespace MemberWithConstructSignature {
 >T : Symbol(T, Decl(constructSignatureAssignabilityInInheritance.ts, 39, 17))
     }
 
-    declare var b: Base;
->b : Symbol(b, Decl(constructSignatureAssignabilityInInheritance.ts, 42, 15))
->Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 40))
+    var b: Base;
+>b : Symbol(b, Decl(constructSignatureAssignabilityInInheritance.ts, 42, 7))
+>Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 37))
 
     var r = new b.a(1);
 >r : Symbol(r, Decl(constructSignatureAssignabilityInInheritance.ts, 43, 7))
 >b.a : Symbol(Base.a, Decl(constructSignatureAssignabilityInInheritance.ts, 35, 20))
->b : Symbol(b, Decl(constructSignatureAssignabilityInInheritance.ts, 42, 15))
+>b : Symbol(b, Decl(constructSignatureAssignabilityInInheritance.ts, 42, 7))
 >a : Symbol(Base.a, Decl(constructSignatureAssignabilityInInheritance.ts, 35, 20))
 
     // S's
     interface I extends Base {
 >I : Symbol(I, Decl(constructSignatureAssignabilityInInheritance.ts, 43, 23))
->Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 40))
+>Base : Symbol(Base, Decl(constructSignatureAssignabilityInInheritance.ts, 34, 37))
 
         // N's
         a: new (x: number) => number; // ok because base returns void

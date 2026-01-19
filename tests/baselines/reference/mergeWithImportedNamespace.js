@@ -11,12 +11,12 @@ export namespace N {
 
 //// [f1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.N = void 0;
 var N;
 (function (N) {
     N.x = 1;
-})(N || (exports.N = N = {}));
+})(N = exports.N || (exports.N = {}));
 //// [f2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

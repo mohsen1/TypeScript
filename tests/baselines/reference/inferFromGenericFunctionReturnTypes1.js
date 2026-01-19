@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferFromGenericFunctionReturnTypes1.ts] ////
-
 //// [inferFromGenericFunctionReturnTypes1.ts]
 // Repro from #15680
 

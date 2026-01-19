@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/numberAssignableToEnum.ts] ////
-
 //// [numberAssignableToEnum.ts]
 enum E { A }
 var n: number;

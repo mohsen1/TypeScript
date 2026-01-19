@@ -1,17 +1,15 @@
-//// [tests/cases/conformance/expressions/unaryOperators/logicalNotOperator/logicalNotOperatorWithBooleanType.ts] ////
-
 //// [logicalNotOperatorWithBooleanType.ts]
 // ! operator on boolean type
-declare var BOOLEAN: boolean;
+var BOOLEAN: boolean;
 
 function foo(): boolean { return true; }
 
 class A {
-    public a!: boolean;
+    public a: boolean;
     static foo() { return false; }
 }
-namespace M {
-    export declare var n: boolean;
+module M {
+    export var n: boolean;
 }
 
 var objA = new A();
@@ -41,6 +39,8 @@ var ResultIsBoolean = !!BOOLEAN;
 !M.n;
 
 //// [logicalNotOperatorWithBooleanType.js]
+// ! operator on boolean type
+var BOOLEAN;
 function foo() { return true; }
 var A = /** @class */ (function () {
     function A() {

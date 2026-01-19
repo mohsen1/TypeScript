@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/intersectionsAndOptionalProperties.ts] ////
-
 //// [intersectionsAndOptionalProperties.ts]
 declare let x: { a?: number, b: string };
 declare let y: { a: null, b: string };

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/staticIndexSignature/staticIndexSignature6.ts] ////
-
 //// [staticIndexSignature6.ts]
 function foo () {
     return class<T> {

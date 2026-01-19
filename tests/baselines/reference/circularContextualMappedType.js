@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularContextualMappedType.ts] ////
-
 //// [circularContextualMappedType.ts]
 type Func<T> = () => T;
 

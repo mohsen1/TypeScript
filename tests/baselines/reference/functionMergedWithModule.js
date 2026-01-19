@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/functionMergedWithModule.ts] ////
-
 //// [functionMergedWithModule.ts]
 function foo(title: string) {
     var x = 10;
 }
 
-namespace foo.Bar {
+module foo.Bar {
     export function f() {
     }
 }
 
-namespace foo.Baz {
+module foo.Baz {
     export function g() {
         Bar.f();
     }

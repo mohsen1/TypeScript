@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/externalModules/exportNonLocalDeclarations.ts] ////
-
-=== exportNonLocalDeclarations.ts ===
+=== tests/cases/conformance/externalModules/exportNonLocalDeclarations.ts ===
 export { string };
 >string : Symbol(string, Decl(exportNonLocalDeclarations.ts, 0, 8))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureWithTrailingComma.ts] ////
-
 //// [indexSignatureWithTrailingComma.ts]
 type A = {
     [key: string,]: string;

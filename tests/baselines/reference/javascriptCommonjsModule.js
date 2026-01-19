@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/javascriptCommonjsModule.ts] ////
-
 //// [index.js]
 class Foo {}
 

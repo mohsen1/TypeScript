@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloadsOutOfOrder.ts] ////
-
 //// [functionOverloadsOutOfOrder.ts]
 class d {
     private foo(n: number): string;

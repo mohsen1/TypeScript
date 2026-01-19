@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/salsa/lateBoundClassMemberAssignmentJS.ts] ////
-
 //// [lateBoundClassMemberAssignmentJS.js]
 const _sym = Symbol("_sym");
 export class MyClass {

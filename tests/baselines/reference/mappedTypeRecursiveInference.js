@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mappedTypeRecursiveInference.ts] ////
-
 //// [mappedTypeRecursiveInference.ts]
 interface A { a: A }
 declare let a: A;
@@ -18,7 +16,7 @@ oub.b
 oub.b.b
 oub.b.a.n.a.n.a
 
-declare let xhr: XMLHttpRequest;
+let xhr: XMLHttpRequest;
 const out2 = foo(xhr);
 out2.responseXML
 out2.responseXML.activeElement.className.length
@@ -33,6 +31,7 @@ var oub = foo(b);
 oub.b;
 oub.b.b;
 oub.b.a.n.a.n.a;
+var xhr;
 var out2 = foo(xhr);
 out2.responseXML;
 out2.responseXML.activeElement.className.length;

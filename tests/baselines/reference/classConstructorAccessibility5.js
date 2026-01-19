@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility5.ts] ////
-
 //// [classConstructorAccessibility5.ts]
 class Base {
     protected constructor() { }

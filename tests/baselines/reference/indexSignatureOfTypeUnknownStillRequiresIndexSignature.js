@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureOfTypeUnknownStillRequiresIndexSignature.ts] ////
-
 //// [indexSignatureOfTypeUnknownStillRequiresIndexSignature.ts]
 declare function f<T extends unknown = unknown>(x: { [x: string]: T }): T;
 

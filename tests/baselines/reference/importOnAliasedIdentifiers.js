@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/importOnAliasedIdentifiers.ts] ////
-
 //// [importOnAliasedIdentifiers.ts]
-namespace A {
+module A {
     export interface X { s: string }
     export var X: X;
 }
-namespace B {
+module B {
     interface A { n: number }
     import Y = A; // Alias only for module A
     import Z = A.X; // Alias for both type and member A.X

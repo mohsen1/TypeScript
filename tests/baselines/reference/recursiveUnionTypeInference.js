@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveUnionTypeInference.ts] ////
-
 //// [recursiveUnionTypeInference.ts]
 interface Foo<T> {
     x: T;

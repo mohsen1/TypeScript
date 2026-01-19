@@ -65,6 +65,6 @@ declare namespace Foo {
 }
 import Bar = require("./bar");
 declare namespace Strings {
-    let a: string;
-    let b: string;
+    const a: string;
+    const b: string;
 }

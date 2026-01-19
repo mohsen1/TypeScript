@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/multipleExportAssignments.ts] ////
-
-=== multipleExportAssignments.ts ===
+=== tests/cases/compiler/multipleExportAssignments.ts ===
 interface connectModule {
 >connectModule : Symbol(connectModule, Decl(multipleExportAssignments.ts, 0, 0))
 
@@ -22,8 +20,8 @@ interface connectExport {
 >listen : Symbol(connectExport.listen, Decl(multipleExportAssignments.ts, 4, 47))
 >port : Symbol(port, Decl(multipleExportAssignments.ts, 5, 13))
 }
-declare const server: {
->server : Symbol(server, Decl(multipleExportAssignments.ts, 7, 13))
+var server: {
+>server : Symbol(server, Decl(multipleExportAssignments.ts, 7, 3))
 
     (): connectExport;
 >connectExport : Symbol(connectExport, Decl(multipleExportAssignments.ts, 2, 1))
@@ -38,7 +36,7 @@ declare const server: {
 
 };
 export = server;
->server : Symbol(server, Decl(multipleExportAssignments.ts, 7, 13))
+>server : Symbol(server, Decl(multipleExportAssignments.ts, 7, 3))
 
 export = connectExport;
 >connectExport : Symbol(connectExport, Decl(multipleExportAssignments.ts, 2, 1))

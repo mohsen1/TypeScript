@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/stringEnumLiteralTypes1.ts] ////
-
 //// [stringEnumLiteralTypes1.ts]
 const enum Choice { Unknown = "", Yes = "yes", No = "no" };
 
@@ -127,8 +125,8 @@ function f3(a, b) {
     var y = !b;
 }
 function f5(a, b, c) {
-    var z1 = g("yes" /* Choice.Yes */);
-    var z2 = g("no" /* Choice.No */);
+    var z1 = g("yes" /* Yes */);
+    var z2 = g("no" /* No */);
     var z3 = g(a);
     var z4 = g(b);
     var z5 = g(c);
@@ -138,14 +136,14 @@ function assertNever(x) {
 }
 function f10(x) {
     switch (x) {
-        case "yes" /* Choice.Yes */: return "true";
-        case "no" /* Choice.No */: return "false";
+        case "yes" /* Yes */: return "true";
+        case "no" /* No */: return "false";
     }
 }
 function f11(x) {
     switch (x) {
-        case "yes" /* Choice.Yes */: return "true";
-        case "no" /* Choice.No */: return "false";
+        case "yes" /* Yes */: return "true";
+        case "no" /* No */: return "false";
     }
     return assertNever(x);
 }
@@ -158,7 +156,7 @@ function f12(x) {
     }
 }
 function f13(x) {
-    if (x === "yes" /* Choice.Yes */) {
+    if (x === "yes" /* Yes */) {
         x;
     }
     else {
@@ -167,14 +165,14 @@ function f13(x) {
 }
 function f20(x) {
     switch (x.kind) {
-        case "yes" /* Choice.Yes */: return x.a;
-        case "no" /* Choice.No */: return x.b;
+        case "yes" /* Yes */: return x.a;
+        case "no" /* No */: return x.b;
     }
 }
 function f21(x) {
     switch (x.kind) {
-        case "yes" /* Choice.Yes */: return x.a;
-        case "no" /* Choice.No */: return x.b;
+        case "yes" /* Yes */: return x.a;
+        case "no" /* No */: return x.b;
     }
     return assertNever(x);
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/override/overrideParameterProperty.ts] ////
-
 //// [overrideParameterProperty.ts]
 class Base {
   p1!: string;

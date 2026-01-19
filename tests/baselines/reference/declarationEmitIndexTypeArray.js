@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitIndexTypeArray.ts] ////
-
 //// [declarationEmitIndexTypeArray.ts]
 function doSomethingWithKeys<T>(...keys: (keyof T)[]) { }
 

@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/cloduleWithDuplicateMember2.ts] ////
-
 //// [cloduleWithDuplicateMember2.ts]
 class C {
     set x(y) { }
     static set y(z) { }
 }
 
-namespace C {
+module C {
     export var x = 1;
 }
-namespace C {
+module C {
     export function x() { }
 }
 

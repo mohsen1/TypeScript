@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionWithDefaultParameterWithNoStatements8.ts] ////
-
 //// [functionWithDefaultParameterWithNoStatements8.ts]
 function foo(a = undefined) { }
 

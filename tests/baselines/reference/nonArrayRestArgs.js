@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nonArrayRestArgs.ts] ////
-
 //// [nonArrayRestArgs.ts]
 function foo(...rest: number) { // error
 	var x: string = rest[0];

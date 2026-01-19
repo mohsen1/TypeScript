@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/node/nodeModulesImportResolutionNoCycle.ts] ////
-
-=== index.ts ===
+=== tests/cases/conformance/node/index.ts ===
 // esm format file
 import * as type from "#type";
 >type : Symbol(type, Decl(index.ts, 1, 6))
@@ -8,7 +6,7 @@ import * as type from "#type";
 type;
 >type : Symbol(type, Decl(index.ts, 1, 6))
 
-=== index.mts ===
+=== tests/cases/conformance/node/index.mts ===
 // esm format file
 import * as type from "#type";
 >type : Symbol(type, Decl(index.mts, 1, 6))
@@ -16,7 +14,7 @@ import * as type from "#type";
 type;
 >type : Symbol(type, Decl(index.mts, 1, 6))
 
-=== index.cts ===
+=== tests/cases/conformance/node/index.cts ===
 // esm format file
 import * as type from "#type";
 >type : Symbol(type, Decl(index.cts, 1, 6))

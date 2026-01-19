@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/contextualTypes/methodDeclarations/contextuallyTypedObjectLiteralMethodDeclaration01.ts] ////
-
 //// [contextuallyTypedObjectLiteralMethodDeclaration01.ts]
 interface A {
     numProp: number;

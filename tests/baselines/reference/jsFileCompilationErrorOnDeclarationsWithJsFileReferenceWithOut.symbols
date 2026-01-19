@@ -1,17 +1,15 @@
-//// [tests/cases/compiler/jsFileCompilationErrorOnDeclarationsWithJsFileReferenceWithOut.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class c {
 >c : Symbol(c, Decl(a.ts, 0, 0))
 }
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 /// <reference path="c.js"/>
 function foo() {
 >foo : Symbol(foo, Decl(b.ts, 0, 0))
 }
 
-=== c.js ===
+=== tests/cases/compiler/c.js ===
 function bar() {
 >bar : Symbol(bar, Decl(c.js, 0, 0))
 }

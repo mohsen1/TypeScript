@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/gettersAndSettersErrors.ts] ////
-
-=== gettersAndSettersErrors.ts ===
+=== tests/cases/compiler/gettersAndSettersErrors.ts ===
 class C {
 >C : Symbol(C, Decl(gettersAndSettersErrors.ts, 0, 0))
 

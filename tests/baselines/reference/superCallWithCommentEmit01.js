@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superCallWithCommentEmit01.ts] ////
-
 //// [superCallWithCommentEmit01.ts]
 class A {
     constructor(public text: string) { }

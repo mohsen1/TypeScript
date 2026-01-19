@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noCollisionThisExpressionAndLocalVarInConstructor.ts] ////
-
 //// [noCollisionThisExpressionAndLocalVarInConstructor.ts]
 class class1 {
     constructor() {

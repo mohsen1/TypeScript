@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferentialTypingWithFunctionTypeSyntacticScenarios.ts] ////
-
 //// [inferentialTypingWithFunctionTypeSyntacticScenarios.ts]
 declare function map<T, U>(array: T, func: (x: T) => U): U;
 declare function identity<V>(y: V): V;

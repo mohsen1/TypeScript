@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsTypedefDescriptionsPreserved.ts] ////
-
 //// [index.js]
 /**
  * Options for Foo <------------

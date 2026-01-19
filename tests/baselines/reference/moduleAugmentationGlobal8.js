@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/moduleAugmentationGlobal8.ts] ////
-
 //// [moduleAugmentationGlobal8.ts]
 namespace A {
     declare global {
@@ -10,4 +8,7 @@ export {}
 
 
 //// [moduleAugmentationGlobal8.js]
-export {};
+define(["require", "exports"], function (require, exports) {
+    "use strict";
+    Object.defineProperty(exports, "__esModule", { value: true });
+});

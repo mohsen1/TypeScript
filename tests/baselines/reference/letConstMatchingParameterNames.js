@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letConstMatchingParameterNames.ts] ////
-
 //// [letConstMatchingParameterNames.ts]
 let parent = true;
 const parent2 = true;

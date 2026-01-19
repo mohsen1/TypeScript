@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/returnStatement1.ts] ////
-
 //// [returnStatement1.ts]
 function f() {
     return function (s) {

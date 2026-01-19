@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalTypeSimplification.ts] ////
-
 //// [conditionalTypeSimplification.ts]
 // Repro from #30794
 

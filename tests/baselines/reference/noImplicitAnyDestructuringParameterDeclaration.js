@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyDestructuringParameterDeclaration.ts] ////
-
 //// [noImplicitAnyDestructuringParameterDeclaration.ts]
 function f1([a], {b}, c, d) { // error
 }

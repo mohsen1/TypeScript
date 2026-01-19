@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorMetadataPromise.ts] ////
-
 //// [decoratorMetadataPromise.ts]
 declare const decorator: MethodDecorator;
 

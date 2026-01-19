@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/namedFunctionExpressionAssignedToClassProperty.ts] ////
-
 //// [namedFunctionExpressionAssignedToClassProperty.ts]
 class Foo{
 

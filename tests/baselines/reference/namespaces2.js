@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/namespaces2.ts] ////
-
 //// [namespaces2.ts]
-namespace A {
-    export namespace B {
+module A {
+    export module B {
         export class C { }
     }
 }

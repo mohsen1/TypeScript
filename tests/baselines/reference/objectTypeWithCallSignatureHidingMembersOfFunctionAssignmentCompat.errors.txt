@@ -1,18 +1,18 @@
-objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts(8,1): error TS2322: Type 'Object' is not assignable to type 'I'.
+tests/cases/conformance/types/members/objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts(8,1): error TS2322: Type 'Object' is not assignable to type 'I'.
   The 'Object' type is assignable to very few other types. Did you mean to use the 'any' type instead?
     Type 'Object' provides no match for the signature '(): void'.
-objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts(14,1): error TS2322: Type 'Object' is not assignable to type '() => void'.
+tests/cases/conformance/types/members/objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts(14,1): error TS2322: Type 'Object' is not assignable to type '() => void'.
   The 'Object' type is assignable to very few other types. Did you mean to use the 'any' type instead?
     Type 'Object' provides no match for the signature '(): void'.
 
 
-==== objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts (2 errors) ====
+==== tests/cases/conformance/types/members/objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts (2 errors) ====
     interface I {
         (): void;
     }
     
-    declare var i: I;
-    declare var f: Object;
+    var i: I;
+    var f: Object;
     f = i;
     i = f;
     ~
@@ -20,7 +20,7 @@ objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts(14,1): err
 !!! error TS2322:   The 'Object' type is assignable to very few other types. Did you mean to use the 'any' type instead?
 !!! error TS2322:     Type 'Object' provides no match for the signature '(): void'.
     
-    declare var a: {
+    var a: {
         (): void
     }
     f = a;

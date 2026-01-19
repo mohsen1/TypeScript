@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letAsIdentifierInStrictMode.ts] ////
-
 //// [letAsIdentifierInStrictMode.ts]
 "use strict";
 var let = 10;

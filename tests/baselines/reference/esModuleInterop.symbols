@@ -1,24 +1,22 @@
-//// [tests/cases/compiler/esModuleInterop.ts] ////
-
-=== hybrid/index.d.ts ===
+=== tests/cases/compiler/hybrid/index.d.ts ===
 export function sayHello(): string;
 >sayHello : Symbol(sayHello, Decl(index.d.ts, 0, 0))
 
-=== path.d.ts ===
+=== tests/cases/compiler/path.d.ts ===
 declare const anything: any;
 >anything : Symbol(anything, Decl(path.d.ts, 0, 13))
 
 export = anything;
 >anything : Symbol(anything, Decl(path.d.ts, 0, 13))
 
-=== fs.d.ts ===
+=== tests/cases/compiler/fs.d.ts ===
 declare const anything: any;
 >anything : Symbol(anything, Decl(fs.d.ts, 0, 13))
 
 export = anything;
 >anything : Symbol(anything, Decl(fs.d.ts, 0, 13))
 
-=== mjts.ts ===
+=== tests/cases/compiler/mjts.ts ===
 import { sayHello } from "./hybrid";
 >sayHello : Symbol(sayHello, Decl(mjts.ts, 0, 8))
 

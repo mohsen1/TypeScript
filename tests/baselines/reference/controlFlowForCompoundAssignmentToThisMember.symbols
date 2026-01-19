@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/controlFlowForCompoundAssignmentToThisMember.ts] ////
-
-=== controlFlowForCompoundAssignmentToThisMember.ts ===
+=== tests/cases/compiler/controlFlowForCompoundAssignmentToThisMember.ts ===
 class DatasourceCommandWidgetElement {
 >DatasourceCommandWidgetElement : Symbol(DatasourceCommandWidgetElement, Decl(controlFlowForCompoundAssignmentToThisMember.ts, 0, 0))
 

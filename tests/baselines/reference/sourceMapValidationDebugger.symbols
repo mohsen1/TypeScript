@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationDebugger.ts] ////
-
-=== sourceMapValidationDebugger.ts ===
-
+=== tests/cases/compiler/sourceMapValidationDebugger.ts ===
 debugger;
+No type information for this code.

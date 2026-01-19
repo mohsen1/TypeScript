@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuring4.ts] ////
-
 //// [declarationEmitDestructuring4.ts]
 // For an array binding pattern with empty elements,
 // we will not make any modification and will emit

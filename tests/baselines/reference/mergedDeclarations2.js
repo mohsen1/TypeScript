@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mergedDeclarations2.ts] ////
-
 //// [mergedDeclarations2.ts]
 enum Foo {
     b
@@ -8,7 +6,7 @@ enum Foo {
     a = b
 }
 
-namespace Foo {
+module Foo {
     export var x = b
 }
 

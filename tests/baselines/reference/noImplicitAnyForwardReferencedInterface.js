@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyForwardReferencedInterface.ts] ////
-
 //// [noImplicitAnyForwardReferencedInterface.ts]
 declare var x: Entry;
 

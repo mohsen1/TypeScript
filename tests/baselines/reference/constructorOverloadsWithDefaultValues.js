@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/constructorOverloadsWithDefaultValues.ts] ////
-
 //// [constructorOverloadsWithDefaultValues.ts]
 class C {
     foo: string;

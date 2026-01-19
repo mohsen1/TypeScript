@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/commentsFormatting.ts] ////
-
 //// [commentsFormatting.ts]
-namespace m {
+module m {
     /** this is first line - aligned to class declaration
 * this is 4 spaces left aligned
  * this is 3 spaces left aligned
@@ -190,7 +188,7 @@ this is 4 spaces left aligned but above line is empty
 
 
 //// [commentsFormatting.d.ts]
-declare namespace m {
+declare module m {
     /** this is first line - aligned to class declaration
 * this is 4 spaces left aligned
  * this is 3 spaces left aligned

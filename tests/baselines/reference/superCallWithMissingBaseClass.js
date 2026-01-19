@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superCallWithMissingBaseClass.ts] ////
-
 //// [superCallWithMissingBaseClass.ts]
 class Foo extends Bar {
     m1() {

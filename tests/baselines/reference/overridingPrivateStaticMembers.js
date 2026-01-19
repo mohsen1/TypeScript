@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overridingPrivateStaticMembers.ts] ////
-
 //// [overridingPrivateStaticMembers.ts]
 class Base2 {
     private static y: { foo: string };

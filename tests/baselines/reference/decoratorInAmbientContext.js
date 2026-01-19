@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/decoratorInAmbientContext.ts] ////
-
 //// [decoratorInAmbientContext.ts]
 declare function decorator(target: any, key: any): any;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesInUnionTypes04.ts] ////
-
 //// [stringLiteralTypesInUnionTypes04.ts]
 type T = "" | "foo";
 
@@ -68,6 +66,6 @@ if (!!!x) {
 
 
 //// [stringLiteralTypesInUnionTypes04.d.ts]
-type T = "" | "foo";
+declare type T = "" | "foo";
 declare let x: T;
 declare let y: T;

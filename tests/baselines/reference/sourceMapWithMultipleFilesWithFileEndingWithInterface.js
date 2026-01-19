@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/sourceMapWithMultipleFilesWithFileEndingWithInterface.ts] ////
 
 //// [a.ts]
-namespace M {
+module M {
     export var X = 1;
 }
 interface Navigator {
@@ -12,11 +12,10 @@ interface Navigator {
 }
 
 //// [b.ts]
-namespace m1 {
+module m1 {
     export class c1 {
     }
 }
-
 
 //// [fooResult.js]
 var M;

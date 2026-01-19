@@ -1,10 +1,10 @@
-a.ts(2,10): error TS2305: Module '"./b"' has no exported member 'default'.
+tests/cases/compiler/a.ts(2,10): error TS2305: Module '"./b"' has no exported member 'default'.
 
 
-==== b.ts (0 errors) ====
+==== tests/cases/compiler/b.ts (0 errors) ====
     export const b = null;
     
-==== a.ts (1 errors) ====
+==== tests/cases/compiler/a.ts (1 errors) ====
     export { b } from "./b";
     export { default as a } from "./b";
              ~~~~~~~

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedBlockScopedBindings2.ts] ////
-
 //// [nestedBlockScopedBindings2.ts]
 function a0() {
     {

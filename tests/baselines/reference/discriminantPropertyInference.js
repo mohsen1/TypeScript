@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminantPropertyInference.ts] ////
-
 //// [discriminantPropertyInference.ts]
 // Repro from #41759
 

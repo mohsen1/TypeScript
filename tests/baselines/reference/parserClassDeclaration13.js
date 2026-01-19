@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ClassDeclarations/parserClassDeclaration13.ts] ////
-
 //// [parserClassDeclaration13.ts]
 class C {
    foo();

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/salsa/plainJSBinderErrors.ts] ////
-
 //// [plainJSBinderErrors.js]
 export default 12
 export default 13
@@ -26,7 +24,7 @@ class C {
         const arguments = 8
     }
     withOctal() {
-        const redundant = 0o10
+        const redundant = 010
         with (redundant) {
             return toFixed()
         }
@@ -69,7 +67,7 @@ class C {
         const arguments = 8;
     }
     withOctal() {
-        const redundant = 0o10;
+        const redundant = 010;
         with (redundant) {
             return toFixed();
         }

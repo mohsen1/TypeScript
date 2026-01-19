@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitOfFuncspace.ts] ////
-
 //// [expando.ts]
 // #27032
 function ExpandoMerge(n: number) {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceMemberPropertyOverridingAccessor.ts] ////
-
 //// [inheritanceMemberPropertyOverridingAccessor.ts]
 class a {
     private __x: () => string;

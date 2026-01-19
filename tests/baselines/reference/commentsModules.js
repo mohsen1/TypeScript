@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/commentsModules.ts] ////
-
 //// [commentsModules.ts]
 /** Module comment*/
-namespace m1 {
+module m1 {
     /** b's comment*/
     export var b: number;
     /** foo's comment*/
@@ -10,7 +8,7 @@ namespace m1 {
         return b;
     }
     /** m2 comments*/
-    export namespace m2 {
+    export module m2 {
         /** class comment;*/
         export class c {
         };
@@ -41,22 +39,22 @@ namespace m1 {
 m1.fooExport();
 var myvar = new m1.m2.c();
 /** module comment of m2.m3*/
-namespace m2.m3 {
+module m2.m3 {
     /** Exported class comment*/
     export class c {
     }
 } /* trailing dotted module comment*/
 new m2.m3.c();
 /** module comment of m3.m4.m5*/
-namespace m3.m4.m5 {
+module m3.m4.m5 {
     /** Exported class comment*/
     export class c {
     }
 } // trailing dotted module 2
 new m3.m4.m5.c();
 /** module comment of m4.m5.m6*/
-namespace m4.m5.m6 {
-    export namespace m7 {
+module m4.m5.m6 {
+    export module m7 {
         /** Exported class comment*/
         export class c {
         }
@@ -64,26 +62,26 @@ namespace m4.m5.m6 {
 }
 new m4.m5.m6.m7.c();
 /** module comment of m5.m6.m7*/
-namespace m5.m6.m7 {
+module m5.m6.m7 {
     /** module m8 comment*/
-    export namespace m8 {
+    export module m8 {
         /** Exported class comment*/
         export class c {
         }
     }
 }
 new m5.m6.m7.m8.c();
-namespace m6.m7 {
-    export namespace m8 {
+module m6.m7 {
+    export module m8 {
         /** Exported class comment*/
         export class c {
         }
     }
 }
 new m6.m7.m8.c();
-namespace m7.m8 {
+module m7.m8 {
     /** module m9 comment*/
-    export namespace m9 {
+    export module m9 {
         /** Exported class comment*/
         export class c {
         }
@@ -272,11 +270,11 @@ new m7.m8.m9.c();
 
 //// [commentsModules.d.ts]
 /** Module comment*/
-declare namespace m1 {
+declare module m1 {
     /** b's comment*/
     var b: number;
     /** m2 comments*/
-    namespace m2 {
+    module m2 {
         /** class comment;*/
         class c {
         }
@@ -293,44 +291,44 @@ declare namespace m1 {
 }
 declare var myvar: m1.m2.c;
 /** module comment of m2.m3*/
-declare namespace m2.m3 {
+declare module m2.m3 {
     /** Exported class comment*/
     class c {
     }
 }
 /** module comment of m3.m4.m5*/
-declare namespace m3.m4.m5 {
+declare module m3.m4.m5 {
     /** Exported class comment*/
     class c {
     }
 }
 /** module comment of m4.m5.m6*/
-declare namespace m4.m5.m6 {
-    namespace m7 {
+declare module m4.m5.m6 {
+    module m7 {
         /** Exported class comment*/
         class c {
         }
     }
 }
 /** module comment of m5.m6.m7*/
-declare namespace m5.m6.m7 {
+declare module m5.m6.m7 {
     /** module m8 comment*/
-    namespace m8 {
+    module m8 {
         /** Exported class comment*/
         class c {
         }
     }
 }
-declare namespace m6.m7 {
-    namespace m8 {
+declare module m6.m7 {
+    module m8 {
         /** Exported class comment*/
         class c {
         }
     }
 }
-declare namespace m7.m8 {
+declare module m7.m8 {
     /** module m9 comment*/
-    namespace m9 {
+    module m9 {
         /** Exported class comment*/
         class c {
         }

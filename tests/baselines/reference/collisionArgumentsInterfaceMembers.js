@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionArgumentsInterfaceMembers.ts] ////
-
 //// [collisionArgumentsInterfaceMembers.ts]
 // call
 interface i1 {

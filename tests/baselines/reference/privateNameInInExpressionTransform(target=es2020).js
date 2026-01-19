@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameInInExpressionTransform.ts] ////
-
 //// [privateNameInInExpressionTransform.ts]
 class Foo {
     #field = 1;

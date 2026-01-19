@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportDeclareClass1.ts] ////
-
 //// [exportDeclareClass1.ts]
     export declare class eaC {
         static tF() { };
@@ -12,7 +10,9 @@
     };
 
 //// [exportDeclareClass1.js]
-"use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-;
-;
+define(["require", "exports"], function (require, exports) {
+    "use strict";
+    exports.__esModule = true;
+    ;
+    ;
+});

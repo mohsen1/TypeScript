@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/recursiveIntersectionTypes.ts] ////
-
 //// [recursiveIntersectionTypes.ts]
 type LinkedList<T> = T & { next: LinkedList<T> };
 

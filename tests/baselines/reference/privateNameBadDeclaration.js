@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameBadDeclaration.ts] ////
-
 //// [privateNameBadDeclaration.ts]
 function A() { }
 A.prototype = {
@@ -22,8 +20,8 @@ class C {
 //// [privateNameBadDeclaration.js]
 function A() { }
 A.prototype = {
-    : 1, // Error
-    : function () { }, // Error
+    : 1,
+    : function () { },
     get () { return ""; } // Error
 };
 var B = /** @class */ (function () {
@@ -32,8 +30,8 @@ var B = /** @class */ (function () {
     return B;
 }());
 B.prototype = {
-    : 2, // Error
-    : function () { }, // Error
+    : 2,
+    : function () { },
     get () { return ""; } // Error
 };
 var C = /** @class */ (function () {

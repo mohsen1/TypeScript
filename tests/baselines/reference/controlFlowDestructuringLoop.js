@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowDestructuringLoop.ts] ////
-
 //// [controlFlowDestructuringLoop.ts]
 // Repro from #28758
 

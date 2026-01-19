@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocSignatureOnReturnedFunction.ts] ////
-
 //// [jsdocSignatureOnReturnedFunction.js]
 function f1() {
     /**

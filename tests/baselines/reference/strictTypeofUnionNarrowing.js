@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictTypeofUnionNarrowing.ts] ////
-
 //// [strictTypeofUnionNarrowing.ts]
 function stringify1(anything: { toString(): string } | undefined): string {
     return typeof anything === "string" ? anything.toUpperCase() : "";

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/exportSpecifierAndLocalMemberDeclaration.ts] ////
-
 //// [exportSpecifierAndLocalMemberDeclaration.ts]
 declare module "m2" {
-    namespace X {
+    module X {
         interface I { }
     }
     function Y();

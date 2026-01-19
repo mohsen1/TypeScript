@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/esnext/esnextmodulekindWithES5Target10.ts] ////
-
 //// [esnextmodulekindWithES5Target10.ts]
 import i = require("mod"); // Error;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferenceUnionOfObjectsMappedContextualType.ts] ////
-
 //// [inferenceUnionOfObjectsMappedContextualType.ts]
 type Entity = {
     someDate: Date | null;

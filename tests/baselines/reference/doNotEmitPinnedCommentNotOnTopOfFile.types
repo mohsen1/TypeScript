@@ -1,11 +1,7 @@
-//// [tests/cases/compiler/doNotEmitPinnedCommentNotOnTopOfFile.ts] ////
-
-=== doNotEmitPinnedCommentNotOnTopOfFile.ts ===
+=== tests/cases/compiler/doNotEmitPinnedCommentNotOnTopOfFile.ts ===
 var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 
 /*!
 
@@ -15,7 +11,5 @@ var x = 10;
 
 var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 

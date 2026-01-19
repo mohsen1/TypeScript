@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letShadowedByNameInNestedScope.ts] ////
-
 //// [letShadowedByNameInNestedScope.ts]
 var x;
 function foo() {

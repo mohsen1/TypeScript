@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/discriminantPropertyInference.ts] ////
-
-=== discriminantPropertyInference.ts ===
+=== tests/cases/compiler/discriminantPropertyInference.ts ===
 // Repro from #41759
 
 type DiscriminatorTrue = {

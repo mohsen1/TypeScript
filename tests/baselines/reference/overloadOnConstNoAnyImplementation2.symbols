@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/overloadOnConstNoAnyImplementation2.ts] ////
-
-=== overloadOnConstNoAnyImplementation2.ts ===
+=== tests/cases/compiler/overloadOnConstNoAnyImplementation2.ts ===
 interface I {
 >I : Symbol(I, Decl(overloadOnConstNoAnyImplementation2.ts, 0, 0))
 
@@ -44,31 +42,31 @@ class C {
     }
 }
 
-declare var c: C;
->c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 11))
+var c: C;
+>c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 3))
 >C : Symbol(C, Decl(overloadOnConstNoAnyImplementation2.ts, 2, 1))
 
 c.x1(1, (x: 'hi') => { return 1; } );
 >c.x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
->c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 11))
+>c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 3))
 >x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
 >x : Symbol(x, Decl(overloadOnConstNoAnyImplementation2.ts, 16, 9))
 
 c.x1(1, (x: 'bye') => { return 1; } );
 >c.x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
->c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 11))
+>c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 3))
 >x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
 >x : Symbol(x, Decl(overloadOnConstNoAnyImplementation2.ts, 17, 9))
 
 c.x1(1, (x) => { return 1; } );
 >c.x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
->c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 11))
+>c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 3))
 >x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
 >x : Symbol(x, Decl(overloadOnConstNoAnyImplementation2.ts, 18, 9))
 
 c.x1(1, (x: number) => { return 1; } );
 >c.x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
->c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 11))
+>c : Symbol(c, Decl(overloadOnConstNoAnyImplementation2.ts, 15, 3))
 >x1 : Symbol(C.x1, Decl(overloadOnConstNoAnyImplementation2.ts, 4, 9), Decl(overloadOnConstNoAnyImplementation2.ts, 5, 49))
 >x : Symbol(x, Decl(overloadOnConstNoAnyImplementation2.ts, 20, 9))
 

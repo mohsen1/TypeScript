@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeAssertions5.ts] ////
-
 //// [genericTypeAssertions5.ts]
 interface A {
     foo(): string;

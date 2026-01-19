@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitInvalidExport.ts] ////
-
 //// [declarationEmitInvalidExport.ts]
 if (false) {
   export var myClass = 0;
@@ -10,7 +8,7 @@ export type MyClass = typeof myClass;
 
 //// [declarationEmitInvalidExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 if (false) {
-    exports.myClass = 0;
+    export var myClass = 0;
 }

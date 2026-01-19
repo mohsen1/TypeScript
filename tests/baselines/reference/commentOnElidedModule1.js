@@ -7,16 +7,16 @@
 */
 
 /*! Don't keep this pinned comment */
-namespace ElidedModule {
+module ElidedModule {
 }
 
 // Don't keep this comment.
-namespace ElidedModule2 {
+module ElidedModule2 {
 }
 
 //// [b.ts]
 ///<reference path="a.ts"/>
-namespace ElidedModule3 {
+module ElidedModule3 {
 }
 
 //// [a.js]

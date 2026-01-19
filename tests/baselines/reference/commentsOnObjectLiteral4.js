@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsOnObjectLiteral4.ts] ////
-
 //// [commentsOnObjectLiteral4.ts]
 var v = {
  /**

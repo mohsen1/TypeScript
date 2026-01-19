@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileClassPropertyType.ts] ////
-
-=== foo.js ===
+=== tests/cases/compiler/foo.js ===
 class C {
 >C : Symbol(C, Decl(foo.js, 0, 0))
 
@@ -12,7 +10,7 @@ class C {
   }
 }
 
-=== bar.ts ===
+=== tests/cases/compiler/bar.ts ===
 (new C()).p = "string";
 >(new C()).p : Symbol(C.p, Decl(foo.js, 1, 18))
 >C : Symbol(C, Decl(foo.js, 0, 0))

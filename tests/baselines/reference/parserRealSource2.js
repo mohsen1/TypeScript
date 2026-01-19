@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource2.ts] ////
-
 //// [parserRealSource2.ts]
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
 
     export function hasFlag(val: number, flag: number) {
         return (val & flag) != 0;

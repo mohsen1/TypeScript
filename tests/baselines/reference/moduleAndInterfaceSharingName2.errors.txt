@@ -1,9 +1,9 @@
-moduleAndInterfaceSharingName2.ts(8,9): error TS2315: Type 'Y' is not generic.
+tests/cases/compiler/moduleAndInterfaceSharingName2.ts(8,9): error TS2315: Type 'Y' is not generic.
 
 
-==== moduleAndInterfaceSharingName2.ts (1 errors) ====
-    namespace X {
-        export namespace Y {
+==== tests/cases/compiler/moduleAndInterfaceSharingName2.ts (1 errors) ====
+    module X {
+        export module Y {
             export interface Z { }
         }
         export interface Y { }

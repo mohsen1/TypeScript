@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/noErrorTruncation.ts] ////
-
-=== noErrorTruncation.ts ===
+=== tests/cases/compiler/noErrorTruncation.ts ===
 // @noErrorTruncation
 
 type SomeLongOptionA = { someLongOptionA: string }

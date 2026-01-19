@@ -9,4 +9,4 @@ import * as b from "./b";
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/invariantGenericErrorElaboration.ts] ////
-
-=== invariantGenericErrorElaboration.ts ===
+=== tests/cases/compiler/invariantGenericErrorElaboration.ts ===
 // Repro from #19746
 
 const wat: Runtype<any> = Num;

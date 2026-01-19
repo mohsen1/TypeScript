@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/primaryExpressionMods.ts] ////
-
 //// [primaryExpressionMods.ts]
-namespace M
+module M
 {
     export interface P { x: number; y: number; }
     export var a = 1;

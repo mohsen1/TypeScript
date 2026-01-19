@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/primitives/string/stringPropertyAccessWithError.ts] ////
-
-=== stringPropertyAccessWithError.ts ===
+=== tests/cases/conformance/types/primitives/string/stringPropertyAccessWithError.ts ===
 var x = '';
 >x : Symbol(x, Decl(stringPropertyAccessWithError.ts, 0, 3))
 

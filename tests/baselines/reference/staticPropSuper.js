@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticPropSuper.ts] ////
-
 //// [staticPropSuper.ts]
 class A {
 }
@@ -61,8 +59,10 @@ var A = /** @class */ (function () {
 var B = /** @class */ (function (_super) {
     __extends(B, _super);
     function B() {
+        var _this = this;
         var x = 1; // should not error
-        return _super.call(this) || this;
+        _this = _super.call(this) || this;
+        return _this;
     }
     B.s = 9;
     return B;

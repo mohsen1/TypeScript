@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declarationEmitExpandoPropertyPrivateName.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 interface I {}
 >I : Symbol(I, Decl(a.ts, 0, 0))
 
@@ -9,7 +7,7 @@ export function f(): I { return null as I; }
 >I : Symbol(I, Decl(a.ts, 0, 0))
 >I : Symbol(I, Decl(a.ts, 0, 0))
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 import {f} from "./a";
 >f : Symbol(f, Decl(b.ts, 0, 8))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/parserConstructorDeclaration12.ts] ////
-
 //// [parserConstructorDeclaration12.ts]
 class C {
   constructor<>() { }

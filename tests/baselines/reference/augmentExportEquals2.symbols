@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/augmentExportEquals2.ts] ////
-
-=== file3.ts ===
+=== tests/cases/compiler/file3.ts ===
 import x = require("./file1");
 >x : Symbol(x, Decl(file3.ts, 0, 0))
 
@@ -10,14 +8,14 @@ let a: x.A; // should not work
 >x : Symbol(x)
 >A : Symbol(x.A)
 
-=== file1.ts ===
+=== tests/cases/compiler/file1.ts ===
 function foo() {}
 >foo : Symbol(foo, Decl(file1.ts, 0, 0))
 
 export = foo;
 >foo : Symbol(foo, Decl(file1.ts, 0, 0))
 
-=== file2.ts ===
+=== tests/cases/compiler/file2.ts ===
 import x = require("./file1"); 
 >x : Symbol(x, Decl(file2.ts, 0, 0))
 

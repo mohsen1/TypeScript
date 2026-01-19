@@ -4,7 +4,7 @@
     "inputFiles": [
         "test.ts"
     ],
-    "outFile": "bin/outAndOutDirFile.js",
+    "out": "bin/outAndOutDirFile.js",
     "outDir": "outdir/outAndOutDirFolder",
     "sourceMap": true,
     "declaration": true,
@@ -12,8 +12,6 @@
     "mapRoot": "../mapFiles",
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "ref/m1.ts",
         "ref/m2.ts",
         "test.ts"

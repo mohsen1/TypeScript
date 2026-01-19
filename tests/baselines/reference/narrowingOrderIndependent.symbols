@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/narrowingOrderIndependent.ts] ////
-
-=== narrowingOrderIndependent.ts ===
+=== tests/cases/compiler/narrowingOrderIndependent.ts ===
 // Repro from #36709
 
 class A {

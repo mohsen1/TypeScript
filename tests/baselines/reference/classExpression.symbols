@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/classExpression.ts] ////
-
-=== classExpression.ts ===
+=== tests/cases/conformance/classes/classExpression.ts ===
 var x = class C {
 >x : Symbol(x, Decl(classExpression.ts, 0, 3))
 >C : Symbol(C, Decl(classExpression.ts, 0, 7))
@@ -15,7 +13,7 @@ var y = {
     }
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(classExpression.ts, 6, 1))
 
     var z = class C4 {

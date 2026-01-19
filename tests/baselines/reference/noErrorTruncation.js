@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noErrorTruncation.ts] ////
-
 //// [noErrorTruncation.ts]
 // @noErrorTruncation
 

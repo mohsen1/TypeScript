@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsFileCompilationNonNullAssertion.ts] ////
-
 //// [a.js]
 0!
 

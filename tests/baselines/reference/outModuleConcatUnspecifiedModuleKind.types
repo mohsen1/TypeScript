@@ -1,14 +1,9 @@
-//// [tests/cases/compiler/outModuleConcatUnspecifiedModuleKind.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 export class A { } // module
 >A : A
->  : ^
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 var x = 0; // global
 >x : number
->  : ^^^^^^
 >0 : 0
->  : ^
 

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/super_inside-object-literal-getters-and-setters.ts] ////
-
 //// [super_inside-object-literal-getters-and-setters.ts]
-namespace ObjectLiteral {
+module ObjectLiteral {
     var ThisInObjectLiteral = {
         _foo: '1',
         get foo(): string {

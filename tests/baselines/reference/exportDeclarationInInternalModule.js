@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/exportDeclarationInInternalModule.ts] ////
-
 //// [exportDeclarationInInternalModule.ts]
 class Bbb {
 }
 
 class Aaa extends Bbb { }
 
-namespace Aaa {
+module Aaa {
     export class SomeType { }
 }
 
-namespace Bbb {
+module Bbb {
     export class SomeType { }
 
     export * from Aaa;      // this line causes the nullref
@@ -71,11 +69,11 @@ declare class Bbb {
 }
 declare class Aaa extends Bbb {
 }
-declare namespace Aaa {
+declare module Aaa {
     class SomeType {
     }
 }
-declare namespace Bbb {
+declare module Bbb {
     export class SomeType {
     }
     export * from Aaa;

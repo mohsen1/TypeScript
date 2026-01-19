@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/string/stringPropertyAccess.ts] ////
-
 //// [stringPropertyAccess.ts]
 var x = '';
 var a = x.charAt(0);

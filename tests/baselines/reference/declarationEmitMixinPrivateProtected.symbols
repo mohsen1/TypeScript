@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declarationEmitMixinPrivateProtected.ts] ////
-
-=== first.ts ===
+=== tests/cases/compiler/first.ts ===
 declare function mix<TMix>(mixin: TMix): TMix;
 >mix : Symbol(mix, Decl(first.ts, 0, 0))
 >TMix : Symbol(TMix, Decl(first.ts, 0, 21))
@@ -39,7 +37,7 @@ export class Monitor extends mix(DisposableMixin) {
     }
 }
 
-=== another.ts ===
+=== tests/cases/compiler/another.ts ===
 declare function mix<TMix>(mixin: TMix): TMix;
 >mix : Symbol(mix, Decl(another.ts, 0, 0))
 >TMix : Symbol(TMix, Decl(another.ts, 0, 21))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/partialTypeNarrowedToByTypeGuard.ts] ////
-
 //// [partialTypeNarrowedToByTypeGuard.ts]
 type Obj = {} | undefined;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithStringIndexer.ts] ////
-
 //// [assignmentCompatWithStringIndexer.ts]
 // index signatures must be compatible in assignments
 
@@ -11,17 +9,17 @@ class A {
     [x: string]: Base;
 }
 
-declare var a: A;
+var a: A;
 
-declare var b: { [x: string]: Derived; };
+var b: { [x: string]: Derived; }
 a = b; // ok
 b = a; // error
 
-declare var b2: { [x: string]: Derived2; };
+var b2: { [x: string]: Derived2; }
 a = b2; // ok
 b2 = a; // error
 
-namespace Generics {
+module Generics {
     class A<T extends Base> {
         [x: string]: T;
     }
@@ -30,8 +28,8 @@ namespace Generics {
         [x: string]: Derived; // ok
     }
 
-    declare var b1: { [x: string]: Derived; };
-    declare var a1: A<Base>;
+    var b1: { [x: string]: Derived; };
+    var a1: A<Base>;
     a1 = b1; // ok
     b1 = a1; // error
 
@@ -39,7 +37,7 @@ namespace Generics {
         [x: string]: Derived2; // ok
     }
 
-    declare var b2: { [x: string]: Derived2; };
+    var b2: { [x: string]: Derived2; };
     a1 = b2; // ok
     b2 = a1; // error
 
@@ -54,7 +52,6 @@ namespace Generics {
         b4 = a3; // error
     }
 }
-
 
 //// [assignmentCompatWithStringIndexer.js]
 // index signatures must be compatible in assignments
@@ -78,8 +75,11 @@ var A = /** @class */ (function () {
     }
     return A;
 }());
+var a;
+var b;
 a = b; // ok
 b = a; // error
+var b2;
 a = b2; // ok
 b2 = a; // error
 var Generics;
@@ -96,6 +96,8 @@ var Generics;
         }
         return B;
     }(A));
+    var b1;
+    var a1;
     a1 = b1; // ok
     b1 = a1; // error
     var B2 = /** @class */ (function (_super) {
@@ -105,6 +107,7 @@ var Generics;
         }
         return B2;
     }(A));
+    var b2;
     a1 = b2; // ok
     b2 = a1; // error
     function foo() {

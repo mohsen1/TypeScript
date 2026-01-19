@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/constructorArgWithGenericCallSignature.ts] ////
-
 //// [constructorArgWithGenericCallSignature.ts]
-namespace Test {
+module Test {
     export interface MyFunc {
         <T>(value1: T): T;
     }

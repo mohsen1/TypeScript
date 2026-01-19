@@ -13,10 +13,10 @@ enum E {
 const enum D {
     A, B, C
 }
-namespace M {
+module M {
     export var x;
 }
-namespace N {
+module N {
     export interface I {
     }
 }
@@ -35,12 +35,12 @@ export { v, f, C, I, E, D, M, N, T, a };
 
 //// [t1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.a = exports.M = exports.E = exports.C = exports.v = void 0;
-exports.f = f;
+exports.__esModule = true;
+exports.a = exports.M = exports.E = exports.C = exports.f = exports.v = void 0;
 var v = 1;
 exports.v = v;
 function f() { }
+exports.f = f;
 var C = /** @class */ (function () {
     function C() {
     }
@@ -52,31 +52,40 @@ var E;
     E[E["A"] = 0] = "A";
     E[E["B"] = 1] = "B";
     E[E["C"] = 2] = "C";
-})(E || (exports.E = E = {}));
+})(E || (E = {}));
+exports.E = E;
 var M;
 (function (M) {
-})(M || (exports.M = M = {}));
+})(M || (M = {}));
+exports.M = M;
 var a = M.x;
 exports.a = a;
 //// [t2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+exports.__esModule = true;
 exports.a = exports.M = exports.E = exports.C = exports.f = exports.v = void 0;
 var t1_1 = require("./t1");
-Object.defineProperty(exports, "v", { enumerable: true, get: function () { return t1_1.v; } });
-Object.defineProperty(exports, "f", { enumerable: true, get: function () { return t1_1.f; } });
-Object.defineProperty(exports, "C", { enumerable: true, get: function () { return t1_1.C; } });
-Object.defineProperty(exports, "E", { enumerable: true, get: function () { return t1_1.E; } });
-Object.defineProperty(exports, "M", { enumerable: true, get: function () { return t1_1.M; } });
-Object.defineProperty(exports, "a", { enumerable: true, get: function () { return t1_1.a; } });
+__createBinding(exports, t1_1, "v");
+__createBinding(exports, t1_1, "f");
+__createBinding(exports, t1_1, "C");
+__createBinding(exports, t1_1, "E");
+__createBinding(exports, t1_1, "M");
+__createBinding(exports, t1_1, "a");
 //// [t3.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a = exports.M = exports.E = exports.C = exports.f = exports.v = void 0;
 var t1_1 = require("./t1");
-Object.defineProperty(exports, "v", { enumerable: true, get: function () { return t1_1.v; } });
-Object.defineProperty(exports, "f", { enumerable: true, get: function () { return t1_1.f; } });
-Object.defineProperty(exports, "C", { enumerable: true, get: function () { return t1_1.C; } });
-Object.defineProperty(exports, "E", { enumerable: true, get: function () { return t1_1.E; } });
-Object.defineProperty(exports, "M", { enumerable: true, get: function () { return t1_1.M; } });
-Object.defineProperty(exports, "a", { enumerable: true, get: function () { return t1_1.a; } });
+exports.v = t1_1.v;
+exports.f = t1_1.f;
+exports.C = t1_1.C;
+exports.E = t1_1.E;
+exports.M = t1_1.M;
+exports.a = t1_1.a;

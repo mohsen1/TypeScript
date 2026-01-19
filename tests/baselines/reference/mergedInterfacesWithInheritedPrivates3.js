@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/mergedInterfacesWithInheritedPrivates3.ts] ////
-
 //// [mergedInterfacesWithInheritedPrivates3.ts]
 class C {
     private x: number;
@@ -22,7 +20,7 @@ class D extends C implements A { // error
     z: string;
 }
 
-namespace M {
+module M {
     class C {
         private x: string;
     }

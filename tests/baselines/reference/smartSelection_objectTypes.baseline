@@ -1,4 +1,3 @@
-// === Smart Selection ===
 type X = {
   /**/foo?: string;
   readonly bar: { x: number };

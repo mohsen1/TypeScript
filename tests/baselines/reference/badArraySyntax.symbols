@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/badArraySyntax.ts] ////
-
-=== badArraySyntax.ts ===
+=== tests/cases/compiler/badArraySyntax.ts ===
 class Z {
 >Z : Symbol(Z, Decl(badArraySyntax.ts, 0, 0))
 

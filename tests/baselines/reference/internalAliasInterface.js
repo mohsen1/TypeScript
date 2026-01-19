@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/internalAliasInterface.ts] ////
-
 //// [internalAliasInterface.ts]
-namespace a {
+module a {
     export interface I {
     }
 }
 
-namespace c {
+module c {
     import b = a.I;
     export var x: b;
 }
@@ -19,11 +17,11 @@ var c;
 
 
 //// [internalAliasInterface.d.ts]
-declare namespace a {
+declare module a {
     interface I {
     }
 }
-declare namespace c {
+declare module c {
     import b = a.I;
     var x: b;
 }

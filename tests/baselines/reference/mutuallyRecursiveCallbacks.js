@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mutuallyRecursiveCallbacks.ts] ////
-
 //// [mutuallyRecursiveCallbacks.ts]
 // Repro from #18277
 

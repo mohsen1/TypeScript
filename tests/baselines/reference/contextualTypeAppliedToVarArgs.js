@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypeAppliedToVarArgs.ts] ////
-
 //// [contextualTypeAppliedToVarArgs.ts]
 function delegate(instance: any, method: (...args: any[]) => any, data?: any): (...args: any[]) => any {
     return function () { };

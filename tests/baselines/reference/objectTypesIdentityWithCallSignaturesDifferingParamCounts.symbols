@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/typeAndMemberIdentity/objectTypesIdentityWithCallSignaturesDifferingParamCounts.ts] ////
-
-=== objectTypesIdentityWithCallSignaturesDifferingParamCounts.ts ===
+=== tests/cases/conformance/types/typeRelationships/typeAndMemberIdentity/objectTypesIdentityWithCallSignaturesDifferingParamCounts.ts ===
 // object types are identical structurally
 
 class A {

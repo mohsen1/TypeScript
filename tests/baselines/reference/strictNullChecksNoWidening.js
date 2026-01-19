@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/widenedTypes/strictNullChecksNoWidening.ts] ////
-
 //// [strictNullChecksNoWidening.ts]
 var a1 = null;
 var a2 = undefined;

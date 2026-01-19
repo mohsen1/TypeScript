@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/parser/ecmascript5/ExportAssignments/parserExportAssignment5.ts] ////
-
 //// [parserExportAssignment5.ts]
-namespace M {
+module M {
     export = A;
 }
 

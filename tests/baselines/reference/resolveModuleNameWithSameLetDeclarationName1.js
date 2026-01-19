@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/resolveModuleNameWithSameLetDeclarationName1.ts] ////
-
 //// [resolveModuleNameWithSameLetDeclarationName1.ts]
-declare namespace foo {
+declare module foo {
 
     interface Bar {
 

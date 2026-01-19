@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/prototypes.ts] ////
-
 //// [prototypes.ts]
 Object.prototype; // ok
 new Object().prototype; // error

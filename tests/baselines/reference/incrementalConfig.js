@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incrementalConfig.ts] ////
-
 //// [a.ts]
 const x = 10;
 

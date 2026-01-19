@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/getterControlFlowStrictNull.ts] ////
-
 //// [getterControlFlowStrictNull.ts]
 class A {
    a(): string | null {

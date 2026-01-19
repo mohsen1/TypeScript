@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/returnTypeTypeArguments.ts] ////
-
 //// [returnTypeTypeArguments.ts]
 class One<T>{
     value: T;

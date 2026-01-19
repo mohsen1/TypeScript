@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameFieldInitializer.ts] ////
-
 //// [privateNameFieldInitializer.ts]
 class A {
     #field = 10;

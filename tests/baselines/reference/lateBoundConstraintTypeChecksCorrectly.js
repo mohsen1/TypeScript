@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lateBoundConstraintTypeChecksCorrectly.ts] ////
-
 //// [lateBoundConstraintTypeChecksCorrectly.ts]
 declare const fooProp: unique symbol;
 declare const barProp: unique symbol;
@@ -24,7 +22,7 @@ function f<T extends Foo<number>>(x: T) {
 
 //// [lateBoundConstraintTypeChecksCorrectly.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 function f(x) {
     var abc = x[fooProp]; // expected: 'T[typeof fooProp]'
     /**

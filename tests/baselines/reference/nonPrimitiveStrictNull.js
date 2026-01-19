@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveStrictNull.ts] ////
-
 //// [nonPrimitiveStrictNull.ts]
 var a: object
 declare var b: object | null

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleWithTryStatement1.ts] ////
-
 //// [moduleWithTryStatement1.ts]
-namespace M {
+module M {
   try {
   }
   catch (e) {

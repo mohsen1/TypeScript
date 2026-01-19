@@ -1,24 +1,24 @@
-genericClassWithFunctionTypedMemberArguments.ts(57,29): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
+tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts(57,29): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
   Types of parameters 'x' and 'a' are incompatible.
     Type 'number' is not assignable to type 'T'.
       'T' could be instantiated with an arbitrary type which could be unrelated to 'number'.
-genericClassWithFunctionTypedMemberArguments.ts(60,30): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
+tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts(60,30): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
   Types of parameters 'x' and 'a' are incompatible.
     Type 'number' is not assignable to type 'T'.
       'T' could be instantiated with an arbitrary type which could be unrelated to 'number'.
-genericClassWithFunctionTypedMemberArguments.ts(61,31): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
+tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts(61,31): error TS2345: Argument of type '(x: T) => string' is not assignable to parameter of type '(a: 1) => string'.
   Types of parameters 'x' and 'a' are incompatible.
     Type 'number' is not assignable to type 'T'.
       'T' could be instantiated with an arbitrary type which could be unrelated to 'number'.
-genericClassWithFunctionTypedMemberArguments.ts(62,30): error TS2345: Argument of type '(a: number) => string' is not assignable to parameter of type '(a: number) => 1'.
+tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts(62,30): error TS2345: Argument of type '(a: number) => string' is not assignable to parameter of type '(a: number) => 1'.
   Type 'string' is not assignable to type '1'.
 
 
-==== genericClassWithFunctionTypedMemberArguments.ts (4 errors) ====
+==== tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts (4 errors) ====
     // Generic functions used as arguments for function typed parameters are not used to make inferences from
     // Using function arguments, no errors expected
     
-    namespace ImmediatelyFix {
+    module ImmediatelyFix {
         class C<T> {
             foo<T>(x: (a: T) => T) {
                 return x(null);
@@ -41,14 +41,14 @@ genericClassWithFunctionTypedMemberArguments.ts(62,30): error TS2345: Argument o
         var r3a = c2.foo(x => 1); // number
     }
     
-    namespace WithCandidates {
+    module WithCandidates {
         class C<T> {
             foo2<T, U>(x: T, cb: (a: T) => U) {
                 return cb(x);
             }
         }
     
-        declare var c: C<number>;
+        var c: C<number>;
         var r4 = c.foo2(1, function <Z>(a: Z) { return '' }); // string, contextual signature instantiation is applied to generic functions
         var r5 = c.foo2(1, (a) => ''); // string
         var r6 = c.foo2<string, number>('', <Z>(a: Z) => 1); // number
@@ -59,7 +59,7 @@ genericClassWithFunctionTypedMemberArguments.ts(62,30): error TS2345: Argument o
             }
         }
     
-        declare var c2: C2<number, string>;
+        var c2: C2<number, string>;
         var r7 = c2.foo3(1, <Z>(a: Z) => '', ''); // string
         var r8 = c2.foo3(1, function (a) { return '' }, ''); // string
     
@@ -68,7 +68,7 @@ genericClassWithFunctionTypedMemberArguments.ts(62,30): error TS2345: Argument o
                 return cb(x);
             }
         }
-        declare var c3: C3<number, string>;
+        var c3: C3<number, string>;
     
         function other<T, U>(t: T, u: U) {
             var r10 = c.foo2(1, (x: T) => ''); // error

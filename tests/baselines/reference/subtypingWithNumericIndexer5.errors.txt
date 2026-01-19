@@ -1,22 +1,22 @@
-subtypingWithNumericIndexer5.ts(11,7): error TS2420: Class 'B' incorrectly implements interface 'A'.
+tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts(11,7): error TS2420: Class 'B' incorrectly implements interface 'A'.
   'string' and 'number' index signatures are incompatible.
     Type 'Base' is not assignable to type 'Derived'.
       Property 'bar' is missing in type 'Base' but required in type 'Derived'.
-subtypingWithNumericIndexer5.ts(32,11): error TS2420: Class 'B3<T>' incorrectly implements interface 'A<T>'.
+tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts(32,11): error TS2420: Class 'B3<T>' incorrectly implements interface 'A<T>'.
   'string' and 'number' index signatures are incompatible.
     Type 'Base' is not assignable to type 'T'.
       'T' could be instantiated with an arbitrary type which could be unrelated to 'Base'.
-subtypingWithNumericIndexer5.ts(36,11): error TS2420: Class 'B4<T>' incorrectly implements interface 'A<T>'.
+tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts(36,11): error TS2420: Class 'B4<T>' incorrectly implements interface 'A<T>'.
   'string' and 'number' index signatures are incompatible.
     Type 'Derived' is not assignable to type 'T'.
       'Derived' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'Derived'.
-subtypingWithNumericIndexer5.ts(40,11): error TS2420: Class 'B5<T>' incorrectly implements interface 'A<T>'.
+tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts(40,11): error TS2420: Class 'B5<T>' incorrectly implements interface 'A<T>'.
   'string' and 'number' index signatures are incompatible.
     Type 'Derived2' is not assignable to type 'T'.
       'Derived2' is assignable to the constraint of type 'T', but 'T' could be instantiated with a different subtype of constraint 'Derived2'.
 
 
-==== subtypingWithNumericIndexer5.ts (4 errors) ====
+==== tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts (4 errors) ====
     // Derived type indexer must be subtype of base type indexer
     
     interface Base { foo: string; }
@@ -33,7 +33,7 @@ subtypingWithNumericIndexer5.ts(40,11): error TS2420: Class 'B5<T>' incorrectly 
 !!! error TS2420:   'string' and 'number' index signatures are incompatible.
 !!! error TS2420:     Type 'Base' is not assignable to type 'Derived'.
 !!! error TS2420:       Property 'bar' is missing in type 'Base' but required in type 'Derived'.
-!!! related TS2728 subtypingWithNumericIndexer5.ts:4:34: 'bar' is declared here.
+!!! related TS2728 tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts:4:34: 'bar' is declared here.
         [x: string]: Base; // error
     }
     
@@ -41,7 +41,7 @@ subtypingWithNumericIndexer5.ts(40,11): error TS2420: Class 'B5<T>' incorrectly 
         [x: string]: Derived2; // ok
     }
     
-    namespace Generics {
+    module Generics {
         interface A<T extends Base> {
             [x: number]: T;
         }

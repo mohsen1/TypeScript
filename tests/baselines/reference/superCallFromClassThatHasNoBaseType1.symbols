@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/superCallFromClassThatHasNoBaseType1.ts] ////
-
-=== superCallFromClassThatHasNoBaseType1.ts ===
+=== tests/cases/compiler/superCallFromClassThatHasNoBaseType1.ts ===
 class A {
 >A : Symbol(A, Decl(superCallFromClassThatHasNoBaseType1.ts, 0, 0))
 
@@ -16,6 +14,6 @@ class B {
 
     constructor() { super(value => String(value)); }
 >value : Symbol(value, Decl(superCallFromClassThatHasNoBaseType1.ts, 7, 26))
->String : Symbol(String, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --) ... and 1 more)
+>String : Symbol(String, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 >value : Symbol(value, Decl(superCallFromClassThatHasNoBaseType1.ts, 7, 26))
 }

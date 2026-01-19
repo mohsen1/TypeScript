@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/null.ts] ////
-
 //// [null.ts]
 var x=null; 
 var y=3+x;  

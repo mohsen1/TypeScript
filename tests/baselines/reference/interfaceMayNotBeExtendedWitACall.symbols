@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/interfaceMayNotBeExtendedWitACall.ts] ////
-
-=== interfaceMayNotBeExtendedWitACall.ts ===
+=== tests/cases/compiler/interfaceMayNotBeExtendedWitACall.ts ===
 interface color {}
 >color : Symbol(color, Decl(interfaceMayNotBeExtendedWitACall.ts, 0, 0))
 

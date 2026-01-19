@@ -1,13 +1,10 @@
-//// [tests/cases/compiler/moduleOuterQualification.ts] ////
-
-=== moduleOuterQualification.ts ===
-declare namespace outer {
+=== tests/cases/compiler/moduleOuterQualification.ts ===
+declare module outer {
   interface Beta { }
-  namespace inner {
+  module inner {
     // .d.ts emit: should be 'extends outer.Beta'
     export interface Beta extends outer.Beta { }
 >outer : any
->      : ^^^
   }
 }
 

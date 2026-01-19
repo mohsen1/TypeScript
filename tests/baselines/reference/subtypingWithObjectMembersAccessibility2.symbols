@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembersAccessibility2.ts] ////
-
-=== subtypingWithObjectMembersAccessibility2.ts ===
+=== tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembersAccessibility2.ts ===
 // Derived member is private, base member is not causes errors
 
 class Base {
@@ -18,11 +16,11 @@ class Derived extends Base {
 >bar : Symbol(Derived.bar, Decl(subtypingWithObjectMembersAccessibility2.ts, 6, 28))
 }
 
-namespace ExplicitPublic {
+module ExplicitPublic {
 >ExplicitPublic : Symbol(ExplicitPublic, Decl(subtypingWithObjectMembersAccessibility2.ts, 8, 1))
 
     class A {
->A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 10, 26))
+>A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 10, 23))
 
         private foo: Base;
 >foo : Symbol(A.foo, Decl(subtypingWithObjectMembersAccessibility2.ts, 11, 13))
@@ -31,7 +29,7 @@ namespace ExplicitPublic {
 
     class B extends A {
 >B : Symbol(B, Decl(subtypingWithObjectMembersAccessibility2.ts, 13, 5))
->A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 10, 26))
+>A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 10, 23))
 
         public foo: Derived; // error
 >foo : Symbol(B.foo, Decl(subtypingWithObjectMembersAccessibility2.ts, 15, 23))
@@ -73,11 +71,11 @@ namespace ExplicitPublic {
     }
 }
 
-namespace ImplicitPublic {
+module ImplicitPublic {
 >ImplicitPublic : Symbol(ImplicitPublic, Decl(subtypingWithObjectMembersAccessibility2.ts, 34, 1))
 
     class A {
->A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 36, 26))
+>A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 36, 23))
 
         private foo: Base;
 >foo : Symbol(A.foo, Decl(subtypingWithObjectMembersAccessibility2.ts, 37, 13))
@@ -86,7 +84,7 @@ namespace ImplicitPublic {
 
     class B extends A {
 >B : Symbol(B, Decl(subtypingWithObjectMembersAccessibility2.ts, 39, 5))
->A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 36, 26))
+>A : Symbol(A, Decl(subtypingWithObjectMembersAccessibility2.ts, 36, 23))
 
         foo: Derived; // error
 >foo : Symbol(B.foo, Decl(subtypingWithObjectMembersAccessibility2.ts, 41, 23))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superNoModifiersCrash.ts] ////
-
 //// [File.js]
 class Parent {
     initialize() {

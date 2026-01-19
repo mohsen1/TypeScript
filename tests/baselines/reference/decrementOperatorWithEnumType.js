@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/decrementOperator/decrementOperatorWithEnumType.ts] ////
-
 //// [decrementOperatorWithEnumType.ts]
 // -- operator on enum type
 

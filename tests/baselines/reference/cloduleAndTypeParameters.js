@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/cloduleAndTypeParameters.ts] ////
-
 //// [cloduleAndTypeParameters.ts]
 class Foo<T extends Foo.Bar> {
   constructor() {
   }
 }
 
-namespace Foo {
+module Foo {
   export interface Bar {
     bar(): void;
   }

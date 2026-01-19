@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/members/classTypes/staticPropertyNotInClassType.ts] ////
-
 //// [staticPropertyNotInClassType.ts]
-namespace NonGeneric {
+module NonGeneric {
     class C {
         fn() { return this; }
         static get x() { return 1; }
@@ -10,7 +8,7 @@ namespace NonGeneric {
         static foo: string; // not reflected in class type
     }
 
-    namespace C {
+    module C {
         export var bar = ''; // not reflected in class type
     }
 
@@ -21,7 +19,7 @@ namespace NonGeneric {
     var r6 = c.x; // error
 }
 
-namespace Generic {
+module Generic {
     class C<T, U> {
         fn() { return this; }
         static get x() { return 1; }
@@ -30,7 +28,7 @@ namespace Generic {
         static foo: T; // not reflected in class type
     }
 
-    namespace C {
+    module C {
         export var bar = ''; // not reflected in class type
     }
 

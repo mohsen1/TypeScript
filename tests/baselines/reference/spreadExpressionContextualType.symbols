@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/spreadExpressionContextualType.ts] ////
-
-=== spreadExpressionContextualType.ts ===
+=== tests/cases/compiler/spreadExpressionContextualType.ts ===
 // Repro from #43966
 
 interface Orange {

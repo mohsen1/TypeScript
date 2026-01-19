@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numericIndexerConstraint3.ts] ////
-
 //// [numericIndexerConstraint3.ts]
 class A {
     foo: number;

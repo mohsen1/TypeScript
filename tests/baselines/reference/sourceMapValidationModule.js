@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/sourceMapValidationModule.ts] ////
-
 //// [sourceMapValidationModule.ts]
-namespace m2 {
+module m2 {
     var a = 10;
     a++;
 }
-namespace m3 {
-    namespace m4 {
+module m3 {
+    module m4 {
         export var x = 30;
     }
 

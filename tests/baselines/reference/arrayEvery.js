@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayEvery.ts] ////
-
 //// [arrayEvery.ts]
 const foo: (number | string)[] = ['aaa'];
 

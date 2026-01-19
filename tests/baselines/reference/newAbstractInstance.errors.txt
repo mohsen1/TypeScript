@@ -1,8 +1,8 @@
-newAbstractInstance.ts(3,5): error TS2351: This expression is not constructable.
+tests/cases/compiler/newAbstractInstance.ts(3,5): error TS2351: This expression is not constructable.
   Type 'B' has no construct signatures.
 
 
-==== newAbstractInstance.ts (1 errors) ====
+==== tests/cases/compiler/newAbstractInstance.ts (1 errors) ====
     abstract class B { }
     declare const b: B;
     new b();

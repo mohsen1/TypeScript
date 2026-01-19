@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericImplements.ts] ////
-
 //// [genericImplements.ts]
 class A { a; };
 class B { b; };

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitProtectedMembers.ts] ////
-
 //// [declarationEmitProtectedMembers.ts]
 // Class with protected members
 class C1 {

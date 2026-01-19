@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportDefaultVariable.ts] ////
-
 //// [exportDefaultVariable.ts]
 // Regression test for #3018
 

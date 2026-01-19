@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsPrivateFields01.ts] ////
-
-=== file.js ===
+=== tests/cases/conformance/jsdoc/declarations/file.js ===
 export class C {
 >C : Symbol(C, Decl(file.js, 0, 0))
 

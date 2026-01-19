@@ -1,17 +1,12 @@
-//// [tests/cases/compiler/doNotEmitPinnedDetachedComments.ts] ////
-
-=== doNotEmitPinnedDetachedComments.ts ===
+=== tests/cases/compiler/doNotEmitPinnedDetachedComments.ts ===
 var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 
 /*! Single Line comment */
 
 function baz() { }
 >baz : () => void
->    : ^^^^^^^^^^
 
 
 /*!
@@ -25,7 +20,6 @@ function baz() { }
 
 function bar() {
 >bar : () => void
->    : ^^^^^^^^^^
 
     /*!
         Remove this comment
@@ -35,13 +29,11 @@ function bar() {
 
 function foo() {
 >foo : () => number
->    : ^^^^^^^^^^^^
 
     /*! Remove this */
 
     return 0;
 >0 : 0
->  : ^
 }
 
 

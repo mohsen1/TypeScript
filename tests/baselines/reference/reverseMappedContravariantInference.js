@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/reverseMappedContravariantInference.ts] ////
-
 //// [reverseMappedContravariantInference.ts]
 // Repro from #21273
 

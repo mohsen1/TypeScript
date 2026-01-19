@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/instanceofOperator/instanceofOperatorWithRHSIsSubtypeOfFunction.ts] ////
-
 //// [instanceofOperatorWithRHSIsSubtypeOfFunction.ts]
 interface I extends Function { }
 

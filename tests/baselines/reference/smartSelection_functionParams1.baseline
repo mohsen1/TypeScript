@@ -1,4 +1,3 @@
-// === Smart Selection ===
 function f(/**/p, q?, ...r: any[] = []) {}
 
            p                          

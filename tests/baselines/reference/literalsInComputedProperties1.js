@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/literalsInComputedProperties1.ts] ////
-
 //// [literalsInComputedProperties1.ts]
 let x = {
     1:1,
@@ -19,20 +17,20 @@ interface A {
     ["4"]:number;
 }
 
-declare let y:A;
+let y:A;
 y[1].toExponential();
 y[2].toExponential();
 y[3].toExponential();
 y[4].toExponential();
 
 class C {
-    1!:number;
-    [2]!:number;
+    1:number;
+    [2]:number;
     "3":number;
-    ["4"]!:number;
+    ["4"]:number;
 }
 
-declare let z:C;
+let z:C;
 z[1].toExponential();
 z[2].toExponential();
 z[3].toExponential();
@@ -65,6 +63,7 @@ x[1].toExponential();
 x[2].toExponential();
 x[3].toExponential();
 x[4].toExponential();
+var y;
 y[1].toExponential();
 y[2].toExponential();
 y[3].toExponential();
@@ -74,6 +73,7 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var z;
 z[1].toExponential();
 z[2].toExponential();
 z[3].toExponential();

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorsWithInvokablesInUnions01.ts] ////
-
 //// [errorsWithInvokablesInUnions01.ts]
 interface ConstructableA {
   new(): { somePropA: any };
@@ -23,7 +21,7 @@ export let ctor: IDirectiveLinkFn<number> | ConstructableA | IDirectivePrePost<n
 
 //// [errorsWithInvokablesInUnions01.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.ctor = exports.blah = void 0;
 var blah = function (x) { };
 exports.blah = blah;

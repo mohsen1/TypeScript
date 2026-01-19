@@ -1,16 +1,14 @@
-//// [tests/cases/conformance/internalModules/importDeclarations/circularImportAlias.ts] ////
-
 //// [circularImportAlias.ts]
 // expected no error
 
-namespace B {
+module B {
     export import a = A;
     export class D extends a.C {
         id: number;
     }
 }
 
-namespace A {
+module A {
     export class C { name: string }
     export import b = B;
 }

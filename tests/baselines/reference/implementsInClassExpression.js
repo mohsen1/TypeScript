@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implementsInClassExpression.ts] ////
-
 //// [implementsInClassExpression.ts]
 interface Foo {
     doThing(): void;

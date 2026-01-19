@@ -24,7 +24,7 @@ var C = /** @class */ (function () {
 module.exports = C;
 //// [externalModuleExportingGenericClass_file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var a = require("./externalModuleExportingGenericClass_file0");
 var v; // this should report error
 var v2 = (new a()).foo;

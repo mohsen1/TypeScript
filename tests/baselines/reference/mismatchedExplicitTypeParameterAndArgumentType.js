@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mismatchedExplicitTypeParameterAndArgumentType.ts] ////
-
 //// [mismatchedExplicitTypeParameterAndArgumentType.ts]
 function map<T, U>(xs: T[], f: (x: T) => U) {
     var ys: U[] = [];

@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/recursiveClassReferenceTest.ts] ////
-
 //// [recursiveClassReferenceTest.ts]
 // Scenario 1: Test reqursive function call with "this" parameter
 // Scenario 2: Test recursive function call with cast and "this" parameter
 
 
 
-declare namespace Sample.Thing {
+declare module Sample.Thing {
 
 	export interface IWidget {
 		getDomNode(): any;
@@ -32,7 +30,7 @@ declare namespace Sample.Thing {
 	}	
 }
 
-namespace Sample.Actions.Thing.Find {
+module Sample.Actions.Thing.Find {
 	export class StartFindAction implements Sample.Thing.IAction {
 		
 		public getId() { return "yo"; }
@@ -44,7 +42,7 @@ namespace Sample.Actions.Thing.Find {
 	}
 }
 
-namespace Sample.Thing.Widgets {
+module Sample.Thing.Widgets {
 	export class FindWidget implements Sample.Thing.IWidget {
 
 		public gar(runner:(widget:Sample.Thing.IWidget)=>any) { if (true) {return runner(this);}}
@@ -76,7 +74,7 @@ interface Window {
 }
 declare var self: Window;
 
-namespace Sample.Thing.Languages.PlainText {
+module Sample.Thing.Languages.PlainText {
 	
 	export class State implements IState {		
         constructor(private mode: IMode) { }

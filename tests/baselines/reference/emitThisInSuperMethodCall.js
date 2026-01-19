@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitThisInSuperMethodCall.ts] ////
-
 //// [emitThisInSuperMethodCall.ts]
 class User {
     sayHello() {

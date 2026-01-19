@@ -1,28 +1,26 @@
-//// [tests/cases/compiler/nameCollisions.ts] ////
-
 //// [nameCollisions.ts]
-namespace T {
+module T {
     var x = 2;
 
-    namespace x { // error
+    module x { // error
         export class Bar {
             test: number;
         }
     }
 
-    namespace z {
+    module z {
         var t;
     }
     var z; // error
 
-    namespace y {
+    module y {
         var b;
     }
 
     class y { } // error
 
     var w;
-    namespace w { } //ok
+    module w { } //ok
 
     var f;
     function f() { } //error

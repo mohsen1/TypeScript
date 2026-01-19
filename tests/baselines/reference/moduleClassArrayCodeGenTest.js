@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/moduleClassArrayCodeGenTest.ts] ////
-
 //// [moduleClassArrayCodeGenTest.ts]
 // Invalid code gen for Array of Module class
 
-namespace M
+module M
 {
     export class A { }
     class B{ }

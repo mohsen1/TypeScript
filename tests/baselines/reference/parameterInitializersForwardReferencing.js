@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/functions/parameterInitializersForwardReferencing.ts] ////
-
 //// [parameterInitializersForwardReferencing.ts]
 function left(a, b = a, c = b) {
     a;

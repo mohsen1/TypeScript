@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedLoops.ts] ////
-
 //// [nestedLoops.ts]
 export class Test  {
     constructor() {

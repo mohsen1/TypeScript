@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/mappedTypePartialConstraints.ts] ////
-
-=== mappedTypePartialConstraints.ts ===
+=== tests/cases/compiler/mappedTypePartialConstraints.ts ===
 // Repro from #16985
 
 interface MyInterface {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateInterfaceProperties.ts] ////
-
 //// [privateInterfaceProperties.ts]
 interface i1 { name:string; }
  

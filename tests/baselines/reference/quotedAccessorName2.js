@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/quotedAccessorName2.ts] ////
-
 //// [quotedAccessorName2.ts]
 class C {
     static get "foo"() { return 0; }

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileFunctionParametersAsOptional2.ts] ////
-
-=== foo.js ===
+=== tests/cases/compiler/foo.js ===
 /**
  * @param a
  * @param b
@@ -13,7 +11,7 @@ function f(a, b, c) { }
 >c : Symbol(c, Decl(foo.js, 5, 16))
 
 
-=== bar.ts ===
+=== tests/cases/compiler/bar.ts ===
 f(); // Error
 >f : Symbol(f, Decl(foo.js, 0, 0))
 

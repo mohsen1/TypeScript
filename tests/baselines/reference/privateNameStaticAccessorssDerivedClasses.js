@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticAccessorssDerivedClasses.ts] ////
-
 //// [privateNameStaticAccessorssDerivedClasses.ts]
 class Base {
     static get #prop(): number { return  123; }

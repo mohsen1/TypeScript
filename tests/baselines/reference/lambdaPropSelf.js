@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lambdaPropSelf.ts] ////
-
 //// [lambdaPropSelf.ts]
 declare var ko: any;
 
@@ -20,7 +18,7 @@ class T {
     }
 }
 
-namespace M {
+module M {
     var x = this;
 }
 

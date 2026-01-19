@@ -1,24 +1,18 @@
-//// [tests/cases/compiler/implicitAnyAnyReturningFunction.ts] ////
-
-=== implicitAnyAnyReturningFunction.ts ===
+=== tests/cases/compiler/implicitAnyAnyReturningFunction.ts ===
 function A() {
 >A : () => any
->  : ^^^^^^   
 
     return <any>"";
 ><any>"" : any
 >"" : ""
->   : ^^
 }
 
 function B() {
 >B : () => any
->  : ^^^^^^^^^
 
     var someLocal: any = {};
 >someLocal : any
 >{} : {}
->   : ^^
 
     return someLocal;
 >someLocal : any
@@ -26,26 +20,21 @@ function B() {
 
 class C {
 >C : C
->  : ^
 
     public A() {
 >A : () => any
->  : ^^^^^^   
 
         return <any>"";
 ><any>"" : any
 >"" : ""
->   : ^^
     }
 
     public B() {
 >B : () => any
->  : ^^^^^^^^^
 
         var someLocal: any = {};
 >someLocal : any
 >{} : {}
->   : ^^
 
         return someLocal;
 >someLocal : any

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxHash.tsx] ////
-
 //// [jsxHash.tsx]
 var t02 = <a>{0}#</a>;
 var t03 = <a>#{0}</a>;

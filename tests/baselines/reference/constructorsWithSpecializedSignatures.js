@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorsWithSpecializedSignatures.ts] ////
-
 //// [constructorsWithSpecializedSignatures.ts]
 // errors
 declare class C {

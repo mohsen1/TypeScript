@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveIndexingWithForIn.ts] ////
-
 //// [nonPrimitiveIndexingWithForIn.ts]
 var a: object;
 

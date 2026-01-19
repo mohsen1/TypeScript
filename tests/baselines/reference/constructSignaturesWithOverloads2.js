@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/constructSignatures/constructSignaturesWithOverloads2.ts] ////
-
 //// [constructSignaturesWithOverloads2.ts]
 // No errors expected for basic overloads of construct signatures with merged declarations
 
@@ -9,7 +7,7 @@ class C {
     constructor(x: number, y: string);
     constructor(x: number) { }
 }
-namespace C {
+module C {
     export var x = 1;
 }
 
@@ -20,7 +18,7 @@ class C2<T> {
     constructor(x: T, y: string);
     constructor(x: T) { }
 }
-namespace C2 {
+module C2 {
     export var x = 1;
 }
 
@@ -37,7 +35,7 @@ interface I<T> {
     new (x: T, y: number): C2<T>;
 }
 
-declare var i2: I<number>;
+var i2: I<number>;
 var r4 = new i2(1, '');
 var r5 = new i2(1, 1);
 
@@ -62,5 +60,6 @@ var C2 = /** @class */ (function () {
     C2.x = 1;
 })(C2 || (C2 = {}));
 var r2 = new C2(1, '');
+var i2;
 var r4 = new i2(1, '');
 var r5 = new i2(1, 1);

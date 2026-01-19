@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionTypeInference3.ts] ////
-
 //// [intersectionTypeInference3.ts]
 // Repro from #19682
 

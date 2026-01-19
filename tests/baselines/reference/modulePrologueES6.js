@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/modulePrologueES6.ts] ////
-
 //// [modulePrologueES6.ts]
 "use strict";
 

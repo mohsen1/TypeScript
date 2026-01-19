@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/sourceMapValidationTryCatchFinally.ts] ////
-
-=== sourceMapValidationTryCatchFinally.ts ===
+=== tests/cases/compiler/sourceMapValidationTryCatchFinally.ts ===
 var x = 10;
 >x : Symbol(x, Decl(sourceMapValidationTryCatchFinally.ts, 0, 3))
 

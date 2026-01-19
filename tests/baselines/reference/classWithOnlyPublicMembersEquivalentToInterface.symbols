@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/namedTypes/classWithOnlyPublicMembersEquivalentToInterface.ts] ////
-
-=== classWithOnlyPublicMembersEquivalentToInterface.ts ===
+=== tests/cases/conformance/types/namedTypes/classWithOnlyPublicMembersEquivalentToInterface.ts ===
 // no errors expected
 
 class C {

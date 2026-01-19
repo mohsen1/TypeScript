@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mappedTypePartialConstraints.ts] ////
-
 //// [mappedTypePartialConstraints.ts]
 // Repro from #16985
 

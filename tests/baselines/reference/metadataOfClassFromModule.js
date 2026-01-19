@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/metadataOfClassFromModule.ts] ////
-
 //// [metadataOfClassFromModule.ts]
-namespace MyModule {
+module MyModule {
 
     export function inject(target: any, key: string): void { }
 

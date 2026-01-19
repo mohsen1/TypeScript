@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameInInExpression.ts] ////
-
-=== privateNameInInExpression.ts ===
+=== tests/cases/conformance/classes/members/privateNames/privateNameInInExpression.ts ===
 class Foo {
 >Foo : Symbol(Foo, Decl(privateNameInInExpression.ts, 0, 0))
 

@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationExportAssignment.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationExportAssignment.js
+emittedFile:tests/cases/compiler/sourceMapValidationExportAssignment.js
 sourceFile:sourceMapValidationExportAssignment.ts
 -------------------------------------------------------------------
 >>>define(["require", "exports"], function (require, exports) {

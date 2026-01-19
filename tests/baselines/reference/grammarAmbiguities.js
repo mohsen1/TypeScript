@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functionCalls/grammarAmbiguities.ts] ////
-
 //// [grammarAmbiguities.ts]
 function f(n: any) { return null; }
 function g<A, B>(x: any) { return null; }

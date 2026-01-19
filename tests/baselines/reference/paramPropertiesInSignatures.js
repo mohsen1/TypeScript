@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/paramPropertiesInSignatures.ts] ////
-
 //// [paramPropertiesInSignatures.ts]
 class C1 {
 	constructor(public p1:string); // ERROR

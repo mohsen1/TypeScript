@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveBaseConstructorCreation2.ts] ////
-
 //// [recursiveBaseConstructorCreation2.ts]
 declare class base
 {

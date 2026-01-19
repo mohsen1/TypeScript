@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/constructSignatures/constructSignaturesWithOverloadsThatDifferOnlyByReturnType.ts] ////
-
 //// [constructSignaturesWithOverloadsThatDifferOnlyByReturnType.ts]
 // Error for construct signature overloads to differ only by return type
 

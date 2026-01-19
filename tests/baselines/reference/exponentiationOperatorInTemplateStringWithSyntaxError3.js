@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorInTemplateStringWithSyntaxError3.ts] ////
-
 //// [exponentiationOperatorInTemplateStringWithSyntaxError3.ts]
 var t1 = 10;
 var t2 = 10;

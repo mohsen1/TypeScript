@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/salsa/propertiesOfGenericConstructorFunctions.ts] ////
-
-=== propertiesOfGenericConstructorFunctions.js ===
+=== tests/cases/conformance/salsa/propertiesOfGenericConstructorFunctions.js ===
 /**
  * @template {string} K
  * @template V

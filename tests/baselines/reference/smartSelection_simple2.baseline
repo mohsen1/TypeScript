@@ -1,4 +1,3 @@
-// === Smart Selection ===
 export interface IService {
   _serviceBrand: any;
 

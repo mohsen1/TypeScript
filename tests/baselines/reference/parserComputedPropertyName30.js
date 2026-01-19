@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript6/ComputedPropertyNames/parserComputedPropertyName30.ts] ////
-
 //// [parserComputedPropertyName30.ts]
 enum E {
     // no ASI, comma expected

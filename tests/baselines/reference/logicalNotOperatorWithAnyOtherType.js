@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/expressions/unaryOperators/logicalNotOperator/logicalNotOperatorWithAnyOtherType.ts] ////
-
 //// [logicalNotOperatorWithAnyOtherType.ts]
 // ! operator on any type
 
 var ANY: any;
 var ANY1;
 var ANY2: any[] = ["", ""];
-declare var obj: () => {}
+var obj: () => {}
 var obj1 = { x: "", y: () => { }};
 function foo(): any {
     var a;
@@ -19,7 +17,7 @@ class A {
         return a;
     }
 }
-namespace M {
+module M {
     export var n: any;
 }
 var objA = new A();
@@ -66,6 +64,7 @@ var ResultIsBoolean21 = !!!(ANY + ANY1);
 var ANY;
 var ANY1;
 var ANY2 = ["", ""];
+var obj;
 var obj1 = { x: "", y: function () { } };
 function foo() {
     var a;

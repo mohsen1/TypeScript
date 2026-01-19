@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/enum/invalidEnumAssignments.ts] ////
-
 //// [invalidEnumAssignments.ts]
 enum E {
     A,

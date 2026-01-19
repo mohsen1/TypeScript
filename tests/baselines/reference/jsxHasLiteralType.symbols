@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxHasLiteralType.tsx] ////
-
-=== jsxHasLiteralType.tsx ===
+=== tests/cases/compiler/jsxHasLiteralType.tsx ===
 import * as React from "react";
 >React : Symbol(React, Decl(jsxHasLiteralType.tsx, 0, 6))
 

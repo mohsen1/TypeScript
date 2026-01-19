@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeConstraints.ts] ////
-
 //// [mappedTypeConstraints.ts]
 function f0<T extends { a: string, b: string }>(obj: Pick<T, Extract<keyof T, 'b'>>) {
     obj.b;

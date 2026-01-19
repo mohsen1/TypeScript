@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mergedEnumDeclarationCodeGen.ts] ////
-
 //// [mergedEnumDeclarationCodeGen.ts]
 enum E {
     a,

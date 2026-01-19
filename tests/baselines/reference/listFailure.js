@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/listFailure.ts] ////
-
 //// [listFailure.ts]
-namespace Editor {
+module Editor {
 
     export class Buffer {
     	lines: List<Line> = ListMakeHead<Line>();

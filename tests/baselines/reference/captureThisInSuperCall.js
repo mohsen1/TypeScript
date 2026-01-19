@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/captureThisInSuperCall.ts] ////
-
 //// [captureThisInSuperCall.ts]
 class A {
     constructor(p:any) {}

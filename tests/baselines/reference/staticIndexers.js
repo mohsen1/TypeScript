@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/indexMemberDeclarations/staticIndexers.ts] ////
-
 //// [staticIndexers.ts]
 // static indexers not allowed
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/rest/restTuplesFromContextualTypes.ts] ////
-
 //// [restTuplesFromContextualTypes.ts]
 declare const t1: [number, boolean, string];
 
@@ -363,7 +361,7 @@ declare let g7: (x: any, y: any) => string;
 declare let g8: (x: number, y: string) => string;
 declare var tuple: [number, string];
 declare function take(cb: (a: number, b: string) => void): void;
-type ArgsUnion = [number, string] | [number, Error];
-type TupleUnionFunc = (...params: ArgsUnion) => number;
+declare type ArgsUnion = [number, string] | [number, Error];
+declare type TupleUnionFunc = (...params: ArgsUnion) => number;
 declare const funcUnionTupleNoRest: TupleUnionFunc;
 declare const funcUnionTupleRest: TupleUnionFunc;

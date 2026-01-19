@@ -1,9 +1,5 @@
-//// [tests/cases/compiler/bom-utf16le.ts] ////
-
-=== bom-utf16le.ts ===
+=== tests/cases/compiler/bom-utf16le.ts ===
 var x=10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 

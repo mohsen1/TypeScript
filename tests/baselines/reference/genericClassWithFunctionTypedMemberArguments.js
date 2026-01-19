@@ -1,10 +1,8 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithFunctionTypedMemberArguments.ts] ////
-
 //// [genericClassWithFunctionTypedMemberArguments.ts]
 // Generic functions used as arguments for function typed parameters are not used to make inferences from
 // Using function arguments, no errors expected
 
-namespace ImmediatelyFix {
+module ImmediatelyFix {
     class C<T> {
         foo<T>(x: (a: T) => T) {
             return x(null);
@@ -27,14 +25,14 @@ namespace ImmediatelyFix {
     var r3a = c2.foo(x => 1); // number
 }
 
-namespace WithCandidates {
+module WithCandidates {
     class C<T> {
         foo2<T, U>(x: T, cb: (a: T) => U) {
             return cb(x);
         }
     }
 
-    declare var c: C<number>;
+    var c: C<number>;
     var r4 = c.foo2(1, function <Z>(a: Z) { return '' }); // string, contextual signature instantiation is applied to generic functions
     var r5 = c.foo2(1, (a) => ''); // string
     var r6 = c.foo2<string, number>('', <Z>(a: Z) => 1); // number
@@ -45,7 +43,7 @@ namespace WithCandidates {
         }
     }
 
-    declare var c2: C2<number, string>;
+    var c2: C2<number, string>;
     var r7 = c2.foo3(1, <Z>(a: Z) => '', ''); // string
     var r8 = c2.foo3(1, function (a) { return '' }, ''); // string
 
@@ -54,7 +52,7 @@ namespace WithCandidates {
             return cb(x);
         }
     }
-    declare var c3: C3<number, string>;
+    var c3: C3<number, string>;
 
     function other<T, U>(t: T, u: U) {
         var r10 = c.foo2(1, (x: T) => ''); // error
@@ -105,6 +103,7 @@ var WithCandidates;
         };
         return C;
     }());
+    var c;
     var r4 = c.foo2(1, function (a) { return ''; }); // string, contextual signature instantiation is applied to generic functions
     var r5 = c.foo2(1, function (a) { return ''; }); // string
     var r6 = c.foo2('', function (a) { return 1; }); // number
@@ -116,6 +115,7 @@ var WithCandidates;
         };
         return C2;
     }());
+    var c2;
     var r7 = c2.foo3(1, function (a) { return ''; }, ''); // string
     var r8 = c2.foo3(1, function (a) { return ''; }, ''); // string
     var C3 = /** @class */ (function () {
@@ -126,6 +126,7 @@ var WithCandidates;
         };
         return C3;
     }());
+    var c3;
     function other(t, u) {
         var r10 = c.foo2(1, function (x) { return ''; }); // error
         var r10 = c.foo2(1, function (x) { return ''; }); // string

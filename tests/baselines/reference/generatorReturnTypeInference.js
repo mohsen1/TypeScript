@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/generators/generatorReturnTypeInference.ts] ////
-
 //// [generatorReturnTypeInference.ts]
 declare const iterableIterator: IterableIterator<number>;
 declare const generator: Generator<number, string, boolean>;

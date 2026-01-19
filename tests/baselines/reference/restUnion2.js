@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restUnion2.ts] ////
-
 //// [restUnion2.ts]
 declare const undefinedUnion: { n: number } | undefined;
 var rest2: { n: number };

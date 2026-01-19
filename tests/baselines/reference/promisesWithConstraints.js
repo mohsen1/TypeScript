@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promisesWithConstraints.ts] ////
-
 //// [promisesWithConstraints.ts]
 interface Promise<T> {
     then<U>(cb: (x: T) => Promise<U>): Promise<U>;
@@ -9,24 +7,26 @@ interface CPromise<T extends { x: any; }> {
     then<U extends { x: any; }>(cb: (x: T) => Promise<U>): Promise<U>;
 }
 
-interface Foo { x: any; }
-interface Bar { x: any; y: any; }
+interface Foo { x; }
+interface Bar { x; y; }
 
 var a: Promise<Foo>;
-declare var b: Promise<Bar>;
+var b: Promise<Bar>;
 a = b; // ok
 b = a; // ok
 
 var a2: CPromise<Foo>;
-declare var b2: CPromise<Bar>;
+var b2: CPromise<Bar>;
 a2 = b2; // ok
 b2 = a2; // was error
 
 
 //// [promisesWithConstraints.js]
 var a;
+var b;
 a = b; // ok
 b = a; // ok
 var a2;
+var b2;
 a2 = b2; // ok
 b2 = a2; // was error

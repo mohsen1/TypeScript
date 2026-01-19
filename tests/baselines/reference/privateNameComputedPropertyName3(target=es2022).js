@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameComputedPropertyName3.ts] ////
-
 //// [privateNameComputedPropertyName3.ts]
 class Foo {
     #name;

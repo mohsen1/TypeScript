@@ -1,7 +1,7 @@
-letDeclarations-scopes.ts(27,1): error TS2410: The 'with' statement is not supported. All symbols in a 'with' block will have type 'any'.
+tests/cases/compiler/letDeclarations-scopes.ts(27,1): error TS2410: The 'with' statement is not supported. All symbols in a 'with' block will have type 'any'.
 
 
-==== letDeclarations-scopes.ts (1 errors) ====
+==== tests/cases/compiler/letDeclarations-scopes.ts (1 errors) ====
     // global
     let l = "string";
     
@@ -113,7 +113,7 @@ letDeclarations-scopes.ts(27,1): error TS2410: The 'with' statement is not suppo
     };
     
     // modules
-    namespace m {
+    module m {
         let l = 0;
         n = l;
     

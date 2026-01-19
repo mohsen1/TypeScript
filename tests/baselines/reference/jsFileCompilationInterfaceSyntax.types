@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsFileCompilationInterfaceSyntax.ts] ////
-
-=== a.js ===
-
+=== tests/cases/compiler/a.js ===
 interface I { }
+No type information for this code.

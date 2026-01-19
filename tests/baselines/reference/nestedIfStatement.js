@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedIfStatement.ts] ////
-
 //// [nestedIfStatement.ts]
 if (0) {
 } else if (1) {

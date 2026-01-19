@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overEagerReturnTypeSpecialization.ts] ////
-
 //// [overEagerReturnTypeSpecialization.ts]
 //Note: Below simpler repro
 

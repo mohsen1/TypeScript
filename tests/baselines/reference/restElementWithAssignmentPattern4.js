@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/restElementWithAssignmentPattern4.ts] ////
-
 //// [restElementWithAssignmentPattern4.ts]
 var a: string, b: number;
 var tuple: [string, number] = ["", 1];

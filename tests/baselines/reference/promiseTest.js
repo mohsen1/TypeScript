@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseTest.ts] ////
-
 //// [promiseTest.ts]
 interface Promise<T> {
     then<A>(success?: (value: T) => Promise<A>): Promise<A>;

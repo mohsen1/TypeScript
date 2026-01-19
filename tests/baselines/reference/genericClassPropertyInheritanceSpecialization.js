@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericClassPropertyInheritanceSpecialization.ts] ////
-
 //// [genericClassPropertyInheritanceSpecialization.ts]
 interface KnockoutObservableBase<T> {
     peek(): T;
@@ -36,11 +34,11 @@ interface KnockoutObservableArrayStatic {
     <T>(value?: T[]): KnockoutObservableArray<T>;
 }
 
-declare namespace ko {
+declare module ko {
     export var observableArray: KnockoutObservableArrayStatic;
 }
 
-namespace Portal.Controls.Validators {
+module Portal.Controls.Validators {
 
     export class Validator<TValue> {
         private _subscription;
@@ -53,7 +51,7 @@ namespace Portal.Controls.Validators {
     }
 }
 
-namespace PortalFx.ViewModels.Controls.Validators {
+module PortalFx.ViewModels.Controls.Validators {
 
     export class Validator<TValue> extends Portal.Controls.Validators.Validator<TValue> {
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/constructSignatureWithAccessibilityModifiersOnParameters2.ts] ////
-
 //// [constructSignatureWithAccessibilityModifiersOnParameters2.ts]
 // Parameter properties are not valid in overloads of constructors
 

@@ -1,17 +1,17 @@
-nonExportedElementsOfMergedModules.ts(13,7): error TS2339: Property 'x' does not exist on type 'typeof B'.
+tests/cases/compiler/nonExportedElementsOfMergedModules.ts(13,7): error TS2339: Property 'x' does not exist on type 'typeof B'.
 
 
-==== nonExportedElementsOfMergedModules.ts (1 errors) ====
-    namespace One {
+==== tests/cases/compiler/nonExportedElementsOfMergedModules.ts (1 errors) ====
+    module One {
         enum A { X }
-        namespace B {
+        module B {
             export var x;
         }
     }
     
-    namespace One {
+    module One {
         enum A { Y }
-        namespace B {
+        module B {
             export var y;
         }
         B.x;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveInheritance.ts] ////
-
 //// [recursiveInheritance.ts]
 interface I5 extends I5 { // error
     foo():void;

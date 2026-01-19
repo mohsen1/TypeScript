@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/moduleAsBaseType.ts] ////
-
-=== moduleAsBaseType.ts ===
-namespace M {}
+=== tests/cases/compiler/moduleAsBaseType.ts ===
+module M {}
 >M : Symbol(M, Decl(moduleAsBaseType.ts, 0, 0))
 
 class C extends M {}
->C : Symbol(C, Decl(moduleAsBaseType.ts, 0, 14))
+>C : Symbol(C, Decl(moduleAsBaseType.ts, 0, 11))
 
 interface I extends M { }
 >I : Symbol(I, Decl(moduleAsBaseType.ts, 1, 20))

@@ -39,9 +39,9 @@ User.addResolver({
 
 //// [app.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 User.addResolver({
-    type: User, // `User as any` fix the problem
+    type: User
 });
 
 

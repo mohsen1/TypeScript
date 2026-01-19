@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/crashInresolveReturnStatement.ts] ////
-
-=== crashInresolveReturnStatement.ts ===
+=== tests/cases/compiler/crashInresolveReturnStatement.ts ===
 class WorkItemToolbar {
 >WorkItemToolbar : Symbol(WorkItemToolbar, Decl(crashInresolveReturnStatement.ts, 0, 0))
 

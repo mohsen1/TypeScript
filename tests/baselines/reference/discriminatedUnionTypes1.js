@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/union/discriminatedUnionTypes1.ts] ////
-
 //// [discriminatedUnionTypes1.ts]
 interface Square {
     kind: "square";

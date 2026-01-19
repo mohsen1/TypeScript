@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferenceErasedSignatures.ts] ////
-
 //// [inferenceErasedSignatures.ts]
 // Repro from #37163
 

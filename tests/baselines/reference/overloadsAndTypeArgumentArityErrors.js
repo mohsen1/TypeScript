@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadsAndTypeArgumentArityErrors.ts] ////
-
 //// [overloadsAndTypeArgumentArityErrors.ts]
 declare function Callbacks(flags?: string): void;
 declare function Callbacks<T>(flags?: string): void;

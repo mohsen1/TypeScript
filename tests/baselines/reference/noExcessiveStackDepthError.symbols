@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/noExcessiveStackDepthError.ts] ////
-
-=== noExcessiveStackDepthError.ts ===
+=== tests/cases/compiler/noExcessiveStackDepthError.ts ===
 // Repro from #46631
 
 interface FindOperator<T> {

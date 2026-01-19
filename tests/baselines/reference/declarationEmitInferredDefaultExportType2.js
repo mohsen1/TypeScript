@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitInferredDefaultExportType2.ts] ////
-
 //// [declarationEmitInferredDefaultExportType2.ts]
 // test.ts
 export = {

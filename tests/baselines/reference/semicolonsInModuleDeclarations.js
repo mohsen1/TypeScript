@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/semicolonsInModuleDeclarations.ts] ////
-
 //// [semicolonsInModuleDeclarations.ts]
-declare namespace ambiModule {
+declare module ambiModule {
    export interface i1 { };
    export interface i2 { }
 }

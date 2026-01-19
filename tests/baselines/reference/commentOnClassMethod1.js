@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnClassMethod1.ts] ////
-
 //// [commentOnClassMethod1.ts]
 class WebControls {
     /**

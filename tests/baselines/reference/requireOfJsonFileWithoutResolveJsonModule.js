@@ -12,11 +12,9 @@ if (x) {
 //// [b.json]
 contents Not read
 
-//// [out/b.json]
-({ contents: contents, Not: Not, read: read })
 //// [out/file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var b1 = require("./b.json"); // error
 var x = b1.a;
 var b2 = require("./b.json"); // error

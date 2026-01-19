@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mutrec.ts] ////
-
 //// [mutrec.ts]
 interface A {
     x:B[];

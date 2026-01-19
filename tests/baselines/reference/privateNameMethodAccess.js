@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameMethodAccess.ts] ////
-
 //// [privateNameMethodAccess.ts]
 class A2 {
     #method() { return "" }
@@ -31,7 +29,7 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
     if (typeof state === "function" ? receiver !== state || !f : !state.has(receiver)) throw new TypeError("Cannot read private member from an object whose class did not declare it");
     return kind === "m" ? f : kind === "a" ? f.call(receiver) : f ? f.value : state.get(receiver);
 };
-var _A2_instances, _A2_method;
+var _A2_instances, _A2_method, _a;
 class A2 {
     constructor() {
         _A2_instances.add(this);
@@ -44,12 +42,14 @@ class A2 {
     }
 }
 _A2_instances = new WeakSet(), _A2_method = function _A2_method() { return ""; };
-new A2().(); // Error
+(_a = new A2())..call(_a); // Error
 function foo() {
-    new A2().(); // Error
+    var _a;
+    (_a = new A2())..call(_a); // Error
 }
 class B2 {
     m() {
-        new A2().();
+        var _a;
+        (_a = new A2())..call(_a);
     }
 }

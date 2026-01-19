@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/mergedModuleDeclarationCodeGen5.ts] ////
-
 //// [mergedModuleDeclarationCodeGen5.ts]
-namespace M.buz.plop {
+module M.buz.plop {
     export function doom() { }
     export function M() { }
 }
-namespace M.buz.plop {
+module M.buz.plop {
     function gunk() { }
     function buz() { }
     export class fudge { }

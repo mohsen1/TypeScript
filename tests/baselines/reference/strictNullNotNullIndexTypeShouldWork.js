@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictNullNotNullIndexTypeShouldWork.ts] ////
-
 //// [strictNullNotNullIndexTypeShouldWork.ts]
 interface A {
     params?: { name: string; };

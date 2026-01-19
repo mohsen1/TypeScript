@@ -1,18 +1,13 @@
-//// [tests/cases/compiler/nodeResolution4.ts] ////
-
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 import y = require("./a");
 >y : typeof y
->  : ^^^^^^^^
 
-=== ref.ts ===
+=== tests/cases/compiler/ref.ts ===
 var x = 1;
 >x : number
->  : ^^^^^^
 >1 : 1
->  : ^
 
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 /// <reference path="ref.ts"/>
 export var y;
 >y : any

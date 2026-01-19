@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeAliases/directDependenceBetweenTypeAliases.ts] ////
-
 //// [directDependenceBetweenTypeAliases.ts]
 // It is an error for the type specified in a type alias to depend on that type alias
 

@@ -9,19 +9,19 @@ export const A1 = A;
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A = void 0;
 exports.A = 0;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.A1 = void 0;
 var a_1 = require("./a");
 exports.A1 = a_1.A;
 
 
 //// [a.d.ts]
-type AX = {
+declare type AX = {
     readonly A: unique symbol;
 };
 export declare const A: AX;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mappedTypeParameterConstraint.ts] ////
-
 //// [mappedTypeParameterConstraint.ts]
 // Repro for #27596
 

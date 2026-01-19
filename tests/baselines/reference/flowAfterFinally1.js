@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/flowAfterFinally1.ts] ////
-
 //// [flowAfterFinally1.ts]
 declare function openFile(): void
 declare function closeFile(): void

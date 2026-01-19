@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/qualifiedModuleLocals.ts] ////
-
 //// [qualifiedModuleLocals.ts]
-namespace A {
+module A {
 
   function b() {}
 

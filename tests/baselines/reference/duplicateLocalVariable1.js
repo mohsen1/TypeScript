@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateLocalVariable1.ts] ////
-
 //// [duplicateLocalVariable1.ts]
 //import FileManager = require('filemanager');
 //import App = require('app');
@@ -32,7 +30,7 @@ export class TestRunner {
             try {
                 testResult = testcase.test();
             }
-            catch (e: any) {
+            catch (e) {
                 exception = true;
                 testResult = false;
                 if (typeof testcase.errorMessageRegEx === "string") {
@@ -349,7 +347,7 @@ export var tests: TestRunner = (function () {
 "use strict";
 //import FileManager = require('filemanager');
 //import App = require('app');
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.tests = exports.TestRunner = exports.TestCase = void 0;
 var TestFileDir = ".\\TempTestFiles";
 var TestCase = /** @class */ (function () {

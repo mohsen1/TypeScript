@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/preserveUnusedImports.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 export type A = {};
 >A : Symbol(A, Decl(a.ts, 0, 0))
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 export class B {}
 >B : Symbol(B, Decl(b.ts, 0, 0))
 
-=== c.ts ===
+=== tests/cases/compiler/c.ts ===
 import { A } from './a';
 >A : Symbol(A, Decl(c.ts, 0, 8))
 

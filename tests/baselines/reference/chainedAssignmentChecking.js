@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/chainedAssignmentChecking.ts] ////
-
 //// [chainedAssignmentChecking.ts]
 class X {
   constructor(public z) { }

@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameBadSuperUseDefineForClassFields.ts] ////
-
 //// [privateNameBadSuperUseDefineForClassFields.ts]
 class B {};
 class A extends B {
-  #x;
-  constructor() {
-    this;
-    super();
-  }
+    #x;
+    constructor() {
+        void 0; // Error: 'super' call must  come first
+        super();
+    }
 }
 
 
@@ -18,7 +16,7 @@ class B {
 class A extends B {
     #x;
     constructor() {
-        this;
+        void 0; // Error: 'super' call must  come first
         super();
     }
 }

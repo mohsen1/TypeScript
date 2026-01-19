@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameNotAccessibleOutsideDefiningClass.ts] ////
-
 //// [privateNameNotAccessibleOutsideDefiningClass.ts]
 class A {
     #foo: number = 3;

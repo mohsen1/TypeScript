@@ -1,25 +1,17 @@
-//// [tests/cases/conformance/externalModules/typeOnly/nestedNamespace.ts] ////
-
-=== a.ts ===
+=== tests/cases/conformance/externalModules/typeOnly/a.ts ===
 export namespace types {
 >types : typeof types
->      : ^^^^^^^^^^^^
 
   export class A {}
 >A : A
->  : ^
 }
 
-=== b.ts ===
+=== tests/cases/conformance/externalModules/typeOnly/b.ts ===
 import type * as a from './a';
 >a : typeof a
->  : ^^^^^^^^
 
 interface B extends a.types.A {}
 >a.types : typeof a.types
->        : ^^^^^^^^^^^^^^
 >a : typeof a
->  : ^^^^^^^^
 >types : typeof a.types
->      : ^^^^^^^^^^^^^^
 

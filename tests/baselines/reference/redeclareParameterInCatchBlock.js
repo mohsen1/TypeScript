@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/redeclareParameterInCatchBlock.ts] ////
-
 //// [redeclareParameterInCatchBlock.ts]
 try {
 

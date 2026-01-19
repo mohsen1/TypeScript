@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/classDeclaration/emitClassDeclarationWithTypeArgumentInES6.ts] ////
-
 //// [emitClassDeclarationWithTypeArgumentInES6.ts]
 class B<T> {
     x: T;

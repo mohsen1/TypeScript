@@ -9,15 +9,15 @@ export const variable = globalThis;
 
 //// [variable.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.variable = void 0;
 exports.variable = globalThis;
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.globalThis = void 0;
 var variable_1 = require("./variable");
-Object.defineProperty(exports, "globalThis", { enumerable: true, get: function () { return variable_1.variable; } });
+exports.globalThis = variable_1.variable;
 
 
 //// [variable.d.ts]

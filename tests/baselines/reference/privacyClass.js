@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privacyClass.ts] ////
-
 //// [privacyClass.ts]
-export namespace m1 {
+export module m1 {
     export interface m1_i_public {
     }
 
@@ -45,7 +43,7 @@ export namespace m1 {
 }
 
 
-namespace m2 {
+module m2 {
     export interface m2_i_public {
     }
 
@@ -146,7 +144,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.glo_C12_public = exports.glo_C11_public = exports.glo_C8_public = exports.glo_C7_public = exports.glo_C4_public = exports.glo_C3_public = exports.glo_c_public = exports.m1 = void 0;
 var m1;
 (function (m1) {
@@ -245,7 +243,7 @@ var m1;
         return m1_C12_public;
     }(m1_c_private));
     m1.m1_C12_public = m1_C12_public;
-})(m1 || (exports.m1 = m1 = {}));
+})(m1 = exports.m1 || (exports.m1 = {}));
 var m2;
 (function (m2) {
     var m2_c_public = /** @class */ (function () {

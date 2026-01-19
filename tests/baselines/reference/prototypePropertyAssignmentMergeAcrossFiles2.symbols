@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/salsa/prototypePropertyAssignmentMergeAcrossFiles2.ts] ////
-
-=== prototypePropertyAssignmentMergeAcrossFiles2.js ===
+=== tests/cases/conformance/salsa/prototypePropertyAssignmentMergeAcrossFiles2.js ===
 var Ns = {}
 >Ns : Symbol(Ns, Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 0, 3), Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 0, 11), Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 1, 23), Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 2, 23), Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 6, 2))
 
@@ -33,13 +31,12 @@ Ns.Two.prototype = {
 >prototype : Symbol(Ns.Two.prototype, Decl(prototypePropertyAssignmentMergeAcrossFiles2.js, 6, 2))
 }
 
-=== other.js ===
+=== tests/cases/conformance/salsa/other.js ===
 /**
  * @type {Ns.One}
  */
-var one = undefined;
+var one;
 >one : Symbol(one, Decl(other.js, 3, 3))
->undefined : Symbol(undefined)
 
 one.wat;
 >one : Symbol(one, Decl(other.js, 3, 3))
@@ -47,9 +44,8 @@ one.wat;
 /**
  * @type {Ns.Two}
  */
-var two = undefined;
+var two;
 >two : Symbol(two, Decl(other.js, 8, 3))
->undefined : Symbol(undefined)
 
 two.wat;
 >two : Symbol(two, Decl(other.js, 8, 3))

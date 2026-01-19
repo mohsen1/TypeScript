@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/sourceMapValidationModule.ts] ////
-
-=== sourceMapValidationModule.ts ===
-namespace m2 {
+=== tests/cases/compiler/sourceMapValidationModule.ts ===
+module m2 {
 >m2 : Symbol(m2, Decl(sourceMapValidationModule.ts, 0, 0))
 
     var a = 10;
@@ -10,11 +8,11 @@ namespace m2 {
     a++;
 >a : Symbol(a, Decl(sourceMapValidationModule.ts, 1, 7))
 }
-namespace m3 {
+module m3 {
 >m3 : Symbol(m3, Decl(sourceMapValidationModule.ts, 3, 1))
 
-    namespace m4 {
->m4 : Symbol(m4, Decl(sourceMapValidationModule.ts, 4, 14))
+    module m4 {
+>m4 : Symbol(m4, Decl(sourceMapValidationModule.ts, 4, 11))
 
         export var x = 30;
 >x : Symbol(x, Decl(sourceMapValidationModule.ts, 6, 18))
@@ -25,7 +23,7 @@ namespace m3 {
 
         return m4.x;
 >m4.x : Symbol(m4.x, Decl(sourceMapValidationModule.ts, 6, 18))
->m4 : Symbol(m4, Decl(sourceMapValidationModule.ts, 4, 14))
+>m4 : Symbol(m4, Decl(sourceMapValidationModule.ts, 4, 11))
 >x : Symbol(m4.x, Decl(sourceMapValidationModule.ts, 6, 18))
     }
 }

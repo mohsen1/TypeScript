@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock16.ts] ////
-
 //// [classStaticBlock16.ts]
 let getX: (c: C) => number;
 class C {

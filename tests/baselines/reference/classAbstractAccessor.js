@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractAccessor.ts] ////
-
 //// [classAbstractAccessor.ts]
 abstract class A {
    abstract get a();

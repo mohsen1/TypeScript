@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticClassProps.ts] ////
-
 //// [staticClassProps.ts]
 class C
 {

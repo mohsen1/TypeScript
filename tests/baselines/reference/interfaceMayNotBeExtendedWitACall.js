@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceMayNotBeExtendedWitACall.ts] ////
-
 //// [interfaceMayNotBeExtendedWitACall.ts]
 interface color {}
 

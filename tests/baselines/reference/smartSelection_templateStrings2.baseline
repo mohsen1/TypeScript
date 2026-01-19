@@ -1,4 +1,3 @@
-// === Smart Selection ===
 `a ${b} /**/c`
 
  a ${b} c 

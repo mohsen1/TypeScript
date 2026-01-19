@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/strictModeWordInImportDeclaration.ts] ////
-
-=== strictModeWordInImportDeclaration.ts ===
+=== tests/cases/compiler/strictModeWordInImportDeclaration.ts ===
 "use strict"
 import * as package from "./1"
 >package : Symbol(package, Decl(strictModeWordInImportDeclaration.ts, 1, 6))

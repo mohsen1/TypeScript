@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameFieldCallExpression.ts] ////
-
 //// [privateNameFieldCallExpression.ts]
 class A {
     #fieldFunc = function() { this.x = 10; };

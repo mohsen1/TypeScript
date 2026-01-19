@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privacyTypeParametersOfClassDeclFile.ts] ////
-
 //// [privacyTypeParametersOfClassDeclFile.ts]
 class privateClass {
 }
@@ -55,7 +53,7 @@ class privateClassWithTypeParametersFromPrivateModule<T extends privateModule.pu
     }
 }
 
-export namespace publicModule {
+export module publicModule {
     class privateClassInPublicModule {
     }
 
@@ -111,7 +109,7 @@ export namespace publicModule {
     }
 }
 
-namespace privateModule {
+module privateModule {
     class privateClassInPrivateModule {
     }
 
@@ -158,7 +156,7 @@ namespace privateModule {
 
 //// [privacyTypeParametersOfClassDeclFile.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.publicModule = exports.publicClassWithTypeParametersFromPrivateModule = exports.publicClassWithPublicTypeParametersWithoutExtends = exports.publicClassWithPublicTypeParameters = exports.publicClassWithPrivateTypeParameters = exports.publicClass = void 0;
 var privateClass = /** @class */ (function () {
     function privateClass() {
@@ -320,7 +318,7 @@ var publicModule;
         };
         return privateClassWithTypeParametersFromPrivateModule;
     }());
-})(publicModule || (exports.publicModule = publicModule = {}));
+})(publicModule = exports.publicModule || (exports.publicModule = {}));
 var privateModule;
 (function (privateModule) {
     var privateClassInPrivateModule = /** @class */ (function () {
@@ -405,7 +403,7 @@ export declare class publicClassWithPublicTypeParametersWithoutExtends<T> {
 export declare class publicClassWithTypeParametersFromPrivateModule<T extends privateModule.publicClassInPrivateModule> {
     myMethod(val: T): T;
 }
-export declare namespace publicModule {
+export declare module publicModule {
     class privateClassInPublicModule {
     }
     export class publicClassInPublicModule {
@@ -424,7 +422,7 @@ export declare namespace publicModule {
     }
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     class privateClassInPrivateModule {
     }
     export class publicClassInPrivateModule {

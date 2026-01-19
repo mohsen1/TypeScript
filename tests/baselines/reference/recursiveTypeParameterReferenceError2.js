@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveTypeParameterReferenceError2.ts] ////
-
 //// [recursiveTypeParameterReferenceError2.ts]
 interface List<T> {
     data: T;

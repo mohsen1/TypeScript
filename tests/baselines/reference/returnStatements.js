@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/returnStatements/returnStatements.ts] ////
-
 //// [returnStatements.ts]
 // all the following should be valid
 function fn1(): number { return 1; }

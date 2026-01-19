@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/parser/ecmascript5/ModuleDeclarations/parserModuleDeclaration4.ts] ////
-
 //// [parserModuleDeclaration4.ts]
-namespace M {
-  declare namespace M1 {
-    namespace M2 {
+module M {
+  declare module M1 {
+    module M2 {
     }
   }
 }

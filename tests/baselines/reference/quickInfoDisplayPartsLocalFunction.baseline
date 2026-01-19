@@ -1,92 +1,3 @@
-// === QuickInfo ===
-=== /tests/cases/fourslash/quickInfoDisplayPartsLocalFunction.ts ===
-// function outerFoo() {
-//          ^^^^^^^^
-// | ----------------------------------------------------------------------
-// | function outerFoo(): void
-// | ----------------------------------------------------------------------
-//     function foo(param: string, optionalParam?: string, paramWithInitializer = "hello", ...restParam: string[]) {
-//              ^^^
-// | ----------------------------------------------------------------------
-// | (local function) foo(param: string, optionalParam?: string, paramWithInitializer?: string, ...restParam: string[]): void
-// | ----------------------------------------------------------------------
-//     }
-//     function foowithoverload(a: string): string;
-//              ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowithoverload(a: string): string (+1 overload)
-// | ----------------------------------------------------------------------
-//     function foowithoverload(a: number): number;
-//              ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowithoverload(a: number): number (+1 overload)
-// | ----------------------------------------------------------------------
-//     function foowithoverload(a: any): any {
-//              ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowithoverload(a: string): string (+1 overload)
-// | ----------------------------------------------------------------------
-//         return a;
-//     }
-//     function foowith3overload(a: string): string;
-//              ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: string): string (+2 overloads)
-// | ----------------------------------------------------------------------
-//     function foowith3overload(a: number): number;
-//              ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: number): number (+2 overloads)
-// | ----------------------------------------------------------------------
-//     function foowith3overload(a: boolean): boolean;
-//              ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: boolean): boolean (+2 overloads)
-// | ----------------------------------------------------------------------
-//     function foowith3overload(a: any): any {
-//              ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: string): string (+2 overloads)
-// | ----------------------------------------------------------------------
-//         return a;
-//     }
-//     foo("hello");
-//     ^^^
-// | ----------------------------------------------------------------------
-// | (local function) foo(param: string, optionalParam?: string, paramWithInitializer?: string, ...restParam: string[]): void
-// | ----------------------------------------------------------------------
-//     foowithoverload("hello");
-//     ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowithoverload(a: string): string (+1 overload)
-// | ----------------------------------------------------------------------
-//     foowithoverload(10);
-//     ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowithoverload(a: number): number (+1 overload)
-// | ----------------------------------------------------------------------
-//     foowith3overload("hello");
-//     ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: string): string (+2 overloads)
-// | ----------------------------------------------------------------------
-//     foowith3overload(10);
-//     ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: number): number (+2 overloads)
-// | ----------------------------------------------------------------------
-//     foowith3overload(true);
-//     ^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (local function) foowith3overload(a: boolean): boolean (+2 overloads)
-// | ----------------------------------------------------------------------
-// }
-// outerFoo();
-// ^^^^^^^^
-// | ----------------------------------------------------------------------
-// | function outerFoo(): void
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -94,7 +5,7 @@
       "position": 9,
       "name": "1"
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {
@@ -144,7 +55,7 @@
       "position": 35,
       "name": "2"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -310,7 +221,7 @@
       "position": 155,
       "name": "3"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -412,7 +323,7 @@
       "position": 204,
       "name": "4"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -514,7 +425,7 @@
       "position": 253,
       "name": "5"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -616,7 +527,7 @@
       "position": 321,
       "name": "6"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -718,7 +629,7 @@
       "position": 371,
       "name": "7"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -820,7 +731,7 @@
       "position": 421,
       "name": "8"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -922,7 +833,7 @@
       "position": 473,
       "name": "9"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1024,7 +935,7 @@
       "position": 533,
       "name": "10"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1190,7 +1101,7 @@
       "position": 551,
       "name": "11"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1292,7 +1203,7 @@
       "position": 581,
       "name": "12"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1394,7 +1305,7 @@
       "position": 606,
       "name": "13"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1496,7 +1407,7 @@
       "position": 637,
       "name": "14"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1598,7 +1509,7 @@
       "position": 663,
       "name": "15"
     },
-    "item": {
+    "quickInfo": {
       "kind": "local function",
       "kindModifiers": "",
       "textSpan": {
@@ -1700,7 +1611,7 @@
       "position": 689,
       "name": "16"
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {

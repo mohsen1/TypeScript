@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superCallInStaticMethod.ts] ////
-
 //// [superCallInStaticMethod.ts]
 class Doing {
     public static staticMethod() {

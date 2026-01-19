@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recur1.ts] ////
-
 //// [recur1.ts]
 var salt:any = new salt.pepper();   
 salt.pepper = function() {}

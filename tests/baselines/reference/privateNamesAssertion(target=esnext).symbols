@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesAssertion.ts] ////
-
-=== privateNamesAssertion.ts ===
+=== tests/cases/conformance/classes/members/privateNames/privateNamesAssertion.ts ===
 class Foo {
 >Foo : Symbol(Foo, Decl(privateNamesAssertion.ts, 0, 0))
 
@@ -14,7 +12,7 @@ class Foo {
 >v : Symbol(v, Decl(privateNamesAssertion.ts, 1, 44))
 
             throw new Error();
->Error : Symbol(Error, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2022.error.d.ts, --, --))
+>Error : Symbol(Error, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
         }
     }
     m1(v: unknown) {
@@ -43,7 +41,7 @@ class Foo2 {
 >v : Symbol(v, Decl(privateNamesAssertion.ts, 13, 8))
 
             throw new Error();
->Error : Symbol(Error, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2022.error.d.ts, --, --))
+>Error : Symbol(Error, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
         }
     }
     m1(v: unknown) {

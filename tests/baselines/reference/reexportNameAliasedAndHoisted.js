@@ -12,17 +12,24 @@ export namespace Sizing {
 
 //// [gridview.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Sizing = void 0;
 exports.Sizing = null;
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+exports.__esModule = true;
 exports.Sizing = exports.GridViewSizing = void 0;
 // https://github.com/microsoft/TypeScript/issues/39195
 var gridview_1 = require("./gridview");
-Object.defineProperty(exports, "GridViewSizing", { enumerable: true, get: function () { return gridview_1.Sizing; } });
+__createBinding(exports, gridview_1, "Sizing", "GridViewSizing");
 var Sizing;
 (function (Sizing) {
     Sizing.Distribute = { type: 'distribute' };
-})(Sizing || (exports.Sizing = Sizing = {}));
+})(Sizing = exports.Sizing || (exports.Sizing = {}));

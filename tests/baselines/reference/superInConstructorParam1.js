@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superInConstructorParam1.ts] ////
-
 //// [superInConstructorParam1.ts]
 class B {
   public foo(): number {

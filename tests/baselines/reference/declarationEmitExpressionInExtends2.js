@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitExpressionInExtends2.ts] ////
-
 //// [declarationEmitExpressionInExtends2.ts]
 class C<T, U> {
     x: T;

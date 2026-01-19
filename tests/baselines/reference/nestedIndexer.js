@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedIndexer.ts] ////
-
 //// [nestedIndexer.ts]
 function then(x) {
 

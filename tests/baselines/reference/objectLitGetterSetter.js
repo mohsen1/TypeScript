@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLitGetterSetter.ts] ////
-
 //// [objectLitGetterSetter.ts]
             var obj = {};
             Object.defineProperty(obj, "accProperty", <PropertyDescriptor>({

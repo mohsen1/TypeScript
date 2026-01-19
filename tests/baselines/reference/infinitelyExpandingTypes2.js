@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infinitelyExpandingTypes2.ts] ////
-
 //// [infinitelyExpandingTypes2.ts]
 interface Foo<T> {
     x: Foo<Foo<T>>;

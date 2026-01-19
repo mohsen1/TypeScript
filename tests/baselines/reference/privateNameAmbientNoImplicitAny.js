@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameAmbientNoImplicitAny.ts] ////
-
 //// [privateNameAmbientNoImplicitAny.ts]
 declare class A {
     #prop;

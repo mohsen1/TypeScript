@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionNarrowing.ts] ////
-
 //// [intersectionNarrowing.ts]
 // Repros from #43130
 

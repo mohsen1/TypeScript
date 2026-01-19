@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeWithAny.ts] ////
-
 //// [mappedTypeWithAny.ts]
 type Item = { value: string };
 type ItemMap<T> = { [P in keyof T]: Item };
@@ -82,10 +80,10 @@ var def = stringifyPair(void 0);
 
 
 //// [mappedTypeWithAny.d.ts]
-type Item = {
+declare type Item = {
     value: string;
 };
-type ItemMap<T> = {
+declare type ItemMap<T> = {
     [P in keyof T]: Item;
 };
 declare let x0: keyof any;
@@ -99,20 +97,20 @@ declare let x3: {
     [P in keyof any]: Item;
 };
 declare let x4: ItemMap<any>;
-type Data = {
+declare type Data = {
     value: string;
 };
-type StrictDataMap<T> = {
+declare type StrictDataMap<T> = {
     [P in keyof T]: Data;
 };
 declare let z: StrictDataMap<any>;
-type Arrayish<T extends unknown[]> = {
+declare type Arrayish<T extends unknown[]> = {
     [K in keyof T]: T[K];
 };
-type Objectish<T extends unknown> = {
+declare type Objectish<T extends unknown> = {
     [K in keyof T]: T[K];
 };
-type IndirectArrayish<U extends unknown[]> = Objectish<U>;
+declare type IndirectArrayish<U extends unknown[]> = Objectish<U>;
 declare function bar(arrayish: Arrayish<any>, objectish: Objectish<any>, indirectArrayish: IndirectArrayish<any>): void;
 declare function stringifyArray<T extends readonly any[]>(arr: T): {
     -readonly [K in keyof T]: string;
@@ -122,9 +120,9 @@ declare function stringifyPair<T extends readonly [any, any]>(arr: T): {
     -readonly [K in keyof T]: string;
 };
 declare let def: [any, any];
-type Evolvable<E extends Evolver> = {
+declare type Evolvable<E extends Evolver> = {
     [P in keyof E]: never;
 };
-type Evolver<T extends Evolvable<any> = any> = {
+declare type Evolver<T extends Evolvable<any> = any> = {
     [key in keyof Partial<T>]: never;
 };

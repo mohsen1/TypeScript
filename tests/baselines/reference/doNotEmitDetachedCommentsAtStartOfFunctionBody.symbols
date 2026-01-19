@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/doNotEmitDetachedCommentsAtStartOfFunctionBody.ts] ////
-
-=== doNotEmitDetachedCommentsAtStartOfFunctionBody.ts ===
+=== tests/cases/compiler/doNotEmitDetachedCommentsAtStartOfFunctionBody.ts ===
 function foo1() {
 >foo1 : Symbol(foo1, Decl(doNotEmitDetachedCommentsAtStartOfFunctionBody.ts, 0, 0))
 

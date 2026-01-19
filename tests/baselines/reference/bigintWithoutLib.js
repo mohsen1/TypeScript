@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/bigintWithoutLib.ts] ////
-
 //// [bigintWithoutLib.ts]
 // Every line should error because these builtins are not declared
 

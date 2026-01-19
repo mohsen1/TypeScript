@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithConstructSignaturesWithSpecializedSignatures.ts] ////
-
 //// [subtypingWithConstructSignaturesWithSpecializedSignatures.ts]
 // same as subtypingWithCallSignatures but with additional specialized signatures that should not affect the results
 
-namespace CallSignature {
+module CallSignature {
     interface Base { // T
         // M's
         new (x: 'a'): void;
@@ -38,7 +36,7 @@ namespace CallSignature {
     }
 }
 
-namespace MemberWithCallSignature {
+module MemberWithCallSignature {
     interface Base { // T
         // M's
         a: {

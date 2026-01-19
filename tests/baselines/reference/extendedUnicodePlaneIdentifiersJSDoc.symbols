@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/extendedUnicodePlaneIdentifiersJSDoc.ts] ////
-
-=== file.js ===
+=== tests/cases/compiler/file.js ===
 /**
  * Adds
  * @param {number} 𝑚

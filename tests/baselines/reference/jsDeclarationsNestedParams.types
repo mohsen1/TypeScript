@@ -1,9 +1,6 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsNestedParams.ts] ////
-
-=== file.js ===
+=== tests/cases/conformance/jsdoc/declarations/file.js ===
 class X {
 >X : X
->  : ^
 
     /**
       * Cancels the request, sending a cancellation to the other party
@@ -14,16 +11,12 @@ class X {
       */ 
     async cancel({reason, code}) {}
 >cancel : ({ reason, code }: {    reason: string | null;    code: string | null;}) => Promise<any>
->       : ^                ^^           ^^         ^^^^^        ^^         ^^^^^ ^^^^^            
 >reason : string
->       : ^^^^^^
 >code : string
->     : ^^^^^^
 }
 
 class Y {
 >Y : Y
->  : ^
 
     /**
       * Cancels the request, sending a cancellation to the other party
@@ -36,10 +29,7 @@ class Y {
       */ 
     async cancel({reason, suberr}) {}
 >cancel : ({ reason, suberr }: {    reason: string | null;    suberr: {        reason: string | null;        code: string | null;    };}) => Promise<any>
->       : ^                  ^^           ^^         ^^^^^          ^^               ^^         ^^^^^            ^^         ^^^^^     ^ ^^^^^            
 >reason : string
->       : ^^^^^^
->suberr : { reason: string | null; code: string | null; }
->       : ^^^^^^^^^^         ^^^^^^^^^^^^         ^^^^^^^
+>suberr : { reason: string; code: string; }
 }
 

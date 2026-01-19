@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/raiseErrorOnParameterProperty.ts] ////
-
 //// [raiseErrorOnParameterProperty.ts]
 class C1 {
   constructor(public x: X) {

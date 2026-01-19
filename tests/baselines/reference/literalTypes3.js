@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/literalTypes3.ts] ////
-
 //// [literalTypes3.ts]
 function f1(s: string) {
     if (s === "foo") {

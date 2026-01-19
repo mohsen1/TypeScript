@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numericClassMembers1.ts] ////
-
 //// [numericClassMembers1.ts]
 class C234 {
   0 = 1; 

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/forLoopEndingMultilineComments.ts] ////
-
-=== forLoopEndingMultilineComments.ts ===
+=== tests/cases/compiler/forLoopEndingMultilineComments.ts ===
 declare var a: any;
 >a : Symbol(a, Decl(forLoopEndingMultilineComments.ts, 0, 11))
 

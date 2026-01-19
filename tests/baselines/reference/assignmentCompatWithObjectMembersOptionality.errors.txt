@@ -1,32 +1,32 @@
-assignmentCompatWithObjectMembersOptionality.ts(73,5): error TS2322: Type 'D' is not assignable to type 'C'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(73,5): error TS2322: Type 'D' is not assignable to type 'C'.
   Property 'opt' is optional in type 'D' but required in type 'C'.
-assignmentCompatWithObjectMembersOptionality.ts(74,5): error TS2322: Type 'E' is not assignable to type 'C'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(74,5): error TS2322: Type 'E' is not assignable to type 'C'.
   Property 'opt' is optional in type 'E' but required in type 'C'.
-assignmentCompatWithObjectMembersOptionality.ts(78,5): error TS2322: Type 'D' is not assignable to type '{ opt: Base; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(78,5): error TS2322: Type 'D' is not assignable to type '{ opt: Base; }'.
   Property 'opt' is optional in type 'D' but required in type '{ opt: Base; }'.
-assignmentCompatWithObjectMembersOptionality.ts(79,5): error TS2322: Type 'E' is not assignable to type '{ opt: Base; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(79,5): error TS2322: Type 'E' is not assignable to type '{ opt: Base; }'.
   Property 'opt' is optional in type 'E' but required in type '{ opt: Base; }'.
-assignmentCompatWithObjectMembersOptionality.ts(83,5): error TS2322: Type 'D' is not assignable to type '{ opt: Base; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(83,5): error TS2322: Type 'D' is not assignable to type '{ opt: Base; }'.
   Property 'opt' is optional in type 'D' but required in type '{ opt: Base; }'.
-assignmentCompatWithObjectMembersOptionality.ts(84,5): error TS2322: Type 'E' is not assignable to type '{ opt: Base; }'.
+tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts(84,5): error TS2322: Type 'E' is not assignable to type '{ opt: Base; }'.
   Property 'opt' is optional in type 'E' but required in type '{ opt: Base; }'.
 
 
-==== assignmentCompatWithObjectMembersOptionality.ts (6 errors) ====
+==== tests/cases/conformance/types/typeRelationships/assignmentCompatibility/assignmentCompatWithObjectMembersOptionality.ts (6 errors) ====
     // Derived member is not optional but base member is, should be ok
     
     class Base { foo: string; }
     class Derived extends Base { bar: string; }
     class Derived2 extends Derived { baz: string; }
     
-    namespace TargetHasOptional {
+    module TargetHasOptional {
         // targets
         interface C {
             opt?: Base
         }
-        declare var c: C;
+        var c: C;
     
-        declare var a: { opt?: Base; };
+        var a: { opt?: Base; }
         var b: typeof a = { opt: new Base() }
     
         // sources
@@ -39,9 +39,9 @@ assignmentCompatWithObjectMembersOptionality.ts(84,5): error TS2322: Type 'E' is
         interface F {
             opt?: Derived;
         }
-        declare var d: D;
-        declare var e: E;
-        declare var f: F;
+        var d: D;
+        var e: E;
+        var f: F;
     
         // all ok
         c = d;
@@ -61,14 +61,14 @@ assignmentCompatWithObjectMembersOptionality.ts(84,5): error TS2322: Type 'E' is
         b = c;
     }
     
-    namespace SourceHasOptional {
+    module SourceHasOptional {
         // targets
         interface C {
             opt: Base
         }
-        declare var c: C;
+        var c: C;
     
-        declare var a: { opt: Base; };
+        var a: { opt: Base; }
         var b = { opt: new Base() }
     
         // sources
@@ -81,9 +81,9 @@ assignmentCompatWithObjectMembersOptionality.ts(84,5): error TS2322: Type 'E' is
         interface F {
             opt: Derived;
         }
-        declare var d: D;
-        declare var e: E;
-        declare var f: F;
+        var d: D;
+        var e: E;
+        var f: F;
     
         c = d; // error
         ~

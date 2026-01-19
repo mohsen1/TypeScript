@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionCallOnConstrainedTypeVariable.ts] ////
-
 //// [functionCallOnConstrainedTypeVariable.ts]
 // Repro from #20196
 

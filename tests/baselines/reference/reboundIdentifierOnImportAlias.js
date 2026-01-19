@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/reboundIdentifierOnImportAlias.ts] ////
-
 //// [reboundIdentifierOnImportAlias.ts]
-namespace Foo {
+module Foo {
     export var x = "hello";
 }
-namespace Bar {
+module Bar {
     var Foo = 1;
     import F = Foo;
 }

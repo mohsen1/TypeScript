@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superWithTypeArgument2.ts] ////
-
 //// [superWithTypeArgument2.ts]
 class C<T> {
     foo: T;

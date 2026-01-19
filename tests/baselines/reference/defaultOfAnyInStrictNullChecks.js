@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/defaultOfAnyInStrictNullChecks.ts] ////
-
 //// [defaultOfAnyInStrictNullChecks.ts]
 // Regression test for #8295
 

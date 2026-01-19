@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithFunctionChildren.ts] ////
-
-=== collisionCodeGenModuleWithFunctionChildren.ts ===
-namespace M {
+=== tests/cases/compiler/collisionCodeGenModuleWithFunctionChildren.ts ===
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 3, 1), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 10, 1))
 
     export var x = 3;
@@ -14,11 +12,11 @@ namespace M {
 >x : Symbol(x, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 1, 14))
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 3, 1), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 10, 1))
 
     function fn2() {
->fn2 : Symbol(fn2, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 5, 13))
+>fn2 : Symbol(fn2, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 5, 10))
 
         var M;
 >M : Symbol(M, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 7, 11))
@@ -29,11 +27,11 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 0, 0), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 3, 1), Decl(collisionCodeGenModuleWithFunctionChildren.ts, 10, 1))
 
     function fn3() {
->fn3 : Symbol(fn3, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 12, 13))
+>fn3 : Symbol(fn3, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 12, 10))
 
         function M() {
 >M : Symbol(M, Decl(collisionCodeGenModuleWithFunctionChildren.ts, 13, 20))

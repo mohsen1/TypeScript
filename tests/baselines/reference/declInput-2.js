@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declInput-2.ts] ////
-
 //// [declInput-2.ts]
-namespace M {
+module M {
     class C { }
     export class E {}
     export interface I1 {}
@@ -53,7 +51,7 @@ var M;
 
 
 //// [declInput-2.d.ts]
-declare namespace M {
+declare module M {
     class C {
     }
     export class E {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypes1.ts] ////
-
 //// [mappedTypes1.ts]
 type Item = { a: string, b: number, c: boolean };
 
@@ -49,78 +47,78 @@ var x4 = f4();
 
 
 //// [mappedTypes1.d.ts]
-type Item = {
+declare type Item = {
     a: string;
     b: number;
     c: boolean;
 };
-type T00 = {
+declare type T00 = {
     [P in "x" | "y"]: number;
 };
-type T01 = {
+declare type T01 = {
     [P in "x" | "y"]: P;
 };
-type T02 = {
+declare type T02 = {
     [P in "a" | "b"]: Item[P];
 };
-type T03 = {
+declare type T03 = {
     [P in keyof Item]: Date;
 };
-type T10 = {
+declare type T10 = {
     [P in keyof Item]: Item[P];
 };
-type T11 = {
+declare type T11 = {
     [P in keyof Item]?: Item[P];
 };
-type T12 = {
+declare type T12 = {
     readonly [P in keyof Item]: Item[P];
 };
-type T13 = {
+declare type T13 = {
     readonly [P in keyof Item]?: Item[P];
 };
-type T20 = {
+declare type T20 = {
     [P in keyof Item]: Item[P] | null;
 };
-type T21 = {
+declare type T21 = {
     [P in keyof Item]: Array<Item[P]>;
 };
-type T30 = {
+declare type T30 = {
     [P in keyof any]: void;
 };
-type T31 = {
+declare type T31 = {
     [P in keyof string]: void;
 };
-type T32 = {
+declare type T32 = {
     [P in keyof number]: void;
 };
-type T33 = {
+declare type T33 = {
     [P in keyof boolean]: void;
 };
-type T34 = {
+declare type T34 = {
     [P in keyof undefined]: void;
 };
-type T35 = {
+declare type T35 = {
     [P in keyof null]: void;
 };
-type T36 = {
+declare type T36 = {
     [P in keyof void]: void;
 };
-type T37 = {
+declare type T37 = {
     [P in keyof symbol]: void;
 };
-type T38 = {
+declare type T38 = {
     [P in keyof never]: void;
 };
-type T40 = {
+declare type T40 = {
     [P in string]: void;
 };
-type T43 = {
+declare type T43 = {
     [P in "a" | "b"]: void;
 };
-type T44 = {
+declare type T44 = {
     [P in "a" | "b" | "0" | "1"]: void;
 };
-type T47 = {
+declare type T47 = {
     [P in string | "a" | "b" | "0" | "1"]: void;
 };
 declare function f1<T1>(): {

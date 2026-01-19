@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithEnum.ts] ////
-
 //// [exponentiationOperatorWithEnum.ts]
 // operands of an enum type are treated as having the primitive type Number.
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateNameWeakMapCollision.ts] ////
-
 //// [privateNameWeakMapCollision.ts]
 function test() {
     let WeakMap;

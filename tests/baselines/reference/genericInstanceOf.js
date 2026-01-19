@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericInstanceOf.ts] ////
-
 //// [genericInstanceOf.ts]
 interface F {
     (): number;

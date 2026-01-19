@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendBaseClassBeforeItsDeclared.ts] ////
-
 //// [extendBaseClassBeforeItsDeclared.ts]
 class derived extends base { }
  

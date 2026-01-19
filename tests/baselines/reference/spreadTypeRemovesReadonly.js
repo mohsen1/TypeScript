@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/spreadTypeRemovesReadonly.ts] ////
-
 //// [spreadTypeRemovesReadonly.ts]
 interface ReadonlyData {
     readonly value: string;

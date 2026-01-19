@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declarationEmitInferredTypeAlias6.ts] ////
-
-=== 0.ts ===
+=== tests/cases/compiler/0.ts ===
 {
     type Data = string | boolean;
 >Data : Symbol(Data, Decl(0.ts, 0, 1))
@@ -11,7 +9,7 @@
 }
 export { }
 
-=== 1.ts ===
+=== tests/cases/compiler/1.ts ===
 let v = "str" || true;
 >v : Symbol(v, Decl(1.ts, 0, 3))
 

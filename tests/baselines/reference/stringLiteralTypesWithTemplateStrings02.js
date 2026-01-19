@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesWithTemplateStrings02.ts] ////
-
 //// [stringLiteralTypesWithTemplateStrings02.ts]
 let abc: "AB\r\nC" = `AB
 C`;

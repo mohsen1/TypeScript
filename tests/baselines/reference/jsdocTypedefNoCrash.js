@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsdocTypedefNoCrash.ts] ////
-
 //// [export.js]
 /**
  * @typedef {{

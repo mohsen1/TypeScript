@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceThatInheritsFromItself.ts] ////
-
 //// [interfaceThatInheritsFromItself.ts]
 interface Foo extends Foo { // error
 }

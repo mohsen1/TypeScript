@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/class/constructor/parameter/decoratorOnClassConstructorParameter4.ts] ////
-
 //// [decoratorOnClassConstructorParameter4.ts]
 declare function dec(target: Function, propertyKey: string | symbol, parameterIndex: number): void;
 

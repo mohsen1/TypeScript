@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringSameNames.ts] ////
-
 //// [destructuringSameNames.ts]
 // Valid cases
 

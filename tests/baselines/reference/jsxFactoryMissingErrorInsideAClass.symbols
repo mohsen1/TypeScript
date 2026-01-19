@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxFactoryMissingErrorInsideAClass.ts] ////
-
-=== test.tsx ===
+=== tests/cases/compiler/test.tsx ===
 export class C {
 >C : Symbol(C, Decl(test.tsx, 0, 0))
 

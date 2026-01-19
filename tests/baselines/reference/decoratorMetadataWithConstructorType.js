@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorMetadataWithConstructorType.ts] ////
-
 //// [decoratorMetadataWithConstructorType.ts]
 declare var console: {
     log(msg: string): void;

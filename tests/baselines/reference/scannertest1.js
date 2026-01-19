@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/scanner/ecmascript5/scannertest1.ts] ////
-
 //// [scannertest1.ts]
 ///<reference path='References.ts' />
 

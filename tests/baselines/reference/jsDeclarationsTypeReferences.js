@@ -26,6 +26,7 @@ module.exports = {
 
 
 //// [index.d.ts]
+/// <reference types="node" />
 export const thing: Something;
 import Something_1 = require("fs");
 import Something = Something_1.Something;

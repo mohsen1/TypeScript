@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionAssignment.ts] ////
-
 //// [functionAssignment.ts]
 function f(n: Function) { }
 f(function () { });
@@ -12,8 +10,8 @@ interface baz {
     get(callback: Function): number;
 }
 
-declare var barbaz: baz;
-declare var test: foo;
+var barbaz: baz;
+var test: foo;
 
 test.get(function (param) {
     var x = barbaz.get(function () { });
@@ -42,6 +40,8 @@ callb((a) =>{ a.length; });
 //// [functionAssignment.js]
 function f(n) { }
 f(function () { });
+var barbaz;
+var test;
 test.get(function (param) {
     var x = barbaz.get(function () { });
 });

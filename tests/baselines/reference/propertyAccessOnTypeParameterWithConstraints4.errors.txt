@@ -1,13 +1,13 @@
-propertyAccessOnTypeParameterWithConstraints4.ts(5,22): error TS2339: Property 'notHere' does not exist on type 'T'.
-propertyAccessOnTypeParameterWithConstraints4.ts(15,16): error TS2339: Property 'notHere' does not exist on type 'Date'.
-propertyAccessOnTypeParameterWithConstraints4.ts(21,22): error TS2339: Property 'notHere' does not exist on type 'Date'.
-propertyAccessOnTypeParameterWithConstraints4.ts(27,22): error TS2339: Property 'notHere' does not exist on type 'T'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints4.ts(5,22): error TS2339: Property 'notHere' does not exist on type 'T'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints4.ts(15,16): error TS2339: Property 'notHere' does not exist on type 'Date'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints4.ts(21,22): error TS2339: Property 'notHere' does not exist on type 'Date'.
+tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints4.ts(27,22): error TS2339: Property 'notHere' does not exist on type 'T'.
 
 
-==== propertyAccessOnTypeParameterWithConstraints4.ts (4 errors) ====
+==== tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints4.ts (4 errors) ====
     class C<T extends Date> {
         f() {
-            var x: T = {} as any;
+            var x: T;
             var a = x['notHere'](); // should be string
             return a + x.notHere();
                          ~~~~~~~
@@ -20,13 +20,13 @@ propertyAccessOnTypeParameterWithConstraints4.ts(27,22): error TS2339: Property 
     interface I<T extends Date> {
         foo: T;
     }
-    declare var i: I<Date>;
+    var i: I<Date>;
     var r2 = i.foo.notHere();
                    ~~~~~~~
 !!! error TS2339: Property 'notHere' does not exist on type 'Date'.
     var r2b = i.foo['notHere']();
     
-    declare var a: {
+    var a: {
         <T extends Date>(): T;
     }
     var r3: string = a().notHere();

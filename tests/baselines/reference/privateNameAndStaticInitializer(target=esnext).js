@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameAndStaticInitializer.ts] ////
-
 //// [privateNameAndStaticInitializer.ts]
 class A {
   #foo = 1;

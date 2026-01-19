@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorInfoForRelatedIndexTypesNoConstraintElaboration.ts] ////
-
 //// [errorInfoForRelatedIndexTypesNoConstraintElaboration.ts]
 /// <reference path="/.lib/react16.d.ts" />
 

@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/mergedModuleDeclarationCodeGen4.ts] ////
-
 //// [mergedModuleDeclarationCodeGen4.ts]
-namespace superContain {
-    export namespace contain {
-        export namespace my.buz {
-            export namespace data {
+module superContain {
+    export module contain {
+        export module my.buz {
+            export module data {
                 export function foo() { }
             }
         }
-        export namespace my.buz {
-            export namespace data {
+        export module my.buz {
+            export module data {
                 export function bar(contain, my, buz, data) {
                     foo();
                 }

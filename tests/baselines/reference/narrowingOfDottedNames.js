@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/narrowingOfDottedNames.ts] ////
-
 //// [narrowingOfDottedNames.ts]
 // Repro from #8383
 

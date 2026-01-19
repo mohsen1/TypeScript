@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/paramterDestrcuturingDeclaration.ts] ////
-
 //// [paramterDestrcuturingDeclaration.ts]
 interface C {
     ({p: name}): any;

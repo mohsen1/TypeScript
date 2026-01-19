@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/optionalParamInOverride.ts] ////
-
 //// [optionalParamInOverride.ts]
 class Z {
     public func(): void { }

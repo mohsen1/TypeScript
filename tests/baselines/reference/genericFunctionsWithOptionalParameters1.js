@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericFunctionsWithOptionalParameters1.ts] ////
-
 //// [genericFunctionsWithOptionalParameters1.ts]
 interface Utils {
    fold<T, S>(c?: Array<T>, folder?: (s: S, t: T) => T, init?: S): T;

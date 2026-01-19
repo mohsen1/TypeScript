@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/constructorOverloads4.ts] ////
-
 //// [constructorOverloads4.ts]
-declare namespace M {    
+declare module M {    
     export class Function {
         constructor(...args: string[]);
     }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privacyTypeParametersOfInterfaceDeclFile.ts] ////
-
 //// [privacyTypeParametersOfInterfaceDeclFile.ts]
 class privateClass {
 }
@@ -66,7 +64,7 @@ export interface publicInterfaceWithPrivateModuleTypeParameterConstraints<T exte
 interface privateInterfaceWithPrivateModuleTypeParameterConstraints<T extends privateModule.publicClassInPrivateModule> { // Error
 }
 
-export namespace publicModule {
+export module publicModule {
     class privateClassInPublicModule {
     }
 
@@ -132,7 +130,7 @@ export namespace publicModule {
     }
 }
 
-namespace privateModule {
+module privateModule {
     class privateClassInPrivateModule {
     }
 
@@ -194,7 +192,7 @@ namespace privateModule {
 
 //// [privacyTypeParametersOfInterfaceDeclFile.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.publicModule = exports.publicClassT = exports.publicClass = void 0;
 var privateClass = /** @class */ (function () {
     function privateClass() {
@@ -242,7 +240,7 @@ var publicModule;
         return publicClassInPublicModuleT;
     }());
     publicModule.publicClassInPublicModuleT = publicClassInPublicModuleT;
-})(publicModule || (exports.publicModule = publicModule = {}));
+})(publicModule = exports.publicModule || (exports.publicModule = {}));
 var privateModule;
 (function (privateModule) {
     var privateClassInPrivateModule = /** @class */ (function () {
@@ -301,7 +299,7 @@ export interface publicInterfaceWithPublicTypeParametersWithoutExtends<T> {
 }
 export interface publicInterfaceWithPrivateModuleTypeParameterConstraints<T extends privateModule.publicClassInPrivateModule> {
 }
-export declare namespace publicModule {
+export declare module publicModule {
     class privateClassInPublicModule {
     }
     export class publicClassInPublicModule {
@@ -334,7 +332,7 @@ export declare namespace publicModule {
     }
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     class privateClassInPrivateModule {
     }
     export class publicClassInPrivateModule {

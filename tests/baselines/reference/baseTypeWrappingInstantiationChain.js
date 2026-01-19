@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/baseTypeWrappingInstantiationChain.ts] ////
-
 //// [baseTypeWrappingInstantiationChain.ts]
 class CBaseBase<T3> {
     constructor(x: Parameter<T3>) { }

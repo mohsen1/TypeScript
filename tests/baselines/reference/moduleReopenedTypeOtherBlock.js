@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/moduleReopenedTypeOtherBlock.ts] ////
-
 //// [moduleReopenedTypeOtherBlock.ts]
-namespace M {
+module M {
     export class C1 { }
     export interface I { n: number; }
 }
-namespace M {
+module M {
     export class C2 { f(): I { return null; } }
 }
 

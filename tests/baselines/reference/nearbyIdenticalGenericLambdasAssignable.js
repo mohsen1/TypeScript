@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nearbyIdenticalGenericLambdasAssignable.ts] ////
-
 //// [nearbyIdenticalGenericLambdasAssignable.ts]
 declare const fA: <T>() => { v: T };
 const fB = <T>() => {

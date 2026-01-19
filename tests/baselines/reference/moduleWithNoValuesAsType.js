@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/moduleWithNoValuesAsType.ts] ////
-
 //// [moduleWithNoValuesAsType.ts]
-namespace A { }
+module A { }
 var a: A; // error
 
-namespace B {
+module B {
     interface I {}
 }
 var b: B; // error
 
-namespace C {
-    namespace M {
+module C {
+    module M {
         interface I {}
     }
 }

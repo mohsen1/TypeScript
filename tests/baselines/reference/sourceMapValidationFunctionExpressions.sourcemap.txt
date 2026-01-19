@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationFunctionExpressions.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationFunctionExpressions.js
+emittedFile:tests/cases/compiler/sourceMapValidationFunctionExpressions.js
 sourceFile:sourceMapValidationFunctionExpressions.ts
 -------------------------------------------------------------------
 >>>var greetings = 0;

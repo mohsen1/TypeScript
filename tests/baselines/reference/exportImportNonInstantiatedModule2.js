@@ -17,21 +17,22 @@ export function w(): e.w { // Should be OK
 //// [w1.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });
 //// [exporter.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });
 //// [consumer.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
-    exports.w = w;
+    exports.__esModule = true;
+    exports.w = void 0;
     function w() {
         return { name: 'value' };
     }
+    exports.w = w;
 });
 
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsMissingTypeParameters.ts] ////
-
 //// [file.js]
 /**
   * @param {Array=} y desc

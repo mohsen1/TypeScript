@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnParenthesizedExpressionOpenParen1.ts] ////
-
 //// [commentOnParenthesizedExpressionOpenParen1.ts]
 var j;
 var f: () => any;

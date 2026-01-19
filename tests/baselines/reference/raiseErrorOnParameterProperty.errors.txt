@@ -1,7 +1,7 @@
-raiseErrorOnParameterProperty.ts(2,25): error TS2304: Cannot find name 'X'.
+tests/cases/compiler/raiseErrorOnParameterProperty.ts(2,25): error TS2304: Cannot find name 'X'.
 
 
-==== raiseErrorOnParameterProperty.ts (1 errors) ====
+==== tests/cases/compiler/raiseErrorOnParameterProperty.ts (1 errors) ====
     class C1 {
       constructor(public x: X) {
                             ~

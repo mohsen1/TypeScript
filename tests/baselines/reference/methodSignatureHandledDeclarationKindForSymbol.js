@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/methodSignatureHandledDeclarationKindForSymbol.ts] ////
-
 //// [methodSignatureHandledDeclarationKindForSymbol.ts]
 interface Foo {
     bold(): string;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringWithConstraint.ts] ////
-
 //// [destructuringWithConstraint.ts]
 // Repro from #22823
 

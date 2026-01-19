@@ -1,21 +1,19 @@
-//// [tests/cases/compiler/moduleResolutionNoTsESM.ts] ////
-
-=== x.ts ===
-
+=== tests/cases/compiler/x.ts ===
+// ESM output
+No type information for this code.
+No type information for this code.export default 0;
+No type information for this code.
+No type information for this code.=== tests/cases/compiler/y.tsx ===
 export default 0;
-
-=== y.tsx ===
-
-export default 0;
-
-=== z.d.ts ===
+No type information for this code.
+No type information for this code.=== tests/cases/compiler/z.d.ts ===
 declare const x: number;
 >x : Symbol(x, Decl(z.d.ts, 0, 13))
 
 export default x;
 >x : Symbol(x, Decl(z.d.ts, 0, 13))
 
-=== user.ts ===
+=== tests/cases/compiler/user.ts ===
 import x from "./x.ts";
 >x : Symbol(x, Decl(user.ts, 0, 6))
 

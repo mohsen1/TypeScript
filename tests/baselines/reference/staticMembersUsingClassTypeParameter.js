@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeParameterLists/staticMembersUsingClassTypeParameter.ts] ////
-
 //// [staticMembersUsingClassTypeParameter.ts]
 // BUG 745747
 class C<T> {

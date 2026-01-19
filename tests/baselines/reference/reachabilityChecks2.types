@@ -1,30 +1,21 @@
-//// [tests/cases/compiler/reachabilityChecks2.ts] ////
-
-=== reachabilityChecks2.ts ===
+=== tests/cases/compiler/reachabilityChecks2.ts ===
 while (true) { }
 >true : true
->     : ^^^^
 
 const enum E { X }
 >E : E
->  : ^
 >X : E.X
->  : ^^^
 
-namespace A4 {
+module A4 {
 >A4 : typeof A4
->   : ^^^^^^^^^
 
     while (true);
 >true : true
->     : ^^^^
 
-    namespace A {
+    module A {
         const enum E { X }
 >E : E
->  : ^
 >X : E.X
->  : ^^^
     }
 }
 

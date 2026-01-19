@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/optionalParamArgsTest.ts] ////
-
 //// [optionalParamArgsTest.ts]
 // Optional parameter and default argument tests
 

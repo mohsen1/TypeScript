@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/functions/functionImplementationErrors.ts] ////
-
 //// [functionImplementationErrors.ts]
 // FunctionExpression with no return type annotation with multiple return statements with unrelated types
 var f1 = function () {
@@ -28,7 +26,7 @@ var f4 = function () {
 function f5(): number {
 }
 
-declare var m: any;
+var m;
 // Function signature with parameter initializer referencing in scope local variable
 function f6(n = m) {
     var m = 4;
@@ -116,6 +114,7 @@ var f4 = function () {
 // Function implemetnation with non -void return type annotation with no return
 function f5() {
 }
+var m;
 // Function signature with parameter initializer referencing in scope local variable
 function f6(n) {
     if (n === void 0) { n = m; }

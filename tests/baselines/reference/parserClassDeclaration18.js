@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ClassDeclarations/parserClassDeclaration18.ts] ////
-
 //// [parserClassDeclaration18.ts]
 declare class FooBase {
     constructor(s: string);

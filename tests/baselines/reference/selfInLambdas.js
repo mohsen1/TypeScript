@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/selfInLambdas.ts] ////
-
 //// [selfInLambdas.ts]
 interface MouseEvent {
     x: number;

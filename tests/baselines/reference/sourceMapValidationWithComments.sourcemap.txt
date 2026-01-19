@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationWithComments.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationWithComments.js
+emittedFile:tests/cases/compiler/sourceMapValidationWithComments.js
 sourceFile:sourceMapValidationWithComments.ts
 -------------------------------------------------------------------
 >>>var DebugClass = /** @class */ (function () {

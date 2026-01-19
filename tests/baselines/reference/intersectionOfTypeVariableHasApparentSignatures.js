@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/intersectionOfTypeVariableHasApparentSignatures.ts] ////
-
 //// [intersectionOfTypeVariableHasApparentSignatures.ts]
 interface Component<P> {
     props: Readonly<P> & Readonly<{ children?: {} }>;

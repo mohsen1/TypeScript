@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/isolatedModulesRequiresPreserveConstEnum.ts] ////
-
 //// [file1.ts]
 export {};
 
@@ -7,4 +5,4 @@ export {};
 
 //// [file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

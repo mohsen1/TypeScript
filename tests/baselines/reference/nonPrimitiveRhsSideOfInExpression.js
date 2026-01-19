@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveRhsSideOfInExpression.ts] ////
-
 //// [nonPrimitiveRhsSideOfInExpression.ts]
 let o: object = {};
 

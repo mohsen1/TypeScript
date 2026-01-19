@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/missingTypeArguments2.ts] ////
-
 //// [missingTypeArguments2.ts]
 class A<T> { }
 

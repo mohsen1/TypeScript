@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorMetadataGenericTypeVariableInScope.ts] ////
-
 //// [decoratorMetadataGenericTypeVariableInScope.ts]
 // Unused, but could collide with the named type argument below.
 class TypeVariable {}
@@ -21,7 +19,7 @@ var __decorate = (this && this.__decorate) || function (decorators, target, key,
 var __metadata = (this && this.__metadata) || function (k, v) {
     if (typeof Reflect === "object" && typeof Reflect.metadata === "function") return Reflect.metadata(k, v);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.C = void 0;
 // Unused, but could collide with the named type argument below.
 var TypeVariable = /** @class */ (function () {
@@ -35,7 +33,7 @@ var C = /** @class */ (function () {
     __decorate([
         Decorate,
         __metadata("design:type", Object)
-    ], C.prototype, "member", void 0);
+    ], C.prototype, "member");
     return C;
 }());
 exports.C = C;

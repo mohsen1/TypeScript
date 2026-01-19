@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/betterErrorForUnionCall.ts] ////
-
 //// [betterErrorForUnionCall.ts]
 declare const union: { a: string } | { b: string }
 union("");

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/spread/iteratorSpreadInCall.ts] ////
-
 //// [iteratorSpreadInCall.ts]
 function foo(s: symbol) { }
 class SymbolIterator {

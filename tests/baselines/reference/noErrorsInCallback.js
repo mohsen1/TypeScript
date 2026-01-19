@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noErrorsInCallback.ts] ////
-
 //// [noErrorsInCallback.ts]
 class Bar {
     constructor(public foo: string) { }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadMethods.ts] ////
-
 //// [spreadMethods.ts]
 class K {
     p = 12;

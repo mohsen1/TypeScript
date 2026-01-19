@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/recursiveExcessPropertyChecks.ts] ////
-
-=== recursiveExcessPropertyChecks.ts ===
+=== tests/cases/compiler/recursiveExcessPropertyChecks.ts ===
 // Repro from #35804
 
 interface ITreeItem {    

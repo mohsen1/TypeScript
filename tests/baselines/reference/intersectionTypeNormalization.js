@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/intersectionTypeNormalization.ts] ////
-
 //// [intersectionTypeNormalization.ts]
 interface A { a: string }
 interface B { b: string }

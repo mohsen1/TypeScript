@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/namespacesDeclaration1.ts] ////
-
 //// [namespacesDeclaration1.ts]
-namespace M {
+module M {
    export namespace N {
-      export namespace M2 {
+      export module M2 {
          export interface I {}
       }
    }
@@ -13,9 +11,9 @@ namespace M {
 
 
 //// [namespacesDeclaration1.d.ts]
-declare namespace M {
+declare module M {
     namespace N {
-        namespace M2 {
+        module M2 {
             interface I {
             }
         }

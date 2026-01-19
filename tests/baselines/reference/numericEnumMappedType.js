@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numericEnumMappedType.ts] ////
-
 //// [numericEnumMappedType.ts]
 // Repro from #31771
 
@@ -81,10 +79,10 @@ declare enum E2 {
     TWO,
     THREE
 }
-type Bins1 = {
+declare type Bins1 = {
     [k in E1]?: string;
 };
-type Bins2 = {
+declare type Bins2 = {
     [k in E2]?: string;
 };
 declare const b1: Bins1;
@@ -100,12 +98,12 @@ declare enum N2 {
     C,
     D
 }
-type T1 = {
+declare type T1 = {
     [K in N1 | N2]: K;
 };
 declare enum E {
-    ONE,
-    TWO,
+    ONE = 0,
+    TWO = 1,
     THREE = "x"
 }
 declare const e: E;

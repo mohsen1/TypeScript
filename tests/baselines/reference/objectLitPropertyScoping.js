@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLitPropertyScoping.ts] ////
-
 //// [objectLitPropertyScoping.ts]
 // Should compile, x and y should not be picked up from the properties
 

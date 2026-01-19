@@ -1,6 +1,8 @@
 //// [tests/cases/compiler/moduleResolution_packageJson_yesAtPackageRoot_fakeScopedPackage.ts] ////
 
 //// [index.js]
+// Copy of `moduleResolution_packageJson_notAtPackageRoot` with `foo/@bar` instead of `foo/bar`. Should behave identically.
+
 not read
 
 //// [package.json]
@@ -15,4 +17,4 @@ import { x } from "foo/@bar";
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

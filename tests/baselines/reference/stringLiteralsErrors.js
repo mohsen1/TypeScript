@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringLiteralsErrors.ts] ////
-
 //// [stringLiteralsErrors.ts]
 // Srtings missing line terminator
 var es1 = "line 1

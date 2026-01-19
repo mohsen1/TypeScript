@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentCompatFunctionsWithOptionalArgs.ts] ////
-
 //// [assignmentCompatFunctionsWithOptionalArgs.ts]
 function foo(x: { id: number; name?: string; }): void;
 foo({ id: 1234 });                 // Ok

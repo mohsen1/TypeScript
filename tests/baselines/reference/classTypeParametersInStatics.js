@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/classTypeParametersInStatics.ts] ////
-
 //// [classTypeParametersInStatics.ts]
-namespace Editor {
+module Editor {
 
 
     export class List<T> {

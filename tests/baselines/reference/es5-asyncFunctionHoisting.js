@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-asyncFunctionHoisting.ts] ////
-
 //// [es5-asyncFunctionHoisting.ts]
 declare var y;
 

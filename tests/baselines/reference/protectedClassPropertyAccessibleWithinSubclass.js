@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/accessibility/protectedClassPropertyAccessibleWithinSubclass.ts] ////
-
 //// [protectedClassPropertyAccessibleWithinSubclass.ts]
 // no errors
 

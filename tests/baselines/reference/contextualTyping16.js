@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTyping16.ts] ////
-
 //// [contextualTyping16.ts]
 var foo: {id:number;} = {id:4}; foo = {id:5};
 

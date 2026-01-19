@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/dynamicNamesErrors.ts] ////
-
-=== dynamicNamesErrors.ts ===
+=== tests/cases/compiler/dynamicNamesErrors.ts ===
 const c0 = "1";
 >c0 : Symbol(c0, Decl(dynamicNamesErrors.ts, 0, 5))
 
@@ -11,11 +9,11 @@ interface T0 {
 >T0 : Symbol(T0, Decl(dynamicNamesErrors.ts, 1, 13))
 
     [c0]: number;
->[c0] : Symbol(T0[1], Decl(dynamicNamesErrors.ts, 4, 17), Decl(dynamicNamesErrors.ts, 3, 14))
+>[c0] : Symbol(T0[c0], Decl(dynamicNamesErrors.ts, 3, 14))
 >c0 : Symbol(c0, Decl(dynamicNamesErrors.ts, 0, 5))
 
     1: number;
->1 : Symbol(T0[1], Decl(dynamicNamesErrors.ts, 4, 17), Decl(dynamicNamesErrors.ts, 3, 14))
+>1 : Symbol(T0[1], Decl(dynamicNamesErrors.ts, 4, 17))
 }
 
 interface T1 {
@@ -46,21 +44,21 @@ interface T3 {
 >c1 : Symbol(c1, Decl(dynamicNamesErrors.ts, 1, 5))
 }
 
-declare let t1: T1;
->t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 11))
+let t1: T1;
+>t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 3))
 >T1 : Symbol(T1, Decl(dynamicNamesErrors.ts, 6, 1))
 
-declare let t2: T2;
->t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 11))
+let t2: T2;
+>t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 3))
 >T2 : Symbol(T2, Decl(dynamicNamesErrors.ts, 10, 1))
 
 t1 = t2;
->t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 11))
->t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 11))
+>t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 3))
+>t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 3))
 
 t2 = t1;
->t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 11))
->t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 11))
+>t2 : Symbol(t2, Decl(dynamicNamesErrors.ts, 22, 3))
+>t1 : Symbol(t1, Decl(dynamicNamesErrors.ts, 21, 3))
 
 const x = Symbol();
 >x : Symbol(x, Decl(dynamicNamesErrors.ts, 26, 5))

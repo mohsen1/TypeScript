@@ -1,7 +1,7 @@
-bar.ts(1,18): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
+tests/cases/compiler/bar.ts(1,18): error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.
 
 
-==== foo.js (0 errors) ====
+==== tests/cases/compiler/foo.js (0 errors) ====
     class C {
         constructor() {
           /** @type {number[]}*/
@@ -9,7 +9,7 @@ bar.ts(1,18): error TS2345: Argument of type 'string' is not assignable to param
       }
     }
     
-==== bar.ts (1 errors) ====
+==== tests/cases/compiler/bar.ts (1 errors) ====
     (new C()).p.push("string");
                      ~~~~~~~~
 !!! error TS2345: Argument of type 'string' is not assignable to parameter of type 'number'.

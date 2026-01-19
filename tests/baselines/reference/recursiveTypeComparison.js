@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveTypeComparison.ts] ////
-
 //// [recursiveTypeComparison.ts]
 // Before fix this would take an exceeding long time to complete (#1170)
 

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleMemberWithoutTypeAnnotation1.ts] ////
-
 //// [moduleMemberWithoutTypeAnnotation1.ts]
-namespace TypeScript.Parser {
+module TypeScript.Parser {
     class SyntaxCursor {
         public currentNode(): SyntaxNode {
             return null;
@@ -9,7 +7,7 @@ namespace TypeScript.Parser {
     }
 }
 
-namespace TypeScript {
+module TypeScript {
     export interface ISyntaxElement { };
     export interface ISyntaxToken { };
 
@@ -25,7 +23,7 @@ namespace TypeScript {
     }
 }
 
-namespace TypeScript {
+module TypeScript {
     export class SyntaxNode {
         public findToken(position: number, includeSkippedTokens: boolean = false): PositionedToken {
             var positionedToken = this.findTokenInternal(null, position, 0);
@@ -37,7 +35,7 @@ namespace TypeScript {
     }
 }
 
-namespace TypeScript.Syntax {
+module TypeScript.Syntax {
     export function childIndex() { }
 
     export class VariableWidthTokenWithTrailingTrivia implements ISyntaxToken {

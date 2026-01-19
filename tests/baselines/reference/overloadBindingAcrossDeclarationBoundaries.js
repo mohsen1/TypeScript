@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadBindingAcrossDeclarationBoundaries.ts] ////
-
 //// [overloadBindingAcrossDeclarationBoundaries.ts]
 interface Opt1 {
     p?: any;

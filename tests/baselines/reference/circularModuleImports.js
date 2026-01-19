@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/circularModuleImports.ts] ////
-
 //// [circularModuleImports.ts]
-namespace M
+module M
  
 {
  

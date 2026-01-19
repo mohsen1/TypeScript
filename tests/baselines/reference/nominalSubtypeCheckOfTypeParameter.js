@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/nominalSubtypeCheckOfTypeParameter.ts] ////
-
 //// [nominalSubtypeCheckOfTypeParameter.ts]
 interface BinaryTuple<T, S> {
     first: T

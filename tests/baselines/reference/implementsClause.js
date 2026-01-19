@@ -17,13 +17,13 @@ class D implements nestedNamespace.types.Component {}
 
 //// [types.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [ns.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var C = /** @class */ (function () {
     function C() {
     }

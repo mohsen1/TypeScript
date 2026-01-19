@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitReturnsInAsync1.ts] ////
-
 //// [noImplicitReturnsInAsync1.ts]
 async function test(isError: boolean = false) {
     if (isError === true) {
@@ -18,8 +16,8 @@ var __awaiter = (this && this.__awaiter) || function (thisArg, _arguments, P, ge
         step((generator = generator.apply(thisArg, _arguments || [])).next());
     });
 };
-function test() {
-    return __awaiter(this, arguments, void 0, function* (isError = false) {
+function test(isError = false) {
+    return __awaiter(this, void 0, void 0, function* () {
         if (isError === true) {
             return;
         }

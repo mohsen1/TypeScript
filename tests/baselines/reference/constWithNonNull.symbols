@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/constWithNonNull.ts] ////
-
-=== constWithNonNull.ts ===
+=== tests/cases/compiler/constWithNonNull.ts ===
 // Fixes #21848
 
 declare const x: number | undefined;

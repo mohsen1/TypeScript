@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superInCatchBlock1.ts] ////
-
 //// [superInCatchBlock1.ts]
 class A {
  m(): void { }

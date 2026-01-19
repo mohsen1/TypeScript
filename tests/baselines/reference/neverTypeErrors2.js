@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/never/neverTypeErrors2.ts] ////
-
 //// [neverTypeErrors2.ts]
 function f1() {
     let x: never;
@@ -26,28 +24,6 @@ function f4(): never {
 for (const n of f4()) {}
 for (const n in f4()) {}
 
-function f5() {
-    let x: never[] = [];  // Ok
-}
-
-// Repro from #46032
-
-interface A {
-    foo: "a";
-}
-
-interface B {
-    foo: "b";
-}
-
-type Union = A & B;
-
-function func(): { value: Union[] } {
-    return {
-        value: [],
-    };
-}
-
 
 //// [neverTypeErrors2.js]
 function f1() {
@@ -72,11 +48,3 @@ for (var _i = 0, _a = f4(); _i < _a.length; _i++) {
     var n = _a[_i];
 }
 for (var n in f4()) { }
-function f5() {
-    var x = []; // Ok
-}
-function func() {
-    return {
-        value: [],
-    };
-}

@@ -1,13 +1,11 @@
-//// [tests/cases/compiler/reexportMissingDefault4.ts] ////
-
-=== b.d.ts ===
+=== tests/cases/compiler/b.d.ts ===
 declare var b: number;
 >b : Symbol(b, Decl(b.d.ts, 0, 11))
 
 export { b };
 >b : Symbol(b, Decl(b.d.ts, 1, 8))
 
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 export { b } from "./b";
 >b : Symbol(b, Decl(a.ts, 0, 8))
 

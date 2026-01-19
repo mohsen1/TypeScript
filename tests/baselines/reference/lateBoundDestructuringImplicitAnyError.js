@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lateBoundDestructuringImplicitAnyError.ts] ////
-
 //// [lateBoundDestructuringImplicitAnyError.ts]
 let named = "foo";
 let {[named]: prop} = {prop: "foo"};

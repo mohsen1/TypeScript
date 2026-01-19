@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superWithGenerics.ts] ////
-
 //// [superWithGenerics.ts]
 declare class B<T> {    
     m<U>(): B<U>;

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/salsa/privateIdentifierExpando.ts] ////
-
-=== privateIdentifierExpando.js ===
+=== tests/cases/conformance/salsa/privateIdentifierExpando.js ===
 const x = {};
 >x : Symbol(x, Decl(privateIdentifierExpando.js, 0, 5))
 

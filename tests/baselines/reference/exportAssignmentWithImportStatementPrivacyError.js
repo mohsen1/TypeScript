@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/exportAssignmentWithImportStatementPrivacyError.ts] ////
-
 //// [exportAssignmentWithImportStatementPrivacyError.ts]
-namespace m2 {
+module m2 {
     export interface connectModule {
         (res, req, next): void;
     }
@@ -12,7 +10,7 @@ namespace m2 {
 
 }
 
-namespace M {
+module M {
     export var server: {
         (): m2.connectExport;
         test1: m2.connectModule;

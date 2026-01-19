@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privatePropertyInUnion.ts] ////
-
 //// [privatePropertyInUnion.ts]
 // Repro from #38236
 

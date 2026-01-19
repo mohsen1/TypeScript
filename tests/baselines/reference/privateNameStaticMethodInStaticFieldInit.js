@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticMethodInStaticFieldInit.ts] ////
-
 //// [privateNameStaticMethodInStaticFieldInit.ts]
 class C {
     static s = C.#method();
@@ -19,5 +17,5 @@ var _a, _C_method;
 class C {
 }
 _a = C, _C_method = function _C_method() { return 42; };
-C.s = __classPrivateFieldGet(_a, _a, "m", _C_method).call(_a);
+C.s = __classPrivateFieldGet(C, _a, "m", _C_method).call(C);
 console.log(C.s);

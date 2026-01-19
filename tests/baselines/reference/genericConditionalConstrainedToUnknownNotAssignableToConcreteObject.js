@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericConditionalConstrainedToUnknownNotAssignableToConcreteObject.ts] ////
-
 //// [genericConditionalConstrainedToUnknownNotAssignableToConcreteObject.ts]
 interface A { x: number }
 

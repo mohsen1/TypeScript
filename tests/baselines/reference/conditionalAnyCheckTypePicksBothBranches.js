@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalAnyCheckTypePicksBothBranches.ts] ////
-
 //// [conditionalAnyCheckTypePicksBothBranches.ts]
 type T = any extends number ? 1 : 0;
 let x: T;

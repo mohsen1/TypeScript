@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameBadSuper.ts] ////
-
 //// [privateNameBadSuper.ts]
 class B {};
 class A extends B {
-  #x;
-  constructor() {
-    this;
-    super();
-  }
+    #x;
+    constructor() {
+        void 0; // Error: 'super' call must  come first
+        super();
+    }
 }
 
 //// [privateNameBadSuper.js]
@@ -17,7 +15,7 @@ class B {
 ;
 class A extends B {
     constructor() {
-        this;
+        void 0; // Error: 'super' call must  come first
         super();
         _A_x.set(this, void 0);
     }

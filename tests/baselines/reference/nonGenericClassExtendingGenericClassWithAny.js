@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nonGenericClassExtendingGenericClassWithAny.ts] ////
-
 //// [nonGenericClassExtendingGenericClassWithAny.ts]
 class Foo<T> {
     t: T;

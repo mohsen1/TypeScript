@@ -24,7 +24,7 @@ var Foo = /** @class */ (function () {
 module.exports = Foo;
 //// [privacyCheckExternalModuleExportAssignmentOfGenericClass_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 
 
 //// [privacyCheckExternalModuleExportAssignmentOfGenericClass_0.d.ts]

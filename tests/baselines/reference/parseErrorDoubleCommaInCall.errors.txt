@@ -1,7 +1,7 @@
-parseErrorDoubleCommaInCall.ts(2,10): error TS1136: Property assignment expected.
+tests/cases/compiler/parseErrorDoubleCommaInCall.ts(2,10): error TS1136: Property assignment expected.
 
 
-==== parseErrorDoubleCommaInCall.ts (1 errors) ====
+==== tests/cases/compiler/parseErrorDoubleCommaInCall.ts (1 errors) ====
     Boolean({
         x: 0,,
              ~

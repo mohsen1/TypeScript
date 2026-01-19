@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassImplementsGenericsSerialization.ts] ////
-
-=== interface.ts ===
+=== tests/cases/conformance/jsdoc/declarations/interface.ts ===
 export interface Encoder<T> {
 >Encoder : Symbol(Encoder, Decl(interface.ts, 0, 0))
 >T : Symbol(T, Decl(interface.ts, 0, 25))
@@ -9,9 +7,9 @@ export interface Encoder<T> {
 >encode : Symbol(Encoder.encode, Decl(interface.ts, 0, 29))
 >value : Symbol(value, Decl(interface.ts, 1, 11))
 >T : Symbol(T, Decl(interface.ts, 0, 25))
->Uint8Array : Symbol(Uint8Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Uint8Array : Symbol(Uint8Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 }
-=== lib.js ===
+=== tests/cases/conformance/jsdoc/declarations/lib.js ===
 /**
  * @template T
  * @implements {IEncoder<T>}
@@ -27,7 +25,7 @@ export class Encoder {
 >value : Symbol(value, Decl(lib.js, 8, 11))
 
         return new Uint8Array(0)
->Uint8Array : Symbol(Uint8Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Uint8Array : Symbol(Uint8Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
     }
 }
 

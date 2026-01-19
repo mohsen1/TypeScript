@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveNamedLambdaCall.ts] ////
-
 //// [recursiveNamedLambdaCall.ts]
 var promise = function( obj ) {
 	

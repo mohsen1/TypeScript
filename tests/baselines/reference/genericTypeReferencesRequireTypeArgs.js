@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeReferencesRequireTypeArgs.ts] ////
-
 //// [genericTypeReferencesRequireTypeArgs.ts]
 class C<T> {
    foo(): T { return null }

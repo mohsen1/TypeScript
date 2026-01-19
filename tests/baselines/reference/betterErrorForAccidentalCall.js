@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/betterErrorForAccidentalCall.ts] ////
-
 //// [betterErrorForAccidentalCall.ts]
 declare function foo(): string;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock18.ts] ////
-
 //// [classStaticBlock18.ts]
 function foo () {
   return class {

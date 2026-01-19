@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overload2.ts] ////
-
 //// [overload2.ts]
 enum A { }
 enum B { }

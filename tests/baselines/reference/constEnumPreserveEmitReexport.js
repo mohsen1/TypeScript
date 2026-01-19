@@ -13,22 +13,29 @@ export { MyConstEnum as default } from './ConstEnum';
 
 //// [ConstEnum.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.MyConstEnum = void 0;
 var MyConstEnum;
 (function (MyConstEnum) {
     MyConstEnum[MyConstEnum["Foo"] = 0] = "Foo";
     MyConstEnum[MyConstEnum["Bar"] = 1] = "Bar";
-})(MyConstEnum || (exports.MyConstEnum = MyConstEnum = {}));
+})(MyConstEnum = exports.MyConstEnum || (exports.MyConstEnum = {}));
 ;
 //// [ImportExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var ConstEnum_1 = require("./ConstEnum");
-exports.default = ConstEnum_1.MyConstEnum;
+exports["default"] = ConstEnum_1.MyConstEnum;
 //// [ReExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = void 0;
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+exports.__esModule = true;
+exports["default"] = void 0;
 var ConstEnum_1 = require("./ConstEnum");
-Object.defineProperty(exports, "default", { enumerable: true, get: function () { return ConstEnum_1.MyConstEnum; } });
+__createBinding(exports, ConstEnum_1, "MyConstEnum", "default");

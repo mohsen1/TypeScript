@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/RealWorld/parserharness.ts] ////
-
 //// [parserharness.ts]
 //﻿
 // Copyright (c) Microsoft Corporation.  All rights reserved.
@@ -50,12 +48,12 @@ if (typeof ActiveXObject === "function") {
     throw new Error('Unknown context');
 }
 
-declare namespace process {
+declare module process {
     export function nextTick(callback: () => any): void;
     export function on(event: string, listener: Function);
 }
 
-namespace Harness {
+module Harness {
     // Settings 
     export var userSpecifiedroot = "";
     var global = <any>Function("return this").call(null);
@@ -81,7 +79,7 @@ namespace Harness {
     }
 
     // Assert functions
-    export namespace Assert {
+    export module Assert {
         export var bugIds: string[] = [];
         export var throwAssertError = (error: Error) => {
             throw error;
@@ -499,16 +497,16 @@ namespace Harness {
     }
 
     // Performance test
-    export namespace Perf {
-        export namespace Clock {
+    export module Perf {
+        export module Clock {
             export var now: () => number;
             export var resolution: number;
 
-            declare namespace WScript {
+            declare module WScript {
                 export function InitializeProjection();
             }
 
-            declare namespace TestUtilities {
+            declare module TestUtilities {
                 export function QueryPerformanceCounter(): number;
                 export function QueryPerformanceFrequency(): number;
             }
@@ -687,7 +685,7 @@ namespace Harness {
     }
 
     /** Functionality for compiling TypeScript code */
-    export namespace Compiler {
+    export module Compiler {
         /** Aggregate various writes into a single array of lines. Useful for passing to the
          *  TypeScript compiler to fill with source code or errors.
          */
@@ -842,13 +840,13 @@ namespace Harness {
 
             // TODO: Find an implementation of isIdenticalTo that works.
             //public isIdenticalTo(other: Type) {
-            //    var testCode = 'namespace __test1__ {\n';
+            //    var testCode = 'module __test1__ {\n';
             //    testCode += '    ' + this.code + ';\n';
             //    testCode += '    export var __val__ = ' + this.identifier + ';\n';
             //    testCode += '}\n';
             //    testCode += 'var __test1__val__ = __test1__.__val__;\n';
 
-            //    testCode += 'namespace __test2__ {\n';
+            //    testCode += 'module __test2__ {\n';
             //    testCode += '    ' + other.code + ';\n';
             //    testCode += '    export var __val__ = ' + other.identifier + ';\n';
             //    testCode += '}\n';
@@ -892,13 +890,13 @@ namespace Harness {
             //}
 
             public isAssignmentCompatibleWith(other: Type) {
-                var testCode = 'namespace __test1__ {\n';
+                var testCode = 'module __test1__ {\n';
                 testCode += '    ' + this.code + ';\n';
                 testCode += '    export var __val__ = ' + this.identifier + ';\n';
                 testCode += '}\n';
                 testCode += 'var __test1__val__ = __test1__.__val__;\n';
 
-                testCode += 'namespace __test2__ {\n';
+                testCode += 'module __test2__ {\n';
                 testCode += '    export ' + other.code + ';\n';
                 testCode += '    export var __val__ = ' + other.identifier + ';\n';
                 testCode += '}\n';
@@ -1414,7 +1412,7 @@ namespace Harness {
     /** Parses the test cases files 
      *  extracts options and individual files in a multifile test
      */
-    export namespace TestCaseParser {
+    export module TestCaseParser {
         /** all the necesarry information to set the right compiler settings */
         export interface CompilerSetting {
             flag: string;
@@ -1869,7 +1867,7 @@ namespace Harness {
     }
 
     /** Runs TypeScript or Javascript code. */
-    export namespace Runner {
+    export module Runner {
         export function runCollateral(path: string, callback: (error: Error, result: any) => void ) {
             path = switchToForwardSlashes(path);
             runString(readFile(path), path.match(/[^\/]*$/)[0], callback);
@@ -1910,7 +1908,7 @@ namespace Harness {
     }
 
     /** Support class for baseline files */
-    export namespace Baseline {
+    export module Baseline {
         var reportFilename = 'baseline-report.html';
 
         var firstRun = true;
@@ -2806,12 +2804,12 @@ var Harness;
             };
             // TODO: Find an implementation of isIdenticalTo that works.
             //public isIdenticalTo(other: Type) {
-            //    var testCode = 'namespace __test1__ {\n';
+            //    var testCode = 'module __test1__ {\n';
             //    testCode += '    ' + this.code + ';\n';
             //    testCode += '    export var __val__ = ' + this.identifier + ';\n';
             //    testCode += '}\n';
             //    testCode += 'var __test1__val__ = __test1__.__val__;\n';
-            //    testCode += 'namespace __test2__ {\n';
+            //    testCode += 'module __test2__ {\n';
             //    testCode += '    ' + other.code + ';\n';
             //    testCode += '    export var __val__ = ' + other.identifier + ';\n';
             //    testCode += '}\n';
@@ -2846,12 +2844,12 @@ var Harness;
             //    }
             //}
             Type.prototype.isAssignmentCompatibleWith = function (other) {
-                var testCode = 'namespace __test1__ {\n';
+                var testCode = 'module __test1__ {\n';
                 testCode += '    ' + this.code + ';\n';
                 testCode += '    export var __val__ = ' + this.identifier + ';\n';
                 testCode += '}\n';
                 testCode += 'var __test1__val__ = __test1__.__val__;\n';
-                testCode += 'namespace __test2__ {\n';
+                testCode += 'module __test2__ {\n';
                 testCode += '    export ' + other.code + ';\n';
                 testCode += '    export var __val__ = ' + other.identifier + ';\n';
                 testCode += '}\n';

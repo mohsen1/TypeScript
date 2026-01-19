@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/parseLinkTag.ts] ////
-
 //// [parseLinkTag.ts]
 /** trailing @link tag {@link */
 var x;

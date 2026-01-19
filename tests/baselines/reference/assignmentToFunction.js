@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/assignmentToFunction.ts] ////
-
 //// [assignmentToFunction.ts]
 function fn() { }
 fn = () => 3;
 
-namespace foo {
+module foo {
     function xyz() {
         function bar() {
         }

@@ -1,26 +1,24 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithBooleanType.ts] ////
-
-=== plusOperatorWithBooleanType.ts ===
+=== tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithBooleanType.ts ===
 // + operator on boolean type
-declare var BOOLEAN: boolean;
->BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 11))
+var BOOLEAN: boolean;
+>BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 3))
 
 function foo(): boolean { return true; }
->foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 29))
+>foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 21))
 
 class A {
 >A : Symbol(A, Decl(plusOperatorWithBooleanType.ts, 3, 40))
 
-    public a!: boolean;
+    public a: boolean;
 >a : Symbol(A.a, Decl(plusOperatorWithBooleanType.ts, 5, 9))
 
     static foo() { return false; }
->foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 23))
+>foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 22))
 }
-namespace M {
+module M {
 >M : Symbol(M, Decl(plusOperatorWithBooleanType.ts, 8, 1))
 
-    export var n: boolean = false;
+    export var n: boolean;
 >n : Symbol(n, Decl(plusOperatorWithBooleanType.ts, 10, 14))
 }
 
@@ -31,7 +29,7 @@ var objA = new A();
 // boolean type var
 var ResultIsNumber1 = +BOOLEAN;
 >ResultIsNumber1 : Symbol(ResultIsNumber1, Decl(plusOperatorWithBooleanType.ts, 16, 3))
->BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 11))
+>BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 3))
 
 // boolean type literal
 var ResultIsNumber2 = +true;
@@ -57,21 +55,21 @@ var ResultIsNumber5 = +M.n;
 
 var ResultIsNumber6 = +foo();
 >ResultIsNumber6 : Symbol(ResultIsNumber6, Decl(plusOperatorWithBooleanType.ts, 25, 3))
->foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 29))
+>foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 21))
 
 var ResultIsNumber7 = +A.foo();
 >ResultIsNumber7 : Symbol(ResultIsNumber7, Decl(plusOperatorWithBooleanType.ts, 26, 3))
->A.foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 23))
+>A.foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 22))
 >A : Symbol(A, Decl(plusOperatorWithBooleanType.ts, 3, 40))
->foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 23))
+>foo : Symbol(A.foo, Decl(plusOperatorWithBooleanType.ts, 6, 22))
 
 // miss assignment operators
 +true;
 +BOOLEAN;
->BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 11))
+>BOOLEAN : Symbol(BOOLEAN, Decl(plusOperatorWithBooleanType.ts, 1, 3))
 
 +foo();
->foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 29))
+>foo : Symbol(foo, Decl(plusOperatorWithBooleanType.ts, 1, 21))
 
 +true, false;
 +objA.a;

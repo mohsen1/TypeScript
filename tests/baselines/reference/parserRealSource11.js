@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource11.ts] ////
-
 //// [parserRealSource11.ts]
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
     export class ASTSpan {
         public minChar: number = -1;  // -1 = "undefined" or "compiler generated"
         public limChar: number = -1;  // -1 = "undefined" or "compiler generated"   

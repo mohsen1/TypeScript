@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/qualifiedName_ImportDeclarations-entity-names-referencing-a-var.ts] ////
-
 //// [qualifiedName_ImportDeclarations-entity-names-referencing-a-var.ts]
-namespace Alpha {
+module Alpha {
     export var x = 100;
 }
 
-namespace Beta {
+module Beta {
     import p = Alpha.x;
 }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/thisType/fluentInterfaces.ts] ////
-
 //// [fluentInterfaces.ts]
 interface A {
     foo(): this;

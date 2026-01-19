@@ -1,15 +1,13 @@
-//// [tests/cases/conformance/classes/members/accessibility/protectedInstanceMemberAccessibility.ts] ////
-
 //// [protectedInstanceMemberAccessibility.ts]
 class A {
-    protected x!: string;
+    protected x: string;
     protected f(): string {
         return "hello";
     }
 }
 
 class B extends A {
-    protected y!: string;
+    protected y: string;
     g() {
         var t1 = this.x;
         var t2 = this.f();
@@ -21,19 +19,19 @@ class B extends A {
         var s3 = super.y;    // error
         var s4 = super.z;    // error
 
-        var a: A = undefined as any;
+        var a: A;
         var a1 = a.x;    // error
         var a2 = a.f();  // error
         var a3 = a.y;    // error
         var a4 = a.z;    // error
 
-        var b: B = undefined as any;
+        var b: B;
         var b1 = b.x;
         var b2 = b.f();
         var b3 = b.y;
         var b4 = b.z;    // error
 
-        var c: C = undefined as any;
+        var c: C;
         var c1 = c.x;    // error
         var c2 = c.f();  // error
         var c3 = c.y;    // error
@@ -42,7 +40,7 @@ class B extends A {
 }
 
 class C extends A {
-    protected z!: string;
+    protected z: string;
 }
 
 
@@ -84,17 +82,17 @@ var B = /** @class */ (function (_super) {
         var s2 = _super.prototype.f.call(this);
         var s3 = _super.prototype.y; // error
         var s4 = _super.prototype.z; // error
-        var a = undefined;
+        var a;
         var a1 = a.x; // error
         var a2 = a.f(); // error
         var a3 = a.y; // error
         var a4 = a.z; // error
-        var b = undefined;
+        var b;
         var b1 = b.x;
         var b2 = b.f();
         var b3 = b.y;
         var b4 = b.z; // error
-        var c = undefined;
+        var c;
         var c1 = c.x; // error
         var c2 = c.f(); // error
         var c3 = c.y; // error

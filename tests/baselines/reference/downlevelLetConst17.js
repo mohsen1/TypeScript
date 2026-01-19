@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/downlevelLetConst17.ts] ////
-
 //// [downlevelLetConst17.ts]
 'use strict'
 

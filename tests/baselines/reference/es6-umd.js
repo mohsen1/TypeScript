@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6-umd.ts] ////
-
 //// [es6-umd.ts]
 class A
 {

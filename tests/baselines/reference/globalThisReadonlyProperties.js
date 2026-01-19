@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es2019/globalThisReadonlyProperties.ts] ////
-
 //// [globalThisReadonlyProperties.ts]
 globalThis.globalThis = 1 as any // should error
 var x = 1

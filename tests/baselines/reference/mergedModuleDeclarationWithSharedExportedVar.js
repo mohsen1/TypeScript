@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/mergedModuleDeclarationWithSharedExportedVar.ts] ////
-
 //// [mergedModuleDeclarationWithSharedExportedVar.ts]
-namespace M {
+module M {
     export var v = 10;
     v;
 }
-namespace M {
+module M {
     v;
 }
 

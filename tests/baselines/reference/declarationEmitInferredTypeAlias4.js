@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitInferredTypeAlias4.ts] ////
-
 //// [declarationEmitInferredTypeAlias4.ts]
 function f<A>() {
     type Foo<T> = T | { x: Foo<T> };
@@ -16,5 +14,5 @@ function f() {
 
 //// [declarationEmitInferredTypeAlias4.d.ts]
 declare function f<A>(): A[] | {
-    x: A[] | /*elided*/ any;
+    x: A[] | any;
 };

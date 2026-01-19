@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/fatarrowfunctionsInFunctionParameterDefaults.ts] ////
-
 //// [fatarrowfunctionsInFunctionParameterDefaults.ts]
 function fn(x = () => this, y = x()) {
 

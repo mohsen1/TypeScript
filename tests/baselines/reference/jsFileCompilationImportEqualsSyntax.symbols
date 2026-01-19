@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationImportEqualsSyntax.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 import a = b;
 >a : Symbol(a, Decl(a.js, 0, 0))
 

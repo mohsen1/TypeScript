@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationClassWithDefaultConstructor.ts] ////
-
 //// [sourceMapValidationClassWithDefaultConstructor.ts]
 class Greeter {
     public a = 10;

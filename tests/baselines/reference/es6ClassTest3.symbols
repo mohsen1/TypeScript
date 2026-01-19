@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/es6ClassTest3.ts] ////
-
-=== es6ClassTest3.ts ===
-namespace M {	
+=== tests/cases/compiler/es6ClassTest3.ts ===
+module M {	
 >M : Symbol(M, Decl(es6ClassTest3.ts, 0, 0))
 
 	class Visibility {
->Visibility : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 13))
+>Visibility : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 10))
 
 	    public foo() { };
 >foo : Symbol(Visibility.foo, Decl(es6ClassTest3.ts, 1, 19))
@@ -25,12 +23,12 @@ namespace M {
 	    constructor() {
 	        this.x = 1;
 >this.x : Symbol(Visibility.x, Decl(es6ClassTest3.ts, 3, 23))
->this : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 13))
+>this : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 10))
 >x : Symbol(Visibility.x, Decl(es6ClassTest3.ts, 3, 23))
 
 	        this.y = 2;
 >this.y : Symbol(Visibility.y, Decl(es6ClassTest3.ts, 4, 26))
->this : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 13))
+>this : Symbol(Visibility, Decl(es6ClassTest3.ts, 0, 10))
 >y : Symbol(Visibility.y, Decl(es6ClassTest3.ts, 4, 26))
 	    }
 	}

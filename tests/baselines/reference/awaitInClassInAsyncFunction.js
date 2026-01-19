@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/awaitInClassInAsyncFunction.ts] ////
-
 //// [awaitInClassInAsyncFunction.ts]
 // https://github.com/microsoft/TypeScript/issues/34887
 

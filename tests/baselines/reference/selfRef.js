@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/selfRef.ts] ////
-
 //// [selfRef.ts]
-namespace M
+module M
 {
     export class Test
     {

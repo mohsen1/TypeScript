@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyParametersInAmbientClass.ts] ////
-
 //// [noImplicitAnyParametersInAmbientClass.ts]
 declare class D_C {
     // No implicit-'any' errors.

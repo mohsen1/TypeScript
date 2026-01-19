@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/pedantic/noUncheckedIndexedAccess.ts] ////
-
 //// [noUncheckedIndexedAccess.ts]
 type CheckBooleanOnly<T extends boolean> = any;
 // Validate CheckBooleanOnly works - should error

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/identityForSignaturesWithTypeParametersAndAny.ts] ////
-
 //// [identityForSignaturesWithTypeParametersAndAny.ts]
 var f: <T, U>(x: T, y: U) => T;
 var f: <T, U>(x: any, y: any) => any;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/accessibility/privateClassPropertyAccessibleWithinClass.ts] ////
-
 //// [privateClassPropertyAccessibleWithinClass.ts]
 // no errors
 

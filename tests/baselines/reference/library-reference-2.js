@@ -1,6 +1,8 @@
 //// [tests/cases/conformance/references/library-reference-2.ts] ////
 
 //// [package.json]
+// package.json in a primary reference can refer to another file
+
 {
     "types": "jquery.d.ts"
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeAndMemberIdentity/objectTypesIdentityWithPublics.ts] ////
-
 //// [objectTypesIdentityWithPublics.ts]
 // object types are identical structurally
 

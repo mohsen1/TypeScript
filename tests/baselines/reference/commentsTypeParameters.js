@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsTypeParameters.ts] ////
-
 //// [commentsTypeParameters.ts]
 class C</**docComment for type parameter*/ T> {
     method</**docComment of method type parameter */ U extends T>(a: U) {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/conditional/inferTypes2.ts] ////
-
 //// [inferTypes2.ts]
 // Repros from #22755
 
@@ -27,15 +25,16 @@ const b: string = a;
 //// [inferTypes2.js]
 "use strict";
 // Repros from #22755
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.bar = bar;
-exports.bar2 = bar2;
+exports.__esModule = true;
+exports.bar2 = exports.bar = void 0;
 function bar(obj) {
     return foo(obj);
 }
+exports.bar = bar;
 function bar2(obj) {
     return foo2(obj);
 }
+exports.bar2 = bar2;
 var a = null;
 var b = a;
 
@@ -43,7 +42,7 @@ var b = a;
 //// [inferTypes2.d.ts]
 export declare function foo<T>(obj: T): T extends () => infer P ? P : never;
 export declare function bar<T>(obj: T): T extends () => infer P ? P : never;
-export type BadNested<T> = {
+export declare type BadNested<T> = {
     x: T extends number ? T : string;
 };
 export declare function foo2<T>(obj: T): T extends {

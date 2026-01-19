@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocReadonlyDeclarations.ts] ////
-
-=== jsdocReadonlyDeclarations.js ===
+=== tests/cases/conformance/jsdoc/jsdocReadonlyDeclarations.js ===
 class C {
 >C : Symbol(C, Decl(jsdocReadonlyDeclarations.js, 0, 0))
 
@@ -51,4 +49,3 @@ class D {
     constructor(/** @readonly */ x) {}
 >x : Symbol(x, Decl(jsdocReadonlyDeclarations.js, 22, 16))
 }
-

@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/types/members/objectTypeHidingMembersOfExtendedObject.ts] ////
-
 //// [objectTypeHidingMembersOfExtendedObject.ts]
 class A {
-    foo!: string;
+    foo: string;
 }
 
 class B extends A {
-    bar!: string;
+    bar: string;
 }
 
 interface Object {
@@ -16,11 +14,11 @@ interface Object {
 
 class C {
     valueOf() { }
-    data!: B;
+    data: B;
     [x: string]: any;
 }
 
-declare var c: C;
+var c: C;
 var r1: void = c.valueOf();
 var r1b: B = c.data;
 var r1c = r1b['hm']; // should be 'Object'
@@ -32,7 +30,7 @@ interface I {
     [x: string]: any;
 }
 
-declare var i: I;
+var i: I;
 var r2: void = i.valueOf();
 var r2b: B = i.data;
 var r2c = r2b['hm']; // should be 'Object'
@@ -48,7 +46,7 @@ var r3b: B = a.data;
 var r3c = r3b['hm']; // should be 'Object'
 var r3d = i['hm'];
 
-declare var b: {
+var b: {
     valueOf(): void;
     data: B;
     [x: string]: any;
@@ -90,10 +88,12 @@ var C = /** @class */ (function () {
     C.prototype.valueOf = function () { };
     return C;
 }());
+var c;
 var r1 = c.valueOf();
 var r1b = c.data;
 var r1c = r1b['hm']; // should be 'Object'
 var r1d = c['hm']; // should be 'any'
+var i;
 var r2 = i.valueOf();
 var r2b = i.data;
 var r2c = r2b['hm']; // should be 'Object'
@@ -106,4 +106,5 @@ var r3 = a.valueOf();
 var r3b = a.data;
 var r3c = r3b['hm']; // should be 'Object'
 var r3d = i['hm'];
+var b;
 var r4 = b.valueOf();

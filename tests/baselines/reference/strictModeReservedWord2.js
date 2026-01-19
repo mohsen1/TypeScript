@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictModeReservedWord2.ts] ////
-
 //// [strictModeReservedWord2.ts]
 "use strict"
 interface public { }

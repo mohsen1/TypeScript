@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/defaultArgsInFunctionExpressions.ts] ////
-
 //// [defaultArgsInFunctionExpressions.ts]
 var f = function (a = 3) { return a; }; // Type should be (a?: number) => number
 var n: number = f(4);
@@ -23,8 +21,8 @@ var f4: (a: number) => void = function (a = "") { };
 var f5: (a: (s: string) => any) => void = function (a = s => <number>s) { };
 
 // Instantiated module
-namespace T { }
-namespace U {
+module T { }
+module U {
     export var x;
 }
 

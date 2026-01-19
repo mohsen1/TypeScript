@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesTypePredicates01.ts] ////
-
 //// [stringLiteralTypesTypePredicates01.ts]
 type Kind = "A" | "B"
 
@@ -45,7 +43,7 @@ else {
 
 
 //// [stringLiteralTypesTypePredicates01.d.ts]
-type Kind = "A" | "B";
+declare type Kind = "A" | "B";
 declare function kindIs(kind: Kind, is: "A"): kind is "A";
 declare function kindIs(kind: Kind, is: "B"): kind is "B";
 declare var x: Kind;

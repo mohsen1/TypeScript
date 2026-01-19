@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/resolveTypeAliasWithSameLetDeclarationName1.ts] ////
-
 //// [resolveTypeAliasWithSameLetDeclarationName1.ts]
 class C { }
 type baz = C;

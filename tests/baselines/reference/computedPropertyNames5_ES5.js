@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames5_ES5.ts] ////
-
 //// [computedPropertyNames5_ES5.ts]
-declare var b: boolean;
+var b: boolean;
 var v = {
     [b]: 0,
     [true]: 1,
@@ -13,6 +11,7 @@ var v = {
 
 //// [computedPropertyNames5_ES5.js]
 var _a;
+var b;
 var v = (_a = {},
     _a[b] = 0,
     _a[true] = 1,

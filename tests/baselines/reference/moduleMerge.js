@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/moduleMerge.ts] ////
-
 //// [moduleMerge.ts]
 // This should not compile both B classes are in the same module this should be a collission
 
-namespace A
+module A
 {
     class B
     {
@@ -14,7 +12,7 @@ namespace A
     }
 }
 
-namespace A
+module A
 {
     export class B
     {

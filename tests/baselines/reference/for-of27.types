@@ -1,24 +1,16 @@
-//// [tests/cases/conformance/es6/for-ofStatements/for-of27.ts] ////
-
-=== for-of27.ts ===
-class MyStringIterator {
->MyStringIterator : MyStringIterator
->                 : ^^^^^^^^^^^^^^^^
+=== tests/cases/conformance/es6/for-ofStatements/for-of27.ts ===
+class StringIterator {
+>StringIterator : StringIterator
 
     [Symbol.iterator]: any;
 >[Symbol.iterator] : any
 >Symbol.iterator : unique symbol
->                : ^^^^^^^^^^^^^
 >Symbol : SymbolConstructor
->       : ^^^^^^^^^^^^^^^^^
 >iterator : unique symbol
->         : ^^^^^^^^^^^^^
 }
 
-for (var v of new MyStringIterator) { }
+for (var v of new StringIterator) { }
 >v : any
->new MyStringIterator : MyStringIterator
->                     : ^^^^^^^^^^^^^^^^
->MyStringIterator : typeof MyStringIterator
->                 : ^^^^^^^^^^^^^^^^^^^^^^^
+>new StringIterator : StringIterator
+>StringIterator : typeof StringIterator
 

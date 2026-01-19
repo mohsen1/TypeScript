@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/primitives/boolean/invalidBooleanAssignments.ts] ////
-
-=== invalidBooleanAssignments.ts ===
+=== tests/cases/conformance/types/primitives/boolean/invalidBooleanAssignments.ts ===
 var x = true;
 >x : Symbol(x, Decl(invalidBooleanAssignments.ts, 0, 3))
 
@@ -57,9 +55,9 @@ var h2: { toString(): string } = x; // no error
 >toString : Symbol(toString, Decl(invalidBooleanAssignments.ts, 17, 9))
 >x : Symbol(x, Decl(invalidBooleanAssignments.ts, 0, 3))
 
-namespace M { export var a = 1; }
+module M { export var a = 1; }
 >M : Symbol(M, Decl(invalidBooleanAssignments.ts, 17, 35))
->a : Symbol(a, Decl(invalidBooleanAssignments.ts, 19, 24))
+>a : Symbol(a, Decl(invalidBooleanAssignments.ts, 19, 21))
 
 M = x;
 >M : Symbol(M, Decl(invalidBooleanAssignments.ts, 17, 35))

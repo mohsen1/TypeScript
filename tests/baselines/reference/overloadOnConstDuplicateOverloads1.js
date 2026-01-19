@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstDuplicateOverloads1.ts] ////
-
 //// [overloadOnConstDuplicateOverloads1.ts]
 function foo(a: 'hi', x: string);
 function foo(a: 'hi', x: string);

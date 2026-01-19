@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numberVsBigIntOperations.ts] ////
-
 //// [numberVsBigIntOperations.ts]
 // Cannot mix bigints and numbers
 let bigInt = 1n, num = 2;
@@ -59,7 +57,7 @@ result = bigInt !== num;
 num = "3" & 5; num = 2 ** false; // should error, but infer number
 "3" & 5n; 2n ** false; // should error, result in any
 num = ~"3"; num = -false; // should infer number
-declare let bigIntOrNumber: bigint | number;
+let bigIntOrNumber: bigint | number;
 bigIntOrNumber + bigIntOrNumber; // should error, result in any
 bigIntOrNumber << bigIntOrNumber; // should error, result in any
 if (typeof bigIntOrNumber === "bigint") {
@@ -86,22 +84,15 @@ anyValue--; // should infer number
 // Distinguishing numbers from bigints with typeof
 const isBigInt: (x: 0n | 1n) => bigint = (x: 0n | 1n) => x;
 const isNumber: (x: 0 | 1) => number = (x: 0 | 1) => x;
-declare const zeroOrBigOne: 0 | 1n;
+const zeroOrBigOne: 0 | 1n;
 if (typeof zeroOrBigOne === "bigint") isBigInt(zeroOrBigOne);
 else isNumber(zeroOrBigOne);
 
 // Distinguishing truthy from falsy
 const isOne = (x: 1 | 1n) => x;
 if (zeroOrBigOne) isOne(zeroOrBigOne);
-declare const bigZeroOrOne: 0n | 1;
+const bigZeroOrOne: 0n | 1;
 if (bigZeroOrOne) isOne(bigZeroOrOne);
-
-type NumberOrBigint = number | bigint;
-function getKey<S extends NumberOrBigint>(key: S) {
-    +key;   // should error
-    0 + key;    // should error
-}
-
 
 //// [numberVsBigIntOperations.js]
 // Cannot mix bigints and numbers
@@ -243,6 +234,7 @@ num = 2 ** false; // should error, but infer number
 2n ** false; // should error, result in any
 num = ~"3";
 num = -false; // should infer number
+let bigIntOrNumber;
 bigIntOrNumber + bigIntOrNumber; // should error, result in any
 bigIntOrNumber << bigIntOrNumber; // should error, result in any
 if (typeof bigIntOrNumber === "bigint") {
@@ -268,6 +260,7 @@ anyValue--; // should infer number
 // Distinguishing numbers from bigints with typeof
 const isBigInt = (x) => x;
 const isNumber = (x) => x;
+const zeroOrBigOne;
 if (typeof zeroOrBigOne === "bigint")
     isBigInt(zeroOrBigOne);
 else
@@ -276,9 +269,6 @@ else
 const isOne = (x) => x;
 if (zeroOrBigOne)
     isOne(zeroOrBigOne);
+const bigZeroOrOne;
 if (bigZeroOrOne)
     isOne(bigZeroOrOne);
-function getKey(key) {
-    +key; // should error
-    0 + key; // should error
-}

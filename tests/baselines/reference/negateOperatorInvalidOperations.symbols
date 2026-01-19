@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorInvalidOperations.ts] ////
-
-=== negateOperatorInvalidOperations.ts ===
+=== tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorInvalidOperations.ts ===
 // Unary operator -
 
 // operand before -

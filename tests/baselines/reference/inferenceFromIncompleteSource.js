@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferenceFromIncompleteSource.ts] ////
-
 //// [inferenceFromIncompleteSource.ts]
 // Repro from #42030
 

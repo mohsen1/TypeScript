@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/interfaceDeclaration4.ts] ////
-
 //// [interfaceDeclaration4.ts]
 // Import this module when test harness supports external modules. Also remove the internal module below.
 // import Foo = require("interfaceDeclaration5")
-namespace Foo {
+module Foo {
     export interface I1 { item: string; }
     export class C1 { }
 }

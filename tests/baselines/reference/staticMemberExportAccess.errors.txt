@@ -1,23 +1,23 @@
-staticMemberExportAccess.ts(14,39): error TS2351: This expression is not constructable.
+tests/cases/compiler/staticMemberExportAccess.ts(14,39): error TS2351: This expression is not constructable.
   Type 'Sammy' has no construct signatures.
-staticMemberExportAccess.ts(17,18): error TS2576: Property 'bar' does not exist on type 'Sammy'. Did you mean to access the static member 'Sammy.bar' instead?
-staticMemberExportAccess.ts(18,18): error TS2339: Property 'x' does not exist on type 'Sammy'.
+tests/cases/compiler/staticMemberExportAccess.ts(17,18): error TS2576: Property 'bar' does not exist on type 'Sammy'. Did you mean to access the static member 'Sammy.bar' instead?
+tests/cases/compiler/staticMemberExportAccess.ts(18,18): error TS2339: Property 'x' does not exist on type 'Sammy'.
 
 
-==== staticMemberExportAccess.ts (3 errors) ====
+==== tests/cases/compiler/staticMemberExportAccess.ts (3 errors) ====
     class Sammy {
        foo() { return "hi"; }
       static bar() {
         return -1;
        }
     }
-    namespace Sammy {
+    module Sammy {
         export var x = 1;
     }
     interface JQueryStatic {
         sammy: Sammy; // class instance
     }
-    declare var $: JQueryStatic;
+    var $: JQueryStatic;
     var instanceOfClassSammy: Sammy = new $.sammy(); // should be error
                                           ~~~~~~~
 !!! error TS2351: This expression is not constructable.

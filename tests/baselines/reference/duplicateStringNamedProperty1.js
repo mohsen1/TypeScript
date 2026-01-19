@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateStringNamedProperty1.ts] ////
-
 //// [duplicateStringNamedProperty1.ts]
 export interface Album {
     "artist": string;
@@ -8,4 +6,4 @@ export interface Album {
 
 //// [duplicateStringNamedProperty1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/externFunc.ts] ////
-
 //// [externFunc.ts]
 declare function parseInt(s:string):number;
 

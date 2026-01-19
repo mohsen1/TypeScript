@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleProperty2.ts] ////
-
 //// [moduleProperty2.ts]
-namespace M {
+module M {
     function f() {
         var x;
     }
@@ -11,7 +9,7 @@ namespace M {
     var test2=y; // y visible because same module
 }
 
-namespace N {
+module N {
     var test3=M.y; // nope y private property of M
     var test4=M.z; // ok public property of M
 }

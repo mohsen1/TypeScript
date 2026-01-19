@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxChildrenGenericContextualTypes.tsx] ////
-
 //// [jsxChildrenGenericContextualTypes.tsx]
 namespace JSX {
     export interface Element {}

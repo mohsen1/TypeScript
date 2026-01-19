@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocTemplateTagNameResolution.ts] ////
-
-=== file.js ===
+=== tests/cases/conformance/jsdoc/file.js ===
 /**
  * @template T
  * @template {keyof T} K

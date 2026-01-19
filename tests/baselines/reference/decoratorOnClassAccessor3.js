@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/class/accessor/decoratorOnClassAccessor3.ts] ////
-
 //// [decoratorOnClassAccessor3.ts]
 declare function dec<T>(target: any, propertyKey: string, descriptor: TypedPropertyDescriptor<T>): TypedPropertyDescriptor<T>;
 

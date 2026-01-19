@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock5.ts] ////
-
 //// [classStaticBlock5.ts]
 class B {
     static a = 1;
@@ -34,6 +32,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
+var _this = this;
 var B = /** @class */ (function () {
     function B() {
     }

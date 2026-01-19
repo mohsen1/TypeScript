@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminantsAndTypePredicates.ts] ////
-
 //// [discriminantsAndTypePredicates.ts]
 // Repro from #10145
 

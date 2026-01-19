@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/fuzzy.ts] ////
-
-=== fuzzy.ts ===
-namespace M {
+=== tests/cases/compiler/fuzzy.ts ===
+module M {
 >M : Symbol(M, Decl(fuzzy.ts, 0, 0))
 
     export interface I {
->I : Symbol(I, Decl(fuzzy.ts, 0, 13))
+>I : Symbol(I, Decl(fuzzy.ts, 0, 10))
 
         works:()=>R;
 >works : Symbol(I.works, Decl(fuzzy.ts, 1, 24))
@@ -28,12 +26,12 @@ namespace M {
 
         oneI:I;
 >oneI : Symbol(R.oneI, Decl(fuzzy.ts, 8, 24))
->I : Symbol(I, Decl(fuzzy.ts, 0, 13))
+>I : Symbol(I, Decl(fuzzy.ts, 0, 10))
     }
 
     export class C implements I {
 >C : Symbol(C, Decl(fuzzy.ts, 10, 5))
->I : Symbol(I, Decl(fuzzy.ts, 0, 13))
+>I : Symbol(I, Decl(fuzzy.ts, 0, 10))
 
         constructor(public x:number) {
 >x : Symbol(C.x, Decl(fuzzy.ts, 13, 20))

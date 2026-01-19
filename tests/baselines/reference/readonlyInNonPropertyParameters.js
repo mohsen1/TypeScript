@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/readonlyInNonPropertyParameters.ts] ////
-
 //// [readonlyInNonPropertyParameters.ts]
 // `readonly` won't work outside of property parameters
 class X {

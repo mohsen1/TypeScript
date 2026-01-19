@@ -17,13 +17,15 @@ export function b(text: string) {
 
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.b = b;
+exports.__esModule = true;
+exports.b = void 0;
 var a_1 = require("@ts-bug/a");
 function b(text) {
     return (0, a_1.a)(text);
 }
+exports.b = b;
 
 
 //// [index.d.ts]
+/// <reference types="@ts-bug/a" />
 export declare function b(text: string): import("@ts-bug/a").AText;

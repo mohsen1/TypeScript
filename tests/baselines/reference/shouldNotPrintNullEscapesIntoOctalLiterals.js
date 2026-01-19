@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/shouldNotPrintNullEscapesIntoOctalLiterals.ts] ////
-
 //// [shouldNotPrintNullEscapesIntoOctalLiterals.ts]
 "use strict";
 `\x001`;

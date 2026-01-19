@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/simpleArrowFunctionParameterReferencedInObjectLiteral1.ts] ////
-
 //// [simpleArrowFunctionParameterReferencedInObjectLiteral1.ts]
 [].map(() => [].map(p => ({ X: p })));
 

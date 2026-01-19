@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emptyThenWithoutWarning.ts] ////
-
 //// [emptyThenWithoutWarning.ts]
 let a = 4;
 

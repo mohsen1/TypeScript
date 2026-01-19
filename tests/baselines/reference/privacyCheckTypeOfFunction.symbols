@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/privacyCheckTypeOfFunction.ts] ////
-
-=== privacyCheckTypeOfFunction.ts ===
+=== tests/cases/compiler/privacyCheckTypeOfFunction.ts ===
 function foo() {
 >foo : Symbol(foo, Decl(privacyCheckTypeOfFunction.ts, 0, 0))
 }

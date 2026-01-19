@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/narrowingByTypeofInSwitch.ts] ////
-
 //// [narrowingByTypeofInSwitch.ts]
 function assertNever(x: never) {
     return x;

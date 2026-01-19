@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/castExpressionParentheses.ts] ////
-
 //// [castExpressionParentheses.ts]
 declare var a;
 

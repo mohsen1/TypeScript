@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkSuperCallBeforeThisAccess.ts] ////
-
 //// [checkSuperCallBeforeThisAccess.ts]
 class A {
     x = 1;

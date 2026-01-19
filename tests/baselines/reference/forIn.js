@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forIn.ts] ////
-
 //// [forIn.ts]
 var arr = null;
 for (var i:number in arr) { // error

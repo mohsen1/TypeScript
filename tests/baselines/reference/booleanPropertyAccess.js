@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/boolean/booleanPropertyAccess.ts] ////
-
 //// [booleanPropertyAccess.ts]
 var x = true;
 

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/functionInIfStatementInModule.ts] ////
-
 //// [functionInIfStatementInModule.ts]
  
-namespace Midori
+module Midori
 {
     if (false) {
         function Foo(src)

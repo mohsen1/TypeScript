@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/out-flag.ts] ////
-
 //// [out-flag.ts]
-//// @outFile: bin\
+//// @out: bin\
 
 // my class comments
 class MyClass
@@ -18,9 +16,8 @@ class MyClass
     }
 }
 
-
 //// [out-flag.js]
-//// @outFile: bin\
+//// @out: bin\
 // my class comments
 var MyClass = /** @class */ (function () {
     function MyClass() {

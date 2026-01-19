@@ -203,7 +203,7 @@ class privateClassWithPrivateModuleSetAccessorTypes {
     }
 }
 
-export namespace publicModule {
+export module publicModule {
     class privateClass {
     }
 
@@ -406,7 +406,7 @@ export namespace publicModule {
     }
 }
 
-namespace privateModule {
+module privateModule {
     class privateClass {
     }
 
@@ -651,14 +651,14 @@ class publicClassInGlobalWithWithPublicSetAccessorTypes {
     }
 }
 
-namespace publicModuleInGlobal {
+module publicModuleInGlobal {
     class privateClass {
     }
 
     export class publicClass {
     }
 
-    namespace privateModule {
+    module privateModule {
         class privateClass {
         }
 
@@ -2018,7 +2018,7 @@ var publicModule;
         });
         return privateClassWithPrivateModuleSetAccessorTypes;
     }());
-})(publicModule || (exports.publicModule = publicModule = {}));
+})(publicModule = exports.publicModule || (exports.publicModule = {}));
 var privateModule;
 (function (privateModule) {
     var privateClass = /** @class */ (function () {
@@ -3604,7 +3604,7 @@ export declare class publicClassWithPrivateModuleSetAccessorTypes {
     static set myPublicStaticMethod(param: privateModule.publicClass);
     set myPublicMethod(param: privateModule.publicClass);
 }
-export declare namespace publicModule {
+export declare module publicModule {
     class privateClass {
     }
     export class publicClass {
@@ -3653,7 +3653,7 @@ export declare namespace publicModule {
     }
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     class privateClass {
     }
     export class publicClass {
@@ -3722,12 +3722,12 @@ declare class publicClassInGlobalWithWithPublicSetAccessorTypes {
     set myPublicMethod(param: publicClassInGlobal);
     private set myPrivateMethod(value);
 }
-declare namespace publicModuleInGlobal {
+declare module publicModuleInGlobal {
     class privateClass {
     }
     export class publicClass {
     }
-    namespace privateModule {
+    module privateModule {
         class privateClass {
         }
         export class publicClass {

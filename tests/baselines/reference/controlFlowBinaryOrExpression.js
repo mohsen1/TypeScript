@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowBinaryOrExpression.ts] ////
-
 //// [controlFlowBinaryOrExpression.ts]
 let x: string | number | boolean;
 let cond: boolean;
@@ -40,7 +38,7 @@ if (isNodeList(sourceObj) || isHTMLCollection(sourceObj)) {
 
 //// [controlFlowBinaryOrExpression.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x;
 var cond;
 (x = "") || (x = 0);

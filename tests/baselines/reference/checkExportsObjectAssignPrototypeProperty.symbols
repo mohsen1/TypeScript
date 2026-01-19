@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/checkExportsObjectAssignPrototypeProperty.ts] ////
-
-=== validator.ts ===
+=== tests/cases/conformance/jsdoc/validator.ts ===
 import "./";
 
 import Person = require("./mod1");
@@ -78,7 +76,7 @@ m1.setonlyAccessor = 0;
 >setonlyAccessor : Symbol(Person.setonlyAccessor, Decl(mod1.js, 13, 88))
 
 
-=== mod1.js ===
+=== tests/cases/conformance/jsdoc/mod1.js ===
 /**
  * @constructor
  * @param {string} name

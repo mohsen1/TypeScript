@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveInGeneric.ts] ////
-
 //// [nonPrimitiveInGeneric.ts]
 function generic<T>(t: T) {
     var o: object = t; // expect error

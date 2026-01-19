@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeWithMultipleBases1.ts] ////
-
 //// [genericTypeWithMultipleBases1.ts]
 export interface I1 {
     m1: () => void;
@@ -23,7 +21,7 @@ x.m2();
 
 //// [genericTypeWithMultipleBases1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x;
 x.p1;
 x.m1();

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictBooleanMemberAssignability.ts] ////
-
 //// [strictBooleanMemberAssignability.ts]
 class Abc {
     def: boolean

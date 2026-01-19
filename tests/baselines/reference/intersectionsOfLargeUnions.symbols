@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/intersectionsOfLargeUnions.ts] ////
-
-=== intersectionsOfLargeUnions.ts ===
+=== tests/cases/compiler/intersectionsOfLargeUnions.ts ===
 // Repro from #23977
 
 export function assertIsElement(node: Node | null): node is Element {

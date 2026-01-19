@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationLabeled.ts] ////
-
 //// [sourceMapValidationLabeled.ts]
 x:
 var b = 10;

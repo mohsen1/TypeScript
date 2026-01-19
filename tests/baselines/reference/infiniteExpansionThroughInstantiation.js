@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/infiniteExpansionThroughInstantiation.ts] ////
-
 //// [infiniteExpansionThroughInstantiation.ts]
 // instantiating a derived type can cause an infinitely expanding type reference to be generated
 
@@ -14,13 +12,13 @@ interface OwnerList<U> extends List<List<U>> {
     name: string;
 }
 
-declare var list: List<string>;
-declare var ownerList: OwnerList<string>;
+var list: List<string>;
+var ownerList: OwnerList<string>;
 list = ownerList; 
 
 function other<T>(x: T) {
     var list: List<T>;
-    var ownerList!: OwnerList<T>;
+    var ownerList: OwnerList<T>;
     list = ownerList; 
 
 }
@@ -28,6 +26,8 @@ function other<T>(x: T) {
 
 //// [infiniteExpansionThroughInstantiation.js]
 // instantiating a derived type can cause an infinitely expanding type reference to be generated
+var list;
+var ownerList;
 list = ownerList;
 function other(x) {
     var list;

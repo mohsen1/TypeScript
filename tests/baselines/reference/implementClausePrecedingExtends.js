@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implementClausePrecedingExtends.ts] ////
-
 //// [implementClausePrecedingExtends.ts]
 class C { foo: number }
 class D implements C extends C { }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/any/narrowExceptionVariableInCatchClause.ts] ////
-
 //// [narrowExceptionVariableInCatchClause.ts]
 declare function isFooError(x: any): x is { type: 'foo'; dontPanic(); };
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/contextualTypes/logicalAnd/contextuallyTypeLogicalAnd02.ts] ////
-
 //// [contextuallyTypeLogicalAnd02.ts]
 let x: (a: string) => string;
 let y = true;

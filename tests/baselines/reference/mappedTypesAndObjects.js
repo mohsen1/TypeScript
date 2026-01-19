@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypesAndObjects.ts] ////
-
 //// [mappedTypesAndObjects.ts]
 function f1<T>(x: Partial<T>, y: Readonly<T>) {
     let obj: {};

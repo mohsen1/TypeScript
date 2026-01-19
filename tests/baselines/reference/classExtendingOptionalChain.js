@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classHeritageSpecification/classExtendingOptionalChain.ts] ////
-
 //// [classExtendingOptionalChain.ts]
 namespace A {
     export class B {}

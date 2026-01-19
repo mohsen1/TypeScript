@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfObjectLiterals.ts] ////
-
 //// [contextualTypingOfObjectLiterals.ts]
 var obj1: { [x: string]: string; };
 var obj2 = {x: ""};

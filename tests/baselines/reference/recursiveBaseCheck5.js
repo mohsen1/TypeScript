@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveBaseCheck5.ts] ////
-
 //// [recursiveBaseCheck5.ts]
 interface I1<T> extends I2<string> { }
 interface I2<T> extends I1<T> { }

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/classDeclaration/emitClassDeclarationWithExtensionInES6.ts] ////
-
 //// [emitClassDeclarationWithExtensionInES6.ts]
 class B {
     baz(a: string, y = 10) { }

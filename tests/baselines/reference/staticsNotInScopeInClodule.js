@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/staticsNotInScopeInClodule.ts] ////
-
 //// [staticsNotInScopeInClodule.ts]
 class Clod {
     static x = 10;
 }
 
-namespace Clod {
+module Clod {
     var p = x; // x isn't in scope here
 }
 

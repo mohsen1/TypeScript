@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superPropertyAccessInComputedPropertiesOfNestedType_ES6.ts] ////
-
 //// [superPropertyAccessInComputedPropertiesOfNestedType_ES6.ts]
 class A {
     foo() { return 1; }

@@ -1,10 +1,7 @@
-//// [tests/cases/compiler/importHelpersWithImportOrExportDefault.ts] ////
-
-=== a.ts ===
-
+=== tests/cases/compiler/a.ts ===
 export default class { }
-
-=== b.ts ===
+No type information for this code.
+No type information for this code.=== tests/cases/compiler/b.ts ===
 export { default } from "./a";
 >default : Symbol(default, Decl(b.ts, 0, 8))
 
@@ -19,7 +16,7 @@ import { default as b } from "./a";
 void b;
 >b : Symbol(b, Decl(b.ts, 2, 8))
 
-=== tslib.d.ts ===
+=== tests/cases/compiler/tslib.d.ts ===
 declare module "tslib" {
 >"tslib" : Symbol("tslib", Decl(tslib.d.ts, --, --))
 

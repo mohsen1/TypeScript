@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/tuple/castingTuple.ts] ////
-
 //// [castingTuple.ts]
 interface I { }
 class A { a = 10; }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/switchCaseNarrowsMatchingClausesEvenWhenNonMatchingClausesExist.ts] ////
-
 //// [switchCaseNarrowsMatchingClausesEvenWhenNonMatchingClausesExist.ts]
 export const narrowToLiterals = (str: string) => {
     switch (str) {
@@ -44,7 +42,7 @@ export const narrowToLiterals = (str: string) => {
 
 //// [switchCaseNarrowsMatchingClausesEvenWhenNonMatchingClausesExist.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.narrowToStringOrNumber = exports.narrowToString = exports.narrowToLiterals = void 0;
 var narrowToLiterals = function (str) {
     switch (str) {

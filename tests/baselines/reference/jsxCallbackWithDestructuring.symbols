@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxCallbackWithDestructuring.tsx] ////
-
-=== jsxCallbackWithDestructuring.tsx ===
+=== tests/cases/compiler/jsxCallbackWithDestructuring.tsx ===
 // minimal component
 interface Component<P = {}, S = {}> { }
 >Component : Symbol(Component, Decl(jsxCallbackWithDestructuring.tsx, 0, 0), Decl(jsxCallbackWithDestructuring.tsx, 1, 39))

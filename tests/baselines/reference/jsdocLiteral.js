@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocLiteral.ts] ////
-
 //// [in.js]
 /**
  * @param {'literal'} p1

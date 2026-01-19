@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsDeclarationsInheritedTypes.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 /**
  * @typedef A
  * @property {string} a

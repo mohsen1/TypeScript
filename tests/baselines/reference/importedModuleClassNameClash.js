@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/importedModuleClassNameClash.ts] ////
-
 //// [importedModuleClassNameClash.ts]
 import foo = m1;
  
-export namespace m1 { }
+export module m1 { }
  
 class foo { }
 
@@ -11,7 +9,7 @@ class foo { }
 //// [importedModuleClassNameClash.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var foo = /** @class */ (function () {
         function foo() {
         }

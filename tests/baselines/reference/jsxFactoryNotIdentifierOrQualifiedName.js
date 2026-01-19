@@ -34,7 +34,7 @@ function toCamelCase(text: string): string {
 //// [test.tsx]
 import { Element} from './Element';
 
-declare let c: {
+let c: {
 	a?: {
 		b: string
 	}
@@ -63,7 +63,7 @@ var Element;
         return {};
     }
     Element.createElement = createElement;
-})(Element || (exports.Element = Element = {}));
+})(Element = exports.Element || (exports.Element = {}));
 exports.createElement = Element.createElement;
 function toCamelCase(text) {
     return text[0].toLowerCase() + text.substring(1);
@@ -71,6 +71,7 @@ function toCamelCase(text) {
 //// [test.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
+let c;
 class A {
     view() {
         return [

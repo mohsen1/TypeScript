@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/parser/ecmascript5/ModuleDeclarations/parserModuleDeclaration11.ts] ////
-
 //// [parserModuleDeclaration11.ts]
-declare namespace string {
+declare module string {
     interface X { }
     export function foo(s: string);
 }

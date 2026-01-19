@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportEqualsOfModule.ts] ////
-
 //// [exportEqualsOfModule.ts]
 declare module '~popsicle/dist/request' {
     export class Request {}

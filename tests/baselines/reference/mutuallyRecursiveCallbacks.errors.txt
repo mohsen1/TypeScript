@@ -1,11 +1,11 @@
-mutuallyRecursiveCallbacks.ts(7,1): error TS2322: Type '<T>(bar: Bar<T>) => void' is not assignable to type 'Bar<{}>'.
+tests/cases/compiler/mutuallyRecursiveCallbacks.ts(7,1): error TS2322: Type '<T>(bar: Bar<T>) => void' is not assignable to type 'Bar<{}>'.
   Types of parameters 'bar' and 'foo' are incompatible.
     Types of parameters 'bar' and 'foo' are incompatible.
       Types of parameters 'bar' and 'foo' are incompatible.
         Type 'void' is not assignable to type 'Foo<unknown>'.
 
 
-==== mutuallyRecursiveCallbacks.ts (1 errors) ====
+==== tests/cases/compiler/mutuallyRecursiveCallbacks.ts (1 errors) ====
     // Repro from #18277
     
     interface Foo<T> { (bar: Bar<T>): void };

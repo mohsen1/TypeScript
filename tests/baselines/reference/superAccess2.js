@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superAccess2.ts] ////
-
 //// [superAccess2.ts]
 class P {
     x() { }

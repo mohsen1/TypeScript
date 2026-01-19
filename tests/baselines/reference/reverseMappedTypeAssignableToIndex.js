@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/reverseMappedTypeAssignableToIndex.ts] ////
-
 //// [reverseMappedTypeAssignableToIndex.ts]
 // Simple mapped type and inferrence
 type Mapped<T> = { [K in keyof T]: { name: T[K] } };

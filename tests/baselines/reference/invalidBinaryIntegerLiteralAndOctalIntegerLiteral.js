@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/binaryAndOctalIntegerLiteral/invalidBinaryIntegerLiteralAndOctalIntegerLiteral.ts] ////
-
 //// [invalidBinaryIntegerLiteralAndOctalIntegerLiteral.ts]
 // Error
 var binary = 0b21010;

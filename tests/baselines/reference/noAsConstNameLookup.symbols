@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/noAsConstNameLookup.ts] ////
-
-=== noAsConstNameLookup.ts ===
+=== tests/cases/compiler/noAsConstNameLookup.ts ===
 // Repros from #44292
 
 type Store = { a: 123 }

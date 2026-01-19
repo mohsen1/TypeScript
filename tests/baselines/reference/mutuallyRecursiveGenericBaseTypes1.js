@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mutuallyRecursiveGenericBaseTypes1.ts] ////
-
 //// [mutuallyRecursiveGenericBaseTypes1.ts]
 interface A<T> {
     foo(): B<T>; // instead of B does see this

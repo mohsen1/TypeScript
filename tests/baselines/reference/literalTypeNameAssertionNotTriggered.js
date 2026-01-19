@@ -12,12 +12,12 @@ f(a, "");
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 var x = require("something");
 exports.x = x;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var a = require("./a");
 f(a, "");

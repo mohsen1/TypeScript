@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembers5.ts] ////
-
 //// [subtypingWithObjectMembers5.ts]
 interface Base {
     foo: string;
@@ -11,7 +9,7 @@ interface Derived extends Base {
 
 // N and M have the same name, same accessibility, same optionality, and N is a subtype of M
 // foo properties are valid, bar properties cause errors in the derived class declarations
-namespace NotOptional {
+module NotOptional {
     interface A {
         foo: Base;
     }
@@ -38,7 +36,7 @@ namespace NotOptional {
 }
 
 // same cases as above but with optional
-namespace Optional {
+module Optional {
     interface A {
         foo?: Base;
     }

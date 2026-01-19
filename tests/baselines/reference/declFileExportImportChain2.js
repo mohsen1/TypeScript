@@ -1,8 +1,8 @@
 //// [tests/cases/compiler/declFileExportImportChain2.ts] ////
 
 //// [declFileExportImportChain2_a.ts]
-namespace m1 {
-    export namespace m2 {
+module m1 {
+    export module m2 {
         export class c1 {
         }
     }
@@ -45,20 +45,20 @@ define(["require", "exports", "declFileExportImportChain2_a"], function (require
 //// [declFileExportImportChain2_c.js]
 define(["require", "exports", "declFileExportImportChain2_b"], function (require, exports, b) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.b = b;
 });
 //// [declFileExportImportChain2_d.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.x = void 0;
 });
 
 
 //// [declFileExportImportChain2_a.d.ts]
-declare namespace m1 {
-    namespace m2 {
+declare module m1 {
+    module m2 {
         class c1 {
         }
     }

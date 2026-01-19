@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/salsa/classCanExtendConstructorFunction.ts] ////
-
-=== first.js ===
+=== tests/cases/conformance/salsa/first.js ===
 /**
  * @constructor
  * @param {number} numberOxen
@@ -127,7 +125,7 @@ class Drakkhen extends Dragon {
 
 }
 
-=== second.ts ===
+=== tests/cases/conformance/salsa/second.ts ===
 /**
  * @constructor
  */
@@ -185,7 +183,7 @@ c.numberOxen
 >c : Symbol(c, Decl(second.ts, 23, 3))
 >numberOxen : Symbol(Wagon.numberOxen, Decl(first.js, 4, 28))
 
-=== generic.js ===
+=== tests/cases/conformance/salsa/generic.js ===
 /**
  * @template T
  * @param {T} flavour

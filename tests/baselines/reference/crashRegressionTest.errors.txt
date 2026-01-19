@@ -1,8 +1,8 @@
-crashRegressionTest.ts(16,56): error TS2339: Property '_name' does not exist on type 'StringTemplate'.
+tests/cases/compiler/crashRegressionTest.ts(16,56): error TS2339: Property '_name' does not exist on type 'StringTemplate'.
 
 
-==== crashRegressionTest.ts (1 errors) ====
-    namespace MsPortal.Util.TemplateEngine {
+==== tests/cases/compiler/crashRegressionTest.ts (1 errors) ====
+    module MsPortal.Util.TemplateEngine {
         "use strict";
      
         interface TemplateKeyValue {

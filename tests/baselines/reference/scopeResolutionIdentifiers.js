@@ -1,29 +1,27 @@
-//// [tests/cases/conformance/expressions/identifiers/scopeResolutionIdentifiers.ts] ////
-
 //// [scopeResolutionIdentifiers.ts]
 // EveryType used in a nested scope of a different EveryType with the same name, type of the identifier is the one defined in the inner scope
 
 var s: string;
-namespace M1 {
-    export var s: number = 0;
+module M1 {
+    export var s: number;
     var n = s;
     var n: number;
 }
 
-namespace M2 {
-    var s: number = 0;
+module M2 {
+    var s: number;
     var n = s;
     var n: number;
 }
 
 function fn() {
-    var s: boolean = false;
+    var s: boolean;
     var n = s;
     var n: boolean;
 }
 
 class C {
-    s!: Date;
+    s: Date;
     n = this.s;
     x() {
         var p = this.n;
@@ -31,9 +29,9 @@ class C {
     }
 }
 
-namespace M3 {
+module M3 {
     var s: any;
-    namespace M4 {
+    module M4 {
         var n = s;
         var n: any;
     }
@@ -45,18 +43,17 @@ namespace M3 {
 var s;
 var M1;
 (function (M1) {
-    M1.s = 0;
     var n = M1.s;
     var n;
 })(M1 || (M1 = {}));
 var M2;
 (function (M2) {
-    var s = 0;
+    var s;
     var n = s;
     var n;
 })(M2 || (M2 = {}));
 function fn() {
-    var s = false;
+    var s;
     var n = s;
     var n;
 }

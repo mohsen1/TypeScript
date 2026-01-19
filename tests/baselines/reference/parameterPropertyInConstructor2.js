@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/parameterPropertyInConstructor2.ts] ////
-
 //// [parameterPropertyInConstructor2.ts]
-namespace mod {
+module mod {
   class Customers {
     constructor(public names: string);
     constructor(public names: string, public ages: number) {

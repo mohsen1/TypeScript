@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/parametersWithNoAnnotationAreAny.ts] ////
-
 //// [parametersWithNoAnnotationAreAny.ts]
 function foo(x) { return x; }
 var f = function foo(x) { return x; }

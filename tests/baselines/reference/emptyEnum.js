@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emptyEnum.ts] ////
-
 //// [emptyEnum.ts]
 enum E {
 }

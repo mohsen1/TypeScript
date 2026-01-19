@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/styleOptions.ts] ////
-
-=== styleOptions.ts ===
+=== tests/cases/compiler/styleOptions.ts ===
 ///<style eqeqeq="on" strict="on" /> 
 
 var x = 1;

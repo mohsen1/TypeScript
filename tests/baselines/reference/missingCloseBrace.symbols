@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/missingCloseBrace.ts] ////
-
-=== missingCloseBrace.ts ===
+=== tests/cases/compiler/missingCloseBrace.ts ===
 function base_init() {
 >base_init : Symbol(base_init, Decl(missingCloseBrace.ts, 0, 0))
     {

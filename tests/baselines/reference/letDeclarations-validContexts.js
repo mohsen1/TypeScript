@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations-validContexts.ts] ////
-
 //// [letDeclarations-validContexts.ts]
 // Control flow statements with blocks
 if (true) { 
@@ -85,7 +83,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
     let l22 = 0;
 
     {
@@ -136,7 +134,7 @@ function f3() {
     }
 }
 
-namespace m3 {
+module m3 {
     label: let l34 = 0;
     {
         label2: let l35 = 0;

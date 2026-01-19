@@ -1,23 +1,16 @@
-//// [tests/cases/compiler/reexportDefaultIsCallable.ts] ////
-
-=== schema.d.ts ===
+=== tests/cases/compiler/schema.d.ts ===
 export default class Schema {}
 >Schema : Schema
->       : ^^^^^^
 
-=== reexporter.d.ts ===
+=== tests/cases/compiler/reexporter.d.ts ===
 export { default } from "./schema";
->default : typeof import("schema").default
->        : ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+>default : typeof import("tests/cases/compiler/schema").default
 
-=== usage.ts ===
+=== tests/cases/compiler/usage.ts ===
 import Base from "./reexporter";
 >Base : typeof Base
->     : ^^^^^^^^^^^
 
 export default class Mine extends Base {}
 >Mine : Mine
->     : ^^^^
 >Base : Base
->     : ^^^^
 

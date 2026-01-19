@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noExcessiveStackDepthError.ts] ////
-
 //// [noExcessiveStackDepthError.ts]
 // Repro from #46631
 
@@ -30,7 +28,7 @@ function foo() {
 interface FindOperator<T> {
     foo: T;
 }
-type FindConditions<T> = {
+declare type FindConditions<T> = {
     [P in keyof T]?: FindConditions<T[P]> | FindOperator<FindConditions<T[P]>>;
 };
 declare function foo<Entity>(): void;

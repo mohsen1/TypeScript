@@ -1,36 +1,3 @@
-// === QuickInfo ===
-=== /b.ts ===
-// import { x } from "./a";
-// x;
-// ^
-// | ----------------------------------------------------------------------
-// | (alias) const x: 0
-// | import x
-// | Doc
-// | @tag Tag text
-// | ----------------------------------------------------------------------
-
-=== /c.ts ===
-// /**
-//  * Doc 2
-//  * @tag Tag text 2
-//  */
-// import {
-//     /**
-//      * Doc 3
-//      * @tag Tag text 3
-//      */
-//     x
-// } from "./a";
-// x;
-// ^
-// | ----------------------------------------------------------------------
-// | (alias) const x: 0
-// | import x
-// | Doc
-// | @tag Tag text
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -38,7 +5,7 @@
       "position": 26,
       "name": "b"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
@@ -128,7 +95,7 @@
       "position": 118,
       "name": "c"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {

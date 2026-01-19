@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/internalModules/moduleDeclarations/asiPreventsParsingAsNamespace02.ts] ////
-
 //// [asiPreventsParsingAsNamespace02.ts]
 var module: number;
 var m: string;

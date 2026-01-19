@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/duplicateVariablesByScope.ts] ////
-
 //// [duplicateVariablesByScope.ts]
 // duplicate local variables are only reported at global scope
 
-namespace M {
+module M {
     for (var j = 0; j < 10; j++) {
     }
 

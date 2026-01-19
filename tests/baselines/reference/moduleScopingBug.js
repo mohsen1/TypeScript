@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleScopingBug.ts] ////
-
 //// [moduleScopingBug.ts]
-namespace M
+module M
 
 {
 
@@ -21,7 +19,7 @@ namespace M
 
     }
 
-    namespace X {
+    module X {
 
         var inner = outer;   // Error: outer not visible
 

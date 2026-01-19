@@ -4,7 +4,7 @@
 enum foo {
 	red, green, blue
 }
-namespace foo {
+module foo {
 	export var answer = 42;
 }
 export = foo;
@@ -34,7 +34,7 @@ define(["require", "exports"], function (require, exports) {
 //// [foo_1.js]
 define(["require", "exports", "./foo_0"], function (require, exports, foo) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var color;
     if (color === foo.green) {
         color = foo.answer;

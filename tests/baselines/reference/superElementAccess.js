@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superElementAccess.ts] ////
-
 //// [superElementAccess.ts]
 class MyBase {
     m1(a: string) { return a; }

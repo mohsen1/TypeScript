@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleNoEmit.ts] ////
-
 //// [moduleNoEmit.ts]
-namespace Foo {
+module Foo {
 	1+1;
 }
 

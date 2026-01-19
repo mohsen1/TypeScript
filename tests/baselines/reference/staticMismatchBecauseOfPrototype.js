@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticMismatchBecauseOfPrototype.ts] ////
-
 //// [staticMismatchBecauseOfPrototype.ts]
 interface A {
     n: number;

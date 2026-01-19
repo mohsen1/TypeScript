@@ -1,4 +1,3 @@
-// === Smart Selection ===
 /** @enum {/**/number} */
 const Foo = {
     x: 0,

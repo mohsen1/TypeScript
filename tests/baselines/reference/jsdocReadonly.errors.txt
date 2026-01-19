@@ -1,7 +1,7 @@
-jsdocReadonly.js(23,3): error TS2540: Cannot assign to 'y' because it is a read-only property.
+tests/cases/conformance/jsdoc/jsdocReadonly.js(23,3): error TS2540: Cannot assign to 'y' because it is a read-only property.
 
 
-==== jsdocReadonly.js (1 errors) ====
+==== tests/cases/conformance/jsdoc/jsdocReadonly.js (1 errors) ====
     class LOL {
         /**
          * @readonly

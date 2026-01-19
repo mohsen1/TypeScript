@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/letDeclarations-scopes.ts] ////
-
-=== letDeclarations-scopes.ts ===
+=== tests/cases/compiler/letDeclarations-scopes.ts ===
 // global
 let l = "string";
 >l : Symbol(l, Decl(letDeclarations-scopes.ts, 1, 3))
@@ -212,7 +210,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
 >m : Symbol(m, Decl(letDeclarations-scopes.ts, 106, 2))
 
     let l = 0;

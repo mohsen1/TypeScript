@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceThatHidesBaseProperty.ts] ////
-
 //// [interfaceThatHidesBaseProperty.ts]
 interface Base {
     x: { a: number };

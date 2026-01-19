@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveIndexingWithForIn.ts] ////
-
-=== nonPrimitiveIndexingWithForIn.ts ===
+=== tests/cases/conformance/types/nonPrimitive/nonPrimitiveIndexingWithForIn.ts ===
 var a: object;
 >a : Symbol(a, Decl(nonPrimitiveIndexingWithForIn.ts, 0, 3))
 

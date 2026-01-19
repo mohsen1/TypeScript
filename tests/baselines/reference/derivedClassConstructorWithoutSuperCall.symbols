@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassConstructorWithoutSuperCall.ts] ////
-
-=== derivedClassConstructorWithoutSuperCall.ts ===
+=== tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassConstructorWithoutSuperCall.ts ===
 // derived class constructors must contain a super call
 
 class Base {

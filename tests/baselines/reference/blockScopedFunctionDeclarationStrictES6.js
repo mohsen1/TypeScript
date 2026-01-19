@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/blockScopedFunctionDeclarationStrictES6.ts] ////
-
 //// [blockScopedFunctionDeclarationStrictES6.ts]
 "use strict";
 if (true) {

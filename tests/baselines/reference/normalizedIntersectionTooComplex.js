@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/normalizedIntersectionTooComplex.ts] ////
-
 //// [normalizedIntersectionTooComplex.ts]
 // Repro from #30050
 

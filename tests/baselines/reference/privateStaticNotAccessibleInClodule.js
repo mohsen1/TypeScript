@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/accessibility/privateStaticNotAccessibleInClodule.ts] ////
-
 //// [privateStaticNotAccessibleInClodule.ts]
 // Any attempt to access a private property member outside the class body that contains its declaration results in a compile-time error.
 
@@ -8,7 +6,7 @@ class C {
     private static bar: string;
 }
 
-namespace C {
+module C {
     export var y = C.bar; // error
 }
 

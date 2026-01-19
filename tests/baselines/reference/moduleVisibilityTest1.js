@@ -1,19 +1,17 @@
-//// [tests/cases/compiler/moduleVisibilityTest1.ts] ////
-
 //// [moduleVisibilityTest1.ts]
-namespace OuterMod {
+module OuterMod {
 	export function someExportedOuterFunc() { return -1; }
 
-	export namespace OuterInnerMod {
+	export module OuterInnerMod {
 		export function someExportedOuterInnerFunc() { return "foo"; }
 	}
 }
 
 import OuterInnerAlias = OuterMod.OuterInnerMod;
 
-namespace M {
+module M {
 
-	export namespace InnerMod {
+	export module InnerMod {
 		export function someExportedInnerFunc() { return -2; }
 	}
 
@@ -53,7 +51,7 @@ namespace M {
 	function someModuleFunction() { return 5;}
 }
 
-namespace M {
+module M {
 	export var c = x;
 	export var meb = M.E.B;
 }

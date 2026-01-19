@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/isolatedModulesNonAmbientConstEnum.ts] ////
-
 //// [file1.ts]
 const enum E { X = 100 };
 var e = E.X;

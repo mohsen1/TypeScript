@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationBindReachabilityErrors.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 function foo(a, b) {
 >foo : Symbol(foo, Decl(a.js, 0, 0))
 >a : Symbol(a, Decl(a.js, 0, 13))

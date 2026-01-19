@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassLeadingOptional.ts] ////
-
 //// [bar.js]
 export class Z {
     f(x = 1, y) {

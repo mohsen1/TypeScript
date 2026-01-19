@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertiesAndIndexersForNumericNames.ts] ////
-
 //// [propertiesAndIndexersForNumericNames.ts]
 class C {
     [i: number]: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/boolean/invalidBooleanAssignments.ts] ////
-
 //// [invalidBooleanAssignments.ts]
 var x = true;
 
@@ -20,7 +18,7 @@ var g: I = x;
 var h: { (): string } = x;
 var h2: { toString(): string } = x; // no error
 
-namespace M { export var a = 1; }
+module M { export var a = 1; }
 M = x;
 
 function i<T>(a: T) {

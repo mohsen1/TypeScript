@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeAliases/interfaceDoesNotDependOnBaseTypes.ts] ////
-
 //// [interfaceDoesNotDependOnBaseTypes.ts]
 var x: StringTree;
 if (typeof x !== "string") {

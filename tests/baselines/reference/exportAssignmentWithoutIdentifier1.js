@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportAssignmentWithoutIdentifier1.ts] ////
-
 //// [exportAssignmentWithoutIdentifier1.ts]
 function Greeter() {
     //...

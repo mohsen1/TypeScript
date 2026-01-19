@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticAsIdentifier.ts] ////
-
 //// [staticAsIdentifier.ts]
 class C1 {
     static static

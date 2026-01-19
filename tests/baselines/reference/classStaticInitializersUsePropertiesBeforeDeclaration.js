@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classStaticInitializersUsePropertiesBeforeDeclaration.ts] ////
-
 //// [classStaticInitializersUsePropertiesBeforeDeclaration.ts]
 class Foo {
     static enumMember = Enum.A;

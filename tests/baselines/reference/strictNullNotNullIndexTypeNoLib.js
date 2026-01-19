@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictNullNotNullIndexTypeNoLib.ts] ////
-
 //// [strictNullNotNullIndexTypeNoLib.ts]
 type Readonly<T> = {readonly [K in keyof T]: T[K]}
 interface A {

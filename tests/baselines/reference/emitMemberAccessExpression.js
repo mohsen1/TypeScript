@@ -7,7 +7,7 @@
 //// [emitMemberAccessExpression_file2.ts]
 /// <reference path="emitMemberAccessExpression_file3.ts" />
 "use strict";
-namespace Microsoft.PeopleAtWork.Model {
+module Microsoft.PeopleAtWork.Model {
     export class _Person {
         public populate(raw: any) {
             var res = Model.KnockoutExtentions;
@@ -19,7 +19,7 @@ namespace Microsoft.PeopleAtWork.Model {
 /// <reference path="emitMemberAccessExpression_file2.ts" />
 /// <reference path="emitMemberAccessExpression_file1.ts" />
 declare var OData: any;
-namespace Microsoft.PeopleAtWork.Model {
+module Microsoft.PeopleAtWork.Model {
     export class KnockoutExtentions {
     }
 }

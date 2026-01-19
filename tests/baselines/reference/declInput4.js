@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declInput4.ts] ////
-
 //// [declInput4.ts]
-namespace M {
+module M {
     class C { }
     export class E {}
     export interface I1 {}
@@ -44,7 +42,7 @@ var M;
 
 
 //// [declInput4.d.ts]
-declare namespace M {
+declare module M {
     class E {
     }
     interface I1 {

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationTypeOfParameter.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 function F(a: number) { }
 >F : Symbol(F, Decl(a.js, 0, 0))
 >a : Symbol(a, Decl(a.js, 0, 11))

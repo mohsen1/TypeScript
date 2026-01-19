@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/publicMemberImplementedAsPrivateInDerivedClass.ts] ////
-
 //// [publicMemberImplementedAsPrivateInDerivedClass.ts]
 interface Qux {
  Bar: number;

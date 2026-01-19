@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/methodContainingLocalFunction.ts] ////
-
-=== methodContainingLocalFunction.ts ===
+=== tests/cases/compiler/methodContainingLocalFunction.ts ===
 // The first case here (BugExhibition<T>) caused a crash. Try with different permutations of features.
 class BugExhibition<T> {
 >BugExhibition : Symbol(BugExhibition, Decl(methodContainingLocalFunction.ts, 0, 0))
@@ -85,11 +83,11 @@ class C {
     }
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(methodContainingLocalFunction.ts, 32, 1))
 
     export function exhibitBug() {
->exhibitBug : Symbol(exhibitBug, Decl(methodContainingLocalFunction.ts, 34, 13))
+>exhibitBug : Symbol(exhibitBug, Decl(methodContainingLocalFunction.ts, 34, 10))
 
         function localFunction() { }
 >localFunction : Symbol(localFunction, Decl(methodContainingLocalFunction.ts, 35, 34))

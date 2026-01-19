@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/defaultParameterTrailingComments.ts] ////
-
 //// [defaultParameterTrailingComments.ts]
 class C {
     constructor(defaultParam: boolean = false /* Emit only once*/) {}

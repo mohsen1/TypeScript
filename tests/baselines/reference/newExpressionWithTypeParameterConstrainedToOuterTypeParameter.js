@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/newExpressionWithTypeParameterConstrainedToOuterTypeParameter.ts] ////
-
 //// [newExpressionWithTypeParameterConstrainedToOuterTypeParameter.ts]
 interface I<T> {
     new <U extends T>(u: U): U;

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/sourceMapSample.ts] ////
-
 //// [sourceMapSample.ts]
-namespace Foo.Bar {
+module Foo.Bar {
     "use strict";
 
     class Greeter {

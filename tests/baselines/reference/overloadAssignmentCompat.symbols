@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/overloadAssignmentCompat.ts] ////
-
-=== overloadAssignmentCompat.ts ===
+=== tests/cases/compiler/overloadAssignmentCompat.ts ===
 // ok - overload signatures are assignment compatible with their implementation
 class Accessor {}
 >Accessor : Symbol(Accessor, Decl(overloadAssignmentCompat.ts, 0, 0))

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/arrayLiterals/arrayLiteralInference.ts] ////
-
-=== arrayLiteralInference.ts ===
+=== tests/cases/conformance/expressions/arrayLiterals/arrayLiteralInference.ts ===
 // Repro from #31204
 
 export enum AppType {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsPropertyAssignedAfterMethodDeclaration.ts] ////
-
 === /a.js ===
 const o = {
 >o : Symbol(o, Decl(a.js, 0, 5))

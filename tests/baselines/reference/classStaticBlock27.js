@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock27.ts] ////
-
 //// [classStaticBlock27.ts]
 // https://github.com/microsoft/TypeScript/issues/44872
 

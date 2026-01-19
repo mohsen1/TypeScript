@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyInCatch.ts] ////
-
 //// [implicitAnyInCatch.ts]
 // this should not be an error
 try { } catch (error) {

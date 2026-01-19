@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowDeleteOperator.ts] ////
-
 //// [controlFlowDeleteOperator.ts]
 function f() {
     let x: { a?: number | string, b: number | string } = { b: 1 };

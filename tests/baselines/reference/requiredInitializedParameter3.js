@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/requiredInitializedParameter3.ts] ////
-
 //// [requiredInitializedParameter3.ts]
 interface I1 {
     method();

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/missingCommaInTemplateStringsArray.ts] ////
-
 //// [missingCommaInTemplateStringsArray.ts]
 var array = [
     `template string 1`

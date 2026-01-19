@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictModeWordInExportDeclaration.ts] ////
-
 //// [strictModeWordInExportDeclaration.ts]
 "use strict"
 var x = 1;

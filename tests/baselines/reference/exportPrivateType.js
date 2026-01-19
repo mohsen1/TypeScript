@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/exportPrivateType.ts] ////
-
 //// [exportPrivateType.ts]
-namespace foo {
+module foo {
     class C1 {
         x: string;
         y: C1;

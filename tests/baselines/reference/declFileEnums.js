@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileEnums.ts] ////
-
 //// [declFileEnums.ts]
 enum e1 {
     a,

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superCallsInConstructor.ts] ////
-
 //// [superCallsInConstructor.ts]
 class C {
     foo() {}

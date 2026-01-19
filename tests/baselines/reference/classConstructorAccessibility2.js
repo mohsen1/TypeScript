@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/classConstructorAccessibility2.ts] ////
-
 //// [classConstructorAccessibility2.ts]
 class BaseA {
     public constructor(public x: number) { }

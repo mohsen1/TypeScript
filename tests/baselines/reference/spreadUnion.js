@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadUnion.ts] ////
-
 //// [spreadUnion.ts]
 var union: { a: number } | { b: string };
 

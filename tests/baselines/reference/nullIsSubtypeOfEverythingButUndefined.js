@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/nullIsSubtypeOfEverythingButUndefined.ts] ////
-
 //// [nullIsSubtypeOfEverythingButUndefined.ts]
 // null is a subtype of any other types except undefined
 
@@ -57,7 +55,7 @@ var r14 = true ? E.A : null;
 var r14 = true ? null : E.A;
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 var af: typeof f;
@@ -65,7 +63,7 @@ var r15 = true ? af : null;
 var r15 = true ? null : af;
 
 class c { baz: string }
-namespace c {
+module c {
     export var bar = 1;
 }
 var ac: typeof c;

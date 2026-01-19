@@ -1,15 +1,10 @@
-//// [tests/cases/compiler/staticAndMemberFunctions.ts] ////
-
-=== staticAndMemberFunctions.ts ===
+=== tests/cases/compiler/staticAndMemberFunctions.ts ===
 class T {
 >T : T
->  : ^
 
     static x() { }
 >x : () => void
->  : ^^^^^^^^^^
 
     public y() { }
 >y : () => void
->  : ^^^^^^^^^^
 }

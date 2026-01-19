@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/nullishCoalescingOperator/nullishCoalescingOperator11.ts] ////
-
 //// [nullishCoalescingOperator11.ts]
 declare const f11: 1 | 0 | '' | null | undefined;
 

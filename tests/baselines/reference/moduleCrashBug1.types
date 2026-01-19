@@ -1,9 +1,6 @@
-//// [tests/cases/compiler/moduleCrashBug1.ts] ////
-
-=== moduleCrashBug1.ts ===
-namespace _modes {
+=== tests/cases/compiler/moduleCrashBug1.ts ===
+module _modes {
 >_modes : typeof _modes
->       : ^^^^^^^^^^^^^
 
  export interface IMode {
   
@@ -11,25 +8,21 @@ namespace _modes {
  
  class Mode {
 >Mode : Mode
->     : ^^^^
   
  }
 }
 
 //_modes. // produces an internal error - please implement in derived class
 
-namespace editor {
+module editor {
  import modes = _modes;
 >modes : typeof modes
->      : ^^^^^^^^^^^^
 >_modes : typeof modes
->       : ^^^^^^^^^^^^
 
 }
 
 var m : _modes;
 >m : _modes
->  : ^^^^^^
 
 
 

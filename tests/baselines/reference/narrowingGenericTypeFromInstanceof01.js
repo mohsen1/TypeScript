@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/instanceOf/narrowingGenericTypeFromInstanceof01.ts] ////
-
 //// [narrowingGenericTypeFromInstanceof01.ts]
 class A<T> {
     constructor(private a: string) { }

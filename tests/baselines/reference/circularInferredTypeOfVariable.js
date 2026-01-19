@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/circularInferredTypeOfVariable.ts] ////
-
 //// [circularInferredTypeOfVariable.ts]
 // Repro from #14428
 

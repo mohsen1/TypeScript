@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/shadowingViaLocalValueOrBindingElement.ts] ////
-
-=== shadowingViaLocalValueOrBindingElement.ts ===
+=== tests/cases/compiler/shadowingViaLocalValueOrBindingElement.ts ===
 if (true) {
     let x;
 >x : Symbol(x, Decl(shadowingViaLocalValueOrBindingElement.ts, 1, 7))

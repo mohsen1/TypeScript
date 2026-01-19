@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superCallOutsideConstructor.ts] ////
-
 //// [superCallOutsideConstructor.ts]
 class C {
     foo() { }

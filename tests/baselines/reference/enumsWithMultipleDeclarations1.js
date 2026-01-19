@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumsWithMultipleDeclarations1.ts] ////
-
 //// [enumsWithMultipleDeclarations1.ts]
 enum E {
   A

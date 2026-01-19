@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emitBundleWithShebang2.ts] ////
-
-=== test.ts ===
+=== tests/cases/compiler/test.ts ===
 #!/usr/bin/env gjs
 class Doo {}
 >Doo : Symbol(Doo, Decl(test.ts, 0, 0))
@@ -9,7 +7,7 @@ class Scooby extends Doo {}
 >Scooby : Symbol(Scooby, Decl(test.ts, 1, 12))
 >Doo : Symbol(Doo, Decl(test.ts, 0, 0))
 
-=== test2.ts ===
+=== tests/cases/compiler/test2.ts ===
 #!/usr/bin/env js
 class Dood {}
 >Dood : Symbol(Dood, Decl(test2.ts, 0, 0))

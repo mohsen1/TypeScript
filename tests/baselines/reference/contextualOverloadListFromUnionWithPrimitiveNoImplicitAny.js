@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualOverloadListFromUnionWithPrimitiveNoImplicitAny.ts] ////
-
 //// [contextualOverloadListFromUnionWithPrimitiveNoImplicitAny.ts]
 // must target esnext for `String.normalize` to exist
 type Validate = (text: string, pos: number, self: Rule) => number | boolean;

@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/moduleMemberWithoutTypeAnnotation2.ts] ////
-
 //// [moduleMemberWithoutTypeAnnotation2.ts]
-namespace TypeScript {
-    export namespace CompilerDiagnostics {
+module TypeScript {
+    export module CompilerDiagnostics {
 
         export interface IDiagnosticWriter {
             Alert(output: string): void;

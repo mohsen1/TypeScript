@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsExpandoObjectDefineProperty.ts] ////
-
-=== index.js ===
+=== tests/cases/compiler/index.js ===
 var chrome = {}
 >chrome : Symbol(chrome, Decl(index.js, 0, 3), Decl(index.js, 1, 22), Decl(index.js, 1, 74))
 

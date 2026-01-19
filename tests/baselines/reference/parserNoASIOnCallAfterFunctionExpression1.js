@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserNoASIOnCallAfterFunctionExpression1.ts] ////
-
 //// [parserNoASIOnCallAfterFunctionExpression1.ts]
 var x = function () { }
 (<any>window).foo;

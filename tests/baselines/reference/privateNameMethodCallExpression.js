@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameMethodCallExpression.ts] ////
-
 //// [privateNameMethodCallExpression.ts]
 class AA {
     #method() { this.x = 10; };

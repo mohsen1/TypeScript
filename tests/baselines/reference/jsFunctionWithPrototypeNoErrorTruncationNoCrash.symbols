@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFunctionWithPrototypeNoErrorTruncationNoCrash.ts] ////
-
-=== index.js ===
+=== tests/cases/compiler/index.js ===
 function Color(obj) {
 >Color : Symbol(Color, Decl(index.js, 0, 0), Decl(index.js, 2, 2))
 >obj : Symbol(obj, Decl(index.js, 0, 15))

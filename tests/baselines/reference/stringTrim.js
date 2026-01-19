@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringTrim.ts] ////
-
 //// [stringTrim.ts]
 var trimmed: string;
 trimmed = "abcde".trimEnd();

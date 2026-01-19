@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/protoInIndexer.ts] ////
-
 //// [protoInIndexer.ts]
 class X {
     constructor() {

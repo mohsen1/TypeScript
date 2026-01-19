@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/specifyingTypes/typeQueries/recursiveTypesWithTypeof.ts] ////
-
 //// [recursiveTypesWithTypeof.ts]
 // The following are errors because of circular references
 var c: typeof c;

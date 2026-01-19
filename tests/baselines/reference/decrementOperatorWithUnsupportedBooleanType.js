@@ -1,8 +1,6 @@
-//// [tests/cases/conformance/expressions/unaryOperators/decrementOperator/decrementOperatorWithUnsupportedBooleanType.ts] ////
-
 //// [decrementOperatorWithUnsupportedBooleanType.ts]
 // -- operator on boolean type
-declare var BOOLEAN: boolean;
+var BOOLEAN: boolean;
 
 function foo(): boolean { return true; }
 
@@ -10,7 +8,7 @@ class A {
     public a: boolean;
     static foo() { return true; }
 }
-namespace M {
+module M {
     export var n: boolean;
 }
 
@@ -57,6 +55,8 @@ M.n--;
 objA.a--, M.n--;
 
 //// [decrementOperatorWithUnsupportedBooleanType.js]
+// -- operator on boolean type
+var BOOLEAN;
 function foo() { return true; }
 var A = /** @class */ (function () {
     function A() {

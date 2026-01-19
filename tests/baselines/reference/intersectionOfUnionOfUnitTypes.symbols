@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/intersection/intersectionOfUnionOfUnitTypes.ts] ////
-
-=== intersectionOfUnionOfUnitTypes.ts ===
+=== tests/cases/conformance/types/intersection/intersectionOfUnionOfUnitTypes.ts ===
 // @strict
 
 const enum E { A, B, C, D, E, F }

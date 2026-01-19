@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictModeWordInImportDeclaration.ts] ////
-
 //// [strictModeWordInImportDeclaration.ts]
 "use strict"
 import * as package from "./1"

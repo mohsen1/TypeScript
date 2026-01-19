@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/baseIndexSignatureResolution.ts] ////
-
 //// [baseIndexSignatureResolution.ts]
 class Base { private a: string; }
 class Derived extends Base { private b: string; }

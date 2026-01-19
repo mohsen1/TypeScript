@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privacyGetter.ts] ////
-
 //// [privacyGetter.ts]
-export namespace m1 {
+export module m1 {
     export class C1_public {
         private f1() {
         }
@@ -71,7 +69,7 @@ export namespace m1 {
     }
 }
 
-namespace m2 {
+module m2 {
     export class m2_C1_public {
         private f1() {
         }
@@ -312,7 +310,7 @@ define(["require", "exports"], function (require, exports) {
             });
             return C4_private;
         }());
-    })(m1 || (exports.m1 = m1 = {}));
+    })(m1 = exports.m1 || (exports.m1 = {}));
     var m2;
     (function (m2) {
         var m2_C1_public = /** @class */ (function () {

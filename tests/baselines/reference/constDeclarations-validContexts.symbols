@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/constDeclarations-validContexts.ts] ////
-
-=== constDeclarations-validContexts.ts ===
+=== tests/cases/compiler/constDeclarations-validContexts.ts ===
 // Control flow statements with blocks
 if (true) { 
     const c1 = 0;
@@ -129,7 +127,7 @@ var F3 = function () {
 };
 
 // modules
-namespace m {
+module m {
 >m : Symbol(m, Decl(constDeclarations-validContexts.ts, 81, 2))
 
     const c22 = 0;

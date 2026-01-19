@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberFunctionDeclarations/staticMemberAssignsToConstructorFunctionMembers.ts] ////
-
 //// [staticMemberAssignsToConstructorFunctionMembers.ts]
 class C {
     static foo() {

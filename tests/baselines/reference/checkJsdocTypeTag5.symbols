@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocTypeTag5.ts] ////
-
-=== test.js ===
+=== tests/cases/conformance/jsdoc/test.js ===
 // all 6 should error on return statement/expression
 /** @type {(x: number) => string} */
 function h(x) { return x }

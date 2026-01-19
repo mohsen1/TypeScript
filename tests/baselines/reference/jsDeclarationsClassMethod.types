@@ -1,9 +1,6 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassMethod.ts] ////
-
-=== jsDeclarationsClassMethod.js ===
+=== tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassMethod.js ===
 function C1() {
 >C1 : typeof C1
->   : ^^^^^^^^^
 
     /**
      * A comment prop
@@ -13,26 +10,17 @@ function C1() {
      */
     this.prop = function (x, y) {
 >this.prop = function (x, y) {        return x + y;    } : (x: number, y: number) => number
->                                                        : ^ ^^      ^^ ^^      ^^^^^      
 >this.prop : any
 >this : this
->     : ^^^^
 >prop : any
->     : ^^^
 >function (x, y) {        return x + y;    } : (x: number, y: number) => number
->                                            : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
         return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
     }
 }
 
@@ -44,30 +32,19 @@ function C1() {
  */
 C1.prototype.method = function (x, y) {
 >C1.prototype.method = function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                                          : ^ ^^      ^^ ^^      ^^^^^      
 >C1.prototype.method : any
 >C1.prototype : any
->             : ^^^
 >C1 : typeof C1
->   : ^^^^^^^^^
 >prototype : any
->          : ^^^
 >method : any
->       : ^^^
 >function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                    : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
     return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 }
 
 /**
@@ -78,32 +55,21 @@ C1.prototype.method = function (x, y) {
  */
 C1.staticProp = function (x, y) {
 >C1.staticProp = function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                                    : ^ ^^      ^^ ^^      ^^^^^      
 >C1.staticProp : (x: number, y: number) => number
->              : ^ ^^      ^^ ^^      ^^^^^      
 >C1 : typeof C1
->   : ^^^^^^^^^
 >staticProp : (x: number, y: number) => number
->           : ^ ^^      ^^ ^^      ^^^^^      
 >function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                    : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
     return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 }
 
 class C2 {
 >C2 : C2
->   : ^^
 
     /**
      * A comment method1
@@ -113,19 +79,13 @@ class C2 {
      */
     method1(x, y) {
 >method1 : (x: number, y: number) => number
->        : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
         return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
     }
 }
 
@@ -137,31 +97,19 @@ class C2 {
  */
 C2.prototype.method2 = function (x, y) {
 >C2.prototype.method2 = function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                                           : ^ ^^      ^^ ^^      ^^^^^      
 >C2.prototype.method2 : (x: number, y: number) => number
->                     : ^ ^^      ^^ ^^      ^^^^^      
 >C2.prototype : C2
->             : ^^
 >C2 : typeof C2
->   : ^^^^^^^^^
 >prototype : C2
->          : ^^
 >method2 : (x: number, y: number) => number
->        : ^ ^^      ^^ ^^      ^^^^^      
 >function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                    : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
     return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 }
 
 /**
@@ -172,26 +120,16 @@ C2.prototype.method2 = function (x, y) {
  */
 C2.staticProp = function (x, y) {
 >C2.staticProp = function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                                    : ^ ^^      ^^ ^^      ^^^^^      
 >C2.staticProp : (x: number, y: number) => number
->              : ^ ^^      ^^ ^^      ^^^^^      
 >C2 : typeof C2
->   : ^^^^^^^^^
 >staticProp : (x: number, y: number) => number
->           : ^ ^^      ^^ ^^      ^^^^^      
 >function (x, y) {    return x + y;} : (x: number, y: number) => number
->                                    : ^ ^^      ^^ ^^      ^^^^^      
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 
     return x + y;
 >x + y : number
->      : ^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 }
 

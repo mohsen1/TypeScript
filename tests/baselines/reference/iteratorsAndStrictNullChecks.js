@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/iteratorsAndStrictNullChecks.ts] ////
-
 //// [iteratorsAndStrictNullChecks.ts]
 // for..of
 for (const x of ["a", "b"]) {

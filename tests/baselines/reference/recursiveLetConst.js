@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveLetConst.ts] ////
-
 //// [recursiveLetConst.ts]
 'use strict'
 let x = x + 1;

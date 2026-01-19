@@ -24,16 +24,16 @@ export {};
 
 //// [preact.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var jsx_runtime_1 = require("preact/jsx-runtime");
 /// <reference path="react16.d.ts" />
 /* @jsxImportSource preact */
-var a = (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)("p", {}), "text", (0, jsx_runtime_1.jsx)("div", { className: "foo" })] });
+var a = (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)("p", {}, void 0), "text", (0, jsx_runtime_1.jsx)("div", { className: "foo" }, void 0)] }, void 0);
 //// [react.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var jsx_runtime_1 = require("react/jsx-runtime");
 /// <reference path="react16.d.ts" />
 /* @jsxImportSource react */
 require("./preact");
-var a = (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)("p", {}), "text", (0, jsx_runtime_1.jsx)("div", { className: "foo" })] });
+var a = (0, jsx_runtime_1.jsxs)(jsx_runtime_1.Fragment, { children: [(0, jsx_runtime_1.jsx)("p", {}, void 0), "text", (0, jsx_runtime_1.jsx)("div", { className: "foo" }, void 0)] }, void 0);

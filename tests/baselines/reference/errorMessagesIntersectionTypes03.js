@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/errorMessagesIntersectionTypes03.ts] ////
-
 //// [errorMessagesIntersectionTypes03.ts]
 interface A {
     a;

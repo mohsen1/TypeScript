@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocImplements_missingType.ts] ////
-
 //// [a.js]
 class A { constructor() { this.x = 0; } }
 /** @implements */

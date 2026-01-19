@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/objectTypeWithStringNamedNumericProperty.ts] ////
-
 //// [objectTypeWithStringNamedNumericProperty.ts]
 // string named numeric properties are legal and distinct when indexed by string values
 // indexed numerically the value is converted to a number
@@ -16,7 +14,7 @@ class C {
     "-1": Date;
 }
 
-declare var c: C;
+var c: C;
 var r1 = c['0.1'];
 var r2 = c['.1'];
 var r3 = c['1'];
@@ -47,7 +45,7 @@ interface I {
     "-1": Date;
 }
 
-declare var i: I;
+var i: I;
 var r1 = i['0.1'];
 var r2 = i['.1'];
 var r3 = i['1'];
@@ -67,7 +65,7 @@ var r11 = i[-0x1]
 var r12 = i[01]
 var r13 = i[-01]
 
-declare var a: {
+var a: {
     "0.1": void;
     ".1": Object;
     "1": number;
@@ -137,6 +135,7 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var c;
 var r1 = c['0.1'];
 var r2 = c['.1'];
 var r3 = c['1'];
@@ -153,8 +152,9 @@ var r8 = i["-1.0"];
 var r9 = i["-1"];
 var r10 = i[0x1];
 var r11 = i[-0x1];
-var r12 = i[1];
-var r13 = i[-1];
+var r12 = i[01];
+var r13 = i[-01];
+var i;
 var r1 = i['0.1'];
 var r2 = i['.1'];
 var r3 = i['1'];
@@ -171,8 +171,9 @@ var r8 = i["-1.0"];
 var r9 = i["-1"];
 var r10 = i[0x1];
 var r11 = i[-0x1];
-var r12 = i[1];
-var r13 = i[-1];
+var r12 = i[01];
+var r13 = i[-01];
+var a;
 var r1 = a['0.1'];
 var r2 = a['.1'];
 var r3 = a['1'];
@@ -189,8 +190,8 @@ var r8 = i["-1.0"];
 var r9 = i["-1"];
 var r10 = i[0x1];
 var r11 = i[-0x1];
-var r12 = i[1];
-var r13 = i[-1];
+var r12 = i[01];
+var r13 = i[-01];
 var b = {
     "0.1": null,
     ".1": new Object(),
@@ -217,5 +218,5 @@ var r8 = i["-1.0"];
 var r9 = i["-1"];
 var r10 = i[0x1];
 var r11 = i[-0x1];
-var r12 = i[1];
-var r13 = i[-1];
+var r12 = i[01];
+var r13 = i[-01];

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exhaustiveSwitchImplicitReturn.ts] ////
-
 //// [exhaustiveSwitchImplicitReturn.ts]
 function foo1(bar: "a"): number {
     switch(bar) {

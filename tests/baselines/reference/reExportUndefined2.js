@@ -11,11 +11,12 @@ use(undefined);
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.undefined = void 0;
 var undefined;
+exports.undefined = undefined;
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var a_1 = require("./a");
 use(a_1.undefined);

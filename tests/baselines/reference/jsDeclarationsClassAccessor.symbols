@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassAccessor.ts] ////
-
-=== supplement.d.ts ===
+=== tests/cases/conformance/jsdoc/declarations/supplement.d.ts ===
 export { };
 declare module "./argument.js" {
->"./argument.js" : Symbol("argument", Decl(argument.js, 0, 0), Decl(supplement.d.ts, 0, 11))
+>"./argument.js" : Symbol("tests/cases/conformance/jsdoc/declarations/argument", Decl(argument.js, 0, 0), Decl(supplement.d.ts, 0, 11))
 
     interface Argument {
 >Argument : Symbol(Argument, Decl(argument.js, 0, 33), Decl(supplement.d.ts, 1, 32))
@@ -15,7 +13,7 @@ declare module "./argument.js" {
 >default : Symbol(Argument.default, Decl(supplement.d.ts, 3, 21))
     }
 }
-=== base.js ===
+=== tests/cases/conformance/jsdoc/declarations/base.js ===
 export class Base {
 >Base : Symbol(Base, Decl(base.js, 0, 0))
 
@@ -37,7 +35,7 @@ export class Base {
 >json : Symbol(json, Decl(base.js, 4, 13))
     }
 }
-=== argument.js ===
+=== tests/cases/conformance/jsdoc/declarations/argument.js ===
 import { Base } from "./base.js";
 >Base : Symbol(Base, Decl(argument.js, 0, 8))
 

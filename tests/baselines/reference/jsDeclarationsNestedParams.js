@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsNestedParams.ts] ////
-
 //// [file.js]
 class X {
     /**
@@ -44,8 +42,8 @@ class X {
       * @param {string?} error.code the error code to send the cancellation with
       * @returns {Promise.<*>} resolves when the event has been sent.
       */
-    cancel(_a) {
-        return __awaiter(this, arguments, void 0, function* ({ reason, code }) { });
+    cancel({ reason, code }) {
+        return __awaiter(this, void 0, void 0, function* () { });
     }
 }
 class Y {
@@ -58,8 +56,8 @@ class Y {
       * @param {string?} error.suberr.code the error code to send the cancellation with
       * @returns {Promise.<*>} resolves when the event has been sent.
       */
-    cancel(_a) {
-        return __awaiter(this, arguments, void 0, function* ({ reason, suberr }) { });
+    cancel({ reason, suberr }) {
+        return __awaiter(this, void 0, void 0, function* () { });
     }
 }
 

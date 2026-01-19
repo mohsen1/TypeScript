@@ -16,4 +16,4 @@ import * as b from './b.json';
 }
 //// [out/file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

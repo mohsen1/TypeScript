@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithModuleChildren.ts] ////
-
 //// [collisionCodeGenModuleWithModuleChildren.ts]
-namespace M {
+module M {
     export var x = 3;
-    namespace m1 {
+    module m1 {
         var M = 10;
         var p = x;
     }
 }
 
-namespace M {
-    namespace m2 {
+module M {
+    module m2 {
         class M {
         }
         var p = x;
@@ -18,8 +16,8 @@ namespace M {
     }
 }
 
-namespace M {
-    namespace m3 {
+module M {
+    module m3 {
         function M() {
         }
         var p = x;
@@ -27,8 +25,8 @@ namespace M {
     }
 }
 
-namespace M { // shouldnt be _M
-    namespace m3 {
+module M { // shouldnt be _M
+    module m3 {
         interface M {
         }
         var p = x;
@@ -36,9 +34,9 @@ namespace M { // shouldnt be _M
     }
 }
 
-namespace M {
-    namespace m4 {
-        namespace M {
+module M {
+    module m4 {
+        module M {
             var p = x;
         }
     }

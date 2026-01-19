@@ -1,5 +1,5 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.outer = void 0;
 var outer;
 (function (outer) {
@@ -8,4 +8,4 @@ var outer;
         var local = 1;
         inner.a = local;
     })(inner = outer.inner || (outer.inner = {}));
-})(outer || (exports.outer = outer = {}));
+})(outer = exports.outer || (exports.outer = {}));

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportEqualsClassRedeclarationError.ts] ////
-
 //// [exportEqualsClassRedeclarationError.ts]
 class SomeClass {
     static get someProp(): number {

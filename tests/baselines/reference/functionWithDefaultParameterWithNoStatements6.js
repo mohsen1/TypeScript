@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionWithDefaultParameterWithNoStatements6.ts] ////
-
 //// [functionWithDefaultParameterWithNoStatements6.ts]
 function foo(a = true) { }
 

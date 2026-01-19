@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsReusesExistingTypeAnnotations.ts] ////
-
 //// [index.js]
 class С1 {
     /** @type {string=} */
@@ -211,29 +209,29 @@ declare class С2 {
 }
 declare class С3 {
     /** @param {string=} value */
-    set p1(value: string | undefined);
+    set p1(arg: string | undefined);
     /** @type {string=} */
     get p1(): string | undefined;
     /** @param {string | undefined} value */
-    set p2(value: string | undefined);
+    set p2(arg: string | undefined);
     /** @type {string | undefined} */
     get p2(): string | undefined;
     /** @param {?string} value */
-    set p3(value: string | null);
+    set p3(arg: string | null);
     /** @type {?string} */
     get p3(): string | null;
     /** @param {string | null} value */
-    set p4(value: string | null);
+    set p4(arg: string | null);
     /** @type {string | null} */
     get p4(): string | null;
 }
 declare class С4 {
     /** @param {string=} value */
-    set p1(value: string | undefined);
+    set p1(arg: string | undefined);
     /** @param {string | undefined} value */
-    set p2(value: string | undefined);
+    set p2(arg: string | undefined);
     /** @param {?string} value */
-    set p3(value: string | null);
+    set p3(arg: string | null);
     /** @param {string | null} value */
-    set p4(value: string | null);
+    set p4(arg: string | null);
 }

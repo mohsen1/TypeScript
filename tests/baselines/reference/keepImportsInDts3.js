@@ -5,15 +5,14 @@ export {};
 //// [main.ts]
 import "test"
 
-
 //// [outputfile.js]
 define("test", ["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });
 define("app/main", ["require", "exports", "test"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });
 
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/stringLiteralPropertyNameWithLineContinuation1.ts] ////
-
 //// [stringLiteralPropertyNameWithLineContinuation1.ts]
 var x = {'text\
 ':'hello'}

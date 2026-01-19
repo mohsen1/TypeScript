@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classMergedWithInterfaceMultipleBasesNoError.ts] ////
-
 //// [classMergedWithInterfaceMultipleBasesNoError.ts]
 interface Bar { }
 interface Baz { }
@@ -29,7 +27,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var Foo = /** @class */ (function () {
     function Foo() {
     }
@@ -45,4 +43,4 @@ var default_1 = /** @class */ (function (_super) {
     }
     return default_1;
 }(Foo));
-exports.default = default_1;
+exports["default"] = default_1;

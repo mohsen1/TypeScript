@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/funduleOfFunctionWithoutReturnTypeAnnotation.ts] ////
-
 //// [funduleOfFunctionWithoutReturnTypeAnnotation.ts]
 function fn() {
     return fn.n;
 }
-namespace fn {
+module fn {
     export var n = 1;
 }
 

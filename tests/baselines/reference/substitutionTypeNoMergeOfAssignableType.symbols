@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/substitutionTypeNoMergeOfAssignableType.ts] ////
-
-=== substitutionTypeNoMergeOfAssignableType.ts ===
+=== tests/cases/compiler/substitutionTypeNoMergeOfAssignableType.ts ===
 interface Entry {
 >Entry : Symbol(Entry, Decl(substitutionTypeNoMergeOfAssignableType.ts, 0, 0))
 

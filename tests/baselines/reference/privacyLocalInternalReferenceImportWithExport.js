@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/privacyLocalInternalReferenceImportWithExport.ts] ////
-
 //// [privacyLocalInternalReferenceImportWithExport.ts]
 // private elements
-namespace m_private {
+module m_private {
     export class c_private {
     }
     export enum e_private {
@@ -15,18 +13,18 @@ namespace m_private {
     export var v_private = new c_private();
     export interface i_private {
     }
-    export namespace mi_private {
+    export module mi_private {
         export class c {
         }
     }
-    export namespace mu_private {
+    export module mu_private {
         export interface i {
         }
     }
 }
 
 // Public elements
-export namespace m_public {
+export module m_public {
     export class c_public {
     }
     export enum e_public {
@@ -39,17 +37,17 @@ export namespace m_public {
     export var v_public = 10;
     export interface i_public {
     }
-    export namespace mi_public {
+    export module mi_public {
         export class c {
         }
     }
-    export namespace mu_public {
+    export module mu_public {
         export interface i {
         }
     }
 }
 
-export namespace import_public {
+export module import_public {
     // Privacy errors - importing private elements
     export import im_public_c_private = m_private.c_private;
     export import im_public_e_private = m_private.e_private;
@@ -102,7 +100,7 @@ export namespace import_public {
     export var publicUse_im_public_mu_public: im_public_mu_public.i;
 }
 
-namespace import_private {
+module import_private {
     // No Privacy errors - importing private elements
     export import im_private_c_private = m_private.c_private;
     export import im_private_e_private = m_private.e_private;
@@ -156,7 +154,7 @@ namespace import_private {
 
 //// [privacyLocalInternalReferenceImportWithExport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.import_public = exports.m_public = void 0;
 // private elements
 var m_private;
@@ -215,7 +213,7 @@ var m_public;
         }());
         mi_public.c = c;
     })(mi_public = m_public.mi_public || (m_public.mi_public = {}));
-})(m_public || (exports.m_public = m_public = {}));
+})(m_public = exports.m_public || (exports.m_public = {}));
 var import_public;
 (function (import_public) {
     // Privacy errors - importing private elements
@@ -256,7 +254,7 @@ var import_public;
     var privateUse_im_public_mi_public = new import_public.im_public_mi_public.c();
     import_public.publicUse_im_public_mi_public = new import_public.im_public_mi_public.c();
     var privateUse_im_public_mu_public;
-})(import_public || (exports.import_public = import_public = {}));
+})(import_public = exports.import_public || (exports.import_public = {}));
 var import_private;
 (function (import_private) {
     // No Privacy errors - importing private elements
@@ -301,7 +299,7 @@ var import_private;
 
 
 //// [privacyLocalInternalReferenceImportWithExport.d.ts]
-declare namespace m_private {
+declare module m_private {
     class c_private {
     }
     enum e_private {
@@ -312,16 +310,16 @@ declare namespace m_private {
     var v_private: c_private;
     interface i_private {
     }
-    namespace mi_private {
+    module mi_private {
         class c {
         }
     }
-    namespace mu_private {
+    module mu_private {
         interface i {
         }
     }
 }
-export declare namespace m_public {
+export declare module m_public {
     class c_public {
     }
     enum e_public {
@@ -332,16 +330,16 @@ export declare namespace m_public {
     var v_public: number;
     interface i_public {
     }
-    namespace mi_public {
+    module mi_public {
         class c {
         }
     }
-    namespace mu_public {
+    module mu_public {
         interface i {
         }
     }
 }
-export declare namespace import_public {
+export declare module import_public {
     export import im_public_c_private = m_private.c_private;
     export import im_public_e_private = m_private.e_private;
     export import im_public_f_private = m_private.f_private;

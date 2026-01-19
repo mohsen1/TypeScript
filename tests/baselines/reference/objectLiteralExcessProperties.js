@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLiteralExcessProperties.ts] ////
-
 //// [objectLiteralExcessProperties.ts]
 interface Book {
     foreword: string;

@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/members/constructorFunctionTypes/constructorHasPrototypeProperty.ts] ////
-
 //// [constructorHasPrototypeProperty.ts]
-namespace NonGeneric {
+module NonGeneric {
     class C {
         foo: string;
     }
@@ -16,7 +14,7 @@ namespace NonGeneric {
     r2.bar;
 }
 
-namespace Generic {
+module Generic {
     class C<T,U> {
         foo: T;
         bar: U;

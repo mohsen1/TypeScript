@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceClassMerging2.ts] ////
-
 //// [interfaceClassMerging2.ts]
 interface Foo {
     interfaceFooMethod(): this;

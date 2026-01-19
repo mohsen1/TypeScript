@@ -1,19 +1,17 @@
-//// [tests/cases/compiler/declFileWithClassNameConflictingWithClassReferredByExtendsClause.ts] ////
-
 //// [declFileWithClassNameConflictingWithClassReferredByExtendsClause.ts]
-declare namespace A.B.Base {
+declare module A.B.Base {
     export class W {
         id: number;
     }
 }
-namespace X.Y.base {
+module X.Y.base {
 
     export class W extends A.B.Base.W {
         name: string;
     }
 }
 
-namespace X.Y.base.Z {
+module X.Y.base.Z {
 
     export class W<TValue> extends X.Y.base.W {
         value: boolean;
@@ -76,17 +74,17 @@ var X;
 
 
 //// [declFileWithClassNameConflictingWithClassReferredByExtendsClause.d.ts]
-declare namespace A.B.Base {
+declare module A.B.Base {
     class W {
         id: number;
     }
 }
-declare namespace X.Y.base {
+declare module X.Y.base {
     class W extends A.B.Base.W {
         name: string;
     }
 }
-declare namespace X.Y.base.Z {
+declare module X.Y.base.Z {
     class W<TValue> extends X.Y.base.W {
         value: boolean;
     }

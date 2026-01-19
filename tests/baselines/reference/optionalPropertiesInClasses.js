@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/optionalPropertiesInClasses.ts] ////
-
 //// [optionalPropertiesInClasses.ts]
 interface ifoo {
 	x?:number;

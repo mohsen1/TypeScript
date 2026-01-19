@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/exportImportNonInstantiatedModule.ts] ////
-
 //// [exportImportNonInstantiatedModule.ts]
-namespace A {
+module A {
     export interface I { x: number }
 }
 
-namespace B {
+module B {
     export import A1 = A
     
 }

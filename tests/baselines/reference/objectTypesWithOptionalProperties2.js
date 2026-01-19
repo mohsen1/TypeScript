@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/methodSignatures/objectTypesWithOptionalProperties2.ts] ////
-
 //// [objectTypesWithOptionalProperties2.ts]
 // Illegal attempts to define optional methods
 

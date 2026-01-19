@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsOptionalTypeLiteralProps1.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/declarations/foo.js ===
 /**
  * foo
  *
@@ -13,24 +11,15 @@
  */
 function foo({ a, b, c }) {
 >foo : ({ a, b, c }: {    a: number;    b?: number;    c?: number;}) => number
->    : ^           ^^      ^^      ^     ^^^      ^     ^^^      ^ ^^^^^      
 >a : number
->  : ^^^^^^
 >b : number
->  : ^^^^^^
 >c : number
->  : ^^^^^^
 
     return a + b + c;
 >a + b + c : number
->          : ^^^^^^
 >a + b : number
->      : ^^^^^^
 >a : number
->  : ^^^^^^
 >b : number
->  : ^^^^^^
 >c : number
->  : ^^^^^^
 }
 

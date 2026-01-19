@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superAccess.ts] ////
-
 //// [superAccess.ts]
 class MyBase {
     static S1: number = 5;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionThisExpressionAndAmbientVarInGlobal.ts] ////
-
 //// [collisionThisExpressionAndAmbientVarInGlobal.ts]
 declare var _this: number; // no error as no code gen
 var f = () => this;

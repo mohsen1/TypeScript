@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeRelationships.ts] ////
-
 //// [mappedTypeRelationships.ts]
 function f1<T>(x: T, k: keyof T) {
     return x[k];
@@ -193,23 +191,6 @@ function f<T extends { x: {} }>(): Partial<T> {
     return undefined! as T;
 }
 
-// #32365
-interface SettingsTypes {
-  audio: {
-    volume: string;
-  };
-  video: {
-    resolution: string;
-  };
-}
-interface Settings<Params extends { [K in keyof Params]?: string }> {
-  config: Params;
-}
-type ConcreteSettingsResult1 = Settings<SettingsTypes["audio"]>;
-type ConcreteSettingsResult2 = Settings<SettingsTypes["audio" | "video"]>;
-type GenericSettingsAccess<T extends keyof SettingsTypes> = Settings<SettingsTypes[T]>;
-type GenericSettingsResult1 = GenericSettingsAccess<"audio">;
-type GenericSettingsResult2 = GenericSettingsAccess<"audio" | "video">;
 
 //// [mappedTypeRelationships.js]
 function f1(x, k) {
@@ -362,7 +343,7 @@ declare function f20<T>(x: T, y: Readonly<T>, k: keyof T): void;
 declare function f21<T, K extends keyof T>(x: T, y: Readonly<T>, k: K): void;
 declare function f22<T, U extends T>(x: T, y: Readonly<U>, k: keyof T): void;
 declare function f23<T, U extends T, K extends keyof T>(x: T, y: Readonly<U>, k: K): void;
-type Thing = {
+declare type Thing = {
     a: string;
     b: string;
 };
@@ -370,22 +351,22 @@ declare function f30<T>(x: T, y: Partial<T>): void;
 declare function f31<T extends Thing>(x: Partial<Thing>, y: Partial<T>): void;
 declare function f40<T>(x: T, y: Readonly<T>): void;
 declare function f41<T extends Thing>(x: Readonly<Thing>, y: Readonly<T>): void;
-type Item = {
+declare type Item = {
     name: string;
 };
-type ItemMap = {
+declare type ItemMap = {
     [x: string]: Item;
 };
 declare function f50<T extends ItemMap>(obj: T, key: keyof T): string;
 declare function f51<T extends ItemMap, K extends keyof T>(obj: T, key: K): string;
-type T1<T> = {
+declare type T1<T> = {
     [P in keyof T]: T[P];
 };
-type T2<T> = {
+declare type T2<T> = {
     [P in keyof T]: T[P];
 };
 declare function f60<U>(x: T1<U>, y: T2<U>): void;
-type Identity<T> = {
+declare type Identity<T> = {
     [P in keyof T]: T[P];
 };
 declare function f61<U>(x: Identity<U>, y: Partial<U>): void;
@@ -428,7 +409,7 @@ declare function f76<T, U extends T, K extends keyof T>(x: {
 declare function f80<T>(t: T): Partial<T>;
 declare function f81<T, K extends keyof T>(t: T, k: K): Partial<T[K]>;
 declare function f82<T, K1 extends keyof T, K2 extends keyof T[K1]>(t: T, k1: K1, k2: K2): Partial<T[K1][K2]>;
-type Numeric<T> = {
+declare type Numeric<T> = {
     [K in keyof T]?: number;
 };
 declare function f90<T extends {
@@ -437,21 +418,3 @@ declare function f90<T extends {
 declare function f<T extends {
     x: {};
 }>(): Partial<T>;
-interface SettingsTypes {
-    audio: {
-        volume: string;
-    };
-    video: {
-        resolution: string;
-    };
-}
-interface Settings<Params extends {
-    [K in keyof Params]?: string;
-}> {
-    config: Params;
-}
-type ConcreteSettingsResult1 = Settings<SettingsTypes["audio"]>;
-type ConcreteSettingsResult2 = Settings<SettingsTypes["audio" | "video"]>;
-type GenericSettingsAccess<T extends keyof SettingsTypes> = Settings<SettingsTypes[T]>;
-type GenericSettingsResult1 = GenericSettingsAccess<"audio">;
-type GenericSettingsResult2 = GenericSettingsAccess<"audio" | "video">;

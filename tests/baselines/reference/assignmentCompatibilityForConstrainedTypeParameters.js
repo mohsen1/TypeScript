@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentCompatibilityForConstrainedTypeParameters.ts] ////
-
 //// [assignmentCompatibilityForConstrainedTypeParameters.ts]
 function foo<T extends { bar: string }>() {
   function bar<S extends T>() {

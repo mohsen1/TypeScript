@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameNotAllowedOutsideClass.ts] ////
-
 //// [privateNameNotAllowedOutsideClass.ts]
 const #foo = 3;
 

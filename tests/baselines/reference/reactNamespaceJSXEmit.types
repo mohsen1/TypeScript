@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/reactNamespaceJSXEmit.tsx] ////
-
-=== reactNamespaceJSXEmit.tsx ===
+=== tests/cases/compiler/reactNamespaceJSXEmit.tsx ===
 declare var myReactLib: any;
 >myReactLib : any
 
@@ -19,9 +17,7 @@ declare var x: any;
 <foo data/>;
 ><foo data/> : error
 >foo : any
->    : ^^^
 >data : true
->     : ^^^^
 
 <Bar x={x} />;
 ><Bar x={x} /> : error
@@ -32,7 +28,6 @@ declare var x: any;
 <x-component />;
 ><x-component /> : error
 >x-component : any
->            : ^^^
 
 <Bar {...x} />;
 ><Bar {...x} /> : error
@@ -44,9 +39,7 @@ declare var x: any;
 >Bar : any
 >x : any
 >y : number
->  : ^^^^^^
 >2 : 2
->  : ^
 
 <_Bar { ...x } />;
 ><_Bar { ...x } /> : error

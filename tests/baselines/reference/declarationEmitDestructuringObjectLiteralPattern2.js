@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuringObjectLiteralPattern2.ts] ////
-
 //// [declarationEmitDestructuringObjectLiteralPattern2.ts]
 var { a: x11, b: { a: y11, b: { a: z11 }}} = { a: 1, b: { a: "hello", b: { a: true } } };
 
@@ -11,7 +9,7 @@ function f15() {
 }
 var { a4, b4, c4 } = f15();
 
-namespace m {
+module m {
     export var { a4, b4, c4 } = f15();
 }
 
@@ -39,6 +37,6 @@ declare function f15(): {
     c4: boolean;
 };
 declare var a4: string, b4: number, c4: boolean;
-declare namespace m {
+declare module m {
     var a4: string, b4: number, c4: boolean;
 }

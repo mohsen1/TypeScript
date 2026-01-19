@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/superNoModifiersCrash.ts] ////
-
-=== File.js ===
+=== tests/cases/compiler/File.js ===
 class Parent {
 >Parent : Symbol(Parent, Decl(File.js, 0, 0))
 

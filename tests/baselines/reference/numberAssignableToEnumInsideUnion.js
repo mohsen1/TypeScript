@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numberAssignableToEnumInsideUnion.ts] ////
-
 //// [numberAssignableToEnumInsideUnion.ts]
 enum E { A, B }
 let n: number;

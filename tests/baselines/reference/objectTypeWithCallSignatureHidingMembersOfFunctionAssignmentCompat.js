@@ -1,23 +1,24 @@
-//// [tests/cases/conformance/types/members/objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts] ////
-
 //// [objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.ts]
 interface I {
     (): void;
 }
 
-declare var i: I;
-declare var f: Object;
+var i: I;
+var f: Object;
 f = i;
 i = f;
 
-declare var a: {
+var a: {
     (): void
 }
 f = a;
 a = f;
 
 //// [objectTypeWithCallSignatureHidingMembersOfFunctionAssignmentCompat.js]
+var i;
+var f;
 f = i;
 i = f;
+var a;
 f = a;
 a = f;

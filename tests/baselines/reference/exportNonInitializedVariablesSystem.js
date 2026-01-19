@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportNonInitializedVariablesSystem.ts] ////
-
 //// [exportNonInitializedVariablesSystem.ts]
 var;
 let;
@@ -18,7 +16,7 @@ namespace B {
     export let x, y, z;
 }
 
-namespace C {
+module C {
     export var a = 1, b, c = 2;
     export var x, y, z;
 }

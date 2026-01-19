@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalTypeRelaxingConstraintAssignability.ts] ////
-
 //// [conditionalTypeRelaxingConstraintAssignability.ts]
 export type ElChildren =
   | ElChildren.Void
@@ -41,7 +39,7 @@ function g(p1: I, p2: Partial<I>): I {
 
 //// [conditionalTypeRelaxingConstraintAssignability.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Elem = void 0;
 var Elem = /** @class */ (function () {
     function Elem(children_) {

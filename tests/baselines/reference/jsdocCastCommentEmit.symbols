@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsdocCastCommentEmit.ts] ////
-
-=== jsdocCastCommentEmit.ts ===
+=== tests/cases/compiler/jsdocCastCommentEmit.ts ===
 // allowJs: true
 // checkJs: true
 // outDir: out/

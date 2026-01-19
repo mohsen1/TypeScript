@@ -1,16 +1,11 @@
-//// [tests/cases/compiler/importsInAmbientModules3.ts] ////
-
-=== main.ts ===
+=== tests/cases/compiler/main.ts ===
 declare module "M" {
 >"M" : typeof import("M")
->    : ^^^^^^^^^^^^^^^^^^
 
     import C = require("external");
 >C : typeof C
->  : ^^^^^^^^
 }
-=== external.d.ts ===
+=== tests/cases/compiler/external.d.ts ===
 export default class C {}
 >C : C
->  : ^
 

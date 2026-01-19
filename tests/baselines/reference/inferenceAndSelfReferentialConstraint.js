@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferenceAndSelfReferentialConstraint.ts] ////
-
 //// [inferenceAndSelfReferentialConstraint.ts]
 // @strict
 

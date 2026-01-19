@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/readonlyInDeclarationFile.ts] ////
-
 //// [readonlyInDeclarationFile.ts]
 interface Foo {
     readonly x: number;

@@ -10,8 +10,6 @@
     "baselineCheck": true,
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "foo.ts",
         "../../../bar/bar.ts"
     ],

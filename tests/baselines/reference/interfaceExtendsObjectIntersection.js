@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceExtendsObjectIntersection.ts] ////
-
 //// [interfaceExtendsObjectIntersection.ts]
 type T1 = { a: number };
 type T2 = T1 & { b: number };

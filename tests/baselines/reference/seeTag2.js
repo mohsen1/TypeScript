@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/seeTag2.ts] ////
-
 //// [seeTag2.ts]
 /** @see {} empty*/
 const a = ""

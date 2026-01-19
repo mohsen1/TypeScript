@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/spread/iteratorSpreadInArray8.ts] ////
-
 //// [iteratorSpreadInArray8.ts]
 class SymbolIterator {
     next() {

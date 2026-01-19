@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/instantiateContextuallyTypedGenericThis.ts] ////
-
 //// [instantiateContextuallyTypedGenericThis.ts]
 interface JQuery {
     each<T>(

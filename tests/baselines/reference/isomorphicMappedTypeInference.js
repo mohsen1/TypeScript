@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/isomorphicMappedTypeInference.ts] ////
-
 //// [isomorphicMappedTypeInference.ts]
 type Box<T> = {
     value: T;
@@ -25,7 +23,7 @@ function boxify<T>(obj: T): Boxified<T> {
     return result;
 }
 
-function unboxify<T extends object>(obj: Boxified<T>): T {
+function unboxify<T>(obj: Boxified<T>): T {
     let result = {} as T;
     for (let k in obj) {
         result[k] = unbox(obj[k]);
@@ -300,16 +298,16 @@ var o2 = getProps(myAny, ['foo', 'bar']);
 
 
 //// [isomorphicMappedTypeInference.d.ts]
-type Box<T> = {
+declare type Box<T> = {
     value: T;
 };
-type Boxified<T> = {
+declare type Boxified<T> = {
     [P in keyof T]: Box<T[P]>;
 };
 declare function box<T>(x: T): Box<T>;
 declare function unbox<T>(x: Box<T>): T;
 declare function boxify<T>(obj: T): Boxified<T>;
-declare function unboxify<T extends object>(obj: Boxified<T>): T;
+declare function unboxify<T>(obj: Boxified<T>): T;
 declare function assignBoxified<T>(obj: Boxified<T>, values: T): void;
 declare function f1(): void;
 declare function f2(): void;
@@ -334,13 +332,13 @@ declare function clone<T>(obj: {
 declare function validateAndClone<T>(obj: {
     readonly [P in keyof T]?: T[P];
 }): T;
-type Foo = {
+declare type Foo = {
     a?: number;
     readonly b: string;
 };
 declare function f10(foo: Foo): void;
-type Func<T> = (...args: any[]) => T;
-type Spec<T> = {
+declare type Func<T> = (...args: any[]) => T;
+declare type Spec<T> = {
     [P in keyof T]: Func<T[P]> | Spec<T[P]>;
 };
 /**

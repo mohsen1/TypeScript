@@ -1,7 +1,7 @@
-bar.d.ts(1,10): error TS2305: Module '"./foo"' has no exported member 'Bar'.
+tests/cases/compiler/bar.d.ts(1,10): error TS2305: Module '"./foo"' has no exported member 'Bar'.
 
 
-==== foo.d.ts (0 errors) ====
+==== tests/cases/compiler/foo.d.ts (0 errors) ====
     export = Foo;
     export as namespace Foo;
     
@@ -13,7 +13,7 @@ bar.d.ts(1,10): error TS2305: Module '"./foo"' has no exported member 'Bar'.
         namespace Bar { }
     }
     
-==== bar.d.ts (1 errors) ====
+==== tests/cases/compiler/bar.d.ts (1 errors) ====
     import { Bar } from './foo';
              ~~~
 !!! error TS2305: Module '"./foo"' has no exported member 'Bar'.

@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/importAliasWithDottedName.ts] ////
-
 //// [importAliasWithDottedName.ts]
-namespace M {
+module M {
     export var x = 1;
-    export namespace N {
+    export module N {
         export var y = 2;
     }
 }
 
-namespace A {
+module A {
     import N = M.N;
     var r = N.y;
     var r2 = M.N.y;

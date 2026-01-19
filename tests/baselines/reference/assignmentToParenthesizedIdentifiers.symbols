@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/expressions/valuesAndReferences/assignmentToParenthesizedIdentifiers.ts] ////
-
-=== assignmentToParenthesizedIdentifiers.ts ===
+=== tests/cases/conformance/expressions/valuesAndReferences/assignmentToParenthesizedIdentifiers.ts ===
 var x: number;
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 0, 3))
 
@@ -16,7 +14,7 @@ x = ''; // Error
 (x) = ''; // Error
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 0, 3))
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(assignmentToParenthesizedIdentifiers.ts, 4, 9))
 
     export var y: number;
@@ -60,54 +58,54 @@ M = { y: 3 }; // Error
 >M : Symbol(M, Decl(assignmentToParenthesizedIdentifiers.ts, 4, 9))
 >y : Symbol(y, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 7))
 
-namespace M2 {
+module M2 {
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
 
-    export namespace M3 {
->M3 : Symbol(M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+    export module M3 {
+>M3 : Symbol(M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 
         export var x: number;
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 21, 18))
     }
 
     M3 = { x: 3 }; // Error
->M3 : Symbol(M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 24, 10))
 }
 M2.M3 = { x: 3 }; // OK
->M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 26, 9))
 
 (M2).M3 = { x: 3 }; // OK
->(M2).M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>(M2).M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 27, 11))
 
 (M2.M3) = { x: 3 }; // OK
->M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 28, 11))
 
 M2.M3 = { x: '' }; // Error
->M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 30, 9))
 
 (M2).M3 = { x: '' }; // Error
->(M2).M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>(M2).M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 31, 11))
 
 (M2.M3) = { x: '' }; // Error
->M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M2.M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >M2 : Symbol(M2, Decl(assignmentToParenthesizedIdentifiers.ts, 17, 15))
->M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 14))
+>M3 : Symbol(M2.M3, Decl(assignmentToParenthesizedIdentifiers.ts, 19, 11))
 >x : Symbol(x, Decl(assignmentToParenthesizedIdentifiers.ts, 32, 11))
 
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithSubtypeEnumAndNumber.ts] ////
-
 //// [comparisonOperatorWithSubtypeEnumAndNumber.ts]
 enum E { a, b, c }
 

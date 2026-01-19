@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveUnionIntersection.ts] ////
-
 //// [nonPrimitiveUnionIntersection.ts]
 var a: object & string = ""; // error
 var b: object | string = ""; // ok

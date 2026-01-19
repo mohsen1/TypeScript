@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/moduleAugmentationWithNonExistentNamedImport.ts] ////
-
-=== foo.d.ts ===
+=== tests/cases/compiler/foo.d.ts ===
 export = Foo;
 >Foo : Symbol(Foo, Decl(foo.d.ts, 1, 24))
 
@@ -21,7 +19,7 @@ declare global {
 >Bar : Symbol(Bar, Decl(foo.d.ts, 7, 16))
 }
 
-=== bar.d.ts ===
+=== tests/cases/compiler/bar.d.ts ===
 import { Bar } from './foo';
 >Bar : Symbol(Bar, Decl(bar.d.ts, 0, 8))
 

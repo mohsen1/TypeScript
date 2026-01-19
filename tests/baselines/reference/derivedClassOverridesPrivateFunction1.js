@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/derivedClassOverridesPrivateFunction1.ts] ////
-
 //// [derivedClassOverridesPrivateFunction1.ts]
 class BaseClass {
     constructor() {

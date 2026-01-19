@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ClassDeclarations/parserClass1.ts] ////
-
 //// [parserClass1.ts]
     export class NullLogger implements ILogger {
         public information(): boolean { return false; }
@@ -13,7 +11,7 @@
 
 //// [parserClass1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.NullLogger = void 0;
 var NullLogger = /** @class */ (function () {
     function NullLogger() {

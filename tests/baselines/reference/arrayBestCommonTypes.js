@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/arrayBestCommonTypes.ts] ////
-
 //// [arrayBestCommonTypes.ts]
-namespace EmptyTypes {
+module EmptyTypes {
     interface iface { }
     class base implements iface { }
     class base2 implements iface { }
@@ -54,7 +52,7 @@ namespace EmptyTypes {
     }
 }
 
-namespace NonEmptyTypes {
+module NonEmptyTypes {
     interface iface { x: string; }
     class base implements iface { x: string; y: string; }
     class base2 implements iface { x: string; z: string; }

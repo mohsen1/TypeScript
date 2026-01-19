@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionSubtypingOfVarArgs.ts] ////
-
 //// [functionSubtypingOfVarArgs.ts]
 class EventBase {
     private _listeners = [];

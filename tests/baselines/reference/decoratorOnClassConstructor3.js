@@ -18,8 +18,7 @@ export class C  extends base{
 //// [0.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.base = void 0;
-exports.foo = foo;
+exports.foo = exports.base = void 0;
 var base = /** @class */ (function () {
     function base() {
     }
@@ -27,6 +26,7 @@ var base = /** @class */ (function () {
 }());
 exports.base = base;
 function foo(target, propertyKey, parameterIndex) { }
+exports.foo = foo;
 //// [2.js]
 "use strict";
 var __extends = (this && this.__extends) || (function () {

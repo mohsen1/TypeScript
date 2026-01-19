@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfacesWithPredefinedTypesAsNames.ts] ////
-
 //// [interfacesWithPredefinedTypesAsNames.ts]
 interface any { }
 interface number { }

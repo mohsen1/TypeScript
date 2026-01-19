@@ -1,10 +1,8 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAndInterfaceWithSameName.ts] ////
-
 //// [classAndInterfaceWithSameName.ts]
 class C { foo: string; }
 interface C { foo: string; }
 
-namespace M {
+module M {
     class D {
         bar: string;
     }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictOptionalProperties1.ts] ////
-
 //// [strictOptionalProperties1.ts]
 function f1(obj: { a?: string, b?: string | undefined }) {
     let a = obj.a;  // string | undefined
@@ -394,11 +392,11 @@ declare function f4(t: [string?]): void;
 declare function f4a(t1: [number, string?], t2: [number, string?, string?]): void;
 declare function f5(t: [number, string?, boolean?]): void;
 declare function f6(): void;
-type Props = {
+declare type Props = {
     foo: string;
     bar: string;
 };
-type InputProps = {
+declare type InputProps = {
     foo?: string;
     bar: string;
 };
@@ -441,7 +439,7 @@ declare function f11<T>(x: {
 }): T;
 declare function f12<T>(x: [T?]): T;
 declare function f13<T>(x: Partial<T>): T;
-type Undefinable<T> = T | undefined;
+declare type Undefinable<T> = T | undefined;
 declare function expectNotUndefined<T>(value: Undefinable<T>): T;
 interface Bar {
     bar?: number;
@@ -484,12 +482,12 @@ interface PropsFromReact {
 interface PropsFromMaterialUI {
     onClick?: (() => void) | undefined;
 }
-type TheTypeFromMaterialUI = PropsFromReact & PropsFromMaterialUI;
+declare type TheTypeFromMaterialUI = PropsFromReact & PropsFromMaterialUI;
 interface NavBottomListItem extends TheTypeFromMaterialUI {
     value: string;
 }
-type UA = undefined;
-type UB = {
+declare type UA = undefined;
+declare type UB = {
     x?: never;
 }['x'];
-type UC = UA & UB;
+declare type UC = UA & UB;

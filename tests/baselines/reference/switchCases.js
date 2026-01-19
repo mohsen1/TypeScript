@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/switchCases.ts] ////
-
 //// [switchCases.ts]
 switch(0) {
  case 1:

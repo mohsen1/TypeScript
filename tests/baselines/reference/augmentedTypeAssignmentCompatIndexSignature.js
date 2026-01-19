@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/augmentedTypeAssignmentCompatIndexSignature.ts] ////
-
 //// [augmentedTypeAssignmentCompatIndexSignature.ts]
 interface Foo { a }
 interface Bar { b }

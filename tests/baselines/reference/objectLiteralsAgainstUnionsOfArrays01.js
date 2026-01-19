@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLiteralsAgainstUnionsOfArrays01.ts] ////
-
 //// [objectLiteralsAgainstUnionsOfArrays01.ts]
 interface Foo {
   bar: Bar | Bar[];

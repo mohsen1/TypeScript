@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/emptyAssignmentPatterns03_ES5iterable.ts] ////
-
 //// [emptyAssignmentPatterns03_ES5iterable.ts]
 var a: any;
 

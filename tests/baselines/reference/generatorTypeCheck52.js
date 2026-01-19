@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/yieldExpressions/generatorTypeCheck52.ts] ////
-
 //// [generatorTypeCheck52.ts]
 class Foo { x: number }
 class Baz { z: number }

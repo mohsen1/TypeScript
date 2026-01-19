@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noIterationTypeErrorsInCFA.ts] ////
-
 //// [noIterationTypeErrorsInCFA.ts]
 interface F {
     d(): void

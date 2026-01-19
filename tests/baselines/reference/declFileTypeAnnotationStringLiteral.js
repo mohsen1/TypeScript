@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileTypeAnnotationStringLiteral.ts] ////
-
 //// [declFileTypeAnnotationStringLiteral.ts]
 function foo(a: "hello"): number;
 function foo(a: "name"): string;

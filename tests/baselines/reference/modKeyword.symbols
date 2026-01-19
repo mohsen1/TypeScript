@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/modKeyword.ts] ////
-
-=== modKeyword.ts ===
+=== tests/cases/compiler/modKeyword.ts ===
 var module:any;
 >module : Symbol(module, Decl(modKeyword.ts, 0, 3))
 

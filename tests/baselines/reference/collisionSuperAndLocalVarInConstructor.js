@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndLocalVarInConstructor.ts] ////
-
 //// [collisionSuperAndLocalVarInConstructor.ts]
 var _super = 10; // No Error
 class Foo {

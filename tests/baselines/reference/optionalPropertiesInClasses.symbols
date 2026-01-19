@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/optionalPropertiesInClasses.ts] ////
-
-=== optionalPropertiesInClasses.ts ===
+=== tests/cases/compiler/optionalPropertiesInClasses.ts ===
 interface ifoo {
 >ifoo : Symbol(ifoo, Decl(optionalPropertiesInClasses.ts, 0, 0))
 

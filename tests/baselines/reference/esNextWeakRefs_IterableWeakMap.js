@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/esNextWeakRefs_IterableWeakMap.ts] ////
-
 //// [esNextWeakRefs_IterableWeakMap.ts]
 /** `static #cleanup` */
 const IterableWeakMap_cleanup = ({ ref, set }: {

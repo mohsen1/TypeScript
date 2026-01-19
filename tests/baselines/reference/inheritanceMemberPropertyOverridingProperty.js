@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceMemberPropertyOverridingProperty.ts] ////
-
 //// [inheritanceMemberPropertyOverridingProperty.ts]
 class a {
     x: () => string;

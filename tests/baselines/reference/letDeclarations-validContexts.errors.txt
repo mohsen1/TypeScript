@@ -1,7 +1,7 @@
-letDeclarations-validContexts.ts(18,1): error TS2410: The 'with' statement is not supported. All symbols in a 'with' block will have type 'any'.
+tests/cases/compiler/letDeclarations-validContexts.ts(18,1): error TS2410: The 'with' statement is not supported. All symbols in a 'with' block will have type 'any'.
 
 
-==== letDeclarations-validContexts.ts (1 errors) ====
+==== tests/cases/compiler/letDeclarations-validContexts.ts (1 errors) ====
     // Control flow statements with blocks
     if (true) { 
         let l1 = 0;
@@ -88,7 +88,7 @@ letDeclarations-validContexts.ts(18,1): error TS2410: The 'with' statement is no
     };
     
     // modules
-    namespace m {
+    module m {
         let l22 = 0;
     
         {
@@ -139,7 +139,7 @@ letDeclarations-validContexts.ts(18,1): error TS2410: The 'with' statement is no
         }
     }
     
-    namespace m3 {
+    module m3 {
         label: let l34 = 0;
         {
             label2: let l35 = 0;

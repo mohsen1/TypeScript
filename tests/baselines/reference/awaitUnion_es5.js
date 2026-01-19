@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es5/awaitUnion_es5.ts] ////
-
 //// [awaitUnion_es5.ts]
 declare let a: number | string;
 declare let b: PromiseLike<number> | PromiseLike<string>;

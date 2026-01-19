@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functionCalls/callWithSpread5.ts] ////
-
 //// [callWithSpread5.ts]
 declare const x: number
 declare const nnnu: [number, number, number?]

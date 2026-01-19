@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/comparable/equalityWithEnumTypes.ts] ////
-
 //// [equalityWithEnumTypes.ts]
 // Literal enum type
 enum E1 {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/StrictMode/parserStrictMode16.ts] ////
-
 //// [parserStrictMode16.ts]
 "use strict";
 delete this;

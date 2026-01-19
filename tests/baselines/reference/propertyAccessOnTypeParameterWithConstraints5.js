@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithConstraints5.ts] ////
-
 //// [propertyAccessOnTypeParameterWithConstraints5.ts]
 class A {
     foo(): string { return ''; }
@@ -13,7 +11,7 @@ class B extends A {
 
 class C<U extends T, T extends A> {
     f() {
-        var x: U = {} as any;
+        var x: U;
         var a = x['foo'](); // should be string
         return a + x.foo() + x.notHere();
     }
@@ -24,11 +22,11 @@ var r = (new C<B, A>()).f();
 interface I<U extends T, T extends A> {
     foo: U;
 }
-declare var i: I<B, A>;
+var i: I<B, A>;
 var r2 = i.foo.notHere();
 var r2b = i.foo['foo']();
 
-declare var a: {
+var a: {
     <U extends T, T extends A>(): U;
 }
 // BUG 794164
@@ -82,15 +80,17 @@ var C = /** @class */ (function () {
     function C() {
     }
     C.prototype.f = function () {
-        var x = {};
+        var x;
         var a = x['foo'](); // should be string
         return a + x.foo() + x.notHere();
     };
     return C;
 }());
 var r = (new C()).f();
+var i;
 var r2 = i.foo.notHere();
 var r2b = i.foo['foo']();
+var a;
 // BUG 794164
 var r3 = a().notHere();
 var r3b = a()['foo']();

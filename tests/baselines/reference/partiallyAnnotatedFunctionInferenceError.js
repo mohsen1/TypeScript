@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/contextualTypes/partiallyAnnotatedFunction/partiallyAnnotatedFunctionInferenceError.ts] ////
-
 //// [partiallyAnnotatedFunctionInferenceError.ts]
 class C {
   test: string

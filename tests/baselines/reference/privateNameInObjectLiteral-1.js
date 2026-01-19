@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameInObjectLiteral-1.ts] ////
-
 //// [privateNameInObjectLiteral-1.ts]
 const obj = {
     #foo: 1

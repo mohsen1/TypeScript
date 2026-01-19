@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxFactoryAndJsxFragmentFactory.tsx] ////
-
 //// [jsxFactoryAndJsxFragmentFactory.tsx]
 declare var h: any;
 declare var Frag: any;

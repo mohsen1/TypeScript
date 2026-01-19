@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedBlockScopedBindings15.ts] ////
-
 //// [nestedBlockScopedBindings15.ts]
 for (; false;) {
     {

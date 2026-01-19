@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxLibraryManagedAttributesUnusedGeneric.tsx] ////
-
 //// [jsxLibraryManagedAttributesUnusedGeneric.tsx]
 // @ts-ignore
 import React from 'react'
@@ -32,5 +30,5 @@ declare const Comp: (p: { className?: string }) => null
 
 //// [jsxLibraryManagedAttributesUnusedGeneric.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 jsx(Comp, { css: "color:hotpink;" });

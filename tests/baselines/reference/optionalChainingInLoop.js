@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/optionalChaining/optionalChainingInLoop.ts] ////
-
 //// [optionalChainingInLoop.ts]
 // https://github.com/microsoft/TypeScript/issues/40643
 const list: any[] = []

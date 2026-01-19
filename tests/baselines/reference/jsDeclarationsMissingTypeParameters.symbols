@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsMissingTypeParameters.ts] ////
-
-=== file.js ===
+=== tests/cases/conformance/jsdoc/declarations/file.js ===
 /**
   * @param {Array=} y desc
   */

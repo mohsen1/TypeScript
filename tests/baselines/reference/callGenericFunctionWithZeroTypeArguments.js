@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeArgumentLists/callGenericFunctionWithZeroTypeArguments.ts] ////
-
 //// [callGenericFunctionWithZeroTypeArguments.ts]
 // valid invocations of generic functions with no explicit type arguments provided 
 

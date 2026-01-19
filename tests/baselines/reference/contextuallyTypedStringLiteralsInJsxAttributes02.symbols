@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/contextualTypes/jsxAttributes/contextuallyTypedStringLiteralsInJsxAttributes02.tsx] ////
-
-=== file.tsx ===
+=== tests/cases/conformance/types/contextualTypes/jsxAttributes/file.tsx ===
 import React = require('react')
 >React : Symbol(React, Decl(file.tsx, 0, 0))
 

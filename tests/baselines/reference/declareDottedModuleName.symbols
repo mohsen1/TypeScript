@@ -1,23 +1,21 @@
-//// [tests/cases/compiler/declareDottedModuleName.ts] ////
-
-=== declareDottedModuleName.ts ===
-namespace M {
+=== tests/cases/compiler/declareDottedModuleName.ts ===
+module M {
 >M : Symbol(M, Decl(declareDottedModuleName.ts, 0, 0), Decl(declareDottedModuleName.ts, 2, 1))
 
-    namespace P.Q { } // This shouldnt be emitted
->P : Symbol(P, Decl(declareDottedModuleName.ts, 0, 13))
->Q : Symbol(Q, Decl(declareDottedModuleName.ts, 1, 16))
+    module P.Q { } // This shouldnt be emitted
+>P : Symbol(P, Decl(declareDottedModuleName.ts, 0, 10))
+>Q : Symbol(Q, Decl(declareDottedModuleName.ts, 1, 13))
 }
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(declareDottedModuleName.ts, 0, 0), Decl(declareDottedModuleName.ts, 2, 1))
 
-    export namespace R.S { }  //This should be emitted
->R : Symbol(R, Decl(declareDottedModuleName.ts, 4, 13))
->S : Symbol(S, Decl(declareDottedModuleName.ts, 5, 23))
+    export module R.S { }  //This should be emitted
+>R : Symbol(R, Decl(declareDottedModuleName.ts, 4, 10))
+>S : Symbol(S, Decl(declareDottedModuleName.ts, 5, 20))
 }
 
-namespace T.U { // This needs to be emitted
+module T.U { // This needs to be emitted
 >T : Symbol(T, Decl(declareDottedModuleName.ts, 6, 1))
->U : Symbol(U, Decl(declareDottedModuleName.ts, 8, 12))
+>U : Symbol(U, Decl(declareDottedModuleName.ts, 8, 9))
 }

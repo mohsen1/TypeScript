@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/superAccessInFatArrow1.ts] ////
-
 //// [superAccessInFatArrow1.ts]
-namespace test {
+module test {
     export class A {
         foo() {
         }

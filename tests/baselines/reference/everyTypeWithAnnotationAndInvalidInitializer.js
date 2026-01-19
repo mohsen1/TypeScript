@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/VariableStatements/everyTypeWithAnnotationAndInvalidInitializer.ts] ////
-
 //// [everyTypeWithAnnotationAndInvalidInitializer.ts]
 interface I {
     id: number;
@@ -18,7 +16,7 @@ class D<T>{
 function F(x: string): number { return 42; }
 function F2(x: number): boolean { return x < 42; }
 
-namespace M {
+module M {
     export class A {
         name: string;
     }
@@ -26,7 +24,7 @@ namespace M {
     export function F2(x: number): string { return x.toString(); }
 }
 
-namespace N {
+module N {
     export class A {
         id: number;
     }

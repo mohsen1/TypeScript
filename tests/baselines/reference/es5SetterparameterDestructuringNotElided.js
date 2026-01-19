@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5SetterparameterDestructuringNotElided.ts] ////
-
 //// [es5SetterparameterDestructuringNotElided.ts]
 const foo = {
     set foo([start, end]: [any, any]) {

@@ -13,7 +13,7 @@ export var x: typeof a;
 
 //// [importDeclarationUsedAsTypeQuery_require.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.B = void 0;
 var B = /** @class */ (function () {
     function B() {
@@ -23,7 +23,7 @@ var B = /** @class */ (function () {
 exports.B = B;
 //// [importDeclarationUsedAsTypeQuery_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 
 
@@ -32,5 +32,6 @@ export declare class B {
     id: number;
 }
 //// [importDeclarationUsedAsTypeQuery_1.d.ts]
+/// <reference path="importDeclarationUsedAsTypeQuery_require.d.ts" />
 import a = require('./importDeclarationUsedAsTypeQuery_require');
 export declare var x: typeof a;

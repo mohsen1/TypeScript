@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript6/ComputedPropertyNames/parserComputedPropertyName28.ts] ////
-
 //// [parserComputedPropertyName28.ts]
 class C {
     [e]: number = 0;

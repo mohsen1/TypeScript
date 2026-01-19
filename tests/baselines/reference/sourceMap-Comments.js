@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/sourceMap-Comments.ts] ////
-
 //// [sourceMap-Comments.ts]
-namespace sas.tools {
+module sas.tools {
     export class Test {
         public doX(): void {
             let f: number = 2;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/primitiveTypeAsInterfaceName.ts] ////
-
-=== primitiveTypeAsInterfaceName.ts ===
-
+=== tests/cases/compiler/primitiveTypeAsInterfaceName.ts ===
 interface number {}
+No type information for this code.

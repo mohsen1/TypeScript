@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/isolatedModulesNoExternalModule.ts] ////
-
 //// [file1.ts]
 var x;
 

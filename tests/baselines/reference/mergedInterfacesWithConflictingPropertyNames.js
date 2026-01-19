@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/mergedInterfacesWithConflictingPropertyNames.ts] ////
-
 //// [mergedInterfacesWithConflictingPropertyNames.ts]
 interface A {
     x: string; // error
@@ -9,7 +7,7 @@ interface A {
     x: number;
 }
 
-namespace M {
+module M {
     interface A<T> {
         x: T;
     }
@@ -19,25 +17,25 @@ namespace M {
     }
 }
 
-namespace M2 {
+module M2 {
     interface A<T> {
         x: T;
     }   
 }
 
-namespace M2 {
+module M2 {
     interface A<T> {
         x: number;  // ok, different declaration space than other M2
     }
 }
 
-namespace M3 {
+module M3 {
     export interface A<T> {
         x: T;
     }
 }
 
-namespace M3 {
+module M3 {
     export interface A<T> {
         x: number;  // error
     }

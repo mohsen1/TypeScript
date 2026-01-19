@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/VariableDeclarations/parserVariableDeclaration1.ts] ////
-
 //// [parserVariableDeclaration1.ts]
 		var selection = a, 
 			position = b,

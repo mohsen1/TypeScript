@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxElementClassTooManyParams.tsx] ////
-
 //// [jsxElementClassTooManyParams.tsx]
 namespace JSX {
     export interface Element {}

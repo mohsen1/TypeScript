@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/moduleReopenedTypeSameBlock.ts] ////
-
 //// [moduleReopenedTypeSameBlock.ts]
-namespace M { export class C1 { } }
-namespace M {
+module M { export class C1 { } }
+module M {
     export interface I { n: number; }
     export class C2 { f(): I { return null; } }
 }

@@ -1,14 +1,9 @@
-//// [tests/cases/compiler/moduleNoneOutFile.ts] ////
-
-=== first.ts ===
+=== tests/cases/compiler/first.ts ===
 class Foo {}
 >Foo : Foo
->    : ^^^
 
-=== second.ts ===
+=== tests/cases/compiler/second.ts ===
 class Bar extends Foo {}
 >Bar : Bar
->    : ^^^
 >Foo : Foo
->    : ^^^
 

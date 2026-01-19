@@ -15,10 +15,11 @@ export {bar};
 //// [utils.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.foo = foo;
-exports.bar = bar;
+exports.bar = exports.foo = void 0;
 function foo() { }
+exports.foo = foo;
 function bar() { }
+exports.bar = bar;
 //// [index.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });

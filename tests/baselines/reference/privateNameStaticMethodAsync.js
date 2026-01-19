@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticMethodAsync.ts] ////
-
 //// [privateNameStaticMethodAsync.ts]
 const C = class {
     static async #bar() { return await Promise.resolve(42); }

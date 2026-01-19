@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/moduleDuplicateIdentifiers.ts] ////
-
 //// [moduleDuplicateIdentifiers.ts]
 export var Foo = 2;
 export var Foo = 42; // Should error
@@ -44,17 +42,17 @@ export enum Utensils { // Shouldn't error
 
 //// [moduleDuplicateIdentifiers.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Utensils = exports.Pot = exports.Kettle = exports.FooBar = exports.Foo = void 0;
 exports.Foo = 2;
 exports.Foo = 42; // Should error
 var FooBar;
 (function (FooBar) {
     FooBar.member1 = 2;
-})(FooBar || (exports.FooBar = FooBar = {}));
+})(FooBar = exports.FooBar || (exports.FooBar = {}));
 (function (FooBar) {
     FooBar.member2 = 42;
-})(FooBar || (exports.FooBar = FooBar = {}));
+})(FooBar = exports.FooBar || (exports.FooBar = {}));
 var Kettle = /** @class */ (function () {
     function Kettle() {
         this.member1 = 2;
@@ -76,7 +74,7 @@ var Utensils;
     Utensils[Utensils["Spoon"] = 0] = "Spoon";
     Utensils[Utensils["Fork"] = 1] = "Fork";
     Utensils[Utensils["Knife"] = 2] = "Knife";
-})(Utensils || (exports.Utensils = Utensils = {}));
+})(Utensils = exports.Utensils || (exports.Utensils = {}));
 (function (Utensils) {
     Utensils[Utensils["Spork"] = 3] = "Spork";
-})(Utensils || (exports.Utensils = Utensils = {}));
+})(Utensils = exports.Utensils || (exports.Utensils = {}));

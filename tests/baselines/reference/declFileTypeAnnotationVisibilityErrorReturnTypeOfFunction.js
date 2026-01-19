@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declFileTypeAnnotationVisibilityErrorReturnTypeOfFunction.ts] ////
-
 //// [declFileTypeAnnotationVisibilityErrorReturnTypeOfFunction.ts]
-namespace m {
+module m {
     class private1 {
     }
 
@@ -37,7 +35,7 @@ namespace m {
         return new public1();
     }
 
-    namespace m2 {
+    module m2 {
         export class public2 {
         }
     }
@@ -128,7 +126,7 @@ var m;
 
 
 //// [declFileTypeAnnotationVisibilityErrorReturnTypeOfFunction.d.ts]
-declare namespace m {
+declare module m {
     class private1 {
     }
     export class public1 {
@@ -137,7 +135,7 @@ declare namespace m {
     export function foo4(): private1;
     export function foo13(): public1;
     export function foo14(): public1;
-    namespace m2 {
+    module m2 {
         class public2 {
         }
     }

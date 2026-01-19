@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/noImplicitAnyParametersInModule.ts] ////
-
 //// [noImplicitAnyParametersInModule.ts]
-namespace M {
+module M {
     // No implicit-'any' errors.
     function m_f1(): void { }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowManyConsecutiveConditionsNoTimeout.ts] ////
-
 //// [controlFlowManyConsecutiveConditionsNoTimeout.ts]
 export enum Choice {
     One,
@@ -136,13 +134,13 @@ while (true) {
 
 //// [controlFlowManyConsecutiveConditionsNoTimeout.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Choice = void 0;
 var Choice;
 (function (Choice) {
     Choice[Choice["One"] = 0] = "One";
     Choice[Choice["Two"] = 1] = "Two";
-})(Choice || (exports.Choice = Choice = {}));
+})(Choice = exports.Choice || (exports.Choice = {}));
 var choice = Choice.One;
 var choiceOne = Choice.One;
 if (choice === choiceOne) { }

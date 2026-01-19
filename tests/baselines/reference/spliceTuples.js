@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/spliceTuples.ts] ////
-
 //// [spliceTuples.ts]
 declare const sb: [string, boolean];
 

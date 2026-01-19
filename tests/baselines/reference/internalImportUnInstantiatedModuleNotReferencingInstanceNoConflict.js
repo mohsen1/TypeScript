@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/internalImportUnInstantiatedModuleNotReferencingInstanceNoConflict.ts] ////
-
 //// [internalImportUnInstantiatedModuleNotReferencingInstanceNoConflict.ts]
-namespace A {
+module A {
     export interface X { s: string }
 }
 
-namespace B {
+module B {
     var A = 1;
     import Y = A;
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/potentiallyUncalledDecorators.ts] ////
-
 //// [potentiallyUncalledDecorators.ts]
 // Angular-style Input/Output API:
 declare function Input(bindingPropertyName?: string): any;

@@ -1,9 +1,9 @@
-negateOperatorWithAnyOtherType.ts(34,24): error TS18050: The value 'undefined' cannot be used here.
-negateOperatorWithAnyOtherType.ts(35,23): error TS18050: The value 'null' cannot be used here.
-negateOperatorWithAnyOtherType.ts(51,1): error TS2695: Left side of comma operator is unused and has no side effects.
+tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorWithAnyOtherType.ts(34,24): error TS2532: Object is possibly 'undefined'.
+tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorWithAnyOtherType.ts(35,23): error TS2531: Object is possibly 'null'.
+tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorWithAnyOtherType.ts(51,1): error TS2695: Left side of comma operator is unused and has no side effects.
 
 
-==== negateOperatorWithAnyOtherType.ts (3 errors) ====
+==== tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorWithAnyOtherType.ts (3 errors) ====
     // - operator on any type
     
     var ANY: any;
@@ -17,13 +17,13 @@ negateOperatorWithAnyOtherType.ts(51,1): error TS2695: Left side of comma operat
         return a;
     }
     class A {
-        public a!: any;
+        public a: any;
         static foo(): any {
             var a;
             return a;
         }
     }
-    namespace M {
+    module M {
         export var n: any;
     }
     var objA = new A();
@@ -39,10 +39,10 @@ negateOperatorWithAnyOtherType.ts(51,1): error TS2695: Left side of comma operat
     // any type literal
     var ResultIsNumber7 = -undefined;
                            ~~~~~~~~~
-!!! error TS18050: The value 'undefined' cannot be used here.
+!!! error TS2532: Object is possibly 'undefined'.
     var ResultIsNumber = -null;
                           ~~~~
-!!! error TS18050: The value 'null' cannot be used here.
+!!! error TS2531: Object is possibly 'null'.
     
     // any type expressions
     var ResultIsNumber8 = -ANY2[0];

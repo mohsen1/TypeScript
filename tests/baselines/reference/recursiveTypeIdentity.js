@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveTypeIdentity.ts] ////
-
 //// [recursiveTypeIdentity.ts]
 interface A {
     <T extends A>(x: T): void;

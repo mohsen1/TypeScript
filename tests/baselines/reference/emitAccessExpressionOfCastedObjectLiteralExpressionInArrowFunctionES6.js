@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitAccessExpressionOfCastedObjectLiteralExpressionInArrowFunctionES6.ts] ////
-
 //// [emitAccessExpressionOfCastedObjectLiteralExpressionInArrowFunctionES6.ts]
 (x) => ({ "1": "one", "2": "two" } as { [key: string]: string })[x];
 (x) => ({ "1": "one", "2": "two" } as { [key: string]: string }).x;

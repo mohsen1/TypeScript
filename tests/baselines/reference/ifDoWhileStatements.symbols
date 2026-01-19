@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/statements/ifDoWhileStatements/ifDoWhileStatements.ts] ////
-
-=== ifDoWhileStatements.ts ===
+=== tests/cases/conformance/statements/ifDoWhileStatements/ifDoWhileStatements.ts ===
 interface I {
 >I : Symbol(I, Decl(ifDoWhileStatements.ts, 0, 0))
 
@@ -56,11 +54,11 @@ function F2(x: number): boolean { return x < 42; }
 >x : Symbol(x, Decl(ifDoWhileStatements.ts, 20, 12))
 >x : Symbol(x, Decl(ifDoWhileStatements.ts, 20, 12))
 
-namespace M {
+module M {
 >M : Symbol(M, Decl(ifDoWhileStatements.ts, 20, 50))
 
     export class A {
->A : Symbol(A, Decl(ifDoWhileStatements.ts, 22, 13))
+>A : Symbol(A, Decl(ifDoWhileStatements.ts, 22, 10))
 
         name: string;
 >name : Symbol(A.name, Decl(ifDoWhileStatements.ts, 23, 20))
@@ -74,11 +72,11 @@ namespace M {
 >toString : Symbol(Number.toString, Decl(lib.es5.d.ts, --, --))
 }
 
-namespace N {
+module N {
 >N : Symbol(N, Decl(ifDoWhileStatements.ts, 28, 1))
 
     export class A {
->A : Symbol(A, Decl(ifDoWhileStatements.ts, 30, 13))
+>A : Symbol(A, Decl(ifDoWhileStatements.ts, 30, 10))
 
         id: number;
 >id : Symbol(A.id, Decl(ifDoWhileStatements.ts, 31, 20))

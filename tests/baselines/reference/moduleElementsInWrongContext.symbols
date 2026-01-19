@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/moduleElementsInWrongContext.ts] ////
-
-=== moduleElementsInWrongContext.ts ===
+=== tests/cases/compiler/moduleElementsInWrongContext.ts ===
 {
-    namespace M { }
+    module M { }
 >M : Symbol(M, Decl(moduleElementsInWrongContext.ts, 0, 1))
 
     export namespace N {
->N : Symbol(N, Decl(moduleElementsInWrongContext.ts, 1, 19))
+>N : Symbol(N, Decl(moduleElementsInWrongContext.ts, 1, 16))
 
         export interface I { }
 >I : Symbol(I, Decl(moduleElementsInWrongContext.ts, 2, 24))

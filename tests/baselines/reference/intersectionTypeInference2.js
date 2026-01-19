@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionTypeInference2.ts] ////
-
 //// [intersectionTypeInference2.ts]
 declare function f<T>(x: { prop: T }): T;
 

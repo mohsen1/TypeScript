@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/defaultParameters/emitDefaultParametersMethod.ts] ////
-
 //// [emitDefaultParametersMethod.ts]
 class C {
     constructor(t: boolean, z: string, x: number, y = "hello") { }

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/multipleExportAssignmentsInAmbientDeclaration.ts] ////
-
-=== multipleExportAssignmentsInAmbientDeclaration.ts ===
+=== tests/cases/compiler/multipleExportAssignmentsInAmbientDeclaration.ts ===
 declare module "m1" {
 >"m1" : Symbol("m1", Decl(multipleExportAssignmentsInAmbientDeclaration.ts, 0, 0))
 

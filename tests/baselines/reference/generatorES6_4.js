@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/generatorES6_4.ts] ////
-
 //// [generatorES6_4.ts]
 var v = { 
    *foo() {

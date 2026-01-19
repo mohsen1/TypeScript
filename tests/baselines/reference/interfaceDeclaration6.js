@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceDeclaration6.ts] ////
-
 //// [interfaceDeclaration6.ts]
 interface i1 { foo: number; };
 interface i2 extends i1 { foo: number; };

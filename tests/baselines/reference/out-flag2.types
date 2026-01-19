@@ -1,12 +1,8 @@
-//// [tests/cases/compiler/out-flag2.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class A { }
 >A : A
->  : ^
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 class B { }
 >B : B
->  : ^
 

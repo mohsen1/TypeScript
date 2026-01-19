@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/keyofObjectWithGlobalSymbolIncluded.ts] ////
-
-=== keyofObjectWithGlobalSymbolIncluded.ts ===
+=== tests/cases/compiler/keyofObjectWithGlobalSymbolIncluded.ts ===
 const obj = {
 >obj : Symbol(obj, Decl(keyofObjectWithGlobalSymbolIncluded.ts, 0, 5))
 

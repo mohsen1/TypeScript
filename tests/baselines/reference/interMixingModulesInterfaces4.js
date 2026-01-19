@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/interMixingModulesInterfaces4.ts] ////
-
 //// [interMixingModulesInterfaces4.ts]
-namespace A {
+module A {
 
-    export namespace B {
+    export module B {
         export function createB(): number {
             return null;
         }

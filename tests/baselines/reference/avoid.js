@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/avoid.ts] ////
-
 //// [avoid.ts]
 function f() {
     var x=1;

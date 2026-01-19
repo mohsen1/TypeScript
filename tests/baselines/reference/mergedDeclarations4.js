@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/mergedDeclarations4.ts] ////
-
 //// [mergedDeclarations4.ts]
-namespace M {
+module M {
     export function f() { }
     f();
     M.f();    
     var r = f.hello;
 }
  
-namespace M {
-    export namespace f {
+module M {
+    export module f {
         export var hello = 1;
     }
     f();

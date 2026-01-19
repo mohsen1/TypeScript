@@ -1,24 +1,18 @@
-//// [tests/cases/compiler/doNotEmitDetachedCommentsAtStartOfConstructor.ts] ////
-
-=== doNotEmitDetachedCommentsAtStartOfConstructor.ts ===
+=== tests/cases/compiler/doNotEmitDetachedCommentsAtStartOfConstructor.ts ===
 class A {
 >A : A
->  : ^
 
     constructor() {
         // Single Line Comment
 
         var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
     }
 }
 
 class B {
 >B : B
->  : ^
 
     constructor() {
         /* 
@@ -27,15 +21,12 @@ class B {
 
         var y = 10;
 >y : number
->  : ^^^^^^
 >10 : 10
->   : ^^
     }
 }
 
 class C {
 >C : C
->  : ^
 
     constructor() {
         // Single Line Comment with more than one blank line
@@ -43,15 +34,12 @@ class C {
 
         var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
     }
 }
 
 class D {
 >D : D
->  : ^
 
     constructor() {
         /* 
@@ -61,8 +49,6 @@ class D {
 
         var y = 10;
 >y : number
->  : ^^^^^^
 >10 : 10
->   : ^^
     }
 }

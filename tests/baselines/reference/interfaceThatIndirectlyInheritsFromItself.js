@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceThatIndirectlyInheritsFromItself.ts] ////
-
 //// [interfaceThatIndirectlyInheritsFromItself.ts]
 interface Base extends Derived2 { // error
     x: string;
@@ -13,7 +11,7 @@ interface Derived2 extends Derived {
     z: string;
 }
 
-namespace Generic {
+module Generic {
     interface Base<T> extends Derived2<T> { // error
         x: string;
     }

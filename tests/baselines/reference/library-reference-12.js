@@ -1,6 +1,8 @@
 //// [tests/cases/conformance/references/library-reference-12.ts] ////
 
 //// [package.json]
+// package.json in a secondary reference can refer to another file
+
 {
     "types": "dist/jquery.d.ts"
 }

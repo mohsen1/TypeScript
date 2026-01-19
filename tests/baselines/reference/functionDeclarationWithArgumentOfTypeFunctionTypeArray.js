@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionDeclarationWithArgumentOfTypeFunctionTypeArray.ts] ////
-
 //// [functionDeclarationWithArgumentOfTypeFunctionTypeArray.ts]
 function foo(args: { (x): number }[]) {
     return args.length;

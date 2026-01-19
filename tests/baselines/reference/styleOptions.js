@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/styleOptions.ts] ////
-
 //// [styleOptions.ts]
 ///<style eqeqeq="on" strict="on" /> 
 

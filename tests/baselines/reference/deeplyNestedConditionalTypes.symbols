@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/deeplyNestedConditionalTypes.ts] ////
-
-=== deeplyNestedConditionalTypes.ts ===
+=== tests/cases/compiler/deeplyNestedConditionalTypes.ts ===
 type Foo<T> =
 >Foo : Symbol(Foo, Decl(deeplyNestedConditionalTypes.ts, 0, 0))
 >T : Symbol(T, Decl(deeplyNestedConditionalTypes.ts, 0, 9))

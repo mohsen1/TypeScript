@@ -1,32 +1,30 @@
-//// [tests/cases/compiler/declFileTypeAnnotationVisibilityErrorTypeAlias.ts] ////
-
 //// [declFileTypeAnnotationVisibilityErrorTypeAlias.ts]
 interface Window {
     someMethod();
 }
 
-namespace M {
+module M {
     type W = Window | string;
-    export namespace N {
+    export module N {
         export class Window { }
         export var p: W; // Should report error that W is private
     }
 }
 
-namespace M1 {
+module M1 {
     export type W = Window | string;
-    export namespace N {
+    export module N {
         export class Window { }
         export var p: W; // No error
     }
 }
 
-namespace M2 {
+module M2 {
     class private1 {
     }
     class public1 {
     }
-    namespace m3 {
+    module m3 {
         export class public1 {
         }
     }
@@ -95,29 +93,29 @@ var M2;
 interface Window {
     someMethod(): any;
 }
-declare namespace M {
+declare module M {
     type W = Window | string;
-    export namespace N {
+    export module N {
         class Window {
         }
         var p: W;
     }
     export {};
 }
-declare namespace M1 {
+declare module M1 {
     type W = Window | string;
-    namespace N {
+    module N {
         class Window {
         }
         var p: W;
     }
 }
-declare namespace M2 {
+declare module M2 {
     class private1 {
     }
     class public1 {
     }
-    namespace m3 {
+    module m3 {
         class public1 {
         }
     }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/extendAndImplementTheSameBaseType.ts] ////
-
 //// [extendAndImplementTheSameBaseType.ts]
 class C {
     foo: number

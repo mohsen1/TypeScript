@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/privacyCheckAnonymousFunctionParameter.ts] ////
-
 //// [privacyCheckAnonymousFunctionParameter.ts]
 export var x = 1;  // Makes this an external module
 interface Iterator<T> {
 }
 
-namespace Query {
+module Query {
     export function fromDoWhile<T>(doWhile: (test: Iterator<T>) => boolean): Iterator<T> {
         return null;
     }
@@ -20,7 +18,7 @@ namespace Query {
 
 //// [privacyCheckAnonymousFunctionParameter.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 exports.x = 1; // Makes this an external module
 var Query;

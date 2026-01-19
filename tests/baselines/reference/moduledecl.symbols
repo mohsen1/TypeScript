@@ -1,36 +1,34 @@
-//// [tests/cases/compiler/moduledecl.ts] ////
-
-=== moduledecl.ts ===
-namespace a {
+=== tests/cases/compiler/moduledecl.ts ===
+module a {
 >a : Symbol(a, Decl(moduledecl.ts, 0, 0))
 }
 
-namespace b.a {
+module b.a {
 >b : Symbol(b, Decl(moduledecl.ts, 1, 1))
->a : Symbol(a, Decl(moduledecl.ts, 3, 12))
+>a : Symbol(a, Decl(moduledecl.ts, 3, 9))
 }
 
-namespace c.a.b {
+module c.a.b {
 >c : Symbol(c, Decl(moduledecl.ts, 4, 1))
->a : Symbol(a, Decl(moduledecl.ts, 6, 12))
->b : Symbol(ma.b, Decl(moduledecl.ts, 6, 14))
+>a : Symbol(a, Decl(moduledecl.ts, 6, 9))
+>b : Symbol(ma.b, Decl(moduledecl.ts, 6, 11))
 
     import ma = a;
->ma : Symbol(ma, Decl(moduledecl.ts, 6, 17))
->a : Symbol(ma, Decl(moduledecl.ts, 6, 12))
+>ma : Symbol(ma, Decl(moduledecl.ts, 6, 14))
+>a : Symbol(ma, Decl(moduledecl.ts, 6, 9))
 }
 
-namespace mImport {
+module mImport {
 >mImport : Symbol(mImport, Decl(moduledecl.ts, 8, 1))
 
     import d = a;
->d : Symbol(d, Decl(moduledecl.ts, 10, 19))
+>d : Symbol(d, Decl(moduledecl.ts, 10, 16))
 >a : Symbol(d, Decl(moduledecl.ts, 0, 0))
 
     import e = b.a;
 >e : Symbol(e, Decl(moduledecl.ts, 11, 17))
 >b : Symbol(b, Decl(moduledecl.ts, 1, 1))
->a : Symbol(e, Decl(moduledecl.ts, 3, 12))
+>a : Symbol(e, Decl(moduledecl.ts, 3, 9))
 
     import d1 = a;
 >d1 : Symbol(d1, Decl(moduledecl.ts, 12, 19))
@@ -39,14 +37,14 @@ namespace mImport {
     import e1 = b.a;
 >e1 : Symbol(e1, Decl(moduledecl.ts, 13, 18))
 >b : Symbol(b, Decl(moduledecl.ts, 1, 1))
->a : Symbol(e, Decl(moduledecl.ts, 3, 12))
+>a : Symbol(e, Decl(moduledecl.ts, 3, 9))
 }
 
-namespace m0 {
+module m0 {
 >m0 : Symbol(m0, Decl(moduledecl.ts, 15, 1))
 
     function f1() {
->f1 : Symbol(f1, Decl(moduledecl.ts, 17, 14))
+>f1 : Symbol(f1, Decl(moduledecl.ts, 17, 11))
     }
 
     function f2(s: string);
@@ -100,7 +98,7 @@ namespace m0 {
     import m4 = b.a;
 >m4 : Symbol(m4, Decl(moduledecl.ts, 39, 18))
 >b : Symbol(m3, Decl(moduledecl.ts, 1, 1))
->a : Symbol(m3.a, Decl(moduledecl.ts, 3, 12))
+>a : Symbol(m3.a, Decl(moduledecl.ts, 3, 9))
 
     import m5 = c;
 >m5 : Symbol(m5, Decl(moduledecl.ts, 40, 20))
@@ -109,20 +107,20 @@ namespace m0 {
     import m6 = c.a;
 >m6 : Symbol(m6, Decl(moduledecl.ts, 41, 18))
 >c : Symbol(m5, Decl(moduledecl.ts, 4, 1))
->a : Symbol(m5.a, Decl(moduledecl.ts, 6, 12))
+>a : Symbol(m5.a, Decl(moduledecl.ts, 6, 9))
 
     import m7 = c.a.b;
 >m7 : Symbol(m7, Decl(moduledecl.ts, 42, 20))
 >c : Symbol(m5, Decl(moduledecl.ts, 4, 1))
->a : Symbol(m5.a, Decl(moduledecl.ts, 6, 12))
->b : Symbol(m6.b, Decl(moduledecl.ts, 6, 14))
+>a : Symbol(m5.a, Decl(moduledecl.ts, 6, 9))
+>b : Symbol(m6.b, Decl(moduledecl.ts, 6, 11))
 }
 
-namespace m1 {
+module m1 {
 >m1 : Symbol(m1, Decl(moduledecl.ts, 44, 1))
 
     export function f1() {
->f1 : Symbol(f1, Decl(moduledecl.ts, 46, 14))
+>f1 : Symbol(f1, Decl(moduledecl.ts, 46, 11))
     }
 
     export function f2(s: string);
@@ -194,7 +192,7 @@ namespace m1 {
     import m4 = b.a;
 >m4 : Symbol(m4, Decl(moduledecl.ts, 76, 18))
 >b : Symbol(m3, Decl(moduledecl.ts, 1, 1))
->a : Symbol(m3.a, Decl(moduledecl.ts, 3, 12))
+>a : Symbol(m3.a, Decl(moduledecl.ts, 3, 9))
 
     import m5 = c;
 >m5 : Symbol(m5, Decl(moduledecl.ts, 77, 20))
@@ -203,20 +201,20 @@ namespace m1 {
     import m6 = c.a;
 >m6 : Symbol(m6, Decl(moduledecl.ts, 78, 18))
 >c : Symbol(m5, Decl(moduledecl.ts, 4, 1))
->a : Symbol(m5.a, Decl(moduledecl.ts, 6, 12))
+>a : Symbol(m5.a, Decl(moduledecl.ts, 6, 9))
 
     import m7 = c.a.b;
 >m7 : Symbol(m7, Decl(moduledecl.ts, 79, 20))
 >c : Symbol(m5, Decl(moduledecl.ts, 4, 1))
->a : Symbol(m5.a, Decl(moduledecl.ts, 6, 12))
->b : Symbol(m6.b, Decl(moduledecl.ts, 6, 14))
+>a : Symbol(m5.a, Decl(moduledecl.ts, 6, 9))
+>b : Symbol(m6.b, Decl(moduledecl.ts, 6, 11))
 }
 
-namespace m {
+module m {
 >m : Symbol(m, Decl(moduledecl.ts, 81, 1), Decl(moduledecl.ts, 92, 1))
 
-    export namespace m2 {
->m2 : Symbol(m2, Decl(moduledecl.ts, 83, 13))
+    export module m2 {
+>m2 : Symbol(m2, Decl(moduledecl.ts, 83, 10))
 
         var a = 10;
 >a : Symbol(a, Decl(moduledecl.ts, 85, 11))
@@ -225,7 +223,7 @@ namespace m {
 >b : Symbol(b, Decl(moduledecl.ts, 86, 18))
     }
 
-    export namespace m3 {
+    export module m3 {
 >m3 : Symbol(m3, Decl(moduledecl.ts, 87, 5))
 
         export var c: number;
@@ -233,14 +231,14 @@ namespace m {
     }
 }
 
-namespace m {
+module m {
 >m : Symbol(m, Decl(moduledecl.ts, 81, 1), Decl(moduledecl.ts, 92, 1))
 
-    export namespace m25 {
->m25 : Symbol(m25, Decl(moduledecl.ts, 94, 13))
+    export module m25 {
+>m25 : Symbol(m25, Decl(moduledecl.ts, 94, 10))
 
-        export namespace m5 {
->m5 : Symbol(m5, Decl(moduledecl.ts, 96, 26))
+        export module m5 {
+>m5 : Symbol(m5, Decl(moduledecl.ts, 96, 23))
 
             export var c: number;
 >c : Symbol(c, Decl(moduledecl.ts, 98, 22))
@@ -248,17 +246,17 @@ namespace m {
     }
 }
 
-namespace m13 {
+module m13 {
 >m13 : Symbol(m13, Decl(moduledecl.ts, 101, 1))
 
-    export namespace m4 {
->m4 : Symbol(m4, Decl(moduledecl.ts, 103, 15))
+    export module m4 {
+>m4 : Symbol(m4, Decl(moduledecl.ts, 103, 12))
 
-        export namespace m2 {
->m2 : Symbol(m2, Decl(moduledecl.ts, 104, 25))
+        export module m2 {
+>m2 : Symbol(m2, Decl(moduledecl.ts, 104, 22))
 
-            export namespace m3 {
->m3 : Symbol(m3, Decl(moduledecl.ts, 105, 29))
+            export module m3 {
+>m3 : Symbol(m3, Decl(moduledecl.ts, 105, 26))
 
                 export var c: number;
 >c : Symbol(c, Decl(moduledecl.ts, 107, 26))
@@ -273,28 +271,28 @@ namespace m13 {
     }
 }
 
-declare namespace m4 {
+declare module m4 {
 >m4 : Symbol(m4, Decl(moduledecl.ts, 115, 1))
 
     export var b;
 >b : Symbol(b, Decl(moduledecl.ts, 118, 14))
 }
 
-declare namespace m5 {
+declare module m5 {
 >m5 : Symbol(m5, Decl(moduledecl.ts, 119, 1))
 
     export var c;
 >c : Symbol(c, Decl(moduledecl.ts, 122, 14))
 }
 
-declare namespace m43 {
+declare module m43 {
 >m43 : Symbol(m43, Decl(moduledecl.ts, 123, 1))
 
     export var b;
 >b : Symbol(b, Decl(moduledecl.ts, 126, 14))
 }
 
-declare namespace m55 {
+declare module m55 {
 >m55 : Symbol(m55, Decl(moduledecl.ts, 127, 1))
 
     export var c;
@@ -308,11 +306,11 @@ declare module "m3" {
 >b : Symbol(b, Decl(moduledecl.ts, 134, 14))
 }
 
-namespace exportTests {
+module exportTests {
 >exportTests : Symbol(exportTests, Decl(moduledecl.ts, 135, 1))
 
     export class C1_public {
->C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 23))
+>C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 20))
 
         private f2() {
 >f2 : Symbol(C1_public.f2, Decl(moduledecl.ts, 138, 28))
@@ -366,27 +364,27 @@ namespace exportTests {
 >getC1_public : Symbol(C3_public.getC1_public, Decl(moduledecl.ts, 165, 9))
 
             return new C1_public();
->C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 23))
+>C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 20))
         }
         public setC1_public(arg: C1_public) {
 >setC1_public : Symbol(C3_public.setC1_public, Decl(moduledecl.ts, 168, 9))
 >arg : Symbol(arg, Decl(moduledecl.ts, 169, 28))
->C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 23))
+>C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 20))
         }
         public get c1() {
 >c1 : Symbol(C3_public.c1, Decl(moduledecl.ts, 170, 9))
 
             return new C1_public();
->C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 23))
+>C1_public : Symbol(C1_public, Decl(moduledecl.ts, 137, 20))
         }
     }
 }
 
-declare namespace mAmbient {
+declare module mAmbient {
 >mAmbient : Symbol(mAmbient, Decl(moduledecl.ts, 175, 1))
 
     class C {
->C : Symbol(C, Decl(moduledecl.ts, 177, 28))
+>C : Symbol(C, Decl(moduledecl.ts, 177, 25))
 
         public myProp: number;
 >myProp : Symbol(C.myProp, Decl(moduledecl.ts, 178, 13))
@@ -394,11 +392,11 @@ declare namespace mAmbient {
 
     function foo() : C;
 >foo : Symbol(foo, Decl(moduledecl.ts, 180, 5))
->C : Symbol(C, Decl(moduledecl.ts, 177, 28))
+>C : Symbol(C, Decl(moduledecl.ts, 177, 25))
 
     var aVar: C;
 >aVar : Symbol(aVar, Decl(moduledecl.ts, 183, 7))
->C : Symbol(C, Decl(moduledecl.ts, 177, 28))
+>C : Symbol(C, Decl(moduledecl.ts, 177, 25))
 
     interface B {
 >B : Symbol(B, Decl(moduledecl.ts, 183, 16))
@@ -408,7 +406,7 @@ declare namespace mAmbient {
 
         y: C;
 >y : Symbol(B.y, Decl(moduledecl.ts, 185, 18))
->C : Symbol(C, Decl(moduledecl.ts, 177, 28))
+>C : Symbol(C, Decl(moduledecl.ts, 177, 25))
     }
     enum e {
 >e : Symbol(e, Decl(moduledecl.ts, 187, 5))
@@ -423,11 +421,11 @@ declare namespace mAmbient {
 >z : Symbol(e.z, Decl(moduledecl.ts, 190, 10))
     }
 
-    namespace m3 {
+    module m3 {
 >m3 : Symbol(m3, Decl(moduledecl.ts, 192, 5))
 
         class C {
->C : Symbol(C, Decl(moduledecl.ts, 194, 18))
+>C : Symbol(C, Decl(moduledecl.ts, 194, 15))
 
             public myProp: number;
 >myProp : Symbol(C.myProp, Decl(moduledecl.ts, 195, 17))
@@ -435,11 +433,11 @@ declare namespace mAmbient {
 
         function foo(): C;
 >foo : Symbol(foo, Decl(moduledecl.ts, 197, 9))
->C : Symbol(C, Decl(moduledecl.ts, 194, 18))
+>C : Symbol(C, Decl(moduledecl.ts, 194, 15))
 
         var aVar: C;
 >aVar : Symbol(aVar, Decl(moduledecl.ts, 200, 11))
->C : Symbol(C, Decl(moduledecl.ts, 194, 18))
+>C : Symbol(C, Decl(moduledecl.ts, 194, 15))
 
         interface B {
 >B : Symbol(B, Decl(moduledecl.ts, 200, 20))
@@ -449,7 +447,7 @@ declare namespace mAmbient {
 
             y: C;
 >y : Symbol(B.y, Decl(moduledecl.ts, 202, 22))
->C : Symbol(C, Decl(moduledecl.ts, 194, 18))
+>C : Symbol(C, Decl(moduledecl.ts, 194, 15))
         }
         enum e {
 >e : Symbol(e, Decl(moduledecl.ts, 204, 9))
@@ -477,9 +475,9 @@ function foo() {
 
 var cVar = new mAmbient.C();
 >cVar : Symbol(cVar, Decl(moduledecl.ts, 217, 3))
->mAmbient.C : Symbol(mAmbient.C, Decl(moduledecl.ts, 177, 28))
+>mAmbient.C : Symbol(mAmbient.C, Decl(moduledecl.ts, 177, 25))
 >mAmbient : Symbol(mAmbient, Decl(moduledecl.ts, 175, 1))
->C : Symbol(mAmbient.C, Decl(moduledecl.ts, 177, 28))
+>C : Symbol(mAmbient.C, Decl(moduledecl.ts, 177, 25))
 
 var aVar = mAmbient.aVar;
 >aVar : Symbol(aVar, Decl(moduledecl.ts, 218, 3))
@@ -510,11 +508,11 @@ function m3foo() {
 
 var m3cVar = new mAmbient.m3.C();
 >m3cVar : Symbol(m3cVar, Decl(moduledecl.ts, 226, 3))
->mAmbient.m3.C : Symbol(mAmbient.m3.C, Decl(moduledecl.ts, 194, 18))
+>mAmbient.m3.C : Symbol(mAmbient.m3.C, Decl(moduledecl.ts, 194, 15))
 >mAmbient.m3 : Symbol(mAmbient.m3, Decl(moduledecl.ts, 192, 5))
 >mAmbient : Symbol(mAmbient, Decl(moduledecl.ts, 175, 1))
 >m3 : Symbol(mAmbient.m3, Decl(moduledecl.ts, 192, 5))
->C : Symbol(mAmbient.m3.C, Decl(moduledecl.ts, 194, 18))
+>C : Symbol(mAmbient.m3.C, Decl(moduledecl.ts, 194, 15))
 
 var m3aVar = mAmbient.m3.aVar;
 >m3aVar : Symbol(m3aVar, Decl(moduledecl.ts, 227, 3))

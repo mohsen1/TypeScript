@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/moduleElementsInWrongContext3.ts] ////
-
 //// [moduleElementsInWrongContext3.ts]
-namespace P {
+module P {
     {
-        namespace M { }
+        module M { }
         export namespace N {
             export interface I { }
         }

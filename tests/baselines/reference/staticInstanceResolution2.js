@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticInstanceResolution2.ts] ////
-
 //// [staticInstanceResolution2.ts]
 class A { }
 A.hasOwnProperty('foo');

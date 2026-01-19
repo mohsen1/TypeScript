@@ -9,6 +9,6 @@ declare var a: number;
 
 //// [1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.j = void 0;
 exports.j = "hello"; // error

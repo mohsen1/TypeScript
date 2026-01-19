@@ -1,17 +1,13 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocReturnTag2.ts] ////
-
-=== returns.js ===
+=== tests/cases/conformance/jsdoc/returns.js ===
 // @ts-check
 /**
  * @returns {string} This comment is not currently exposed
  */
 function f() {
 >f : () => string
->  : ^^^^^^      
 
     return 5;
 >5 : 5
->  : ^
 }
 
 /**
@@ -19,14 +15,9 @@ function f() {
  */
 function f1() {
 >f1 : () => string | number
->   : ^^^^^^               
 
     return 5 || true;
 >5 || true : true | 5
->          : ^^^^^^^^
 >5 : 5
->  : ^
 >true : true
->     : ^^^^
 }
-

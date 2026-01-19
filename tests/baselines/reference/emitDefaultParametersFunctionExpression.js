@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/defaultParameters/emitDefaultParametersFunctionExpression.ts] ////
-
 //// [emitDefaultParametersFunctionExpression.ts]
 var lambda1 = (y = "hello") => { }
 var lambda2 = (x: number, y = "hello") => { }

@@ -37,7 +37,7 @@ const AnotherMixedClass = MyMixin(MyExtendedClass);
 
 //// [BaseClass.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.MyBaseClass = void 0;
 var MyBaseClass = /** @class */ (function () {
     function MyBaseClass(value) {
@@ -62,8 +62,8 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.MyMixin = MyMixin;
+exports.__esModule = true;
+exports.MyMixin = void 0;
 function MyMixin(base) {
     return /** @class */ (function (_super) {
         __extends(class_1, _super);
@@ -73,6 +73,7 @@ function MyMixin(base) {
         return class_1;
     }(base));
 }
+exports.MyMixin = MyMixin;
 //// [FinalClass.js]
 "use strict";
 var __extends = (this && this.__extends) || (function () {
@@ -90,7 +91,7 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.MyExtendedClass = void 0;
 var BaseClass_1 = require("./BaseClass");
 var MixinClass_1 = require("./MixinClass");
@@ -104,7 +105,7 @@ var MyExtendedClass = /** @class */ (function (_super) {
 exports.MyExtendedClass = MyExtendedClass;
 //// [Main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var FinalClass_1 = require("./FinalClass");
 var MixinClass_1 = require("./MixinClass");
 var myExtendedClass = new FinalClass_1.MyExtendedClass('string');
@@ -112,7 +113,7 @@ var AnotherMixedClass = (0, MixinClass_1.MyMixin)(FinalClass_1.MyExtendedClass);
 
 
 //// [BaseClass.d.ts]
-export type Constructor<T> = new (...args: any[]) => T;
+export declare type Constructor<T> = new (...args: any[]) => T;
 export declare class MyBaseClass<T> {
     baseProperty: string;
     constructor(value: T);

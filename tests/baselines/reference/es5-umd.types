@@ -1,9 +1,6 @@
-//// [tests/cases/compiler/es5-umd.ts] ////
-
-=== es5-umd.ts ===
+=== tests/cases/compiler/es5-umd.ts ===
 class A
 >A : A
->  : ^
 {
     constructor ()
     {
@@ -12,11 +9,9 @@ class A
 
     public B()
 >B : () => number
->  : ^^^^^^^^^^^^
     {
         return 42;
 >42 : 42
->   : ^^
     }
 }
 

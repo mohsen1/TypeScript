@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractProperties.ts] ////
-
 //// [classAbstractProperties.ts]
 abstract class A {
     abstract x : number;

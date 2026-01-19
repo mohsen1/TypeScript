@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource12.ts] ////
-
 //// [parserRealSource12.ts]
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
     export interface IAstWalker {
         walk(ast: AST, parent: AST): AST;
         options: AstWalkOptions;
@@ -220,7 +218,7 @@ namespace TypeScript {
         return globalAstWalkerFactory;
     }
 
-    namespace ChildrenWalkers {
+    module ChildrenWalkers {
         export function walkNone(preAst: ASTList, parent: AST, walker: IAstWalker): void {
             // Nothing to do
         }

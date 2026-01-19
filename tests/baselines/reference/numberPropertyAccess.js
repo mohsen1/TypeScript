@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/number/numberPropertyAccess.ts] ////
-
 //// [numberPropertyAccess.ts]
 var x = 1;
 var a = x.toExponential();

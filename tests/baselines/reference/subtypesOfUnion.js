@@ -1,14 +1,12 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypesOfUnion.ts] ////
-
 //// [subtypesOfUnion.ts]
 enum E { e1, e2 }
 interface I8 { [x: string]: number[]; }
 class A { foo: number; }
 class A2<T> { foo: T; }
 function f() { }
-namespace f { export var bar = 1; }
+module f { export var bar = 1; }
 class c { baz: string }
-namespace c { export var bar = 1; }
+module c { export var bar = 1; }
 
 // A type T is a subtype of a union type U if T is a subtype of any type in U.
 interface I1<T> {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mappedTypeInferenceCircularity.ts] ////
-
 //// [mappedTypeInferenceCircularity.ts]
 // Repro from #12511
 

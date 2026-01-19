@@ -12,7 +12,7 @@ declare module "./observable" {
     class Bar {}
     let y: number, z: string;
     let {a: x, b: x1}: {a: number, b: number};
-    namespace Z {}
+    module Z {}
 }
 
 //// [observable.ts]
@@ -29,15 +29,15 @@ let y = x.map(x => x + 1);
 
 //// [observable.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [map.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var observable_1 = require("./observable");
 observable_1.Observable.prototype.map = function () { };
 //// [main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 require("./map");
 var x;
 var y = x.map(function (x) { return x + 1; });

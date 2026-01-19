@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emitClassExpressionInDeclarationFile.ts] ////
-
-=== emitClassExpressionInDeclarationFile.ts ===
+=== tests/cases/compiler/emitClassExpressionInDeclarationFile.ts ===
 export var simpleExample = class {
 >simpleExample : Symbol(simpleExample, Decl(emitClassExpressionInDeclarationFile.ts, 0, 10))
 

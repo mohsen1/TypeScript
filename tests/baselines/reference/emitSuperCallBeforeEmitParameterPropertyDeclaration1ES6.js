@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/emitSuperCallBeforeEmitParameterPropertyDeclaration1ES6.ts] ////
-
 //// [emitSuperCallBeforeEmitParameterPropertyDeclaration1ES6.ts]
 class A {
     blub = 6;

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/sourceMapValidationImport.ts] ////
-
 //// [sourceMapValidationImport.ts]
-export namespace m {
+export module m {
     export class c {
     }
 }
@@ -12,7 +10,7 @@ var y = new b();
 
 //// [sourceMapValidationImport.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.b = exports.m = void 0;
 var m;
 (function (m) {
@@ -22,7 +20,7 @@ var m;
         return c;
     }());
     m.c = c;
-})(m || (exports.m = m = {}));
+})(m = exports.m || (exports.m = {}));
 var a = m.c;
 exports.b = m.c;
 var x = new a();

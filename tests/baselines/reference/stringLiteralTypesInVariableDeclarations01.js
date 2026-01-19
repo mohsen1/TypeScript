@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesInVariableDeclarations01.ts] ////
-
 //// [stringLiteralTypesInVariableDeclarations01.ts]
 let a: "";
 var b: "foo";

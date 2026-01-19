@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionReduction.ts] ////
-
 //// [intersectionReduction.ts]
 declare const sym1: unique symbol;
 declare const sym2: unique symbol;

@@ -33,7 +33,7 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var preact_1 = require("preact");
 var jsx_runtime_1 = require("preact/jsx-runtime");
 /// <reference path="react16.d.ts" />
@@ -54,7 +54,7 @@ var __assign = (this && this.__assign) || function () {
     };
     return __assign.apply(this, arguments);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var react_1 = require("react");
 var jsx_runtime_1 = require("react/jsx-runtime");
 /// <reference path="react16.d.ts" />

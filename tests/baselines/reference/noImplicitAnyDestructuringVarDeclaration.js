@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyDestructuringVarDeclaration.ts] ////
-
 //// [noImplicitAnyDestructuringVarDeclaration.ts]
 var [a], {b}, c, d; // error
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritedMembersAndIndexSignaturesFromDifferentBases2.ts] ////
-
 //// [inheritedMembersAndIndexSignaturesFromDifferentBases2.ts]
 interface A<T> {
     [n: number]: T;

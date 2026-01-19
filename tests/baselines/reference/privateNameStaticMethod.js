@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticMethod.ts] ////
-
 //// [privateNameStaticMethod.ts]
 class A1 {
     static #method(param: string): string {
@@ -24,9 +22,9 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _a, _A1_method;
 class A1 {
     constructor() {
-        __classPrivateFieldGet(_a, _a, "m", _A1_method).call(_a, "");
-        __classPrivateFieldGet(_a, _a, "m", _A1_method).call(_a, 1); // Error
-        __classPrivateFieldGet(_a, _a, "m", _A1_method).call(_a); // Error 
+        __classPrivateFieldGet(A1, _a, "m", _A1_method).call(A1, "");
+        __classPrivateFieldGet(A1, _a, "m", _A1_method).call(A1, 1); // Error
+        __classPrivateFieldGet(A1, _a, "m", _A1_method).call(A1); // Error 
     }
 }
 _a = A1, _A1_method = function _A1_method(param) {

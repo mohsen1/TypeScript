@@ -1,25 +1,3 @@
-//// [tests/cases/compiler/duplicateIdentifierShouldNotShortCircuitBaseTypeBinding.ts] ////
+=== tests/cases/compiler/duplicateIdentifierShouldNotShortCircuitBaseTypeBinding_0.ts ===
 
-=== duplicateIdentifierShouldNotShortCircuitBaseTypeBinding_0.ts ===
-export interface IPoint {}
-
-export namespace Shapes {
->Shapes : typeof Shapes
->       : ^^^^^^^^^^^^^
-
-    export class Point implements IPoint {}
->Point : Point
->      : ^^^^^
-
-}
-
-=== duplicateIdentifierShouldNotShortCircuitBaseTypeBinding_1.ts ===
-
-//var x = new Shapes.Point();
-//interface IPoint {}
-
-//namespace Shapes {
-
-//    export class Point implements IPoint {}
-
-//}
+No type information for this code.

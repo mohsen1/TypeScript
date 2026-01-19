@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/selfReferencingTypeReferenceInference.ts] ////
-
 //// [selfReferencingTypeReferenceInference.ts]
 interface Box<T> {
     __: T

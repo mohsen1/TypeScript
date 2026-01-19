@@ -1,7 +1,4 @@
-//// [tests/cases/compiler/prettyContextNotDebugAssertion.ts] ////
-
-=== index.ts ===
+=== tests/cases/compiler/index.ts ===
 if (true) {
 >true : true
->     : ^^^^
 

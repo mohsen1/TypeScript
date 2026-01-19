@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/generics4.ts] ////
-
 //// [generics4.ts]
 class C<T> { private x: T; }
 interface X { f(): string; }
 interface Y { f(): boolean; }
-declare var a: C<X>;
-declare var b: C<Y>;
+var a: C<X>;
+var b: C<Y>;
 
 a = b; // Not ok - return types of "f" are different
 
@@ -15,4 +13,6 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var a;
+var b;
 a = b; // Not ok - return types of "f" are different

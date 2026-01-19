@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inOperator.ts] ////
-
 //// [inOperator.ts]
 var a=[];
 
@@ -9,8 +7,8 @@ if (3 in a) {}
 
 var b = '' in 0;
 
-declare var c: any;
-declare var y: number;
+var c: any;
+var y: number;
 if (y in c) { }
 
 
@@ -19,4 +17,6 @@ var a = [];
 for (var x in a) { }
 if (3 in a) { }
 var b = '' in 0;
+var c;
+var y;
 if (y in c) { }

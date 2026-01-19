@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/assignmentCompatibility/everyTypeAssignableToAny.ts] ////
-
 //// [everyTypeAssignableToAny.ts]
 var a: any;
 

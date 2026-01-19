@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/expandoFunctionContextualTypesNoValue.ts] ////
-
 //// [expandoFunctionContextualTypesNoValue.ts]
 // GH #38532
 import Foo from "blah";
@@ -11,12 +9,10 @@ Foo.bar = () => { };
 
 //// [expandoFunctionContextualTypesNoValue.js]
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.Foo = Foo;
+exports.__esModule = true;
+exports.Foo = void 0;
 // GH #38532
-var blah_1 = __importDefault(require("blah"));
+var blah_1 = require("blah");
 function Foo() { }
-blah_1.default.bar = function () { };
+exports.Foo = Foo;
+blah_1["default"].bar = function () { };

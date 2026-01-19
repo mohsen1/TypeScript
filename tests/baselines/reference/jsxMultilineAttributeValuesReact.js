@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxMultilineAttributeValuesReact.tsx] ////
-
 //// [jsxMultilineAttributeValuesReact.tsx]
 declare var React: any;
 const a = <input value="

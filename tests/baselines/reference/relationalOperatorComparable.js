@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/relationalOperatorComparable.ts] ////
-
 //// [relationalOperatorComparable.ts]
 function f(onethree: 1 | 3, two: 2) {
     const t = true;

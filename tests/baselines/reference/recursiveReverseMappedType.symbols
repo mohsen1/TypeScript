@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/recursiveReverseMappedType.ts] ////
-
-=== recursiveReverseMappedType.ts ===
+=== tests/cases/compiler/recursiveReverseMappedType.ts ===
 // Repro from #38198
 
 type Recur<T> = (

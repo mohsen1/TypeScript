@@ -1,16 +1,12 @@
-//// [tests/cases/compiler/methodSignatureHandledDeclarationKindForSymbol.ts] ////
-
-=== methodSignatureHandledDeclarationKindForSymbol.ts ===
+=== tests/cases/compiler/methodSignatureHandledDeclarationKindForSymbol.ts ===
 interface Foo {
     bold(): string;
 >bold : () => string
->     : ^^^^^^      
 }
 
 interface Foo {
     bold: string;
 >bold : () => string
->     : ^^^^^^      
 }
 
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/multipleClassPropertyModifiersErrors.ts] ////
-
 //// [multipleClassPropertyModifiersErrors.ts]
 class C {
 	public public p1;

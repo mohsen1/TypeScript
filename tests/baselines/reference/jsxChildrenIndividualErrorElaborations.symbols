@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxChildrenIndividualErrorElaborations.tsx] ////
-
-=== index.tsx ===
+=== tests/cases/compiler/index.tsx ===
 /// <reference path="react16.d.ts" />
 import * as React from "react";
 >React : Symbol(React, Decl(index.tsx, 1, 6))

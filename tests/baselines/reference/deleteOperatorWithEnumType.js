@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/deleteOperator/deleteOperatorWithEnumType.ts] ////
-
 //// [deleteOperatorWithEnumType.ts]
 // delete  operator on enum type
 

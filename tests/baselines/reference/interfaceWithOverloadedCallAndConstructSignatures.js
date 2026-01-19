@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceWithOverloadedCallAndConstructSignatures.ts] ////
-
 //// [interfaceWithOverloadedCallAndConstructSignatures.ts]
 interface Foo {
     (): number;

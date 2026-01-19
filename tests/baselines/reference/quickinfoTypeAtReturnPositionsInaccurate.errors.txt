@@ -1,8 +1,8 @@
-quickinfoTypeAtReturnPositionsInaccurate.ts(33,15): error TS2339: Property 'numExclusive' does not exist on type 'NumClass<number> | StrClass<string>'.
+tests/cases/compiler/quickinfoTypeAtReturnPositionsInaccurate.ts(33,15): error TS2339: Property 'numExclusive' does not exist on type 'NumClass<number> | StrClass<string>'.
   Property 'numExclusive' does not exist on type 'StrClass<string>'.
 
 
-==== quickinfoTypeAtReturnPositionsInaccurate.ts (1 errors) ====
+==== tests/cases/compiler/quickinfoTypeAtReturnPositionsInaccurate.ts (1 errors) ====
     class NumClass<T extends number> {
         private value!: T;
         public get(): T {

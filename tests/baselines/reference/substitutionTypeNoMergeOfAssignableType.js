@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/substitutionTypeNoMergeOfAssignableType.ts] ////
-
 //// [substitutionTypeNoMergeOfAssignableType.ts]
 interface Entry {
     comment?: string;

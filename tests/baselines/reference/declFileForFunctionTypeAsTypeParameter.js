@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileForFunctionTypeAsTypeParameter.ts] ////
-
 //// [declFileForFunctionTypeAsTypeParameter.ts]
 class X<T> {
 }

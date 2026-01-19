@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseVoidErrorCallback.ts] ////
-
 //// [promiseVoidErrorCallback.ts]
 interface T1 {
     __t1: string;

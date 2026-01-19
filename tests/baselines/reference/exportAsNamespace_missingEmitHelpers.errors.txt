@@ -1,10 +1,10 @@
-b.ts(1,1): error TS2354: This syntax requires an imported helper but module 'tslib' cannot be found.
+tests/cases/conformance/es2020/modules/b.ts(1,1): error TS2354: This syntax requires an imported helper but module 'tslib' cannot be found.
 
 
-==== a.ts (0 errors) ====
+==== tests/cases/conformance/es2020/modules/a.ts (0 errors) ====
     export {}
     
-==== b.ts (1 errors) ====
+==== tests/cases/conformance/es2020/modules/b.ts (1 errors) ====
     export * as ns from './a'; // Error
     ~~~~~~~~~~~~~~~~~~~~~~~~~~
 !!! error TS2354: This syntax requires an imported helper but module 'tslib' cannot be found.

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/intersection/intersectionOfUnionOfUnitTypes.ts] ////
-
 //// [intersectionOfUnionOfUnitTypes.ts]
 // @strict
 

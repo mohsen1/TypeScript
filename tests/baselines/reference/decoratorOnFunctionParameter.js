@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/decorators/invalid/decoratorOnFunctionParameter.ts] ////
-
 //// [decoratorOnFunctionParameter.ts]
 declare const dec: any;
 

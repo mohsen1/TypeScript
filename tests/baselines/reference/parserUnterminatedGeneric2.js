@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/parser/ecmascript5/ErrorRecovery/parserUnterminatedGeneric2.ts] ////
-
 //// [parserUnterminatedGeneric2.ts]
-declare namespace ng {
+declare module ng {
     interfaceICompiledExpression {
         (context: any, locals?: any): any;
         assign(context: any, value: any): any;

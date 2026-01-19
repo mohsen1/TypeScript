@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocVariableDeclarationWithTypeAnnotation.ts] ////
-
 //// [foo.js]
 /** @type {boolean} */
 var /** @type {string} */ x,

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/es6ClassTest7.ts] ////
-
 //// [es6ClassTest7.ts]
-declare namespace M {
+declare module M {
     export class Foo {
     }
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/derivedClasses.ts] ////
-
 //// [derivedClasses.ts]
 class Red extends Color {
     public shade() { 

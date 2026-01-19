@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/mergeTwoInterfaces.ts] ////
-
 //// [mergeTwoInterfaces.ts]
 // two interfaces with the same root module should merge
 
@@ -31,7 +29,7 @@ var r3 = b.foo
 var r4 = b.bar;
 
 // basic non-generic and generic case inside a module
-namespace M {
+module M {
     interface A {
         foo: string;
     }

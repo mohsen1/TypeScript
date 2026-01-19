@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classMemberInitializerWithLamdaScoping5.ts] ////
-
 //// [classMemberInitializerWithLamdaScoping5.ts]
 declare var console: {
     log(message?: any, ...optionalParams: any[]): void;

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/objectSpreadWithinMethodWithinObjectWithSpread.ts] ////
-
-=== objectSpreadWithinMethodWithinObjectWithSpread.ts ===
+=== tests/cases/compiler/objectSpreadWithinMethodWithinObjectWithSpread.ts ===
 const obj = {};
 >obj : Symbol(obj, Decl(objectSpreadWithinMethodWithinObjectWithSpread.ts, 0, 5))
 

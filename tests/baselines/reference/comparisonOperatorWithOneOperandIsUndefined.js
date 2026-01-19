@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithOneOperandIsUndefined.ts] ////
-
 //// [comparisonOperatorWithOneOperandIsUndefined.ts]
 var x: typeof undefined;
 

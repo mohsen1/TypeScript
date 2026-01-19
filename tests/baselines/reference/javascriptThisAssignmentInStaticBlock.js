@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/javascriptThisAssignmentInStaticBlock.ts] ////
-
 //// [a.js]
 class Thing {
     static {
@@ -37,6 +35,7 @@ var __extends = (this && this.__extends) || (function () {
     };
 })();
 var _a, _b;
+var _this = this;
 var Thing = /** @class */ (function () {
     function Thing() {
     }

@@ -9,7 +9,7 @@ declare namespace Foo {
 }
 
 //// [foo2.ts]
-declare let x: { a: string; c: string; } | { b: number; c: number; };
+let x: { a: string; c: string; } | { b: number; c: number; };
 export = x
 
 //// [bar.ts]
@@ -20,10 +20,11 @@ c;
 
 //// [foo2.js]
 "use strict";
+var x;
 module.exports = x;
 //// [bar.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var foo_1 = require("./foo");
 (0, foo_1.foo)();
 var foo2_1 = require("./foo2");

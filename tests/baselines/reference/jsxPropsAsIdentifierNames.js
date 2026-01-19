@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxPropsAsIdentifierNames.tsx] ////
-
 //// [index.tsx]
 declare namespace JSX {
     interface Element { }
@@ -14,5 +12,5 @@ export default <div static={true} />;
 
 //// [index.jsx]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = <div static={true}/>;
+exports.__esModule = true;
+exports["default"] = <div static={true}/>;

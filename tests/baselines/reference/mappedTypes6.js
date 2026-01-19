@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypes6.ts] ////
-
 //// [mappedTypes6.ts]
 type T00<T> = { [P in keyof T]: T[P] };
 type T01<T> = { [P in keyof T]?: T[P] };
@@ -200,65 +198,65 @@ x5.b = 1;
 
 
 //// [mappedTypes6.d.ts]
-type T00<T> = {
+declare type T00<T> = {
     [P in keyof T]: T[P];
 };
-type T01<T> = {
+declare type T01<T> = {
     [P in keyof T]?: T[P];
 };
-type T02<T> = {
+declare type T02<T> = {
     [P in keyof T]+?: T[P];
 };
-type T03<T> = {
+declare type T03<T> = {
     [P in keyof T]-?: T[P];
 };
-type T04<T> = {
+declare type T04<T> = {
     readonly [P in keyof T]: T[P];
 };
-type T05<T> = {
+declare type T05<T> = {
     readonly [P in keyof T]?: T[P];
 };
-type T06<T> = {
+declare type T06<T> = {
     readonly [P in keyof T]+?: T[P];
 };
-type T07<T> = {
+declare type T07<T> = {
     readonly [P in keyof T]-?: T[P];
 };
-type T08<T> = {
+declare type T08<T> = {
     +readonly [P in keyof T]: T[P];
 };
-type T09<T> = {
+declare type T09<T> = {
     +readonly [P in keyof T]?: T[P];
 };
-type T10<T> = {
+declare type T10<T> = {
     +readonly [P in keyof T]+?: T[P];
 };
-type T11<T> = {
+declare type T11<T> = {
     +readonly [P in keyof T]-?: T[P];
 };
-type T12<T> = {
+declare type T12<T> = {
     -readonly [P in keyof T]: T[P];
 };
-type T13<T> = {
+declare type T13<T> = {
     -readonly [P in keyof T]?: T[P];
 };
-type T14<T> = {
+declare type T14<T> = {
     -readonly [P in keyof T]+?: T[P];
 };
-type T15<T> = {
+declare type T15<T> = {
     -readonly [P in keyof T]-?: T[P];
 };
 declare function f1<T>(x: Required<T>, y: T, z: Partial<T>): void;
-type Denullified<T> = {
+declare type Denullified<T> = {
     [P in keyof T]-?: NonNullable<T[P]>;
 };
 declare function f2<T>(w: Denullified<T>, x: Required<T>, y: T, z: Partial<T>): void;
 declare function f3<T>(w: Denullified<T>, x: Required<T>, y: T, z: Partial<T>): void;
-type Readwrite<T> = {
+declare type Readwrite<T> = {
     -readonly [P in keyof T]: T[P];
 };
 declare function f10<T>(x: Readonly<T>, y: T, z: Readwrite<T>): void;
-type Foo = {
+declare type Foo = {
     a: number;
     b: number | undefined;
     c?: number;
@@ -266,7 +264,7 @@ type Foo = {
 };
 declare let x1: Foo;
 declare let x2: Required<Foo>;
-type Bar = {
+declare type Bar = {
     a: number;
     readonly b: number;
 };

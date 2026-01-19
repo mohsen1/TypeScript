@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertyParameterWithQuestionMark.ts] ////
-
 //// [propertyParameterWithQuestionMark.ts]
 class C {
     constructor(public x?) { }
@@ -7,7 +5,7 @@ class C {
 
 // x should be an optional property
 var v: C = {}; // Should succeed
-declare var v2: { x? }
+var v2: { x? }
 v = v2; // Should succeed
 var v3: { x } = new C; // Should fail
 
@@ -20,5 +18,6 @@ var C = /** @class */ (function () {
 }());
 // x should be an optional property
 var v = {}; // Should succeed
+var v2;
 v = v2; // Should succeed
 var v3 = new C; // Should fail

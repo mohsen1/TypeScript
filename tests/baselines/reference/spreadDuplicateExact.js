@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadDuplicateExact.ts] ////
-
 //// [spreadDuplicateExact.ts]
 // Repro from #44438
 

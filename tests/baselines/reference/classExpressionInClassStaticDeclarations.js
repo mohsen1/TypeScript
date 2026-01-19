@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExpressionInClassStaticDeclarations.ts] ////
-
 //// [classExpressionInClassStaticDeclarations.ts]
 class C {
     static D = class extends C {};
@@ -39,6 +37,6 @@ var C = /** @class */ (function () {
 declare class C {
     static D: {
         new (): {};
-        D: /*elided*/ any;
+        D: any;
     };
 }

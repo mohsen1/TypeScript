@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportInFunction.ts] ////
-
 //// [exportInFunction.ts]
 function f() {
     export = 0;

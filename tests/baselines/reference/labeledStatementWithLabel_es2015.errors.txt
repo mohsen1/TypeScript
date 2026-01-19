@@ -1,8 +1,8 @@
-labeledStatementWithLabel_es2015.ts(11,8): error TS1235: A namespace declaration is only allowed at the top level of a namespace or module.
-labeledStatementWithLabel_es2015.ts(12,8): error TS1235: A namespace declaration is only allowed at the top level of a namespace or module.
+tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel_es2015.ts(11,8): error TS1235: A namespace declaration is only allowed in a namespace or module.
+tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel_es2015.ts(12,8): error TS1235: A namespace declaration is only allowed in a namespace or module.
 
 
-==== labeledStatementWithLabel_es2015.ts (2 errors) ====
+==== tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel_es2015.ts (2 errors) ====
     label: function fn() { }
     label: function* gen() { }
     label: async function gen1() { }
@@ -13,11 +13,11 @@ labeledStatementWithLabel_es2015.ts(12,8): error TS1235: A namespace declaration
     label: let b = 1;
     label: const c = 1;
     
-    label: namespace M { }
-           ~~~~~~~~~
-!!! error TS1235: A namespace declaration is only allowed at the top level of a namespace or module.
+    label: module M { }
+           ~~~~~~
+!!! error TS1235: A namespace declaration is only allowed in a namespace or module.
     label: namespace N {}
            ~~~~~~~~~
-!!! error TS1235: A namespace declaration is only allowed at the top level of a namespace or module.
+!!! error TS1235: A namespace declaration is only allowed in a namespace or module.
     label: type T = {}
     

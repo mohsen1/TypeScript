@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/moduleResolutionWithoutExtension1.ts] ////
-
 === /src/foo.mts ===
 export function foo() {
 >foo : Symbol(foo, Decl(foo.mts, 0, 0))

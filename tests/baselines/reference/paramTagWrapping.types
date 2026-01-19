@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/paramTagWrapping.ts] ////
-
-=== good.js ===
+=== tests/cases/conformance/jsdoc/good.js ===
 /**
  * @param
  * {number} x Arg x.
@@ -11,29 +9,20 @@
  */
 function good(x, y, z) {
 >good : (x: number, y: number, z: number) => void
->     : ^ ^^      ^^ ^^      ^^ ^^      ^^^^^^^^^
 >x : number
->  : ^^^^^^
 >y : number
->  : ^^^^^^
 >z : number
->  : ^^^^^^
 }
 
 good(1, 2, 3)
 >good(1, 2, 3) : void
->              : ^^^^
 >good : (x: number, y: number, z: number) => void
->     : ^ ^^      ^^ ^^      ^^ ^^      ^^^^^^^^^
 >1 : 1
->  : ^
 >2 : 2
->  : ^
 >3 : 3
->  : ^
 
 
-=== bad.js ===
+=== tests/cases/conformance/jsdoc/bad.js ===
 /**
  * @param *
  * {number} x Arg x.
@@ -44,24 +33,15 @@ good(1, 2, 3)
  */
 function bad(x, y, z) {
 >bad : (x: any, y: any, z: any) => void
->    : ^ ^^^^^^^ ^^^^^^^ ^^^^^^^^^^^^^^
 >x : any
->  : ^^^
 >y : any
->  : ^^^
 >z : any
->  : ^^^
 }
 
 bad(1, 2, 3)
 >bad(1, 2, 3) : void
->             : ^^^^
 >bad : (x: any, y: any, z: any) => void
->    : ^ ^^^^^^^ ^^^^^^^ ^^^^^^^^^^^^^^
 >1 : 1
->  : ^
 >2 : 2
->  : ^
 >3 : 3
->  : ^
 

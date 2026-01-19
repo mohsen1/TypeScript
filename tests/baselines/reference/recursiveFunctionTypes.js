@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveFunctionTypes.ts] ////
-
 //// [recursiveFunctionTypes.ts]
 function fn(): typeof fn { return 1; }
 

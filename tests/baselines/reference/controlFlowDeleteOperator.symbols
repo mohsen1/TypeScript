@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/controlFlow/controlFlowDeleteOperator.ts] ////
-
-=== controlFlowDeleteOperator.ts ===
+=== tests/cases/conformance/controlFlow/controlFlowDeleteOperator.ts ===
 function f() {
 >f : Symbol(f, Decl(controlFlowDeleteOperator.ts, 0, 0))
 

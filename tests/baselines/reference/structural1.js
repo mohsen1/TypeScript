@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/structural1.ts] ////
-
 //// [structural1.ts]
-namespace M {
+module M {
     export interface I {
         salt:number;
         pepper:number;

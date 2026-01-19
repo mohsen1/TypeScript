@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privateFieldAssignabilityFromUnknown.ts] ////
-
 //// [privateFieldAssignabilityFromUnknown.ts]
 export class Class {
   #field: any
@@ -11,7 +9,7 @@ const task: Class = {} as unknown;
 //// [privateFieldAssignabilityFromUnknown.js]
 "use strict";
 var _Class_field;
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Class = void 0;
 var Class = /** @class */ (function () {
     function Class() {

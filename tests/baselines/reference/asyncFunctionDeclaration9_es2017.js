@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es2017/functionDeclarations/asyncFunctionDeclaration9_es2017.ts] ////
-
 //// [asyncFunctionDeclaration9_es2017.ts]
 async function foo(): Promise<void> {
   var v = { [await]: foo }

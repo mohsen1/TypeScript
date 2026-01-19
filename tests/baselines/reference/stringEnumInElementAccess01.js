@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/elementAccess/stringEnumInElementAccess01.ts] ////
-
 //// [stringEnumInElementAccess01.ts]
 enum E {
     A = "a",

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mutuallyRecursiveGenericBaseTypes2.ts] ////
-
 //// [mutuallyRecursiveGenericBaseTypes2.ts]
 class foo<T>
 {

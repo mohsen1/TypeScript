@@ -1,13 +1,11 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithMemberClassConflict.ts] ////
-
 //// [collisionCodeGenModuleWithMemberClassConflict.ts]
-namespace m1 {
+module m1 {
     export class m1 {
     }
 }
 var foo = new m1.m1();
 
-namespace m2 {
+module m2 {
     export class m2 {
     }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel_es2015.ts] ////
-
 //// [labeledStatementWithLabel_es2015.ts]
 label: function fn() { }
 label: function* gen() { }
@@ -11,7 +9,7 @@ label: var a = 1;
 label: let b = 1;
 label: const c = 1;
 
-label: namespace M { }
+label: module M { }
 label: namespace N {}
 label: type T = {}
 

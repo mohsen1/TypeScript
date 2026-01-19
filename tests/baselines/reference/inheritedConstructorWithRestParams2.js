@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritedConstructorWithRestParams2.ts] ////
-
 //// [inheritedConstructorWithRestParams2.ts]
 class IBaseBase<T, U> {
     constructor(x: U) { }

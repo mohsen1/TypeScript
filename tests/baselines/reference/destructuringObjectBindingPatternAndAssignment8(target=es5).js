@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringObjectBindingPatternAndAssignment8.ts] ////
-
 //// [destructuringObjectBindingPatternAndAssignment8.ts]
 const K = {
     a: "a",

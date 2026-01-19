@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/blockScopedEnumVariablesUseBeforeDef.ts] ////
-
 //// [blockScopedEnumVariablesUseBeforeDef.ts]
 function foo1() {
     return E.A
@@ -11,15 +9,6 @@ function foo2() {
     const enum E { A }
 }
 
-const config = {
-    a: AfterObject.A,
-};
-
-const enum AfterObject {
-    A = 2,
-}
-
-
 //// [blockScopedEnumVariablesUseBeforeDef.js]
 function foo1() {
     return E.A;
@@ -29,8 +18,5 @@ function foo1() {
     })(E || (E = {}));
 }
 function foo2() {
-    return 0 /* E.A */;
+    return 0 /* A */;
 }
-var config = {
-    a: 2 /* AfterObject.A */,
-};

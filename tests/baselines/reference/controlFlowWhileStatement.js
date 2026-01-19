@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowWhileStatement.ts] ////
-
 //// [controlFlowWhileStatement.ts]
 let cond: boolean;
 function a() {

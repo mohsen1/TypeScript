@@ -1,23 +1,21 @@
-//// [tests/cases/compiler/enumLiteralAssignableToEnumInsideUnion.ts] ////
-
 //// [enumLiteralAssignableToEnumInsideUnion.ts]
-namespace X {
+module X {
     export enum Foo {
         A, B
     }
 }
-namespace Y {
+module Y {
     export enum Foo {
         A, B
     }
 }
-namespace Z {
+module Z {
     export enum Foo {
         A = 1 << 1,
         B = 1 << 2,
     }
 }
-namespace Ka {
+module Ka {
     export enum Foo {
         A = 1 << 10,
         B = 1 << 11,

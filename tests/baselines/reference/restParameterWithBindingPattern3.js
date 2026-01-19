@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restParameterWithBindingPattern3.ts] ////
-
 //// [restParameterWithBindingPattern3.ts]
 function a(...[a = 1, b = true]: string[]) { }
 

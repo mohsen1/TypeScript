@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ramdaToolsNoInfinite.ts] ////
-
 //// [ramdaToolsNoInfinite.ts]
 // All the following types are explained here:
 // https://medium.freecodecamp.org/typescript-curry-ramda-types-f747e99744ab

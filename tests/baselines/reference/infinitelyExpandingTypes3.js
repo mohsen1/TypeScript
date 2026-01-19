@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/infinitelyExpandingTypes3.ts] ////
-
 //// [infinitelyExpandingTypes3.ts]
 interface List<T> {
     data: T;

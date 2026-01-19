@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/objectSpreadNegative.ts] ////
-
 //// [objectSpreadNegative.ts]
 let o = { a: 1, b: 'no' }
 
@@ -8,7 +6,7 @@ class PrivateOptionalX {
     private x?: number;
 }
 class PublicX {
-    public x: number = 42;
+    public x: number;
 }
 declare let publicX: PublicX;
 declare let privateOptionalX: PrivateOptionalX;
@@ -99,7 +97,6 @@ var PrivateOptionalX = /** @class */ (function () {
 }());
 var PublicX = /** @class */ (function () {
     function PublicX() {
-        this.x = 42;
     }
     return PublicX;
 }());

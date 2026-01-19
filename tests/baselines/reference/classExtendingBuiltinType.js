@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classExtendingBuiltinType.ts] ////
-
 //// [classExtendingBuiltinType.ts]
 class C1 extends Object { }
 class C2 extends Function { }

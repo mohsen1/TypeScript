@@ -1,25 +1,25 @@
-moduleVisibilityTest2.ts(55,17): error TS2304: Cannot find name 'x'.
-moduleVisibilityTest2.ts(56,21): error TS2339: Property 'E' does not exist on type 'typeof M'.
-moduleVisibilityTest2.ts(59,16): error TS2694: Namespace 'M' has no exported member 'I'.
-moduleVisibilityTest2.ts(59,23): error TS2694: Namespace 'M' has no exported member 'I'.
-moduleVisibilityTest2.ts(62,11): error TS2339: Property 'x' does not exist on type 'typeof M'.
-moduleVisibilityTest2.ts(63,15): error TS2339: Property 'E' does not exist on type 'typeof M'.
+tests/cases/compiler/moduleVisibilityTest2.ts(55,17): error TS2304: Cannot find name 'x'.
+tests/cases/compiler/moduleVisibilityTest2.ts(56,21): error TS2339: Property 'E' does not exist on type 'typeof M'.
+tests/cases/compiler/moduleVisibilityTest2.ts(59,16): error TS2694: Namespace 'M' has no exported member 'I'.
+tests/cases/compiler/moduleVisibilityTest2.ts(59,23): error TS2694: Namespace 'M' has no exported member 'I'.
+tests/cases/compiler/moduleVisibilityTest2.ts(62,11): error TS2339: Property 'x' does not exist on type 'typeof M'.
+tests/cases/compiler/moduleVisibilityTest2.ts(63,15): error TS2339: Property 'E' does not exist on type 'typeof M'.
 
 
-==== moduleVisibilityTest2.ts (6 errors) ====
-    namespace OuterMod {
+==== tests/cases/compiler/moduleVisibilityTest2.ts (6 errors) ====
+    module OuterMod {
     	export function someExportedOuterFunc() { return -1; }
     
-    	export namespace OuterInnerMod {
+    	export module OuterInnerMod {
     		export function someExportedOuterInnerFunc() { return "foo"; }
     	}
     }
     
     import OuterInnerAlias = OuterMod.OuterInnerMod;
     
-    namespace M {
+    module M {
     
-    	namespace InnerMod {
+    	module InnerMod {
     		export function someExportedInnerFunc() { return -2; }
     	}
     
@@ -60,7 +60,7 @@ moduleVisibilityTest2.ts(63,15): error TS2339: Property 'E' does not exist on ty
     	function someModuleFunction() { return 5;}
     }
     
-    namespace M {
+    module M {
     	export var c = x;
     	               ~
 !!! error TS2304: Cannot find name 'x'.

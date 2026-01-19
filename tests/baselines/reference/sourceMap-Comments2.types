@@ -1,13 +1,8 @@
-//// [tests/cases/compiler/sourceMap-Comments2.ts] ////
-
-=== sourceMap-Comments2.ts ===
+=== tests/cases/compiler/sourceMap-Comments2.ts ===
 function foo(str: string, num: number): void {
 >foo : (str: string, num: number) => void
->    : ^   ^^      ^^   ^^      ^^^^^    
 >str : string
->    : ^^^^^^
 >num : number
->    : ^^^^^^
 
     return;
 }
@@ -17,11 +12,8 @@ function foo(str: string, num: number): void {
  */
 function bar(str: string, num: number): void {
 >bar : (str: string, num: number) => void
->    : ^   ^^      ^^   ^^      ^^^^^    
 >str : string
->    : ^^^^^^
 >num : number
->    : ^^^^^^
 
     return;
 }
@@ -29,22 +21,16 @@ function bar(str: string, num: number): void {
 // some sort of comment
 function baz(str: string, num: number): void {
 >baz : (str: string, num: number) => void
->    : ^   ^^      ^^   ^^      ^^^^^    
 >str : string
->    : ^^^^^^
 >num : number
->    : ^^^^^^
 
     return;
 }
 
 function qat(str: string, num: number): void {
 >qat : (str: string, num: number) => void
->    : ^   ^^      ^^   ^^      ^^^^^    
 >str : string
->    : ^^^^^^
 >num : number
->    : ^^^^^^
 
     return;
 }

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocLiteral.ts] ////
-
-=== in.js ===
+=== tests/cases/conformance/jsdoc/in.js ===
 /**
  * @param {'literal'} p1
  * @param {"literal"} p2

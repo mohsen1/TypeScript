@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportAssignmentWithExportModifier.ts] ////
-
 //// [exportAssignmentWithExportModifier.ts]
 var x;
 export export = x;

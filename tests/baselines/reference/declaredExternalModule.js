@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declaredExternalModule.ts] ////
-
 //// [declaredExternalModule.ts]
 declare module 'connect' {
 

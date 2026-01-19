@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/exportEqualsAmd.ts] ////
-
 //// [exportEqualsAmd.ts]
 export = { ["hi"]: "there" };
 

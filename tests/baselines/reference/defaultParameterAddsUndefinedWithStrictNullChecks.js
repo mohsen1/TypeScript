@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/defaultParameterAddsUndefinedWithStrictNullChecks.ts] ////
-
 //// [defaultParameterAddsUndefinedWithStrictNullChecks.ts]
 function f(addUndefined1 = "J", addUndefined2?: number) {
     return addUndefined1.length + (addUndefined2 || 0);
@@ -126,7 +124,7 @@ declare function foo1(x: string | undefined, b: number): void;
 declare function foo2(x: string | undefined, b: number): void;
 declare function foo3(x: string | undefined, b: number): void;
 declare function foo4(x: string | undefined, b: number): void;
-type OptionalNullableString = string | null | undefined;
+declare type OptionalNullableString = string | null | undefined;
 declare function allowsNull(val?: OptionalNullableString): void;
 declare function removeUndefinedButNotFalse(x?: boolean): false | undefined;
 declare const cond: boolean;

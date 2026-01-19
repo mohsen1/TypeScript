@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functionCalls/overloadResolutionClassConstructors.ts] ////
-
 //// [overloadResolutionClassConstructors.ts]
 class SomeBase {
     private n;

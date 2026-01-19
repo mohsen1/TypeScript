@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentBeforeStaticMethod1.ts] ////
-
 //// [commentBeforeStaticMethod1.ts]
 class C {
   /**

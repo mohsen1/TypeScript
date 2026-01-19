@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocTypedefOnlySourceFile.ts] ////
-
 //// [0.js]
 // @ts-check
 

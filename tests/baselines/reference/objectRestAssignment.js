@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/rest/objectRestAssignment.ts] ////
-
 //// [objectRestAssignment.ts]
 let ka: any;
 let nested: { ki };

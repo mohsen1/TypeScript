@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserOptionalTypeMembers1.ts] ////
-
 //// [parserOptionalTypeMembers1.ts]
 interface PropertyDescriptor2 {
     configurable?: boolean;

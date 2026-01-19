@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionThisExpressionAndAliasInGlobal.ts] ////
-
 //// [collisionThisExpressionAndAliasInGlobal.ts]
-namespace a {
+module a {
     export var b = 10;
 }
 var f = () => this;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentOnBinaryOperator2.ts] ////
-
 //// [commentOnBinaryOperator2.ts]
 var a = 'some'
     // comment

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithConstructSignatures2.ts] ////
-
 //// [subtypingWithConstructSignatures2.ts]
 // checking subtype relations for function types as it relates to contextual signature instantiation
 

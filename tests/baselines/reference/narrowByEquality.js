@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/narrowByEquality.ts] ////
-
 //// [narrowByEquality.ts]
 declare let x: number | string | boolean
 declare let n: number;

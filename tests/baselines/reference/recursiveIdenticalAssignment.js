@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveIdenticalAssignment.ts] ////
-
 //// [recursiveIdenticalAssignment.ts]
 interface A<T> {
     x: A<T>

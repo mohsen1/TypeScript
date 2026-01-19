@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsemitComments.ts] ////
-
 //// [commentsemitComments.ts]
 /** Variable comments*/
 var myVariable = 10;
@@ -72,7 +70,7 @@ interface i1 {
 var i1_i: i1;
 
 /** this is module comment*/
-namespace m1 {
+module m1 {
     /** class b */
     export class b {
         constructor(public x: number) {
@@ -81,7 +79,7 @@ namespace m1 {
     }
 
     /// module m2
-    export namespace m2 {
+    export module m2 {
     }
 }
 
@@ -188,13 +186,13 @@ interface i1 {
 /**interface instance comments*/
 declare var i1_i: i1;
 /** this is module comment*/
-declare namespace m1 {
+declare module m1 {
     /** class b */
     class b {
         x: number;
         constructor(x: number);
     }
-    namespace m2 {
+    module m2 {
     }
 }
 declare var x: any;

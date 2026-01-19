@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/union/discriminatedUnionTypes2.ts] ////
-
 //// [discriminatedUnionTypes2.ts]
 function f10(x : { kind: false, a: string } | { kind: true, b: string } | { kind: string, c: string }) {
     if (x.kind === false) {

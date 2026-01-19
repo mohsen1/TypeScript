@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/defaultParameters/emitDefaultParametersFunctionProperty.ts] ////
-
 //// [emitDefaultParametersFunctionProperty.ts]
 var obj2 = {
     func1(y = 10, ...rest) { },

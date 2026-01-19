@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstNoAnyImplementation2.ts] ////
-
 //// [overloadOnConstNoAnyImplementation2.ts]
 interface I {
     x1(a: number, callback: (x: 'hi') => number);
@@ -16,7 +14,7 @@ class C {
     }
 }
 
-declare var c: C;
+var c: C;
 c.x1(1, (x: 'hi') => { return 1; } );
 c.x1(1, (x: 'bye') => { return 1; } );
 c.x1(1, (x) => { return 1; } );
@@ -36,6 +34,7 @@ var C = /** @class */ (function () {
     };
     return C;
 }());
+var c;
 c.x1(1, function (x) { return 1; });
 c.x1(1, function (x) { return 1; });
 c.x1(1, function (x) { return 1; });

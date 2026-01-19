@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mismatchedClassConstructorVariable.ts] ////
-
 //// [mismatchedClassConstructorVariable.ts]
 var baz: foo;
 class baz { }

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/objectTypeWithRecursiveWrappedProperty.ts] ////
-
-=== objectTypeWithRecursiveWrappedProperty.ts ===
+=== tests/cases/conformance/types/typeRelationships/recursiveTypes/objectTypeWithRecursiveWrappedProperty.ts ===
 // Basic recursive type
 
 class List<T> {

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithNew.ts] ////
-
-=== exponentiationOperatorWithNew.ts ===
+=== tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithNew.ts ===
 var a: any;
 >a : Symbol(a, Decl(exponentiationOperatorWithNew.ts, 0, 3))
 

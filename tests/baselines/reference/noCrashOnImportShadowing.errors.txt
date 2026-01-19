@@ -1,10 +1,11 @@
-index.ts(9,10): error TS2709: Cannot use namespace 'OriginalB' as a type.
+tests/cases/compiler/index.ts(4,1): error TS2693: 'B' only refers to a type, but is being used as a value here.
+tests/cases/compiler/index.ts(9,10): error TS2709: Cannot use namespace 'OriginalB' as a type.
 
 
-==== b.ts (0 errors) ====
+==== tests/cases/compiler/b.ts (0 errors) ====
     export const zzz = 123;
     
-==== a.ts (0 errors) ====
+==== tests/cases/compiler/a.ts (0 errors) ====
     import * as B from "./b";
     
     interface B {
@@ -16,11 +17,13 @@ index.ts(9,10): error TS2709: Cannot use namespace 'OriginalB' as a type.
     
     export { B };
     
-==== index.ts (1 errors) ====
+==== tests/cases/compiler/index.ts (2 errors) ====
     import { B } from "./a";
     
     const x: B = { x: "" };
     B.zzz;
+    ~
+!!! error TS2693: 'B' only refers to a type, but is being used as a value here.
     
     import * as OriginalB from "./b";
     OriginalB.zzz;

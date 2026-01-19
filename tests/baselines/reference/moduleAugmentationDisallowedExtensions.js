@@ -47,27 +47,27 @@ import "./x";
 
 //// [x0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a = void 0;
 exports.a = 1;
 //// [x.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var N1;
 (function (N1) {
     N1.x = 1;
 })(N1 || (N1 = {}));
 //// [observable.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.x = void 0;
 exports.x = 1;
 //// [test.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.b = void 0;
 exports.b = 1;
 //// [main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 require("./x");

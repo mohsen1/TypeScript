@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsdocClassMissingTypeArguments.ts] ////
-
 === /a.js ===
 /** @template T */
 class C {}

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/metadataOfUnion.ts] ////
-
 //// [metadataOfUnion.ts]
 function PropDeco(target: Object, propKey: string | symbol) { }
 
@@ -60,15 +58,15 @@ var B = /** @class */ (function () {
     __decorate([
         PropDeco,
         __metadata("design:type", Object)
-    ], B.prototype, "x", void 0);
+    ], B.prototype, "x");
     __decorate([
         PropDeco,
         __metadata("design:type", Boolean)
-    ], B.prototype, "y", void 0);
+    ], B.prototype, "y");
     __decorate([
         PropDeco,
         __metadata("design:type", Object)
-    ], B.prototype, "z", void 0);
+    ], B.prototype, "z");
     return B;
 }());
 var E;
@@ -84,18 +82,18 @@ var D = /** @class */ (function () {
     __decorate([
         PropDeco,
         __metadata("design:type", Number)
-    ], D.prototype, "a", void 0);
+    ], D.prototype, "a");
     __decorate([
         PropDeco,
         __metadata("design:type", Number)
-    ], D.prototype, "b", void 0);
+    ], D.prototype, "b");
     __decorate([
         PropDeco,
         __metadata("design:type", Number)
-    ], D.prototype, "c", void 0);
+    ], D.prototype, "c");
     __decorate([
         PropDeco,
         __metadata("design:type", Number)
-    ], D.prototype, "d", void 0);
+    ], D.prototype, "d");
     return D;
 }());

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/mixinClassesAnnotated.ts] ////
-
 //// [mixinClassesAnnotated.ts]
 type Constructor<T> = new(...args: any[]) => T;
 
@@ -157,7 +155,7 @@ var Thing3 = /** @class */ (function (_super) {
 
 
 //// [mixinClassesAnnotated.d.ts]
-type Constructor<T> = new (...args: any[]) => T;
+declare type Constructor<T> = new (...args: any[]) => T;
 declare class Base {
     x: number;
     y: number;

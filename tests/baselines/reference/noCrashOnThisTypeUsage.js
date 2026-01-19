@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noCrashOnThisTypeUsage.ts] ////
-
 //// [noCrashOnThisTypeUsage.ts]
 interface IListenable {
     changeListeners: Function[] | null
@@ -28,7 +26,7 @@ export class ObservableValue<T> {
 
 //// [noCrashOnThisTypeUsage.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.ObservableValue = void 0;
 function notifyListeners(listenable, change) {
 }

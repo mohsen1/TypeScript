@@ -1,4 +1,5 @@
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.hello = hello;
+exports.__esModule = true;
+exports.hello = void 0;
 function hello() { }
+exports.hello = hello;

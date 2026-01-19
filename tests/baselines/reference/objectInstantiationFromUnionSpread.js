@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectInstantiationFromUnionSpread.ts] ////
-
 //// [objectInstantiationFromUnionSpread.ts]
 // #40995
 

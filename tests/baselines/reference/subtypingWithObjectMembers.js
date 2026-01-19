@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembers.ts] ////
-
 //// [subtypingWithObjectMembers.ts]
 class Base { foo: string; }
 class Derived extends Base { bar: string; }
@@ -37,7 +35,7 @@ class B3 extends A3 {
     '2.0': string; // error
 }
 
-namespace TwoLevels {
+module TwoLevels {
     class A {
         foo: Base;
         bar: Base;

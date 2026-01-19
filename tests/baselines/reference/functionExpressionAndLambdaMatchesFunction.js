@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionExpressionAndLambdaMatchesFunction.ts] ////
-
 //// [functionExpressionAndLambdaMatchesFunction.ts]
 class CDoc {
         constructor() {

@@ -16,17 +16,15 @@ foo();
 //// [m1.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = f;
-exports.f = f;
+exports.f = void 0;
 function f() {
 }
+exports.default = f;
+exports.f = f;
 //// [m2.js]
 "use strict";
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-var m1_1 = __importDefault(require("./m1"));
+var m1_1 = require("./m1");
 var m1_2 = require("./m1");
 (0, m1_2.f)();
 (0, m1_1.default)();

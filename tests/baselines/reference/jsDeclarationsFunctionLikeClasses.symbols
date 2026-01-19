@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsFunctionLikeClasses.ts] ////
-
-=== source.js ===
+=== tests/cases/conformance/jsdoc/declarations/source.js ===
 /**
  * @param {number} x
  * @param {number} y
@@ -32,7 +30,7 @@ export function Point(x, y) {
 >y : Symbol(y, Decl(source.js, 4, 24))
 }
 
-=== referencer.js ===
+=== tests/cases/conformance/jsdoc/declarations/referencer.js ===
 import {Point} from "./source";
 >Point : Symbol(Point, Decl(referencer.js, 0, 8))
 
@@ -45,7 +43,7 @@ export function magnitude(p) {
 
     return Math.sqrt(p.x ** 2 + p.y ** 2);
 >Math.sqrt : Symbol(Math.sqrt, Decl(lib.es5.d.ts, --, --))
->Math : Symbol(Math, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Math : Symbol(Math, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 >sqrt : Symbol(Math.sqrt, Decl(lib.es5.d.ts, --, --))
 >p.x : Symbol(Point.x, Decl(source.js, 7, 5))
 >p : Symbol(p, Decl(referencer.js, 5, 26))

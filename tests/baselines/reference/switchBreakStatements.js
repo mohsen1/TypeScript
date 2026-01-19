@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/breakStatements/switchBreakStatements.ts] ////
-
 //// [switchBreakStatements.ts]
 switch ('') {
     case 'a':

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsdocParameterParsingInfiniteLoop.ts] ////
-
-=== example.js ===
+=== tests/cases/compiler/example.js ===
 // @ts-check
 /**
  * @type {function(@foo)}

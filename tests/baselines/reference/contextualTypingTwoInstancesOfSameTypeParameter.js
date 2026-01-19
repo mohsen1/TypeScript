@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingTwoInstancesOfSameTypeParameter.ts] ////
-
 //// [contextualTypingTwoInstancesOfSameTypeParameter.ts]
 function f6<T>(x: (a: T) => T) {
     return null;

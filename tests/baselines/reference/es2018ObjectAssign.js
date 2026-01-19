@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es2018ObjectAssign.ts] ////
-
 //// [es2018ObjectAssign.ts]
 const test = Object.assign({}, { test: true });
 

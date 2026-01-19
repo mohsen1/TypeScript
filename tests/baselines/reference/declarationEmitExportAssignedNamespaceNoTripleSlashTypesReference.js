@@ -39,14 +39,15 @@ export * from '@emotion/core';
 
 //// [get-comp.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.getComp = getComp;
+exports.__esModule = true;
+exports.getComp = void 0;
 function getComp() {
     return {};
 }
+exports.getComp = getComp;
 //// [inferred-comp-export.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.obj = void 0;
 var get_comp_1 = require("./get-comp");
 // this shouldn't need any triple-slash references - it should have a direct import to `react` and that's it
@@ -58,11 +59,7 @@ exports.obj = {
 "use strict";
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
@@ -70,7 +67,7 @@ var __createBinding = (this && this.__createBinding) || (Object.create ? (functi
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 __exportStar(require("@emotion/core"), exports);
 
 
@@ -79,7 +76,7 @@ import { Component } from 'react';
 export declare function getComp(): Component;
 //// [inferred-comp-export.d.ts]
 export declare const obj: {
-    comp: import("react").Component;
+    comp: import("react").Component<any, {}, {}>;
 };
 //// [some-other-file.d.ts]
 export * from '@emotion/core';

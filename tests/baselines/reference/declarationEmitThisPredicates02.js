@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/declarationEmit/typePredicates/declarationEmitThisPredicates02.ts] ////
-
 //// [declarationEmitThisPredicates02.ts]
 export interface Foo {
     a: string;
@@ -16,7 +14,7 @@ export const obj = {
 
 //// [declarationEmitThisPredicates02.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.obj = void 0;
 exports.obj = {
     m: function () {

@@ -14,6 +14,6 @@ import { Component, type ComponentProps } from "./exports.js";
 //// [exports.js]
 export function Component() { }
 //// [index.js]
-export {};
+import { Component } from "./exports.js";
 //// [index.fixed.js]
-export {};
+import { Component } from "./exports.js";

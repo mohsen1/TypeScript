@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/quotedModuleNameMustBeAmbient.ts] ////
-
 //// [quotedModuleNameMustBeAmbient.ts]
 module 'M' {}
 

@@ -5,7 +5,7 @@ sourceRoot:
 sources: inlineSourceMap.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:inlineSourceMap.js
+emittedFile:tests/cases/compiler/inlineSourceMap.js
 sourceFile:inlineSourceMap.ts
 -------------------------------------------------------------------
 >>>var x = 0;

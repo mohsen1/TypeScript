@@ -1,7 +1,4 @@
-//// [tests/cases/compiler/optionsStrictPropertyInitializationStrictNullChecks.ts] ////
-
-=== optionsStrictPropertyInitializationStrictNullChecks.ts ===
+=== tests/cases/compiler/optionsStrictPropertyInitializationStrictNullChecks.ts ===
 var x;
 >x : any
->  : ^^^
 

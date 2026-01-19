@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/primitiveTypeAssignment.ts] ////
-
 //// [primitiveTypeAssignment.ts]
 var x = any;
 

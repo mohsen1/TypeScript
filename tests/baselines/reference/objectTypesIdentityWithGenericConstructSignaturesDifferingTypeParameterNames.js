@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeAndMemberIdentity/objectTypesIdentityWithGenericConstructSignaturesDifferingTypeParameterNames.ts] ////
-
 //// [objectTypesIdentityWithGenericConstructSignaturesDifferingTypeParameterNames.ts]
 // object types are identical structurally
 
@@ -89,7 +87,7 @@ var C = /** @class */ (function () {
     return C;
 }());
 var a;
-var b = { new: function (x) { return new C(x); } };
+var b = { "new": function (x) { return new C(x); } };
 function foo1b(x) { }
 function foo1c(x) { }
 function foo2(x) { }

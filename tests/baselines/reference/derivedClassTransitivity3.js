@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedClassTransitivity3.ts] ////
-
 //// [derivedClassTransitivity3.ts]
 // subclassing is not transitive when you can remove required parameters and add optional parameters
 
@@ -15,9 +13,9 @@ class E<T> extends D<T> {
     foo(x: T, y?: number) { } // ok to add optional parameters
 }
 
-declare var c: C<string>;
-declare var d: D<string>;
-declare var e: E<string>;
+var c: C<string>;
+var d: D<string>;
+var e: E<string>;
 c = e;
 var r = c.foo('', '');
 var r2 = e.foo('', 1);
@@ -61,6 +59,9 @@ var E = /** @class */ (function (_super) {
     E.prototype.foo = function (x, y) { }; // ok to add optional parameters
     return E;
 }(D));
+var c;
+var d;
+var e;
 c = e;
 var r = c.foo('', '');
 var r2 = e.foo('', 1);

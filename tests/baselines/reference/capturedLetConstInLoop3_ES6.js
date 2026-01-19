@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/capturedLetConstInLoop3_ES6.ts] ////
-
 //// [capturedLetConstInLoop3_ES6.ts]
 ///=========let
 declare function use(a: any);

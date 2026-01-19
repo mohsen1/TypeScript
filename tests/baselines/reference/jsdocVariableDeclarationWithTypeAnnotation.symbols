@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocVariableDeclarationWithTypeAnnotation.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/foo.js ===
 /** @type {boolean} */
 var /** @type {string} */ x,
 >x : Symbol(x, Decl(foo.js, 1, 3))

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/nullableFunctionError.ts] ////
-
-=== nullableFunctionError.ts ===
+=== tests/cases/compiler/nullableFunctionError.ts ===
 null();
 undefined();
 >undefined : Symbol(undefined)

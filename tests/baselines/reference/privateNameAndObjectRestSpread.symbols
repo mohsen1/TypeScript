@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameAndObjectRestSpread.ts] ////
-
-=== privateNameAndObjectRestSpread.ts ===
+=== tests/cases/conformance/classes/members/privateNames/privateNameAndObjectRestSpread.ts ===
 class C {
 >C : Symbol(C, Decl(privateNameAndObjectRestSpread.ts, 0, 0))
 

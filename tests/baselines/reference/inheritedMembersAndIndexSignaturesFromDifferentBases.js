@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritedMembersAndIndexSignaturesFromDifferentBases.ts] ////
-
 //// [inheritedMembersAndIndexSignaturesFromDifferentBases.ts]
 // indexer in B is a subtype of indexer in A
 interface A {

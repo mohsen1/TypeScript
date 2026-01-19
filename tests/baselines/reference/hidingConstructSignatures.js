@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/hidingConstructSignatures.ts] ////
-
 //// [hidingConstructSignatures.ts]
 interface C {
     (a: string): string;

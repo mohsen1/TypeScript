@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/emptyIndexer.ts] ////
-
-=== emptyIndexer.ts ===
+=== tests/cases/compiler/emptyIndexer.ts ===
 interface I1 {
 >I1 : Symbol(I1, Decl(emptyIndexer.ts, 0, 0))
 

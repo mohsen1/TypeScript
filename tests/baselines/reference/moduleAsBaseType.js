@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleAsBaseType.ts] ////
-
 //// [moduleAsBaseType.ts]
-namespace M {}
+module M {}
 class C extends M {}
 interface I extends M { }
 class C2 implements M { }

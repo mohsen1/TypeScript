@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/numericIndexerConstraint2.ts] ////
-
 //// [numericIndexerConstraint2.ts]
 class Foo { foo() { } }
-declare var x: { [index: string]: Foo; };
-var a: { one: number; } = { one: 1 };
+var x: { [index: string]: Foo; };
+var a: { one: number; };
 x = a;
 
 //// [numericIndexerConstraint2.js]
@@ -13,5 +11,6 @@ var Foo = /** @class */ (function () {
     Foo.prototype.foo = function () { };
     return Foo;
 }());
-var a = { one: 1 };
+var x;
+var a;
 x = a;

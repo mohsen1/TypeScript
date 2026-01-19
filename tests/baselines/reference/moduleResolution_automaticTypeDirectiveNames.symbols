@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/moduleResolution_automaticTypeDirectiveNames.ts] ////
-
 === /a.ts ===
 a;
 >a : Symbol(a, Decl(index.d.ts, 0, 13))

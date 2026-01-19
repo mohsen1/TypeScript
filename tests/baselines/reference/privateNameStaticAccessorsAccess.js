@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticAccessorsAccess.ts] ////
-
 //// [privateNameStaticAccessorsAccess.ts]
 export {}
 class A2 {
@@ -38,8 +36,8 @@ var __classPrivateFieldGet = (this && this.__classPrivateFieldGet) || function (
 var _a, _A2_prop_get, _A2_prop_set;
 class A2 {
     constructor() {
-        console.log(__classPrivateFieldGet(_a, _a, "a", _A2_prop_get));
-        let a = _a;
+        console.log(__classPrivateFieldGet(A2, _a, "a", _A2_prop_get));
+        let a = A2;
         __classPrivateFieldGet(a, _a, "a", _A2_prop_get);
         function foo() {
             __classPrivateFieldGet(a, _a, "a", _A2_prop_get);

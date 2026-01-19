@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/cf.ts] ////
-
 //// [cf.ts]
 function f() {
     var z;

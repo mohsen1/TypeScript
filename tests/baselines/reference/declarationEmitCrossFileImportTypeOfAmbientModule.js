@@ -14,11 +14,12 @@ export const reeexported = item;
 
 //// [index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.reeexported = void 0;
 var somepackage_1 = require("../somepackage");
 exports.reeexported = somepackage_1.item;
 
 
 //// [index.d.ts]
+/// <reference path="../../types/component.d.ts" />
 export declare const reeexported: typeof import("@namespace/component").Foo;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesOverloads02.ts] ////
-
 //// [stringLiteralTypesOverloads02.ts]
 function getFalsyPrimitive(x: "string"): string;
 function getFalsyPrimitive(x: "number"): number;

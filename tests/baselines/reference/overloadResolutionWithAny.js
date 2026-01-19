@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadResolutionWithAny.ts] ////
-
 //// [overloadResolutionWithAny.ts]
 var func: {
     (s: string): number;

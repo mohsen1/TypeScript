@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithNumericIndexer5.ts] ////
-
 //// [subtypingWithNumericIndexer5.ts]
 // Derived type indexer must be subtype of base type indexer
 
@@ -19,7 +17,7 @@ class B2 implements A {
     [x: string]: Derived2; // ok
 }
 
-namespace Generics {
+module Generics {
     interface A<T extends Base> {
         [x: number]: T;
     }

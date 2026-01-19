@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadUnion3.ts] ////
-
 //// [spreadUnion3.ts]
 function f(x: { y: string } | undefined): { y: string } {
     return { y: 123, ...x } // y: string | number

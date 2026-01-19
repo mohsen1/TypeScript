@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/recursiveMods.ts] ////
-
 //// [recursiveMods.ts]
-export namespace Foo {
+export module Foo {
 	export class C {}
 }
 
-export namespace Foo {
+export module Foo {
 
 	function Bar() : C {
 		if (true) { return Bar();}
@@ -27,7 +25,7 @@ export namespace Foo {
 
 //// [recursiveMods.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Foo = void 0;
 var Foo;
 (function (Foo) {
@@ -37,7 +35,7 @@ var Foo;
         return C;
     }());
     Foo.C = C;
-})(Foo || (exports.Foo = Foo = {}));
+})(Foo = exports.Foo || (exports.Foo = {}));
 (function (Foo) {
     function Bar() {
         if (true) {
@@ -53,4 +51,4 @@ var Foo;
         var c = Baz();
         return;
     }
-})(Foo || (exports.Foo = Foo = {}));
+})(Foo = exports.Foo || (exports.Foo = {}));

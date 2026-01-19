@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lateBoundFunctionMemberAssignmentDeclarations.ts] ////
-
 //// [index.ts]
 export function foo() {}
 foo.bar = 12;

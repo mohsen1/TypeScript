@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/didYouMeanStringLiteral.ts] ////
-
 //// [didYouMeanStringLiteral.ts]
 type T1 = "string" | "number" | "boolean";
 type T2 = T1 & ("number" | "boolean"); // "number" | "boolean"

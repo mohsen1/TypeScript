@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/downlevelLetConst16.ts] ////
-
-=== downlevelLetConst16.ts ===
+=== tests/cases/compiler/downlevelLetConst16.ts ===
 'use strict'
 
 declare function use(a: any);
@@ -270,7 +268,7 @@ function bar2() {
 >x : Symbol(x, Decl(downlevelLetConst16.ts, 4, 3))
 }
 
-namespace M1 {
+module M1 {
 >M1 : Symbol(M1, Decl(downlevelLetConst16.ts, 98, 1))
 
     let x = 1;
@@ -297,7 +295,7 @@ namespace M1 {
 >z : Symbol(z, Decl(downlevelLetConst16.ts, 105, 9))
 }
 
-namespace M2 {
+module M2 {
 >M2 : Symbol(M2, Decl(downlevelLetConst16.ts, 107, 1))
     {
         let x = 1;
@@ -328,7 +326,7 @@ namespace M2 {
 >x : Symbol(x, Decl(downlevelLetConst16.ts, 4, 3))
 }
 
-namespace M3 {
+module M3 {
 >M3 : Symbol(M3, Decl(downlevelLetConst16.ts, 119, 1))
 
     const x = 1;
@@ -356,7 +354,7 @@ namespace M3 {
 
 }
 
-namespace M4 {
+module M4 {
 >M4 : Symbol(M4, Decl(downlevelLetConst16.ts, 129, 1))
     {
         const x = 1;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/genericAndNonGenericInterfaceWithTheSameName.ts] ////
-
 //// [genericAndNonGenericInterfaceWithTheSameName.ts]
 // generic and non-generic interfaces with the same name do not merge
 
@@ -11,7 +9,7 @@ interface A<T> { // error
     bar: T;
 }
 
-namespace M {
+module M {
     interface A<T> { 
         bar: T;
     }
@@ -21,25 +19,25 @@ namespace M {
     }
 }
 
-namespace M2 {
+module M2 {
     interface A {
         foo: string;
     }
 }
 
-namespace M2 {
+module M2 {
     interface A<T> { // ok, different declaration space than other M2
         bar: T;
     }
 }
 
-namespace M3 {
+module M3 {
     export interface A {
         foo: string;
     }
 }
 
-namespace M3 {
+module M3 {
     export interface A<T> { // error
         bar: T;
     }

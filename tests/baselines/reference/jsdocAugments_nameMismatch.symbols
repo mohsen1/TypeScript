@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocAugments_nameMismatch.ts] ////
-
 === /b.js ===
 class A {}
 >A : Symbol(A, Decl(b.js, 0, 0))

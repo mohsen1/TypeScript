@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/arraySigChecking.ts] ////
-
-=== arraySigChecking.ts ===
-declare namespace M {
+=== tests/cases/compiler/arraySigChecking.ts ===
+declare module M {
 >M : Symbol(M, Decl(arraySigChecking.ts, 0, 0))
 
     interface iBar { t: any; }
->iBar : Symbol(iBar, Decl(arraySigChecking.ts, 0, 21))
+>iBar : Symbol(iBar, Decl(arraySigChecking.ts, 0, 18))
 >t : Symbol(iBar.t, Decl(arraySigChecking.ts, 1, 20))
 
     interface iFoo extends iBar {
 >iFoo : Symbol(iFoo, Decl(arraySigChecking.ts, 1, 30))
->iBar : Symbol(iBar, Decl(arraySigChecking.ts, 0, 21))
+>iBar : Symbol(iBar, Decl(arraySigChecking.ts, 0, 18))
 
         s: any;
 >s : Symbol(iFoo.s, Decl(arraySigChecking.ts, 2, 33))
@@ -34,14 +32,14 @@ interface myInt {
     voidFn(): void;
 >voidFn : Symbol(myInt.voidFn, Decl(arraySigChecking.ts, 13, 17))
 }
-declare var myVar: myInt;
->myVar : Symbol(myVar, Decl(arraySigChecking.ts, 16, 11))
+var myVar: myInt;
+>myVar : Symbol(myVar, Decl(arraySigChecking.ts, 16, 3))
 >myInt : Symbol(myInt, Decl(arraySigChecking.ts, 11, 1))
 
 var strArray: string[] = [myVar.voidFn()];
 >strArray : Symbol(strArray, Decl(arraySigChecking.ts, 17, 3))
 >myVar.voidFn : Symbol(myInt.voidFn, Decl(arraySigChecking.ts, 13, 17))
->myVar : Symbol(myVar, Decl(arraySigChecking.ts, 16, 11))
+>myVar : Symbol(myVar, Decl(arraySigChecking.ts, 16, 3))
 >voidFn : Symbol(myInt.voidFn, Decl(arraySigChecking.ts, 13, 17))
 
 
@@ -67,11 +65,11 @@ isEmpty([]);
 
 isEmpty(new Array(3));
 >isEmpty : Symbol(isEmpty, Decl(arraySigChecking.ts, 21, 19))
->Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 
 isEmpty(new Array<string>(3));
 >isEmpty : Symbol(isEmpty, Decl(arraySigChecking.ts, 21, 19))
->Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --), Decl(lib.es2015.core.d.ts, --, --), Decl(lib.es2015.iterable.d.ts, --, --), Decl(lib.es2015.symbol.wellknown.d.ts, --, --))
+>Array : Symbol(Array, Decl(lib.es5.d.ts, --, --), Decl(lib.es5.d.ts, --, --))
 
 isEmpty(['a']);
 >isEmpty : Symbol(isEmpty, Decl(arraySigChecking.ts, 21, 19))

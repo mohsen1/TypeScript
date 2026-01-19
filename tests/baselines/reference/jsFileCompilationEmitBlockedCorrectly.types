@@ -1,21 +1,16 @@
-//// [tests/cases/compiler/jsFileCompilationEmitBlockedCorrectly.ts] ////
-
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class c {
 >c : c
->  : ^
 }
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 // this should be emitted
 class d {
 >d : d
->  : ^
 }
 
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 function foo() {
 >foo : () => void
->    : ^^^^^^^^^^
 }
 

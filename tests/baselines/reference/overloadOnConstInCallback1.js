@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstInCallback1.ts] ////
-
 //// [overloadOnConstInCallback1.ts]
 class C {
     x1(a: number, callback: (x: 'hi') => number); // error

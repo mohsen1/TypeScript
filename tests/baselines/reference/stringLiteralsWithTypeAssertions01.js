@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/stringLiteralsWithTypeAssertions01.ts] ////
-
 //// [stringLiteralsWithTypeAssertions01.ts]
 let fooOrBar: "foo" | "bar";
 

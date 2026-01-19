@@ -1,8 +1,8 @@
-octalIntegerLiteralError.ts(2,19): error TS1005: ',' expected.
-octalIntegerLiteralError.ts(3,18): error TS1005: ',' expected.
+tests/cases/conformance/es6/binaryAndOctalIntegerLiteral/octalIntegerLiteralError.ts(2,19): error TS1005: ',' expected.
+tests/cases/conformance/es6/binaryAndOctalIntegerLiteral/octalIntegerLiteralError.ts(3,18): error TS1005: ',' expected.
 
 
-==== octalIntegerLiteralError.ts (2 errors) ====
+==== tests/cases/conformance/es6/binaryAndOctalIntegerLiteral/octalIntegerLiteralError.ts (2 errors) ====
     // error
     var oct1 = 0O13334823;
                       ~~~

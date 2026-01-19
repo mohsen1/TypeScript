@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/downlevelLetConst11.ts] ////
-
-=== downlevelLetConst11.ts ===
-
+=== tests/cases/compiler/downlevelLetConst11.ts ===
 "use strict";
-let
+No type information for this code.let
+No type information for this code.

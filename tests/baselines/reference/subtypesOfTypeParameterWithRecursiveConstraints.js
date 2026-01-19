@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypesOfTypeParameterWithRecursiveConstraints.ts] ////
-
 //// [subtypesOfTypeParameterWithRecursiveConstraints.ts]
 // checking whether other types are subtypes of type parameters with constraints
 
@@ -56,7 +54,7 @@ function f<T extends Foo<U>, U extends Foo<T>, V extends Foo<V>>(t: T, u: U, v: 
     var r12 = true ? new Foo<V>() : v;
 }
 
-namespace M1 {
+module M1 {
     class Base<T> {
         foo: T;
     }
@@ -108,7 +106,7 @@ namespace M1 {
 }
 
 
-namespace M2 {
+module M2 {
     class Base2<T> {
         foo: Foo<T>;
     }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualPropertyOfGenericMappedType.ts] ////
-
 //// [contextualPropertyOfGenericMappedType.ts]
 // Repro for #24694
 

@@ -18,6 +18,6 @@ export default "";
 /**
  * @typedef {number} Foo
  */
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 /** @type {Foo} */
-exports.default = "";
+exports["default"] = "";

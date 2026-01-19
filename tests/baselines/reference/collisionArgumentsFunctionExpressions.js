@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionArgumentsFunctionExpressions.ts] ////
-
 //// [collisionArgumentsFunctionExpressions.ts]
 function foo() {
     function f1(arguments: number, ...restParameters) { //arguments is error

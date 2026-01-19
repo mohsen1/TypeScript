@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocTypeTagOnObjectProperty1.ts] ////
-
 //// [0.js]
 // @ts-check
 var lol = "hello Lol"

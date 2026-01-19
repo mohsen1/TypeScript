@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitReturnsWithoutReturnExpression.ts] ////
-
 //// [noImplicitReturnsWithoutReturnExpression.ts]
 function isMissingReturnExpression(): number {
     return;

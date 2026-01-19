@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertiesAndIndexers2.ts] ////
-
 //// [propertiesAndIndexers2.ts]
 interface A {
     [n: number]: string;

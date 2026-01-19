@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/quotedPropertyName3.ts] ////
-
 //// [quotedPropertyName3.ts]
 class Test {
     "prop1": number;

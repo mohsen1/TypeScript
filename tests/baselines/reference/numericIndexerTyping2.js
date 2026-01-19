@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numericIndexerTyping2.ts] ////
-
 //// [numericIndexerTyping2.ts]
 class I {
     [x: string]: Date
@@ -8,10 +6,10 @@ class I {
 class I2 extends I {
 }
 
-declare var i: I;
+var i: I;
 var r: string = i[1]; // error: numeric indexer returns the type of the string indexer
 
-declare var i2: I2;
+var i2: I2;
 var r2: string = i2[1]; // error: numeric indexer returns the type of the string indexere
 
 //// [numericIndexerTyping2.js]
@@ -42,5 +40,7 @@ var I2 = /** @class */ (function (_super) {
     }
     return I2;
 }(I));
+var i;
 var r = i[1]; // error: numeric indexer returns the type of the string indexer
+var i2;
 var r2 = i2[1]; // error: numeric indexer returns the type of the string indexere

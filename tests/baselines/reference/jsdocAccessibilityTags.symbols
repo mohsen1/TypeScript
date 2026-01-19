@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocAccessibilityTags.ts] ////
-
-=== jsdocAccessibilityTag.js ===
+=== tests/cases/conformance/jsdoc/jsdocAccessibilityTag.js ===
 class A {
 >A : Symbol(A, Decl(jsdocAccessibilityTag.js, 0, 0))
 

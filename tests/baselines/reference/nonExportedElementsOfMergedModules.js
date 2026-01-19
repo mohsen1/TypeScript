@@ -1,16 +1,14 @@
-//// [tests/cases/compiler/nonExportedElementsOfMergedModules.ts] ////
-
 //// [nonExportedElementsOfMergedModules.ts]
-namespace One {
+module One {
     enum A { X }
-    namespace B {
+    module B {
         export var x;
     }
 }
 
-namespace One {
+module One {
     enum A { Y }
-    namespace B {
+    module B {
         export var y;
     }
     B.x;

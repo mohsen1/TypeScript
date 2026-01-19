@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyDeclareVariablesWithoutTypeAndInit.ts] ////
-
 //// [implicitAnyDeclareVariablesWithoutTypeAndInit.ts]
 // this should be an error
 var x;                   // no error, control flow typed

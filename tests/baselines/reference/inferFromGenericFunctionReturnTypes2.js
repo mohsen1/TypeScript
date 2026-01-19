@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inferFromGenericFunctionReturnTypes2.ts] ////
-
 //// [inferFromGenericFunctionReturnTypes2.ts]
 type Mapper<T, U> = (x: T) => U;
 

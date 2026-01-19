@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionCall6.ts] ////
-
 //// [functionCall6.ts]
 function foo(a:string){}; 
 foo('bar');

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/spreadUnion2.ts] ////
-
 //// [spreadUnion2.ts]
 declare const undefinedUnion: { a: number } | undefined;
 declare const nullUnion: { b: number } | null;

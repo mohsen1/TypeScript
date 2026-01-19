@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractClinterfaceAssignability.ts] ////
-
 //// [classAbstractClinterfaceAssignability.ts]
 interface I {
     x: number;
@@ -12,24 +10,27 @@ interface IConstructor {
     prototype: I;
 }
 
-declare var I: IConstructor;
+var I: IConstructor;
 
 abstract class A {
     x: number;
     static y: number;
 }
 
-declare var AA: typeof A;
+var AA: typeof A;
 AA = I;
 
-declare var AAA: typeof I;
+var AAA: typeof I;
 AAA = A;
 
 //// [classAbstractClinterfaceAssignability.js]
+var I;
 var A = /** @class */ (function () {
     function A() {
     }
     return A;
 }());
+var AA;
 AA = I;
+var AAA;
 AAA = A;

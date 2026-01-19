@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectCreationOfElementAccessExpression.ts] ////
-
 //// [objectCreationOfElementAccessExpression.ts]
 class Food {
     private amount: number;

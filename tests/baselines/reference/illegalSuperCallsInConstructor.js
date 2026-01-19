@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/illegalSuperCallsInConstructor.ts] ////
-
 //// [illegalSuperCallsInConstructor.ts]
 class Base {
     x: string;

@@ -1,31 +1,29 @@
-//// [tests/cases/conformance/directives/multiline.tsx] ////
-
-=== a.ts ===
+=== tests/cases/conformance/directives/a.ts ===
 export const texts: string[] = [];
 >texts : Symbol(texts, Decl(a.ts, 0, 12))
 
 /**
  @ts-ignore */
 texts.push(100);
->texts.push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>texts.push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 >texts : Symbol(texts, Decl(a.ts, 0, 12))
->push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 
 /**
  @ts-expect-error */
 texts.push(100);
->texts.push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>texts.push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 >texts : Symbol(texts, Decl(a.ts, 0, 12))
->push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 
 /**
  @ts-expect-error */
 texts.push("100");
->texts.push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>texts.push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 >texts : Symbol(texts, Decl(a.ts, 0, 12))
->push : Symbol(Array.push, Decl(lib.es5.d.ts, --, --))
+>push : Symbol(Array.push, Decl(lib.d.ts, --, --))
 
-=== b.tsx ===
+=== tests/cases/conformance/directives/b.tsx ===
 import * as React from "react";
 >React : Symbol(React, Decl(b.tsx, 0, 6))
 

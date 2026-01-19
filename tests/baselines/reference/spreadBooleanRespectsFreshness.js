@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/spreadBooleanRespectsFreshness.ts] ////
-
 //// [spreadBooleanRespectsFreshness.ts]
 type Foo = FooBase | FooArray;
 type FooBase = string | false;

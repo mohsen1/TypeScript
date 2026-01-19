@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyStringIndexerOnObject.ts] ////
-
 //// [noImplicitAnyStringIndexerOnObject.ts]
 var a = {}["hello"];
 var b: string = { '': 'foo' }[''];
@@ -75,12 +73,12 @@ declare const sym : unique symbol;
 o[sym];
 
 enum NumEnum { a, b }
-declare let numEnumKey: NumEnum;
+let numEnumKey: NumEnum;
 o[numEnumKey];
 
 
 enum StrEnum { a = "a", b = "b" }
-declare let strEnumKey: StrEnum;
+let strEnumKey: StrEnum;
 o[strEnumKey];
 
 
@@ -165,12 +163,14 @@ var NumEnum;
     NumEnum[NumEnum["a"] = 0] = "a";
     NumEnum[NumEnum["b"] = 1] = "b";
 })(NumEnum || (NumEnum = {}));
+var numEnumKey;
 o[numEnumKey];
 var StrEnum;
 (function (StrEnum) {
     StrEnum["a"] = "a";
     StrEnum["b"] = "b";
 })(StrEnum || (StrEnum = {}));
+var strEnumKey;
 o[strEnumKey];
 var rover = { bark: function () { } };
 map[rover] = "Rover";

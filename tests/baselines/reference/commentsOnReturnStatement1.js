@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsOnReturnStatement1.ts] ////
-
 //// [commentsOnReturnStatement1.ts]
 class DebugClass {
     public static debugFunc() {

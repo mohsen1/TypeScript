@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/assignToModule.ts] ////
-
 //// [assignToModule.ts]
-namespace A {}
+module A {}
 A = undefined; // invalid LHS
 
 //// [assignToModule.js]

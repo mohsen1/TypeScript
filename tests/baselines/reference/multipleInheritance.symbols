@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/multipleInheritance.ts] ////
-
-=== multipleInheritance.ts ===
+=== tests/cases/compiler/multipleInheritance.ts ===
 class B1 {
 >B1 : Symbol(B1, Decl(multipleInheritance.ts, 0, 0))
 

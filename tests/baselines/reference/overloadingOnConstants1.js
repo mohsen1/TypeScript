@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadingOnConstants1.ts] ////
-
 //// [overloadingOnConstants1.ts]
 class Base { foo() { } }
 class Derived1 extends Base { bar() { } }
@@ -13,7 +11,7 @@ interface Document2 {
     createElement(tagName: string): Base;
 }
 
-declare var d2: Document2;
+var d2: Document2;
 
 // these are ok
 var htmlElement: Base = d2.createElement("yo")
@@ -73,6 +71,7 @@ var Derived3 = /** @class */ (function (_super) {
     Derived3.prototype.biz = function () { };
     return Derived3;
 }(Base));
+var d2;
 // these are ok
 var htmlElement = d2.createElement("yo");
 var htmlCanvasElement = d2.createElement("canvas");

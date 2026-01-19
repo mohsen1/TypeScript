@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/specializedSignatureIsNotSubtypeOfNonSpecializedSignature.ts] ////
-
 //// [specializedSignatureIsNotSubtypeOfNonSpecializedSignature.ts]
 function foo(x: 'a');
 function foo(x: number) { }

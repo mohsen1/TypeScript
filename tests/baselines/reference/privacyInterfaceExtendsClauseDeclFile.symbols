@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/privacyInterfaceExtendsClauseDeclFile.ts] ////
-
-=== privacyInterfaceExtendsClauseDeclFile_externalModule.ts ===
-export namespace publicModule {
+=== tests/cases/compiler/privacyInterfaceExtendsClauseDeclFile_externalModule.ts ===
+export module publicModule {
 >publicModule : Symbol(publicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 0))
 
     export interface publicInterfaceInPublicModule {
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 31))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 28))
     }
 
     interface privateInterfaceInPublicModule {
@@ -14,7 +12,7 @@ export namespace publicModule {
 
     interface privateInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPublicModule {
 >privateInterfaceImplementingPublicInterfaceInModule : Symbol(privateInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 5, 5))
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 31))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 28))
     }
     interface privateInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPublicModule {
 >privateInterfaceImplementingPrivateInterfaceInModule : Symbol(privateInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 8, 5))
@@ -22,7 +20,7 @@ export namespace publicModule {
     }
     export interface publicInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPublicModule {
 >publicInterfaceImplementingPublicInterfaceInModule : Symbol(publicInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 10, 5))
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 31))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 28))
     }
     export interface publicInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPublicModule { // Should error
 >publicInterfaceImplementingPrivateInterfaceInModule : Symbol(publicInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 12, 5))
@@ -31,29 +29,29 @@ export namespace publicModule {
 
     interface privateInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule {
 >privateInterfaceImplementingFromPrivateModuleInterface : Symbol(privateInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 14, 5))
->privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
     export interface publicInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule { // Should error
 >publicInterfaceImplementingFromPrivateModuleInterface : Symbol(publicInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 17, 5))
->privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
 
     export interface publicInterfaceImplementingPrivateAndPublicInterface extends privateInterfaceInPublicModule, publicInterfaceInPublicModule { // Should error
 >publicInterfaceImplementingPrivateAndPublicInterface : Symbol(publicInterfaceImplementingPrivateAndPublicInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 19, 5))
 >privateInterfaceInPublicModule : Symbol(privateInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 2, 5))
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 31))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 0, 28))
     }
 }
 
-namespace privateModule {
+module privateModule {
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
 
     export interface publicInterfaceInPrivateModule {
->publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 
     }
 
@@ -63,7 +61,7 @@ namespace privateModule {
 
     interface privateInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPrivateModule {
 >privateInterfaceImplementingPublicInterfaceInModule : Symbol(privateInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 31, 5))
->publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
     interface privateInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPrivateModule {
 >privateInterfaceImplementingPrivateInterfaceInModule : Symbol(privateInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 34, 5))
@@ -71,7 +69,7 @@ namespace privateModule {
     }
     export interface publicInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPrivateModule {
 >publicInterfaceImplementingPublicInterfaceInModule : Symbol(publicInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 36, 5))
->publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
     export interface publicInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPrivateModule {
 >publicInterfaceImplementingPrivateInterfaceInModule : Symbol(publicInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 38, 5))
@@ -80,15 +78,15 @@ namespace privateModule {
 
     interface privateInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule {
 >privateInterfaceImplementingFromPrivateModuleInterface : Symbol(privateInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 40, 5))
->privateModule.publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
     export interface publicInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule {
 >publicInterfaceImplementingFromPrivateModuleInterface : Symbol(publicInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 43, 5))
->privateModule.publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
     }
 }
 
@@ -120,23 +118,23 @@ export interface publicInterfaceImplementingPrivateInterface extends privateInte
 
 interface privateInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule {
 >privateInterfaceImplementingFromPrivateModuleInterface : Symbol(privateInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 62, 1))
->privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 }
 export interface publicInterfaceImplementingFromPrivateModuleInterface extends privateModule.publicInterfaceInPrivateModule { // Should error
 >publicInterfaceImplementingFromPrivateModuleInterface : Symbol(publicInterfaceImplementingFromPrivateModuleInterface, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 65, 1))
->privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>privateModule.publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 >privateModule : Symbol(privateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 23, 1))
->publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 25))
+>publicInterfaceInPrivateModule : Symbol(privateModule.publicInterfaceInPrivateModule, Decl(privacyInterfaceExtendsClauseDeclFile_externalModule.ts, 25, 22))
 }
 
-=== privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts ===
-namespace publicModuleInGlobal {
+=== tests/cases/compiler/privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts ===
+module publicModuleInGlobal {
 >publicModuleInGlobal : Symbol(publicModuleInGlobal, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 0))
 
     export interface publicInterfaceInPublicModule {
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 32))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 29))
     }
 
     interface privateInterfaceInPublicModule {
@@ -145,7 +143,7 @@ namespace publicModuleInGlobal {
 
     interface privateInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPublicModule {
 >privateInterfaceImplementingPublicInterfaceInModule : Symbol(privateInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 5, 5))
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 32))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 29))
     }
     interface privateInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPublicModule {
 >privateInterfaceImplementingPrivateInterfaceInModule : Symbol(privateInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 8, 5))
@@ -153,7 +151,7 @@ namespace publicModuleInGlobal {
     }
     export interface publicInterfaceImplementingPublicInterfaceInModule extends publicInterfaceInPublicModule {
 >publicInterfaceImplementingPublicInterfaceInModule : Symbol(publicInterfaceImplementingPublicInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 10, 5))
->publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 32))
+>publicInterfaceInPublicModule : Symbol(publicInterfaceInPublicModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 0, 29))
     }
     export interface publicInterfaceImplementingPrivateInterfaceInModule extends privateInterfaceInPublicModule { // Should error
 >publicInterfaceImplementingPrivateInterfaceInModule : Symbol(publicInterfaceImplementingPrivateInterfaceInModule, Decl(privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts, 12, 5))

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/accessibility/protectedClassPropertyAccessibleWithinNestedClass.ts] ////
-
-=== protectedClassPropertyAccessibleWithinNestedClass.ts ===
+=== tests/cases/conformance/classes/members/accessibility/protectedClassPropertyAccessibleWithinNestedClass.ts ===
 // no errors
 
 class C {

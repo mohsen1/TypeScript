@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Statements/LabeledStatements/parser_duplicateLabel3.ts] ////
-
 //// [parser_duplicateLabel3.ts]
 target:
 while (true) {

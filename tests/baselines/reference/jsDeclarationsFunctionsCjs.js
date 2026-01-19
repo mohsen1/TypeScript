@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsFunctionsCjs.ts] ////
-
 //// [index.js]
 module.exports.a = function a() {}
 
@@ -119,7 +117,7 @@ module.exports.j = function j() { };
 export function a(): void;
 export function b(): void;
 export namespace b {
-    let cat: string;
+    const cat: string;
 }
 export function c(): void;
 export namespace c {

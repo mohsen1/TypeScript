@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/externSyntax.ts] ////
-
-=== externSyntax.ts ===
+=== tests/cases/compiler/externSyntax.ts ===
 declare var v;
 >v : Symbol(v, Decl(externSyntax.ts, 0, 11))
 
-declare namespace M {
+declare module M {
 >M : Symbol(M, Decl(externSyntax.ts, 0, 14))
 
     export class D {
->D : Symbol(D, Decl(externSyntax.ts, 1, 21))
+>D : Symbol(D, Decl(externSyntax.ts, 1, 18))
 
         public p;
 >p : Symbol(D.p, Decl(externSyntax.ts, 2, 20))

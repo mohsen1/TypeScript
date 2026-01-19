@@ -1,17 +1,15 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithBooleanType.ts] ////
-
 //// [plusOperatorWithBooleanType.ts]
 // + operator on boolean type
-declare var BOOLEAN: boolean;
+var BOOLEAN: boolean;
 
 function foo(): boolean { return true; }
 
 class A {
-    public a!: boolean;
+    public a: boolean;
     static foo() { return false; }
 }
-namespace M {
-    export var n: boolean = false;
+module M {
+    export var n: boolean;
 }
 
 var objA = new A();
@@ -38,6 +36,8 @@ var ResultIsNumber7 = +A.foo();
 +M.n;
 
 //// [plusOperatorWithBooleanType.js]
+// + operator on boolean type
+var BOOLEAN;
 function foo() { return true; }
 var A = /** @class */ (function () {
     function A() {
@@ -47,7 +47,6 @@ var A = /** @class */ (function () {
 }());
 var M;
 (function (M) {
-    M.n = false;
 })(M || (M = {}));
 var objA = new A();
 // boolean type var

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classExtendsNull.ts] ////
-
 //// [classExtendsNull.ts]
 class C extends null {
     constructor() {
@@ -33,7 +31,7 @@ var __extends = (this && this.__extends) || (function () {
 var C = /** @class */ (function (_super) {
     __extends(C, _super);
     function C() {
-        var _this = _super.call(this) || this;
+        _this = _super.call(this) || this;
         return Object.create(null);
     }
     return C;

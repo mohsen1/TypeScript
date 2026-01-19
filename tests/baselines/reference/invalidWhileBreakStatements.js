@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/breakStatements/invalidWhileBreakStatements.ts] ////
-
 //// [invalidWhileBreakStatements.ts]
 // All errors
 

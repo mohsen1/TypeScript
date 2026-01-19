@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/classAbstractKeyword/classAbstractOverloads.ts] ////
-
 //// [classAbstractOverloads.ts]
 abstract class A {
     abstract foo();

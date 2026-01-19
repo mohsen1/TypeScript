@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/literal/numericLiteralTypes1.ts] ////
-
 //// [numericLiteralTypes1.ts]
 type A1 = 1;
 type A2 = 1.0;

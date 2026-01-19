@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/sourceMapValidationEnums.ts] ////
-
-=== sourceMapValidationEnums.ts ===
+=== tests/cases/compiler/sourceMapValidationEnums.ts ===
 enum e {
 >e : Symbol(e, Decl(sourceMapValidationEnums.ts, 0, 0))
 

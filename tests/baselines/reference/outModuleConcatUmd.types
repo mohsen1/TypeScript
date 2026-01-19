@@ -1,18 +1,14 @@
-//// [tests/cases/compiler/outModuleConcatUmd.ts] ////
+=== tests/cases/compiler/ref/a.ts ===
+// This should error
 
-=== ref/a.ts ===
 export class A { }
 >A : A
->  : ^
 
-=== b.ts ===
+=== tests/cases/compiler/b.ts ===
 import {A} from "./ref/a";
 >A : typeof A
->  : ^^^^^^^^
 
 export class B extends A { }
 >B : B
->  : ^
 >A : A
->  : ^
 

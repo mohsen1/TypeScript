@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restUnion3.ts] ////
-
 //// [restUnion3.ts]
 declare const nullAndUndefinedUnion: null | undefined;
 var rest4: { };

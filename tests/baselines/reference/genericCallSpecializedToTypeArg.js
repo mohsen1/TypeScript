@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericCallSpecializedToTypeArg.ts] ////
-
 //// [genericCallSpecializedToTypeArg.ts]
 function dupe<T>(x: T): T {
   return x;

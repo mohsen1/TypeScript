@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsAfterSpread.ts] ////
-
 //// [commentsAfterSpread.ts]
 const identity = (a) => a;
 

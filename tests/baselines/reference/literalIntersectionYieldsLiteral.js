@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/literalIntersectionYieldsLiteral.ts] ////
-
 //// [literalIntersectionYieldsLiteral.ts]
 const x: { type: string } & { type: "string" } = { type: "string" };
 

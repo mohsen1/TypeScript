@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/narrowTypeByInstanceof.ts] ////
-
-=== narrowTypeByInstanceof.ts ===
+=== tests/cases/compiler/narrowTypeByInstanceof.ts ===
     class Match {
 >Match : Symbol(Match, Decl(narrowTypeByInstanceof.ts, 0, 0))
 

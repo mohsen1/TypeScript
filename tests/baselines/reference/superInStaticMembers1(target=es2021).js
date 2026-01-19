@@ -947,11 +947,11 @@ var _a;
 (_a = class Reflect {
     },
     (() => {
-        var _b, _c;
-        class C extends (_c = B) {
+        var _a, _b;
+        class C extends (_b = B) {
         }
-        _b = C;
-        C._ = Reflect.get(_c, "w", _b).call(_b);
+        _a = C;
+        C._ = Reflect.get(_b, "w", _a).call(_a);
     })(),
     _a);
 export {};
@@ -960,12 +960,12 @@ var _a;
 (_a = class Reflect {
     },
     (() => {
-        var _b, _c;
-        class C extends (_c = B) {
+        var _a, _b;
+        class C extends (_b = B) {
         }
-        _b = C;
+        _a = C;
         (() => {
-            Reflect.get(_c, "w", _b).call(_b);
+            Reflect.get(_b, "w", _a).call(_a);
         })();
     })(),
     _a);

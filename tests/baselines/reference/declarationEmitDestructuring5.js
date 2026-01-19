@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declarationEmitDestructuring5.ts] ////
-
 //// [declarationEmitDestructuring5.ts]
 function baz([, z, , ]) { }
 function foo([, b, ]: [any, any]): void { }

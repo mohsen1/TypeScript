@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadedStaticMethodSpecialization.ts] ////
-
 //// [overloadedStaticMethodSpecialization.ts]
 class A<T> {
     static B<S>(v: A<S>): A<S>;

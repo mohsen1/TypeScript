@@ -1,27 +1,25 @@
-//// [tests/cases/conformance/internalModules/moduleDeclarations/nestedModules.ts] ////
-
 //// [nestedModules.ts]
-namespace A.B.C {
+module A.B.C {
     export interface Point {
         x: number;
         y: number;
     }
 }
 
-namespace A {
-    export namespace B {
+module A {
+    export module B {
         var Point: C.Point = { x: 0, y: 0 }; // bug 832088: could not find module 'C'
     }
 }
 
-namespace M2.X {
+module M2.X {
     export interface Point {
         x: number; y: number;
     }
 }
 
-namespace M2 {
-    export namespace X {
+module M2 {
+    export module X {
         export var Point: number;
     }
 }

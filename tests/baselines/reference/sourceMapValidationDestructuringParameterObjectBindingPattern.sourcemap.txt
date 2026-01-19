@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationDestructuringParameterObjectBindingPattern.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationDestructuringParameterObjectBindingPattern.js
+emittedFile:tests/cases/compiler/sourceMapValidationDestructuringParameterObjectBindingPattern.js
 sourceFile:sourceMapValidationDestructuringParameterObjectBindingPattern.ts
 -------------------------------------------------------------------
 >>>var hello = "hello";

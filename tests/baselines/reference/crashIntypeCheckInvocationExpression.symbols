@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/crashIntypeCheckInvocationExpression.ts] ////
-
-=== crashIntypeCheckInvocationExpression.ts ===
+=== tests/cases/compiler/crashIntypeCheckInvocationExpression.ts ===
 var nake;
 >nake : Symbol(nake, Decl(crashIntypeCheckInvocationExpression.ts, 0, 3))
 

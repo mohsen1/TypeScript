@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classDeclarations/modifierOnClassDeclarationMemberInFunction.ts] ////
-
 //// [modifierOnClassDeclarationMemberInFunction.ts]
 function f() {
     class C {

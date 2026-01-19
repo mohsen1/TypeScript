@@ -1,19 +1,17 @@
-//// [tests/cases/conformance/types/members/objectTypeHidingMembersOfObjectAssignmentCompat.ts] ////
-
 //// [objectTypeHidingMembersOfObjectAssignmentCompat.ts]
 interface I {
     toString(): void;
 }
 
-declare var i: I;
-declare var o: Object;
+var i: I;
+var o: Object;
 o = i; // error
 i = o; // ok
 
 class C {
     toString(): void { }
 }
-declare var c: C;
+var c: C;
 o = c; // error
 c = o; // ok
 
@@ -24,6 +22,8 @@ o = a; // error
 a = o; // ok
 
 //// [objectTypeHidingMembersOfObjectAssignmentCompat.js]
+var i;
+var o;
 o = i; // error
 i = o; // ok
 var C = /** @class */ (function () {
@@ -32,6 +32,7 @@ var C = /** @class */ (function () {
     C.prototype.toString = function () { };
     return C;
 }());
+var c;
 o = c; // error
 c = o; // ok
 var a = {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/nestedClassDeclaration.ts] ////
-
 //// [nestedClassDeclaration.ts]
 // nested classes are not allowed
 
@@ -40,5 +38,5 @@ function foo() {
     }());
 }
 var x = {
-    class: C4
+    "class": C4
 }, _a = void 0;

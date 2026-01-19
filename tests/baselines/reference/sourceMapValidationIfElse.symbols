@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/sourceMapValidationIfElse.ts] ////
-
-=== sourceMapValidationIfElse.ts ===
+=== tests/cases/compiler/sourceMapValidationIfElse.ts ===
 var i = 10;
 >i : Symbol(i, Decl(sourceMapValidationIfElse.ts, 0, 3))
 

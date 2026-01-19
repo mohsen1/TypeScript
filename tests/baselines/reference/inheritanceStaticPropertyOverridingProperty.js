@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/inheritanceStaticPropertyOverridingProperty.ts] ////
-
 //// [inheritanceStaticPropertyOverridingProperty.ts]
 class a {
     static x: () => string;

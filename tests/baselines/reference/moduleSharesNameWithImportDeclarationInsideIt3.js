@@ -1,15 +1,13 @@
-//// [tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt3.ts] ////
-
 //// [moduleSharesNameWithImportDeclarationInsideIt3.ts]
-namespace Z {
-    export namespace M {
+module Z {
+    export module M {
         export function bar() {
             return "";
         }
     }
     export interface I { }
 }
-namespace A.M {
+module A.M {
     import M = Z.M;
     import M = Z.I;
 

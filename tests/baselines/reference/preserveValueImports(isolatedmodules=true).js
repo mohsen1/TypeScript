@@ -31,14 +31,14 @@ export default {};
 export var b = 0;
 export var c = 1;
 //// [b.js]
-export {};
+import a, { b, c } from "./a";
 //// [c.js]
-export {};
+import * as a from "./a";
 //// [d.js]
 export {};
 //// [e.js]
 DD;
 export {};
 //// [f.js]
-import { b } from "./a";
+import { b, c } from "./a";
 b;

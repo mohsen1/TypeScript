@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMap-Comments2.ts] ////
-
 //// [sourceMap-Comments2.ts]
 function foo(str: string, num: number): void {
     return;

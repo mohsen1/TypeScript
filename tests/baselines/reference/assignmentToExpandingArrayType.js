@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/assignmentToExpandingArrayType.ts] ////
-
 //// [assignmentToExpandingArrayType.ts]
 // Fixes exponential time/space in #14628
 let x = []

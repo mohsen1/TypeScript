@@ -30,7 +30,7 @@ declare module "interface-variable" {
 }
 
 declare module "module" {
-    namespace Foo {
+    module Foo {
         export var a: number;
         export var b: number;
     }
@@ -42,7 +42,7 @@ declare module "interface-module" {
         x: number;
         y: number;
     }
-    namespace Foo {
+    module Foo {
         export var a: number;
         export var b: number;
     }
@@ -50,7 +50,7 @@ declare module "interface-module" {
 }
 
 declare module "variable-module" {
-    namespace Foo {
+    module Foo {
         interface Bar {
             x: number;
             y: number;
@@ -70,7 +70,7 @@ declare module "function" {
 
 declare module "function-module" {
     function foo();
-    namespace foo {
+    module foo {
         export var a: number;
         export var b: number;
     }
@@ -90,7 +90,7 @@ declare module "class-module" {
         x: number;
         y: number;
     }
-    namespace Foo {
+    module Foo {
         export var a: number;
         export var b: number;
     }
@@ -211,41 +211,15 @@ export * from "class-module";
 /// <reference path="modules.d.ts"/>
 var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
-    var desc = Object.getOwnPropertyDescriptor(m, k);
-    if (!desc || ("get" in desc ? !m.__esModule : desc.writable || desc.configurable)) {
-      desc = { enumerable: true, get: function() { return m[k]; } };
-    }
-    Object.defineProperty(o, k2, desc);
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
 }) : (function(o, m, k, k2) {
     if (k2 === undefined) k2 = k;
     o[k2] = m[k];
 }));
-var __setModuleDefault = (this && this.__setModuleDefault) || (Object.create ? (function(o, v) {
-    Object.defineProperty(o, "default", { enumerable: true, value: v });
-}) : function(o, v) {
-    o["default"] = v;
-});
-var __importStar = (this && this.__importStar) || (function () {
-    var ownKeys = function(o) {
-        ownKeys = Object.getOwnPropertyNames || function (o) {
-            var ar = [];
-            for (var k in o) if (Object.prototype.hasOwnProperty.call(o, k)) ar[ar.length] = k;
-            return ar;
-        };
-        return ownKeys(o);
-    };
-    return function (mod) {
-        if (mod && mod.__esModule) return mod;
-        var result = {};
-        if (mod != null) for (var k = ownKeys(mod), i = 0; i < k.length; i++) if (k[i] !== "default") __createBinding(result, mod, k[i]);
-        __setModuleDefault(result, mod);
-        return result;
-    };
-})();
 var __exportStar = (this && this.__exportStar) || function(m, exports) {
     for (var p in m) if (p !== "default" && !Object.prototype.hasOwnProperty.call(exports, p)) __createBinding(exports, m, p);
 };
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.a0 = exports.a9 = exports.a8 = exports.a7 = exports.a6 = exports.a5 = exports.a4 = exports.a3 = exports.a2 = exports.a1 = void 0;
 var z2 = require("variable");
 var z3 = require("interface-variable");
@@ -266,15 +240,15 @@ z7.a;
 z8.a;
 z9.a;
 z0.a;
-var y2 = __importStar(require("variable"));
-var y3 = __importStar(require("interface-variable"));
-var y4 = __importStar(require("module"));
-var y5 = __importStar(require("interface-module"));
-var y6 = __importStar(require("variable-module"));
-var y7 = __importStar(require("function"));
-var y8 = __importStar(require("function-module"));
-var y9 = __importStar(require("class"));
-var y0 = __importStar(require("class-module"));
+var y2 = require("variable");
+var y3 = require("interface-variable");
+var y4 = require("module");
+var y5 = require("interface-module");
+var y6 = require("variable-module");
+var y7 = require("function");
+var y8 = require("function-module");
+var y9 = require("class");
+var y0 = require("class-module");
 y1.a;
 y2.a;
 y3.a;
@@ -308,25 +282,25 @@ class_1.a;
 class_module_1.a;
 // named export
 var interface_2 = require("interface");
-Object.defineProperty(exports, "a1", { enumerable: true, get: function () { return interface_2.a; } });
+__createBinding(exports, interface_2, "a", "a1");
 var variable_2 = require("variable");
-Object.defineProperty(exports, "a2", { enumerable: true, get: function () { return variable_2.a; } });
+__createBinding(exports, variable_2, "a", "a2");
 var interface_variable_2 = require("interface-variable");
-Object.defineProperty(exports, "a3", { enumerable: true, get: function () { return interface_variable_2.a; } });
+__createBinding(exports, interface_variable_2, "a", "a3");
 var module_2 = require("module");
-Object.defineProperty(exports, "a4", { enumerable: true, get: function () { return module_2.a; } });
+__createBinding(exports, module_2, "a", "a4");
 var interface_module_2 = require("interface-module");
-Object.defineProperty(exports, "a5", { enumerable: true, get: function () { return interface_module_2.a; } });
+__createBinding(exports, interface_module_2, "a", "a5");
 var variable_module_2 = require("variable-module");
-Object.defineProperty(exports, "a6", { enumerable: true, get: function () { return variable_module_2.a; } });
+__createBinding(exports, variable_module_2, "a", "a6");
 var function_2 = require("function");
-Object.defineProperty(exports, "a7", { enumerable: true, get: function () { return function_2.a; } });
+__createBinding(exports, function_2, "a", "a7");
 var function_module_2 = require("function-module");
-Object.defineProperty(exports, "a8", { enumerable: true, get: function () { return function_module_2.a; } });
+__createBinding(exports, function_module_2, "a", "a8");
 var class_2 = require("class");
-Object.defineProperty(exports, "a9", { enumerable: true, get: function () { return class_2.a; } });
+__createBinding(exports, class_2, "a", "a9");
 var class_module_2 = require("class-module");
-Object.defineProperty(exports, "a0", { enumerable: true, get: function () { return class_module_2.a; } });
+__createBinding(exports, class_module_2, "a", "a0");
 // export-star
 __exportStar(require("interface"), exports);
 __exportStar(require("variable"), exports);

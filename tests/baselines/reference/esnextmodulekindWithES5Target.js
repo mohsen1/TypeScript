@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/esnext/esnextmodulekindWithES5Target.ts] ////
-
 //// [esnextmodulekindWithES5Target.ts]
 export class C {
     static s = 0;

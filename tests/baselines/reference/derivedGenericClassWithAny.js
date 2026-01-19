@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/inheritanceAndOverriding/derivedGenericClassWithAny.ts] ////
-
 //// [derivedGenericClassWithAny.ts]
 class C<T extends number> {
     x: T;
@@ -36,9 +34,9 @@ class E<T extends string> extends D {
     }
 }
 
-declare var c: C<number>;
-declare var d: D;
-declare var e: E<string>;
+var c: C<number>;
+var d: D;
+var e: E<string>;
 
 c = d;
 c = e;
@@ -117,6 +115,9 @@ var E = /** @class */ (function (_super) {
     };
     return E;
 }(D));
+var c;
+var d;
+var e;
 c = d;
 c = e;
 var r = c.foo(); // e.foo would return string

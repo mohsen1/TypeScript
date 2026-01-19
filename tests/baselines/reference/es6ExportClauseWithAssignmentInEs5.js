@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6ExportClauseWithAssignmentInEs5.ts] ////
-
 //// [server.ts]
 var foo = 2;
 foo = 3;

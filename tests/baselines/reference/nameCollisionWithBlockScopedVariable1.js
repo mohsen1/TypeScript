@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/nameCollisionWithBlockScopedVariable1.ts] ////
-
 //// [nameCollisionWithBlockScopedVariable1.ts]
-namespace M {
+module M {
     export class C { }
 }
-namespace M {
+module M {
     {
         let M = 0;
         new C();

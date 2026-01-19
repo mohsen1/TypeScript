@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsExportAssignedClassInstance1.ts] ////
-
 //// [index.js]
 class Foo {}
 

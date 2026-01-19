@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/innerOverloads.ts] ////
-
 //// [innerOverloads.ts]
 function outer() {
     function inner(x:number); // should work

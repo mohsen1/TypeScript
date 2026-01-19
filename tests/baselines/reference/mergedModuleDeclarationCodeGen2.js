@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/mergedModuleDeclarationCodeGen2.ts] ////
-
 //// [mergedModuleDeclarationCodeGen2.ts]
-namespace my.data.foo {
+module my.data.foo {
     export function buz() { }
 }
-namespace my.data {
+module my.data {
     function data(my) {
         foo.buz();
     }

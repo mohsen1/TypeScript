@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/partiallyDiscriminantedUnions.ts] ////
-
 //// [partiallyDiscriminantedUnions.ts]
 // Repro from #10586
 

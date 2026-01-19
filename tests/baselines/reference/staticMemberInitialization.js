@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/staticMemberInitialization.ts] ////
-
 //// [staticMemberInitialization.ts]
 class C {
     static x = 1;

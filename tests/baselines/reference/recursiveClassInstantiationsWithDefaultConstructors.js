@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/recursiveClassInstantiationsWithDefaultConstructors.ts] ////
-
 //// [recursiveClassInstantiationsWithDefaultConstructors.ts]
-namespace TypeScript2 {
+module TypeScript2 {
     export class MemberName {
         public prefix: string = "";
     }

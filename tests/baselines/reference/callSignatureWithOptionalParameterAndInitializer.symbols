@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithOptionalParameterAndInitializer.ts] ////
-
-=== callSignatureWithOptionalParameterAndInitializer.ts ===
+=== tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithOptionalParameterAndInitializer.ts ===
 // Optional parameters cannot also have initializer expressions, these are all errors
 
 function foo(x?: number = 1) { }
@@ -43,18 +41,18 @@ class C {
 >x : Symbol(x, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 14, 8))
 }
 
-declare var c: C;
->c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 11))
+var c: C;
+>c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 3))
 >C : Symbol(C, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 11, 9))
 
 c.foo();
 >c.foo : Symbol(C.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 13, 9))
->c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 11))
+>c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 3))
 >foo : Symbol(C.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 13, 9))
 
 c.foo(1);
 >c.foo : Symbol(C.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 13, 9))
->c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 11))
+>c : Symbol(c, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 17, 3))
 >foo : Symbol(C.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 13, 9))
 
 interface I {
@@ -69,28 +67,28 @@ interface I {
 >y : Symbol(y, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 23, 18))
 }
 
-declare var i: I;
->i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 11))
+var i: I;
+>i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 3))
 >I : Symbol(I, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 19, 9))
 
 i();
->i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 11))
+>i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 3))
 
 i(1);
->i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 11))
+>i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 3))
 
 i.foo(1);
 >i.foo : Symbol(I.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 22, 13))
->i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 11))
+>i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 3))
 >foo : Symbol(I.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 22, 13))
 
 i.foo(1, 2);
 >i.foo : Symbol(I.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 22, 13))
->i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 11))
+>i : Symbol(i, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 26, 3))
 >foo : Symbol(I.foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 22, 13))
 
-declare var a: {
->a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 11))
+var a: {
+>a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 3))
 
     (x?: number = 1);
 >x : Symbol(x, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 33, 5))
@@ -101,19 +99,19 @@ declare var a: {
 }
 
 a();
->a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 11))
+>a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 3))
 
 a(1);
->a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 11))
+>a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 3))
 
 a.foo();
 >a.foo : Symbol(foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 33, 21))
->a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 11))
+>a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 3))
 >foo : Symbol(foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 33, 21))
 
 a.foo(1);
 >a.foo : Symbol(foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 33, 21))
->a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 11))
+>a : Symbol(a, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 32, 3))
 >foo : Symbol(foo, Decl(callSignatureWithOptionalParameterAndInitializer.ts, 33, 21))
 
 var b = {

@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/protectedMembers.ts] ////
-
 //// [protectedMembers.ts]
 // Class with protected members
 class C1 {
-    protected x!: number;
+    protected x: number;
     protected static sx: number;
     protected f() {
         return this.x;
@@ -25,8 +23,8 @@ class C2 extends C1 {
 
 // Derived class making protected members public
 class C3 extends C2 {
-    x!: number;
-    static sx: number
+    x: number;
+    static sx: number;
     f() {
         return super.f();
     }
@@ -35,9 +33,9 @@ class C3 extends C2 {
     }
 }
 
-declare var c1: C1;
-declare var c2: C2;
-declare var c3: C3;
+var c1: C1;
+var c2: C2;
+var c3: C3;
 
 // All of these should be errors
 c1.x;
@@ -95,8 +93,8 @@ class A1 {
 class B1 {
     x;
 }
-declare var a1: A1;
-declare var b1: B1;
+var a1: A1;
+var b1: B1;
 a1 = b1;  // Error, B1 doesn't derive from A1
 b1 = a1;  // Error, x is protected in A1 but public in B1
 
@@ -173,6 +171,9 @@ var C3 = /** @class */ (function (_super) {
     };
     return C3;
 }(C2));
+var c1;
+var c2;
+var c3;
 // All of these should be errors
 c1.x;
 c1.f();
@@ -236,6 +237,8 @@ var B1 = /** @class */ (function () {
     }
     return B1;
 }());
+var a1;
+var b1;
 a1 = b1; // Error, B1 doesn't derive from A1
 b1 = a1; // Error, x is protected in A1 but public in B1
 var A2 = /** @class */ (function () {

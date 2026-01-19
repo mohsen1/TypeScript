@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/getAndSetNotIdenticalType3.ts] ////
-
 //// [getAndSetNotIdenticalType3.ts]
 class A<T> { foo: T; }
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/importWithTrailingSlash.ts] ////
-
 === /a.ts ===
 export default { a: 0 };
 >a : Symbol(a, Decl(a.ts, 0, 16))
@@ -16,7 +14,9 @@ import aIndex from "./";
 >aIndex : Symbol(aIndex, Decl(test.ts, 1, 6))
 
 a.a;
+>a.a : Symbol(a, Decl(a.ts, 0, 16))
 >a : Symbol(a, Decl(test.ts, 0, 6))
+>a : Symbol(a, Decl(a.ts, 0, 16))
 
 aIndex.aIndex;
 >aIndex.aIndex : Symbol(aIndex, Decl(index.ts, 0, 16))
@@ -31,7 +31,9 @@ import aIndex from "../";
 >aIndex : Symbol(aIndex, Decl(test.ts, 1, 6))
 
 a.a;
+>a.a : Symbol(a, Decl(a.ts, 0, 16))
 >a : Symbol(a, Decl(test.ts, 0, 6))
+>a : Symbol(a, Decl(a.ts, 0, 16))
 
 aIndex.aIndex;
 >aIndex.aIndex : Symbol(aIndex, Decl(index.ts, 0, 16))

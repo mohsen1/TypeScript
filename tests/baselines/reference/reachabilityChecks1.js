@@ -1,36 +1,34 @@
-//// [tests/cases/compiler/reachabilityChecks1.ts] ////
-
 //// [reachabilityChecks1.ts]
 while (true);
 var x = 1;
 
-namespace A {
+module A {
     while (true);
     let x;
 }
 
-namespace A1 {
+module A1 {
     do {} while(true);
-    namespace A {
+    module A {
         interface F {}
     }
 }
 
-namespace A2 {
+module A2 {
     while (true);
-    namespace A {
+    module A {
         var x = 1;
     }
 }
 
-namespace A3 {
+module A3 {
     while (true);
     type T = string;
 }
 
-namespace A4 {
+module A4 {
     while (true);
-    namespace A {
+    module A {
         const enum E { X }
     }
 }
@@ -51,9 +49,9 @@ function f2() {
     }
 }
 
-namespace B {
+module B {
     for (; ;);
-    namespace C {
+    module C {
     }
 }
 

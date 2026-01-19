@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/compoundExponentiationAssignmentLHSIsValue.ts] ////
-
 //// [compoundExponentiationAssignmentLHSIsValue.ts]
 // expected error for all the LHS of compound assignments (arithmetic and addition)
 var value: any;
@@ -24,7 +22,7 @@ function foo() {
 this **= value;
 
 // identifiers: module, class, enum, function
-namespace M { export var a; }
+module M { export var a; }
 M **= value;
 
 C **= value;

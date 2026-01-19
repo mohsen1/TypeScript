@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/instanceofNarrowReadonlyArray.ts] ////
-
 //// [instanceofNarrowReadonlyArray.ts]
 // @strict
 

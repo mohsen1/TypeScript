@@ -21,23 +21,23 @@ mod1.default;
 
 //// [mod1.d.ts]
 export namespace a {
-    let x: string;
+    const x: string;
 }
 export namespace b {
-    let x_1: string;
+    const x_1: string;
     export { x_1 as x };
 }
 declare namespace _default {
-    let x_2: string;
+    const x_2: string;
     export { x_2 as x };
 }
 export default _default;
 export namespace c {
-    let x_3: string;
+    const x_3: string;
     export { x_3 as x };
 }
 export namespace d {
-    let e: number;
+    const e: number;
 }
 //// [mod2.d.ts]
 export {};

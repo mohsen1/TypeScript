@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/numberOnLeftSideOfInExpression.ts] ////
-
-=== numberOnLeftSideOfInExpression.ts ===
+=== tests/cases/compiler/numberOnLeftSideOfInExpression.ts ===
 var left: number;
 >left : Symbol(left, Decl(numberOnLeftSideOfInExpression.ts, 0, 3))
 

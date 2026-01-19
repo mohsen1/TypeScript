@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/arrowFunction/disallowLineTerminatorBeforeArrow.ts] ////
-
 //// [disallowLineTerminatorBeforeArrow.ts]
 var f1 = ()
     => { }
@@ -56,7 +54,7 @@ foo(()
 foo(()
     => { return false; });
 
-namespace m {
+module m {
     class City {
         constructor(x: number, thing = ()
             => 100) {

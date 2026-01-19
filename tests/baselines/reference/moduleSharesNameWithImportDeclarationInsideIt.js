@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt.ts] ////
-
 //// [moduleSharesNameWithImportDeclarationInsideIt.ts]
-namespace Z.M {
+module Z.M {
     export function bar() {
         return "";
     }
 }
-namespace A.M {
+module A.M {
     import M = Z.M;
     export function bar() {
     }

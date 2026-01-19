@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocTemplateTag.ts] ////
-
-=== forgot.js ===
+=== tests/cases/conformance/jsdoc/forgot.js ===
 /**
  * @param {T} a
  * @template T

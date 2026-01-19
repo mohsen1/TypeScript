@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleCodeGenTest3.ts] ////
-
 //// [moduleCodeGenTest3.ts]
-namespace Baz { export var x = "hello"; }
+module Baz { export var x = "hello"; }
 
 Baz.x = "goodbye";
 

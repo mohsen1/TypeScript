@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/discriminantsAndPrimitives.ts] ////
-
 //// [discriminantsAndPrimitives.ts]
 // Repro from #10257 plus other tests
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constraintPropagationThroughReturnTypes.ts] ////
-
 //// [constraintPropagationThroughReturnTypes.ts]
 function g<T>(x: T): T {
   return x;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/modulePrologueSystem.ts] ////
-
 //// [modulePrologueSystem.ts]
 "use strict";
 

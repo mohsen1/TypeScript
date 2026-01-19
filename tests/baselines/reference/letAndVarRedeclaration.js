@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letAndVarRedeclaration.ts] ////
-
 //// [letAndVarRedeclaration.ts]
 let e0
 var e0;
@@ -21,13 +19,13 @@ function f1() {
     }
 }
 
-namespace M0 {
+module M0 {
     let x2;
     var x2;
     function x2() { }
 }
 
-namespace M1 {
+module M1 {
     let x2;
     {
         var x2;
@@ -47,7 +45,7 @@ function f2() {
     }
 }
 
-namespace M2 {
+module M2 {
     let x11;
     for (var x11; ;) {
     }

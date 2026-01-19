@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/bindingPatternOmittedExpressionNesting.ts] ////
-
-=== bindingPatternOmittedExpressionNesting.ts ===
+=== tests/cases/compiler/bindingPatternOmittedExpressionNesting.ts ===
 export let [,,[,[],,[],]] = undefined as any;
 >undefined : Symbol(undefined)
 

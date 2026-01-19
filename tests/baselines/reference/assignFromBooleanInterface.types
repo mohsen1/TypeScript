@@ -1,29 +1,18 @@
-//// [tests/cases/conformance/types/primitives/boolean/assignFromBooleanInterface.ts] ////
-
-=== assignFromBooleanInterface.ts ===
+=== tests/cases/conformance/types/primitives/boolean/assignFromBooleanInterface.ts ===
 var x = true;
 >x : boolean
->  : ^^^^^^^
 >true : true
->     : ^^^^
 
-declare var a: Boolean;
+var a: Boolean;
 >a : Boolean
->  : ^^^^^^^
 
 x = a;
 >x = a : Boolean
->      : ^^^^^^^
 >x : boolean
->  : ^^^^^^^
 >a : Boolean
->  : ^^^^^^^
 
 a = x;
 >a = x : boolean
->      : ^^^^^^^
 >a : Boolean
->  : ^^^^^^^
 >x : boolean
->  : ^^^^^^^
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/throwStatements/invalidThrowStatement.ts] ////
-
 //// [invalidThrowStatement.ts]
 throw; 
 

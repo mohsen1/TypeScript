@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/indexMemberDeclarations/privateIndexer.ts] ////
-
-=== privateIndexer.ts ===
+=== tests/cases/conformance/classes/indexMemberDeclarations/privateIndexer.ts ===
 // private indexers not allowed
 
 class C {

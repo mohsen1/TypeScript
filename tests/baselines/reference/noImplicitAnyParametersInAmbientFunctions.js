@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyParametersInAmbientFunctions.ts] ////
-
 //// [noImplicitAnyParametersInAmbientFunctions.ts]
 // No implicit-'any' errors.
 declare function d_f1(): void;

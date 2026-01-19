@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationTypeSyntaxOfVar.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 var v: () => number;
 >v : Symbol(v, Decl(a.js, 0, 3))
 

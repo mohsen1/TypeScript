@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/checkJsObjectLiteralIndexSignatures.ts] ////
-
 //// [file.js]
 // @ts-check
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorOverloads1.ts] ////
-
 //// [constructorOverloads1.ts]
 class Foo {
     constructor(s: string);

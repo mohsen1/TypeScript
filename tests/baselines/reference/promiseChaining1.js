@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseChaining1.ts] ////
-
 //// [promiseChaining1.ts]
 // same example but with constraints on each type parameter
 class Chain2<T extends { length: number }> {

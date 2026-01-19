@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/forInStatement7.ts] ////
-
 //// [forInStatement7.ts]
 var a: number;
 var expr: any;

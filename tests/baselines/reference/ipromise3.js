@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ipromise3.ts] ////
-
 //// [ipromise3.ts]
 interface IPromise3<T> {
     then<U>(success?: (value: T) => IPromise3<U>, error?: (error: any) => IPromise3<U>, progress?: (progress: any) => void ): IPromise3<U>;

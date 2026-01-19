@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/intersectionTypeWithLeadingOperator.ts] ////
-
 //// [intersectionTypeWithLeadingOperator.ts]
 type A = & string;
 type B =

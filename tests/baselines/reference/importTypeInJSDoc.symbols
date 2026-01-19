@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/import/importTypeInJSDoc.ts] ////
-
-=== externs.d.ts ===
+=== tests/cases/conformance/types/import/externs.d.ts ===
 declare namespace MyClass {
 >MyClass : Symbol(MyClass, Decl(externs.d.ts, 0, 0), Decl(externs.d.ts, 4, 1))
 
@@ -38,7 +36,7 @@ declare global {
 export = MyClass;
 >MyClass : Symbol(MyClass, Decl(externs.d.ts, 0, 0), Decl(externs.d.ts, 4, 1))
 
-=== index.js ===
+=== tests/cases/conformance/types/import/index.js ===
 /**
  * @typedef {import("./externs")} Foo
  */

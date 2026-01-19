@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeOverlappingStringEnumKeys.ts] ////
-
 //// [mappedTypeOverlappingStringEnumKeys.ts]
 // #37859
 

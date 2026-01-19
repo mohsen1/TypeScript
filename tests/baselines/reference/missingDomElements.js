@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/missingDomElements.ts] ////
-
 //// [missingDomElements.ts]
 interface Element {}
 interface EventTarget {}

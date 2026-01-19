@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayFlatNoCrashInferenceDeclarations.ts] ////
-
 //// [arrayFlatNoCrashInferenceDeclarations.ts]
 function foo<T>(arr: T[], depth: number) {
     return arr.flat(depth);

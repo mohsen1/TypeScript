@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/declarationMaps.ts] ////
-
 //// [declarationMaps.ts]
-namespace m2 {
+module m2 {
     export interface connectModule {
         (res, req, next): void;
     }
@@ -27,7 +25,7 @@ module.exports = m2;
 
 
 //// [declarationMaps.d.ts]
-declare namespace m2 {
+declare module m2 {
     interface connectModule {
         (res: any, req: any, next: any): void;
     }

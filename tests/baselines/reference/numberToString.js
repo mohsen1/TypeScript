@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/numberToString.ts] ////
-
 //// [numberToString.ts]
 function f1(n:number):string {
     return n; // error return type mismatch

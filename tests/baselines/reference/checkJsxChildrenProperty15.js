@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/checkJsxChildrenProperty15.tsx] ////
-
 //// [file.tsx]
 import React = require('react');
 
@@ -17,7 +15,7 @@ const k5 = <Tag key="1"><div></div><div></div></Tag>;
 
 //// [file.jsx]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var React = require("react");
 var Tag = function (x) { return <div></div>; };
 // OK

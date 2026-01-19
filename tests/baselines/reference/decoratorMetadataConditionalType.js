@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/decoratorMetadataConditionalType.ts] ////
-
 //// [decoratorMetadataConditionalType.ts]
 declare function d(): PropertyDecorator;
 abstract class BaseEntity<T> {
@@ -27,7 +25,7 @@ var BaseEntity = /** @class */ (function () {
     __decorate([
         d(),
         __metadata("design:type", Object)
-    ], BaseEntity.prototype, "attributes", void 0);
+    ], BaseEntity.prototype, "attributes");
     return BaseEntity;
 }());
 var C = /** @class */ (function () {
@@ -36,6 +34,6 @@ var C = /** @class */ (function () {
     __decorate([
         d(),
         __metadata("design:type", Boolean)
-    ], C.prototype, "x", void 0);
+    ], C.prototype, "x");
     return C;
 }());

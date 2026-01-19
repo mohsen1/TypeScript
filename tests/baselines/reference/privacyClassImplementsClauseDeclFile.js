@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/privacyClassImplementsClauseDeclFile.ts] ////
 
 //// [privacyClassImplementsClauseDeclFile_externalModule.ts]
-export namespace publicModule {
+export module publicModule {
     export interface publicInterfaceInPublicModule {
     }
 
@@ -26,7 +26,7 @@ export namespace publicModule {
     }
 }
 
-namespace privateModule {
+module privateModule {
     export interface publicInterfaceInPrivateModule {
 
     }
@@ -71,7 +71,7 @@ export class publicClassImplementingFromPrivateModuleInterface implements privat
 }
 
 //// [privacyClassImplementsClauseDeclFile_GlobalFile.ts]
-namespace publicModuleInGlobal {
+module publicModuleInGlobal {
     export interface publicInterfaceInPublicModule {
     }
 
@@ -95,7 +95,7 @@ class publicClassImplementingPublicInterfaceInGlobal implements publicInterfaceI
 
 //// [privacyClassImplementsClauseDeclFile_externalModule.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.publicClassImplementingFromPrivateModuleInterface = exports.publicClassImplementingPrivateInterface = exports.publicClassImplementingPublicInterface = exports.publicModule = void 0;
 var publicModule;
 (function (publicModule) {
@@ -138,7 +138,7 @@ var publicModule;
         return publicClassImplementingPrivateAndPublicInterface;
     }());
     publicModule.publicClassImplementingPrivateAndPublicInterface = publicClassImplementingPrivateAndPublicInterface;
-})(publicModule || (exports.publicModule = publicModule = {}));
+})(publicModule = exports.publicModule || (exports.publicModule = {}));
 var privateModule;
 (function (privateModule) {
     var privateClassImplementingPublicInterfaceInModule = /** @class */ (function () {
@@ -242,7 +242,7 @@ var publicClassImplementingPublicInterfaceInGlobal = /** @class */ (function () 
 
 
 //// [privacyClassImplementsClauseDeclFile_externalModule.d.ts]
-export declare namespace publicModule {
+export declare module publicModule {
     export interface publicInterfaceInPublicModule {
     }
     interface privateInterfaceInPublicModule {
@@ -257,7 +257,7 @@ export declare namespace publicModule {
     }
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     export interface publicInterfaceInPrivateModule {
     }
     interface privateInterfaceInPrivateModule {
@@ -282,7 +282,7 @@ export declare class publicClassImplementingFromPrivateModuleInterface implement
 }
 export {};
 //// [privacyClassImplementsClauseDeclFile_GlobalFile.d.ts]
-declare namespace publicModuleInGlobal {
+declare module publicModuleInGlobal {
     export interface publicInterfaceInPublicModule {
     }
     interface privateInterfaceInPublicModule {

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionThisExpressionAndLocalVarInLambda.ts] ////
-
 //// [collisionThisExpressionAndLocalVarInLambda.ts]
 declare function alert(message?: any): void;
 

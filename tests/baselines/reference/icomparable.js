@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/icomparable.ts] ////
-
 //// [icomparable.ts]
     interface IComparable<T> {
        compareTo(other: T);

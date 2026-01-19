@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/inferenceAndSelfReferentialConstraint.ts] ////
-
-=== inferenceAndSelfReferentialConstraint.ts ===
+=== tests/cases/compiler/inferenceAndSelfReferentialConstraint.ts ===
 // @strict
 
 // Repro from #29520

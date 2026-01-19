@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationDecorators.ts] ////
-
 //// [sourceMapValidationDecorators.ts]
 declare function ClassDecorator1(target: Function): void;
 declare function ClassDecorator2(x: number): (target: Function) => void;

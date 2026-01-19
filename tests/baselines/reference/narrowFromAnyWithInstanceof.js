@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/any/narrowFromAnyWithInstanceof.ts] ////
-
 //// [narrowFromAnyWithInstanceof.ts]
 declare var x: any;
 

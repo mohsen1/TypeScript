@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/multiModuleFundule1.ts] ////
-
 //// [multiModuleFundule1.ts]
 function C(x: number) { }
 
-namespace C {
+module C {
     export var x = 1;
 }
-namespace C {
+module C {
     export function foo() { }
 }
 

@@ -1,7 +1,7 @@
-modifiersOnInterfaceIndexSignature1.ts(2,3): error TS1071: 'public' modifier cannot appear on an index signature.
+tests/cases/compiler/modifiersOnInterfaceIndexSignature1.ts(2,3): error TS1071: 'public' modifier cannot appear on an index signature.
 
 
-==== modifiersOnInterfaceIndexSignature1.ts (1 errors) ====
+==== tests/cases/compiler/modifiersOnInterfaceIndexSignature1.ts (1 errors) ====
     interface I {
       public [a: string]: number;
       ~~~~~~

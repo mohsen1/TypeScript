@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/interMixingModulesInterfaces3.ts] ////
-
-=== interMixingModulesInterfaces3.ts ===
-namespace A {
+=== tests/cases/compiler/interMixingModulesInterfaces3.ts ===
+module A {
 >A : Symbol(A, Decl(interMixingModulesInterfaces3.ts, 0, 0))
 
-    namespace B {
->B : Symbol(B, Decl(interMixingModulesInterfaces3.ts, 0, 13), Decl(interMixingModulesInterfaces3.ts, 6, 5))
+    module B {
+>B : Symbol(B, Decl(interMixingModulesInterfaces3.ts, 0, 10), Decl(interMixingModulesInterfaces3.ts, 6, 5))
 
         export function createB(): B {
->createB : Symbol(createB, Decl(interMixingModulesInterfaces3.ts, 2, 17))
+>createB : Symbol(createB, Decl(interMixingModulesInterfaces3.ts, 2, 14))
 >B : Symbol(B, Decl(interMixingModulesInterfaces3.ts, 6, 5))
 
             return null;

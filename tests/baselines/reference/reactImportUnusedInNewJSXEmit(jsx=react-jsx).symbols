@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/reactImportUnusedInNewJSXEmit.tsx] ////
-
-=== index.tsx ===
+=== tests/cases/compiler/index.tsx ===
 /// <reference path="react16.d.ts" />
 
 import React from "react";

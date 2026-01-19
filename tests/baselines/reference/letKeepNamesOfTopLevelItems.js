@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/letKeepNamesOfTopLevelItems.ts] ////
-
 //// [letKeepNamesOfTopLevelItems.ts]
 let x;
 function foo() {
     let x;
 }
 
-namespace A {
+module A {
     let x;
 }
 

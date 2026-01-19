@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/narrowingTruthyObject.ts] ////
-
 //// [narrowingTruthyObject.ts]
 function foo(x: unknown, b: boolean) {
     if (typeof x === 'object') {

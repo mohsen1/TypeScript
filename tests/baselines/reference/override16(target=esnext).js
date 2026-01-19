@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/override/override16.ts] ////
-
 //// [override16.ts]
 class A {
     foo?: string;

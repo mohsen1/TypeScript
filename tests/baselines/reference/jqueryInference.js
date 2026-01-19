@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jqueryInference.ts] ////
-
 //// [jqueryInference.ts]
 // #22362
 interface MyPromise<T, U> {

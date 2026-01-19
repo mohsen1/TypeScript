@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalTypesSimplifyWhenTrivial.ts] ////
-
 //// [conditionalTypesSimplifyWhenTrivial.ts]
 const fn1 = <Params>(
     params: Pick<Params, Exclude<keyof Params, never>>,

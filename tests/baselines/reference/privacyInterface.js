@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privacyInterface.ts] ////
-
 //// [privacyInterface.ts]
-export namespace m1 {
+export module m1 {
     export class C1_public {
         private f1() {
         }
@@ -67,7 +65,7 @@ export namespace m1 {
 }
 
 
-namespace m2 {
+module m2 {
     export class C1_public {
         private f1() {
         }
@@ -195,7 +193,7 @@ interface C8_private {
 
 }
 
-export namespace m3 {
+export module m3 {
     export interface m3_i_public {
         f1(): number;
     }
@@ -220,7 +218,7 @@ export namespace m3 {
 }
 
 
-namespace m4 {
+module m4 {
     export interface m4_i_public {
         f1(): number;
     }
@@ -268,7 +266,7 @@ export interface glo_C6_public extends  glo_i_private, glo_i_public {
 
 //// [privacyInterface.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.C5_public = exports.m1 = void 0;
 var m1;
 (function (m1) {
@@ -285,7 +283,7 @@ var m1;
         }
         return C2_private;
     }());
-})(m1 || (exports.m1 = m1 = {}));
+})(m1 = exports.m1 || (exports.m1 = {}));
 var m2;
 (function (m2) {
     var C1_public = /** @class */ (function () {

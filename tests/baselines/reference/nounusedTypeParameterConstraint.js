@@ -9,7 +9,7 @@ export type DomainEntityConstructor<TEntity extends IEventSourcedEntity> = { new
 
 //// [bar.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [test.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

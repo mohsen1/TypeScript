@@ -12,8 +12,6 @@
     "baselineCheck": true,
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "subfolder/b.ts",
         "a.ts",
         "subfolder/c.ts"

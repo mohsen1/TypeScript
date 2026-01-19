@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithObjectTypeArgsAndConstraints.ts] ////
-
 //// [genericClassWithObjectTypeArgsAndConstraints.ts]
 // Generic call with constraints infering type parameter from object member properties
 // No errors expected
@@ -17,7 +15,7 @@ class X<T> {
     x: T;
 }
 
-namespace Class {
+module Class {
     class G<T extends { x: string }> {
         foo<T extends { x: string }>(t: X<T>, t2: X<T>) {
             var x: T;
@@ -42,7 +40,7 @@ namespace Class {
     var r2 = g2.foo2(c1, c1);
 }
 
-namespace Interface {
+module Interface {
     interface G<T extends { x: string }> {
         foo<T extends { x: string }>(t: X<T>, t2: X<T>): T;
     }

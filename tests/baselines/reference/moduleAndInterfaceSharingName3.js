@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/moduleAndInterfaceSharingName3.ts] ////
-
 //// [moduleAndInterfaceSharingName3.ts]
-namespace X {
-    export namespace Y {
+module X {
+    export module Y {
         export interface Z { }
     }
     export interface Y<T> { }

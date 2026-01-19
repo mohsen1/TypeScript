@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesUseBeforeDef.ts] ////
-
-=== privateNamesUseBeforeDef.ts ===
+=== tests/cases/conformance/classes/members/privateNames/privateNamesUseBeforeDef.ts ===
 class A {
 >A : Symbol(A, Decl(privateNamesUseBeforeDef.ts, 0, 0))
 

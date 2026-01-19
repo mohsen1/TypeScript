@@ -1,13 +1,9 @@
-//// [tests/cases/compiler/declarationFileOverwriteError.ts] ////
-
-=== a.d.ts ===
+=== tests/cases/compiler/a.d.ts ===
 declare class c {
 >c : c
->  : ^
 }
 
-=== a.ts ===
+=== tests/cases/compiler/a.ts ===
 class d {
 >d : d
->  : ^
 }

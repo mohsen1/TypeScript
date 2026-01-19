@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superAccessCastedCall.ts] ////
-
 //// [superAccessCastedCall.ts]
 class Foo {
     bar(): void {}

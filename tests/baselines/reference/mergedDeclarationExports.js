@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mergedDeclarationExports.ts] ////
-
 //// [mergedDeclarationExports.ts]
 // OK -- one is type, one is value
 interface b {}
@@ -27,7 +25,7 @@ export namespace N {}
 
 //// [mergedDeclarationExports.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.d = exports.t = exports.b = void 0;
 exports.b = 1;
 exports.t = 0;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfLambdaWithMultipleSignatures2.ts] ////
-
 //// [contextualTypingOfLambdaWithMultipleSignatures2.ts]
 var f: {
     (x: string): string;

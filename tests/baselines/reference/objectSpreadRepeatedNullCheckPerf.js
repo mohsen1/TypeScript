@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/spread/objectSpreadRepeatedNullCheckPerf.ts] ////
-
 //// [objectSpreadRepeatedNullCheckPerf.ts]
 interface Props {
     readonly a?: string

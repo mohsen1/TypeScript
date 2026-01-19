@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameDeclaration.ts] ////
-
 //// [privateNameDeclaration.ts]
 class A {
     #foo: string;

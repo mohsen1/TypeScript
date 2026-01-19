@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/missingReturnStatement.ts] ////
-
 //// [missingReturnStatement.ts]
-namespace Test {
+module Test {
     export class Bug {
         public foo():string {
         }

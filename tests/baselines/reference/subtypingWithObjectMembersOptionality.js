@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembersOptionality.ts] ////
-
 //// [subtypingWithObjectMembersOptionality.ts]
 // Derived member is not optional but base member is, should be ok
 
@@ -44,7 +42,7 @@ var a: { Foo?: Base; };
 var b = { Foo: <Derived>null };
 var r = true ? a : b;
 
-namespace TwoLevels {
+module TwoLevels {
     interface T {
         Foo?: Base;
     }

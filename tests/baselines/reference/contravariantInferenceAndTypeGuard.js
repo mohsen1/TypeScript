@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contravariantInferenceAndTypeGuard.ts] ////
-
 //// [contravariantInferenceAndTypeGuard.ts]
 interface ListItem<TData> {
     prev: ListItem<TData> | null;

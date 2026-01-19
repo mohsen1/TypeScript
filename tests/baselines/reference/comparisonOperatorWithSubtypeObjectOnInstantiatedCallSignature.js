@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/comparisonOperator/comparisonOperatorWithSubtypeObjectOnInstantiatedCallSignature.ts] ////
-
 //// [comparisonOperatorWithSubtypeObjectOnInstantiatedCallSignature.ts]
 class Base {
     public a: string;

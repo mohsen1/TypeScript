@@ -1,13 +1,11 @@
-//// [tests/cases/conformance/internalModules/codeGeneration/importStatementsInterfaces.ts] ////
-
 //// [importStatementsInterfaces.ts]
-namespace A {
+module A {
     export interface Point {
         x: number;
         y: number;
     }
 
-    export namespace inA {
+    export module inA {
         export interface Point3D extends Point {
             z: number;
         }
@@ -15,12 +13,12 @@ namespace A {
 }
 
 // no code gen expected
-namespace B {
+module B {
     import a = A;
 }
 
 // no code gen expected
-namespace C {
+module C {
     import a = A;
     import b = a.inA;
     var m: typeof a;
@@ -29,14 +27,14 @@ namespace C {
 }
 
 // no code gen expected
-namespace D {
+module D {
     import a = A;
 
     var p : a.Point;
 }
 
 // no code gen expected
-namespace E {
+module E {
     import a = A.inA;
     export function xDist(x: a.Point3D) {
         return 0 - x.x;

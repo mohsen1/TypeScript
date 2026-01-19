@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/didYouMeanElaborationsForExpressionsWhichCouldBeCalled.ts] ////
-
 //// [didYouMeanElaborationsForExpressionsWhichCouldBeCalled.ts]
 class Bar {
     x!: string;

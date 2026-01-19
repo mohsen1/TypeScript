@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertyAccessibility1.ts] ////
-
 //// [propertyAccessibility1.ts]
 class Foo {
   private privProp = 0;

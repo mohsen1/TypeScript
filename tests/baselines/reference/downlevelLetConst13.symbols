@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/downlevelLetConst13.ts] ////
-
-=== downlevelLetConst13.ts ===
+=== tests/cases/compiler/downlevelLetConst13.ts ===
 'use strict'
 // exported let\const bindings should not be renamed
 
@@ -26,7 +24,7 @@ export const {a: bar4} = { a: 1 };
 >bar4 : Symbol(bar4, Decl(downlevelLetConst13.ts, 8, 14))
 >a : Symbol(a, Decl(downlevelLetConst13.ts, 8, 26))
 
-export namespace M {
+export module M {
 >M : Symbol(M, Decl(downlevelLetConst13.ts, 8, 34))
 
     export let baz = 100;

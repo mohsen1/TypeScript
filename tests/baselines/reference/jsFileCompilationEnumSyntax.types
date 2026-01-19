@@ -1,7 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationEnumSyntax.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 enum E { }
 >E : E
->  : ^
 

@@ -4,13 +4,11 @@
     "inputFiles": [
         "test.ts"
     ],
-    "outFile": "bin/test.js",
+    "out": "bin/test.js",
     "declaration": true,
     "baselineCheck": true,
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "test.ts"
     ],
     "emittedFiles": [

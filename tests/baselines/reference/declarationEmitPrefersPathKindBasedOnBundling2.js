@@ -23,10 +23,11 @@ export default {
 define("lib/operators/scalar", ["require", "exports"], function (require, exports) {
     "use strict";
     Object.defineProperty(exports, "__esModule", { value: true });
-    exports.scalar = scalar;
+    exports.scalar = void 0;
     function scalar(value) {
         return null;
     }
+    exports.scalar = scalar;
 });
 define("settings/spacing", ["require", "exports", "lib/operators/scalar"], function (require, exports, scalar_1) {
     "use strict";

@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/recursiveIdenticalOverloadResolution.ts] ////
-
 //// [recursiveIdenticalOverloadResolution.ts]
-namespace M {
+module M {
 
    interface I { (i: I): I; }
 

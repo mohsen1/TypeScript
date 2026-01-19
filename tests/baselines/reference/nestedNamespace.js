@@ -12,7 +12,7 @@ interface B extends a.types.A {}
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.types = void 0;
 var types;
 (function (types) {
@@ -22,7 +22,7 @@ var types;
         return A;
     }());
     types.A = A;
-})(types || (exports.types = types = {}));
+})(types = exports.types || (exports.types = {}));
 //// [b.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

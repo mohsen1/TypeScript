@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/inferenceLimit.ts] ////
-
-=== file1.ts ===
+=== tests/cases/compiler/file1.ts ===
 "use strict";
 import * as MyModule from "./mymodule";
 >MyModule : Symbol(MyModule, Decl(file1.ts, 1, 6))
@@ -94,7 +92,7 @@ export class BrokenClass {
   }
 }
 
-=== mymodule.ts ===
+=== tests/cases/compiler/mymodule.ts ===
 export interface MyModel {
 >MyModel : Symbol(MyModel, Decl(mymodule.ts, 0, 0))
 

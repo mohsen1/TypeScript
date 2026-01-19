@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfObjectLiterals2.ts] ////
-
 //// [contextualTypingOfObjectLiterals2.ts]
 interface Foo {
     foo: (t: string) => string;

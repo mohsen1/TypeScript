@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/overloadResolutionOverNonCTObjectLit.ts] ////
-
 //// [overloadResolutionOverNonCTObjectLit.ts]
-namespace Bugs {
+module Bugs {
                 export interface IToken {
                                 startIndex:number;
                                 type:string;

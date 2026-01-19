@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/objectLiterals/objectLiteralNormalization.ts] ////
-
 //// [objectLiteralNormalization.ts]
 // Object literals in unions are normalized upon widening
 let a1 = [{ a: 0 }, { a: 1, b: "x" }, { a: 2, b: "y", c: true }][0];
@@ -158,14 +156,14 @@ declare let opts: {
     baz?: boolean;
 };
 declare let c1: {
-    foo?: string;
-    bar?: string;
-    baz?: boolean;
+    foo?: string | undefined;
+    bar?: string | undefined;
+    baz?: boolean | undefined;
 };
 declare let c2: {
-    foo?: string;
-    bar?: string;
-    baz?: boolean;
+    foo?: string | undefined;
+    bar?: string | undefined;
+    baz?: boolean | undefined;
 };
 declare let c3: {
     a: number;

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/enumTagOnExports2.ts] ////
-
-=== enumTagOnExports.js ===
+=== tests/cases/conformance/jsdoc/enumTagOnExports.js ===
 /** @enum {string} */
 module.exports = {};
 >module.exports : Symbol(module.exports, Decl(enumTagOnExports.js, 0, 0))

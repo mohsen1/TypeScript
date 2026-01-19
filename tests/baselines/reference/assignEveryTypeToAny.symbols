@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/any/assignEveryTypeToAny.ts] ////
-
-=== assignEveryTypeToAny.ts ===
+=== tests/cases/conformance/types/any/assignEveryTypeToAny.ts ===
 // all of these are valid
 
 var x: any;

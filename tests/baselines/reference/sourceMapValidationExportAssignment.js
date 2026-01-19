@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationExportAssignment.ts] ////
-
 //// [sourceMapValidationExportAssignment.ts]
 class a {
     public c;

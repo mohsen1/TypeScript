@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/enumConflictsWithGlobalIdentifier.ts] ////
-
 //// [enumConflictsWithGlobalIdentifier.ts]
 enum Position { 
     IgnoreRulesSpecific = 0,

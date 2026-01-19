@@ -1,12 +1,10 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource3.ts] ////
-
 //// [parserRealSource3.ts]
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
     // Note: Any addition to the NodeType should also be supported with addition to AstWalkerDetailCallback
     export enum NodeType {
         None,

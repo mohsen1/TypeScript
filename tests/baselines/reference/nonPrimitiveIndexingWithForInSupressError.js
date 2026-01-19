@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveIndexingWithForInSupressError.ts] ////
-
 //// [nonPrimitiveIndexingWithForInSupressError.ts]
-var a: object = {};
+var a: object;
 
 for (var key in a) {
     var value = a[key];
@@ -9,7 +7,7 @@ for (var key in a) {
 
 
 //// [nonPrimitiveIndexingWithForInSupressError.js]
-var a = {};
+var a;
 for (var key in a) {
     var value = a[key];
 }

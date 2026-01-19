@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6ClassTest.ts] ////
-
 //// [es6ClassTest.ts]
 class Bar {
     public goo: number;
@@ -34,7 +32,7 @@ class Foo  extends Bar {
 
 var f = new Foo();
 
-declare namespace AmbientMod {
+declare module AmbientMod {
 	export class Provide {
 		foo:number;
 		zoo:string;

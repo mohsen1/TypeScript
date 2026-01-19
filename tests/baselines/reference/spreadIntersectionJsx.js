@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/spreadIntersectionJsx.tsx] ////
-
 //// [spreadIntersectionJsx.tsx]
 const React: any = null;
 class A { a; }

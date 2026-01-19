@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsonFileImportChecksCallCorrectlyTwice.ts] ////
-
-=== index.ts ===
+=== tests/cases/compiler/index.ts ===
 import data from "./data.json";
 >data : Symbol(data, Decl(index.ts, 0, 6))
 
@@ -28,7 +26,7 @@ function fn(arg: Foo[]) { }
 >arg : Symbol(arg, Decl(index.ts, 9, 12))
 >Foo : Symbol(Foo, Decl(index.ts, 0, 31))
 
-=== data.json ===
+=== tests/cases/compiler/data.json ===
 {
     "foo": [
 >"foo" : Symbol("foo", Decl(data.json, 0, 1))

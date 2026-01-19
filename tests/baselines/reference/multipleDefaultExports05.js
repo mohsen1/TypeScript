@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/modules/multipleDefaultExports05.ts] ////
-
 //// [multipleDefaultExports05.ts]
 export default class AA1 {}
 

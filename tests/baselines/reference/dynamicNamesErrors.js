@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/dynamicNamesErrors.ts] ////
-
 //// [dynamicNamesErrors.ts]
 const c0 = "1";
 const c1 = 1;
@@ -22,8 +20,8 @@ interface T3 {
     [c1]: string;
 }
 
-declare let t1: T1;
-declare let t2: T2;
+let t1: T1;
+let t2: T2;
 t1 = t2;
 t2 = t1;
 
@@ -67,6 +65,8 @@ Object.defineProperty(exports, "__esModule", { value: true });
 exports.ObjectLiteralVisibility = exports.ClassMemberVisibility = void 0;
 const c0 = "1";
 const c1 = 1;
+let t1;
+let t2;
 t1 = t2;
 t2 = t1;
 const x = Symbol();
@@ -109,7 +109,7 @@ export declare class ClassMemberVisibility {
     get [z](): number;
     set [w](value: number);
 }
-export type ObjectTypeVisibility = {
+export declare type ObjectTypeVisibility = {
     [x]: number;
     [y](): number;
 };

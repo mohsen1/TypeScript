@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/out-flag.ts] ////
-
-=== out-flag.ts ===
-//// @outFile: bin\
+=== tests/cases/compiler/out-flag.ts ===
+//// @out: bin\
 
 // my class comments
 class MyClass
@@ -21,4 +19,3 @@ class MyClass
         //
     }
 }
-

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/callOverloadViaElementAccessExpression.ts] ////
-
 //// [callOverloadViaElementAccessExpression.ts]
 class C {
     foo(x: number): number;

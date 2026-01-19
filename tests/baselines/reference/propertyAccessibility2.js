@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertyAccessibility2.ts] ////
-
 //// [propertyAccessibility2.ts]
 class C {
   private static x = 1;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexAt.ts] ////
-
 //// [indexAt.ts]
 [0].at(0);
 "foo".at(0);

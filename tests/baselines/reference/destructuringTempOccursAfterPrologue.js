@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/destructuringTempOccursAfterPrologue.ts] ////
-
 //// [destructuringTempOccursAfterPrologue.ts]
 function test(p: any) {
     'use strict';

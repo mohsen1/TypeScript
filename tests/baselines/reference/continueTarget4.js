@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/continueTarget4.ts] ////
-
 //// [continueTarget4.ts]
 target1:
 target2:

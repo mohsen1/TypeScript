@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsClassStatic.ts] ////
-
 //// [source.js]
 class Handler {
 	static get OPTIONS() {
@@ -65,8 +63,8 @@ declare namespace Handler {
 }
 declare function statische(): void;
 declare namespace Strings {
-    let a: string;
-    let b: string;
+    const a: string;
+    const b: string;
 }
 type HandlerOptions = {
     /**

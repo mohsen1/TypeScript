@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/complicatedIndexedAccessKeyofReliesOnKeyofNeverUpperBound.ts] ////
-
-=== complicatedIndexedAccessKeyofReliesOnKeyofNeverUpperBound.ts ===
+=== tests/cases/compiler/complicatedIndexedAccessKeyofReliesOnKeyofNeverUpperBound.ts ===
 interface TextChannel {
 >TextChannel : Symbol(TextChannel, Decl(complicatedIndexedAccessKeyofReliesOnKeyofNeverUpperBound.ts, 0, 0))
 

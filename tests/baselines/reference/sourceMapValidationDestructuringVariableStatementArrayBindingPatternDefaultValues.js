@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationDestructuringVariableStatementArrayBindingPatternDefaultValues.ts] ////
-
 //// [sourceMapValidationDestructuringVariableStatementArrayBindingPatternDefaultValues.ts]
 declare var console: {
     log(msg: string): void;

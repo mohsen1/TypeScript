@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/recursiveGenericUnionType2.ts] ////
-
 //// [recursiveGenericUnionType2.ts]
-declare namespace Test1 {
+declare module Test1 {
     export type Container<T> = T | {
         [i: string]: Container<T>[];
     };
     export type IStringContainer = Container<string>;
 }
 
-declare namespace Test2 {
+declare module Test2 {
     export type Container<T> = T | {
         [i: string]: Container<T>[];
     };

@@ -27,9 +27,3 @@ module.exports.memberName = "thing";
 declare const _exports: typeof m.default;
 export = _exports;
 import m = require("./exporter");
-
-
-!!!! File out/exporter.d.ts missing from original emit, but present in noCheck emit
-//// [exporter.d.ts]
-export default validate;
-declare function validate(): void;

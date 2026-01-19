@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralMatchedInSwitch01.ts] ////
-
 //// [stringLiteralMatchedInSwitch01.ts]
 type S = "a" | "b";
 type T = S[] | S;

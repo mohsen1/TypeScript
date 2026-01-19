@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignaturesWithOptionalParameters2.ts] ////
-
 //// [callSignaturesWithOptionalParameters2.ts]
 // Optional parameters should be valid in all the below casts
 

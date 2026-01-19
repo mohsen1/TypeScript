@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/nullishCoalescingOperator/nullishCoalescingOperatorInAsyncGenerator.ts] ////
-
 //// [nullishCoalescingOperatorInAsyncGenerator.ts]
 // https://github.com/microsoft/TypeScript/issues/37686
 async function* f(a: { b?: number }) {

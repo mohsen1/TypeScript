@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignatureWithoutReturnTypeAnnotationInference.ts] ////
-
 //// [callSignatureWithoutReturnTypeAnnotationInference.ts]
 // Call signatures without a return type should infer one from the function body (if present)
 
@@ -74,7 +72,7 @@ function foo10(x: number) {
 }
 var r10 = foo10(1);
 
-namespace M {
+module M {
     export var x = 1;
     export class C { foo: string }
 }
@@ -97,7 +95,7 @@ function foo12() {
 var r12 = foo12();
 
 function m1() { return 1; }
-namespace m1 { export var y = 2; }
+module m1 { export var y = 2; }
 function foo13() {
     return m1;
 }
@@ -107,7 +105,7 @@ class c1 {
     foo: string;
     constructor(x) { }
 }
-namespace c1 {
+module c1 {
     export var x = 1;
 }
 function foo14() {
@@ -116,7 +114,7 @@ function foo14() {
 var r14 = foo14();
 
 enum e1 { A }
-namespace e1 { export var y = 1; }
+module e1 { export var y = 1; }
 function foo15() {
     return e1;
 }

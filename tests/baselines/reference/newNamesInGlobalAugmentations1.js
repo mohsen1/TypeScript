@@ -3,7 +3,7 @@
 //// [f1.d.ts]
 export {};
 
-declare namespace M.M1 {
+declare module M.M1 {
     export let x: number;
 }
 declare global {

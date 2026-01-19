@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superPropertyAccess/superSymbolIndexedAccess2.ts] ////
-
 //// [superSymbolIndexedAccess2.ts]
 class Foo {
     [Symbol.isConcatSpreadable]() {

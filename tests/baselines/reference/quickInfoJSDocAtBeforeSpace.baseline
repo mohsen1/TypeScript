@@ -1,35 +1,3 @@
-// === QuickInfo ===
-=== /tests/cases/fourslash/quickInfoJSDocAtBeforeSpace.ts ===
-// /**
-//  * @return Don't @ me
-//  */
-// function f() { }
-//          ^
-// | ----------------------------------------------------------------------
-// | function f(): void
-// | @return Don't @ me
-// | ----------------------------------------------------------------------
-// /**
-//  * @return One final @
-//  */
-// function g() { }
-//          ^
-// | ----------------------------------------------------------------------
-// | function g(): void
-// | @return One final @
-// | ----------------------------------------------------------------------
-// /**
-//  * @return An @
-//  * But another line
-//  */
-// function h() { }
-//          ^
-// | ----------------------------------------------------------------------
-// | function h(): void
-// | @return An @
-// | But another line
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -37,7 +5,7 @@
       "position": 39,
       "name": "f"
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {
@@ -98,7 +66,7 @@
       "position": 87,
       "name": "g"
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {
@@ -159,7 +127,7 @@
       "position": 148,
       "name": "h"
     },
-    "item": {
+    "quickInfo": {
       "kind": "function",
       "kindModifiers": "",
       "textSpan": {

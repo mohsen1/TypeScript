@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/assignToExistingClass.ts] ////
-
 //// [assignToExistingClass.ts]
-namespace Test {
+module Test {
     class Mocked {
         myProp: string;
     }

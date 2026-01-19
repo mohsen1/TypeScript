@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorWithExpressionLessReturn.ts] ////
-
 //// [constructorWithExpressionLessReturn.ts]
 class C {
     constructor() {

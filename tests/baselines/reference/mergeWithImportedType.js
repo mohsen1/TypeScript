@@ -9,12 +9,12 @@ export type E = E;
 
 //// [f1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.E = void 0;
 var E;
 (function (E) {
     E[E["X"] = 0] = "X";
-})(E || (exports.E = E = {}));
+})(E = exports.E || (exports.E = {}));
 //// [f2.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

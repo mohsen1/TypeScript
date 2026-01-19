@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/declarationImportTypeAliasInferredAndEmittable.ts] ////
-
-=== foo.ts ===
+=== tests/cases/compiler/foo.ts ===
 class Conn {
 >Conn : Symbol(Conn, Decl(foo.ts, 0, 0))
 
@@ -15,7 +13,7 @@ class Conn {
 export = Conn;
 >Conn : Symbol(Conn, Decl(foo.ts, 0, 0))
 
-=== usage.ts ===
+=== tests/cases/compiler/usage.ts ===
 type Conn = import("./foo");
 >Conn : Symbol(Conn, Decl(usage.ts, 0, 0))
 

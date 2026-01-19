@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restParameterNoTypeAnnotation.ts] ////
-
 //// [restParameterNoTypeAnnotation.ts]
 function foo(...rest) {   
      var x: number = rest[0];

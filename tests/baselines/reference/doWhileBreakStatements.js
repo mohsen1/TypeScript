@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/statements/breakStatements/doWhileBreakStatements.ts] ////
-
 //// [doWhileBreakStatements.ts]
 do {
     break;

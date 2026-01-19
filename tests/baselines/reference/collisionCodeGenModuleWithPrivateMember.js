@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithPrivateMember.ts] ////
-
 //// [collisionCodeGenModuleWithPrivateMember.ts]
-namespace m1 {
+module m1 {
     class m1 {
     }
     var x = new m1();

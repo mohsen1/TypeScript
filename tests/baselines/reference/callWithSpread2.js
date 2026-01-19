@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/functionCalls/callWithSpread2.ts] ////
-
 //// [callWithSpread2.ts]
 declare function all(a?: number, b?: number): void;
 declare function weird(a?: number | string, b?: number | string): void;

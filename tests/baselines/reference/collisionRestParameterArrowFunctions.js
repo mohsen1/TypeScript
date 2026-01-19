@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionRestParameterArrowFunctions.ts] ////
-
 //// [collisionRestParameterArrowFunctions.ts]
 var f1 = (_i: number, ...restParameters) => { //_i is error
     var _i = 10; // no error

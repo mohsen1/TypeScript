@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/mergedInheritedMembersSatisfyAbstractBase.ts] ////
-
-=== mergedInheritedMembersSatisfyAbstractBase.ts ===
+=== tests/cases/conformance/interfaces/declarationMerging/mergedInheritedMembersSatisfyAbstractBase.ts ===
 abstract class BaseClass {
 >BaseClass : Symbol(BaseClass, Decl(mergedInheritedMembersSatisfyAbstractBase.ts, 0, 0))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/jsxParsingError4.tsx] ////
-
 //// [a.tsx]
 declare const React: any
 declare namespace JSX {

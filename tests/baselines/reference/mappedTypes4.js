@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypes4.ts] ////
-
 //// [mappedTypes4.ts]
 type Box<T> = {
 };
@@ -65,7 +63,7 @@ var x1: DeepReadonlyFoo;
 
 type Z = { a: number };
 type Clone<T> = {
-  [P in keyof (T & {})]: (T & {})[P];
+  [P in keyof (T & {})]: T[P];
 };
 type M = Clone<Z>; // M should be { a: number }
 
@@ -94,37 +92,37 @@ var z1;
 
 
 //// [mappedTypes4.d.ts]
-type Box<T> = {};
-type Boxified<T> = {
+declare type Box<T> = {};
+declare type Boxified<T> = {
     [P in keyof T]: Box<T[P]>;
 };
 declare function boxify<T>(obj: T): Boxified<T>;
-type A = {
+declare type A = {
     a: string;
 };
-type B = {
+declare type B = {
     b: string;
 };
-type C = {
+declare type C = {
     c: string;
 };
 declare function f1(x: A | B | C | undefined): Boxified<A | B | C | undefined>;
-type T00 = Partial<A | B | C>;
-type T01 = Readonly<A | B | C | null | undefined>;
-type T02 = Boxified<A | B[] | C | string>;
-type T03 = Readonly<string | number | boolean | null | undefined | void>;
-type T04 = Boxified<string | number | boolean | null | undefined | void>;
-type T05 = Partial<"hello" | "world" | 42>;
-type BoxifiedWithSentinel<T, U> = {
+declare type T00 = Partial<A | B | C>;
+declare type T01 = Readonly<A | B | C | null | undefined>;
+declare type T02 = Boxified<A | B[] | C | string>;
+declare type T03 = Readonly<string | number | boolean | null | undefined | void>;
+declare type T04 = Boxified<string | number | boolean | null | undefined | void>;
+declare type T05 = Partial<"hello" | "world" | 42>;
+declare type BoxifiedWithSentinel<T, U> = {
     [P in keyof T]: Box<T[P]> | U;
 };
-type T10 = BoxifiedWithSentinel<A | B | C, null>;
-type T11 = BoxifiedWithSentinel<A | B | C, undefined>;
-type T12 = BoxifiedWithSentinel<string, undefined>;
-type DeepReadonly<T> = {
+declare type T10 = BoxifiedWithSentinel<A | B | C, null>;
+declare type T11 = BoxifiedWithSentinel<A | B | C, undefined>;
+declare type T12 = BoxifiedWithSentinel<string, undefined>;
+declare type DeepReadonly<T> = {
     readonly [P in keyof T]: DeepReadonly<T[P]>;
 };
-type Foo = {
+declare type Foo = {
     x: number;
     y: {
         a: string;
@@ -132,7 +130,7 @@ type Foo = {
     };
     z: boolean;
 };
-type DeepReadonlyFoo = {
+declare type DeepReadonlyFoo = {
     readonly x: number;
     readonly y: {
         readonly a: string;
@@ -142,12 +140,12 @@ type DeepReadonlyFoo = {
 };
 declare var x1: DeepReadonly<Foo>;
 declare var x1: DeepReadonlyFoo;
-type Z = {
+declare type Z = {
     a: number;
 };
-type Clone<T> = {
-    [P in keyof (T & {})]: (T & {})[P];
+declare type Clone<T> = {
+    [P in keyof (T & {})]: T[P];
 };
-type M = Clone<Z>;
+declare type M = Clone<Z>;
 declare var z1: Z;
 declare var z1: Clone<Z>;

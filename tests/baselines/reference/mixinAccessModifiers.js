@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/mixinAccessModifiers.ts] ////
-
 //// [mixinAccessModifiers.ts]
 type Constructable = new (...args: any[]) => object;
 
@@ -324,7 +322,7 @@ function f9(x) {
 
 
 //// [mixinAccessModifiers.d.ts]
-type Constructable = new (...args: any[]) => object;
+declare type Constructable = new (...args: any[]) => object;
 declare class Private {
     constructor(...args: any[]);
     private p;

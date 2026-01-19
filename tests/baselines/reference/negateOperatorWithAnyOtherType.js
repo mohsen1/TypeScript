@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/negateOperator/negateOperatorWithAnyOtherType.ts] ////
-
 //// [negateOperatorWithAnyOtherType.ts]
 // - operator on any type
 
@@ -14,13 +12,13 @@ function foo(): any {
     return a;
 }
 class A {
-    public a!: any;
+    public a: any;
     static foo(): any {
         var a;
         return a;
     }
 }
-namespace M {
+module M {
     export var n: any;
 }
 var objA = new A();

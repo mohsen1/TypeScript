@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/indexSignatures/stringIndexingResults.ts] ////
-
 //// [stringIndexingResults.ts]
 class C {
     [x: string]: string;

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxEmptyExpressionNotCountedAsChild.tsx] ////
-
 //// [jsxEmptyExpressionNotCountedAsChild.tsx]
 /// <reference path="/.lib/react16.d.ts" />
 import * as React from 'react'
@@ -21,9 +19,9 @@ const element = (
 
 //// [jsxEmptyExpressionNotCountedAsChild.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var jsx_runtime_1 = require("react/jsx-runtime");
 function Wrapper(props) {
-    return (0, jsx_runtime_1.jsx)("div", { children: props.children });
+    return (0, jsx_runtime_1.jsx)("div", { children: props.children }, void 0);
 }
-var element = ((0, jsx_runtime_1.jsx)(Wrapper, { children: (0, jsx_runtime_1.jsx)("div", { children: "Hello" }) }));
+var element = ((0, jsx_runtime_1.jsx)(Wrapper, { children: (0, jsx_runtime_1.jsx)("div", { children: "Hello" }, void 0) }, void 0));

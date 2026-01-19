@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypesOfTypeParameterWithConstraints2.ts] ////
-
 //// [subtypesOfTypeParameterWithConstraints2.ts]
 // checking whether other types are subtypes of type parameters with constraints
 
@@ -42,11 +40,11 @@ class C1 { foo: number; }
 class C2<T> { foo: T; }
 enum E { A }
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 class c { baz: string }
-namespace c {
+module c {
     export var bar = 1;
 }
 

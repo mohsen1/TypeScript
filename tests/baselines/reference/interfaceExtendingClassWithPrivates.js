@@ -1,8 +1,6 @@
-//// [tests/cases/conformance/interfaces/interfacesExtendingClasses/interfaceExtendingClassWithPrivates.ts] ////
-
 //// [interfaceExtendingClassWithPrivates.ts]
 class Foo {
-    private x!: string;
+    private x: string;
 }
 
 interface I extends Foo { // error
@@ -13,7 +11,7 @@ interface I2 extends Foo {
     y: string;
 }
 
-declare var i: I2;
+var i: I2;
 var r = i.y;
 var r2 = i.x; // error
 
@@ -23,5 +21,6 @@ var Foo = /** @class */ (function () {
     }
     return Foo;
 }());
+var i;
 var r = i.y;
 var r2 = i.x; // error

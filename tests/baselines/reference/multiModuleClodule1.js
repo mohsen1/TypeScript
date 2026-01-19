@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/multiModuleClodule1.ts] ////
-
 //// [multiModuleClodule1.ts]
 class C {
     constructor(x: number) { }
@@ -8,11 +6,11 @@ class C {
     static boo() { }
 }
 
-namespace C {
+module C {
     export var x = 1;
     var y = 2;
 }
-namespace C {
+module C {
     export function foo() { }
     function baz() { return ''; }
 }

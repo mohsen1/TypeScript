@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/computedPropertiesInDestructuring1_ES6.ts] ////
-
 //// [computedPropertiesInDestructuring1_ES6.ts]
 // destructuring in variable declarations
 let foo = "bar";

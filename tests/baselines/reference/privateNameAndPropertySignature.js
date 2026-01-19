@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameAndPropertySignature.ts] ////
-
 //// [privateNameAndPropertySignature.ts]
 type A = {
     #foo: string;

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocParseBackquotedParamName.ts] ////
-
-=== a.js ===
+=== tests/cases/conformance/jsdoc/a.js ===
 /**
  * @param {string=} `args`
  * @param `bwarg` {?number?}
@@ -11,7 +9,7 @@ function f(args, bwarg) {
 >bwarg : Symbol(bwarg, Decl(a.js, 4, 16))
 }
 
-=== ts.ts ===
+=== tests/cases/conformance/jsdoc/ts.ts ===
 /**
  * @param `arg` - this is fine
  */

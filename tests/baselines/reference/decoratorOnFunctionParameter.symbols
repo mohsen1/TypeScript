@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/decorators/invalid/decoratorOnFunctionParameter.ts] ////
-
-=== decoratorOnFunctionParameter.ts ===
+=== tests/cases/conformance/decorators/invalid/decoratorOnFunctionParameter.ts ===
 declare const dec: any;
 >dec : Symbol(dec, Decl(decoratorOnFunctionParameter.ts, 0, 13))
 

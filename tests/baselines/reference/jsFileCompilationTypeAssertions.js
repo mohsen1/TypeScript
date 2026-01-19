@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsFileCompilationTypeAssertions.ts] ////
-
 //// [a.js]
 0 as number;
 var v = <string>undefined;

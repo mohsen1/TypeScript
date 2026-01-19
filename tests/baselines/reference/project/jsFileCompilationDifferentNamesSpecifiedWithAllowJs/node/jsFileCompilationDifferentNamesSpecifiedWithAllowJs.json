@@ -6,13 +6,11 @@
     "project": "DifferentNamesSpecifiedWithAllowJs",
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "DifferentNamesSpecifiedWithAllowJs/a.ts",
         "DifferentNamesSpecifiedWithAllowJs/b.js"
     ],
     "emittedFiles": [
-        "DifferentNamesSpecifiedWithAllowJs/test.js",
-        "DifferentNamesSpecifiedWithAllowJs/test.d.ts"
+        "test.js",
+        "test.d.ts"
     ]
 }

@@ -1,39 +1,39 @@
-mergedDeclarations3.ts(37,7): error TS2339: Property 'x' does not exist on type 'typeof foo'.
-mergedDeclarations3.ts(39,7): error TS2339: Property 'z' does not exist on type 'typeof foo'.
+tests/cases/compiler/mergedDeclarations3.ts(37,7): error TS2339: Property 'x' does not exist on type 'typeof foo'.
+tests/cases/compiler/mergedDeclarations3.ts(39,7): error TS2339: Property 'z' does not exist on type 'typeof foo'.
 
 
-==== mergedDeclarations3.ts (2 errors) ====
-    namespace M {
+==== tests/cases/compiler/mergedDeclarations3.ts (2 errors) ====
+    module M {
      export enum Color {
        Red, Green
      }
     }
-    namespace M {
-     export namespace Color {
+    module M {
+     export module Color {
        export var Blue = 4;
       }
     }
     var p = M.Color.Blue; // ok
     
-    namespace M {
+    module M {
         export function foo() {
         }
     }
     
-    namespace M {
-        namespace foo {
+    module M {
+        module foo {
             export var x = 1;
         }
     }
     
-    namespace M {
-        export namespace foo {
+    module M {
+        export module foo {
             export var y = 2
         }
     }
     
-    namespace M {
-        namespace foo {
+    module M {
+        module foo {
             export var z = 1;
         }
     }

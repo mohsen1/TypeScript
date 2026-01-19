@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/exponentiationOperatorWithAnyAndNumber.ts] ////
-
 //// [exponentiationOperatorWithAnyAndNumber.ts]
 var a: any;
 var b: number;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classStaticBlock/classStaticBlock5.ts] ////
-
 //// [classStaticBlock5.ts]
 class B {
     static a = 1;

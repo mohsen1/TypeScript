@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/generatorTransformFinalLabel.ts] ////
-
 //// [generatorTransformFinalLabel.ts]
 async function test(skip: boolean) {
     if (!skip) {

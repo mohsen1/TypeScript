@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/override/override17.ts] ////
-
 //// [override17.ts]
 class A {
     public m1(): number {

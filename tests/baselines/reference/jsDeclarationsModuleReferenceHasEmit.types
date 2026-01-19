@@ -1,12 +1,9 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsModuleReferenceHasEmit.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/jsdoc/declarations/index.js ===
 /**
  * @module A
  */
 class A {}
 >A : A
->  : ^
 
 
 /**
@@ -15,8 +12,8 @@ class A {}
  */
 export let el = null;
 >el : error
+>null : null
 
 export default A;
 >A : A
->  : ^
 

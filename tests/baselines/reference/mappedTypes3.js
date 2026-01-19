@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypes3.ts] ////
-
 //// [mappedTypes3.ts]
 class Box<P> {
     value: P;
@@ -67,7 +65,7 @@ function f3(bb) {
 declare class Box<P> {
     value: P;
 }
-type Boxified<T> = {
+declare type Boxified<T> = {
     [K in keyof T]: Box<T[K]>;
 };
 declare function boxify<T>(obj: T): Boxified<T>;

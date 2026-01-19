@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/objectTypeWithConstructSignatureHidingMembersOfFunction.ts] ////
-
 //// [objectTypeWithConstructSignatureHidingMembersOfFunction.ts]
 interface I {
     new(): number;

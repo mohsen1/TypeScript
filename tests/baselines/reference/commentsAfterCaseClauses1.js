@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsAfterCaseClauses1.ts] ////
-
 //// [commentsAfterCaseClauses1.ts]
 function getSecurity(level) {
     switch(level){

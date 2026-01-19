@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/es6/es6modulekindWithES5Target5.ts] ////
-
 //// [es6modulekindWithES5Target5.ts]
 export enum E1 {
     value1

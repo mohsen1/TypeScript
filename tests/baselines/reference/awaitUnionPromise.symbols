@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/awaitUnionPromise.ts] ////
-
-=== awaitUnionPromise.ts ===
+=== tests/cases/compiler/awaitUnionPromise.ts ===
 // https://github.com/Microsoft/TypeScript/issues/18186
 
 class AsyncEnumeratorDone { };

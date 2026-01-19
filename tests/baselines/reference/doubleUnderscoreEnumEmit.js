@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/doubleUnderscoreEnumEmit.ts] ////
-
 //// [doubleUnderscoreEnumEmit.ts]
 enum Foo {
     "__a" = 1,

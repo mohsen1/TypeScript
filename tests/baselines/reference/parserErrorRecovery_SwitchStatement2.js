@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ErrorRecovery/SwitchStatements/parserErrorRecovery_SwitchStatement2.ts] ////
-
 //// [parserErrorRecovery_SwitchStatement2.ts]
 class C {
   constructor() {

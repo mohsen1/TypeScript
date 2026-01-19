@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/dottedModuleName.ts] ////
-
 //// [dottedModuleName.ts]
-namespace M {
-    export namespace N {
+module M {
+    export module N {
 	export function f(x:number)=>2*x;
-	export namespace X.Y.Z {
+	export module X.Y.Z {
 	    export var v2=f(v);
 	}
     }
@@ -12,9 +10,9 @@ namespace M {
 
 
 
-namespace M.N {
-    export namespace X {
-	export namespace Y.Z {
+module M.N {
+    export module X {
+	export module Y.Z {
 	    export var v=f(10);
 	}
     }

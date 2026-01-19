@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/interfaceWithMultipleBaseTypes.ts] ////
-
 //// [interfaceWithMultipleBaseTypes.ts]
 // an interface may have multiple bases with properties of the same name as long as the interface's implementation satisfies all base type versions
 
@@ -27,7 +25,7 @@ interface Derived2 extends Base1, Base2 { // error
     }
 }
 
-namespace Generic {
+module Generic {
     interface Base1<T> {
         x: {
             a: T;

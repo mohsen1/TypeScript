@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/grammarAmbiguities1.ts] ////
-
 //// [grammarAmbiguities1.ts]
 class A { foo() { } }
 class B { bar() { }}

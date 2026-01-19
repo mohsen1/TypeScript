@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel.ts] ////
-
-=== labeledStatementWithLabel.ts ===
+=== tests/cases/conformance/statements/labeledStatements/labeledStatementWithLabel.ts ===
 label: function fn() { }
 >fn : Symbol(fn, Decl(labeledStatementWithLabel.ts, 0, 6))
 
@@ -28,7 +26,7 @@ label: let b = 1;
 label: const c = 1;
 >c : Symbol(c, Decl(labeledStatementWithLabel.ts, 8, 12))
 
-label: namespace M { }
+label: module M { }
 >M : Symbol(M, Decl(labeledStatementWithLabel.ts, 10, 6))
 
 label: namespace N {}

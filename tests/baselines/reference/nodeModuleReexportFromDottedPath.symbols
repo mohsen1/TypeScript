@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nodeModuleReexportFromDottedPath.ts] ////
-
 === /node_modules/.prisma/client/index.d.ts ===
 export interface PrismaClientOptions {
 >PrismaClientOptions : Symbol(PrismaClientOptions, Decl(index.d.ts, 0, 0))
@@ -19,10 +17,9 @@ export class PrismaClient<T extends PrismaClientOptions = PrismaClientOptions> {
 }
 
 === /node_modules/@prisma/client/index.d.ts ===
-
 export * from ".prisma/client";
-
-=== /index.ts ===
+No type information for this code.
+No type information for this code.=== /index.ts ===
 import { PrismaClient } from "@prisma/client";
 >PrismaClient : Symbol(PrismaClient, Decl(index.ts, 0, 8))
 

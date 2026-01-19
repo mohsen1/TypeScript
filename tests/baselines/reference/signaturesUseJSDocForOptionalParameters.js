@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/signaturesUseJSDocForOptionalParameters.ts] ////
-
 //// [jsDocOptionality.js]
 function MyClass() {
   this.prop = null;

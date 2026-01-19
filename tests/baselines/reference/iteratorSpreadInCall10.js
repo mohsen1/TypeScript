@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/spread/iteratorSpreadInCall10.ts] ////
-
 //// [iteratorSpreadInCall10.ts]
 function foo<T>(s: T[]) { return s[0] }
 class SymbolIterator {

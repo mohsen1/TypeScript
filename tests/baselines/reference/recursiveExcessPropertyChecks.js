@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveExcessPropertyChecks.ts] ////
-
 //// [recursiveExcessPropertyChecks.ts]
 // Repro from #35804
 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorOverloads2.ts] ////
-
 //// [constructorOverloads2.ts]
 class FooBase {
     constructor(s: string);

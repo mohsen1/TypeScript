@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMap-StringLiteralWithNewLine.ts] ////
-
 //// [sourceMap-StringLiteralWithNewLine.ts]
 interface Document {
 }
@@ -8,7 +6,7 @@ interface Window {
 }
 declare var window: Window;
 
-namespace Foo {
+module Foo {
     var x = "test1";
     var y = "test 2\
 isn't this a lot of fun";

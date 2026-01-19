@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionWithNoBestCommonType1.ts] ////
-
 //// [functionWithNoBestCommonType1.ts]
 function foo() {
     return true;

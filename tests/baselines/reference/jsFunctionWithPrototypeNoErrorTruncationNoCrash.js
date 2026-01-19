@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsFunctionWithPrototypeNoErrorTruncationNoCrash.ts] ////
-
 //// [index.js]
 function Color(obj) {
     this.example = true
@@ -32,5 +30,5 @@ Color.prototype = {
     blacken: function (ratio) { return this; },
     greyscale: function () { return this; },
     clearer: function (ratio) { return this; },
-    toJSON: function () { return this.rgb(); },
+    toJSON: function () { return this.rgb(); }
 };

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNamesContextualType4_ES6.ts] ////
-
 //// [computedPropertyNamesContextualType4_ES6.ts]
 interface I {
     [s: string]: any;

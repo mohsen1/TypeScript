@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/collisionThisExpressionAndModuleInGlobal.ts] ////
-
 //// [collisionThisExpressionAndModuleInGlobal.ts]
-namespace _this { //Error
+module _this { //Error
     class c {
     }
 }

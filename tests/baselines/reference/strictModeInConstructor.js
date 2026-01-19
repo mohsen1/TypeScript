@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/strictModeInConstructor.ts] ////
-
 //// [strictModeInConstructor.ts]
 class A {
 }
@@ -28,8 +26,7 @@ class D extends A {
     public s: number = 9;
 
     constructor () {
-        var x = 1; // No error
-        var y = this.s; // Error
+        var x = 1; // Error
         super();
         "use strict";
     }
@@ -97,7 +94,7 @@ var B = /** @class */ (function (_super) {
 var C = /** @class */ (function (_super) {
     __extends(C, _super);
     function C() {
-        var _this = _super.call(this) || this; // No error
+        var _this = _super.call(this) || this;
         _this.s = 9;
         "use strict";
         return _this;
@@ -108,8 +105,7 @@ var D = /** @class */ (function (_super) {
     __extends(D, _super);
     function D() {
         var _this = this;
-        var x = 1; // No error
-        var y = _this.s; // Error
+        var x = 1; // Error
         _this = _super.call(this) || this;
         _this.s = 9;
         "use strict";
@@ -129,8 +125,8 @@ var Bs = /** @class */ (function (_super) {
 var Cs = /** @class */ (function (_super) {
     __extends(Cs, _super);
     function Cs() {
-        var _this = _super.call(this) || this; // No error
         "use strict";
+        var _this = _super.call(this) || this;
         return _this;
     }
     Cs.s = 9;

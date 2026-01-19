@@ -1,4 +1,3 @@
-// === Smart Selection ===
 type M = { /**/-readonly [K in keyof any]-?: any };
 
            -                                   

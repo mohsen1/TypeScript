@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericClassStaticMethod.ts] ////
-
 //// [genericClassStaticMethod.ts]
 class Foo<T> {
     static getFoo() {

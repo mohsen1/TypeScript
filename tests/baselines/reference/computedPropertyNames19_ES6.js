@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNames19_ES6.ts] ////
-
 //// [computedPropertyNames19_ES6.ts]
-namespace M {
+module M {
     var obj = {
         [this.bar]: 0
     }

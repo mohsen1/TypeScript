@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/async/es2017/asyncUseStrict_es2017.ts] ////
-
 //// [asyncUseStrict_es2017.ts]
 declare var a: boolean;
 declare var p: Promise<boolean>;

@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/moduleImport.ts] ////
-
 //// [moduleImport.ts]
-namespace A.B.C {
+module A.B.C {
 	import XYZ = X.Y.Z;
 	export function ping(x: number) {
 		if (x>0) XYZ.pong (x-1);
 	}
 }
 
-namespace X {
+module X {
 	import ABC = A.B.C;
 	export function pong(x: number) {
 		if (x > 0) ABC.ping(x-1);

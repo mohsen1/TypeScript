@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/checkForObjectTooStrict.ts] ////
-
 //// [checkForObjectTooStrict.ts]
-namespace Foo {
+module Foo {
 
     export class Object {
 

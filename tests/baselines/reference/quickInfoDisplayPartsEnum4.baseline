@@ -1,20 +1,3 @@
-// === QuickInfo ===
-=== /tests/cases/fourslash/quickInfoDisplayPartsEnum4.ts ===
-// const enum Foo {
-// 	"\t" = 9,
-// 	"\u007f" = 127,
-// }
-// Foo["\t"]
-//     ^^^^
-// | ----------------------------------------------------------------------
-// | (enum member) Foo["\t"] = 9
-// | ----------------------------------------------------------------------
-// Foo["\u007f"]
-//     ^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (enum member) Foo["\u007f"] = 127
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -22,7 +5,7 @@
       "position": 51,
       "name": "1"
     },
-    "item": {
+    "quickInfo": {
       "kind": "enum member",
       "kindModifiers": "",
       "textSpan": {
@@ -88,7 +71,7 @@
       "position": 61,
       "name": "2"
     },
-    "item": {
+    "quickInfo": {
       "kind": "enum member",
       "kindModifiers": "",
       "textSpan": {

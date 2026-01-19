@@ -1,4 +1,3 @@
-// === Syntax and Semantic Diagnostics ===
 Syntactic Diagnostics for file '/tests/cases/fourslash/moduleNodeNextImportFix.ts':
 
 
@@ -11,13 +10,13 @@ Syntactic Diagnostics for file '/tests/cases/fourslash/moduleNodeNextImportFix.t
     export function util() {}
 
 Semantic Diagnostics for file '/tests/cases/fourslash/moduleNodeNextImportFix.ts':
-/tests/cases/fourslash/src/index.mts(1,22): error TS5097: An import path can only end with a '.mts' extension when 'allowImportingTsExtensions' is enabled.
+/tests/cases/fourslash/src/index.mts(1,22): error TS2691: An import path cannot end with a '.mts' extension. Consider importing './deps.mjs' instead.
 
 
 ==== /tests/cases/fourslash/src/index.mts (1 errors) ====
     import { util } from './deps.mts'
                          ~~~~~~~~~~~~
-!!! error TS5097: An import path can only end with a '.mts' extension when 'allowImportingTsExtensions' is enabled.
+!!! error TS2691: An import path cannot end with a '.mts' extension. Consider importing './deps.mjs' instead.
     export function main() {
         util()
     }

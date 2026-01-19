@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/specializedInheritedConstructors1.ts] ////
-
 //// [specializedInheritedConstructors1.ts]
 interface ViewOptions<TModel> {
     model: TModel;

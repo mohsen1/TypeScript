@@ -1,9 +1,7 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithGenericConstructSignaturesWithOptionalParameters.ts] ////
-
 //// [subtypingWithGenericConstructSignaturesWithOptionalParameters.ts]
 // call signatures in derived types must have the same or fewer optional parameters as the base type
 
-namespace ClassTypeParam {
+module ClassTypeParam {
     interface Base<T> {
         a: new () => T;
         a2: new (x?: T) => T;
@@ -89,7 +87,7 @@ namespace ClassTypeParam {
     }
 }
 
-namespace GenericSignaturesInvalid {
+module GenericSignaturesInvalid {
 
     // all of these are errors
     interface Base2 {
@@ -177,7 +175,7 @@ namespace GenericSignaturesInvalid {
     }
 }
 
-namespace GenericSignaturesValid {
+module GenericSignaturesValid {
 
     interface Base2 {
         a: new <T>() => T;

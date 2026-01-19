@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/genericArray0.ts] ////
-
-=== genericArray0.ts ===
+=== tests/cases/compiler/genericArray0.ts ===
 
 var x:number[];
 >x : Symbol(x, Decl(genericArray0.ts, 1, 3))

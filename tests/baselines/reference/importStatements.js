@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/internalModules/codeGeneration/importStatements.ts] ////
-
 //// [importStatements.ts]
-namespace A {
+module A {
     export class Point {
         constructor(public x: number, public y: number) { }
     }
@@ -10,12 +8,12 @@ namespace A {
 }
 
 // no code gen expected
-namespace B {
+module B {
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
 }
 
 // no code gen expected
-namespace C {
+module C {
     import a = A; //Error generates 'var <Alias> = <EntityName>;'
     var m: typeof a;
     var p: a.Point;
@@ -23,13 +21,13 @@ namespace C {
 }
 
 // code gen expected
-namespace D {
+module D {
     import a = A;
 
     var p = new a.Point(1, 1);
 }
 
-namespace E {
+module E {
     import a = A;
     export function xDist(x: a.Point) {
         return (a.Origin.x - x.x);

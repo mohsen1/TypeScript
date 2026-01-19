@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithObjectTypeArgsAndConstraints.ts] ////
-
-=== genericClassWithObjectTypeArgsAndConstraints.ts ===
+=== tests/cases/conformance/types/typeRelationships/typeInference/genericClassWithObjectTypeArgsAndConstraints.ts ===
 // Generic call with constraints infering type parameter from object member properties
 // No errors expected
 
@@ -30,11 +28,11 @@ class X<T> {
 >T : Symbol(T, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 12, 8))
 }
 
-namespace Class {
+module Class {
 >Class : Symbol(Class, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 14, 1))
 
     class G<T extends { x: string }> {
->G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 16, 17))
+>G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 16, 14))
 >T : Symbol(T, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 17, 12))
 >x : Symbol(x, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 17, 23))
 
@@ -70,7 +68,7 @@ namespace Class {
 
     var g: G<{ x: string; y: string }>;
 >g : Symbol(g, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 26, 7))
->G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 16, 17))
+>G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 16, 14))
 >x : Symbol(x, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 26, 14))
 >y : Symbol(y, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 26, 25))
 
@@ -136,11 +134,11 @@ namespace Class {
 >c1 : Symbol(c1, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 24, 7))
 }
 
-namespace Interface {
+module Interface {
 >Interface : Symbol(Interface, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 39, 1))
 
     interface G<T extends { x: string }> {
->G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 41, 21))
+>G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 41, 18))
 >T : Symbol(T, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 42, 16))
 >x : Symbol(x, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 42, 27))
 
@@ -169,7 +167,7 @@ namespace Interface {
 
     var g: G<{ x: string; y: string }>;
 >g : Symbol(g, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 48, 7))
->G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 41, 21))
+>G : Symbol(G, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 41, 18))
 >x : Symbol(x, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 48, 14))
 >y : Symbol(y, Decl(genericClassWithObjectTypeArgsAndConstraints.ts, 48, 25))
 

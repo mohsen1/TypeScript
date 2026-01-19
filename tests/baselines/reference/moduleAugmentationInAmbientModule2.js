@@ -30,7 +30,7 @@ x.foo().x;
 //// [main.js]
 "use strict";
 /// <reference path="O.d.ts" />
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 require("Map");
 var x;
 x.foo().x;

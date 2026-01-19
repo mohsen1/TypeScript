@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/moduleMergeConstructor.ts] ////
-
-=== foo.d.ts ===
+=== tests/cases/compiler/foo.d.ts ===
 declare module "foo" {
 >"foo" : Symbol("foo", Decl(foo.d.ts, 0, 0), Decl(foo-ext.d.ts, 0, 0))
 
@@ -13,7 +11,7 @@ declare module "foo" {
     }
 }
 
-=== foo-ext.d.ts ===
+=== tests/cases/compiler/foo-ext.d.ts ===
 declare module "foo" {
 >"foo" : Symbol("foo", Decl(foo.d.ts, 0, 0), Decl(foo-ext.d.ts, 0, 0))
 
@@ -25,7 +23,7 @@ declare module "foo" {
     }
 }
 
-=== index.ts ===
+=== tests/cases/compiler/index.ts ===
 import * as foo from "foo";
 >foo : Symbol(foo, Decl(index.ts, 0, 6))
 

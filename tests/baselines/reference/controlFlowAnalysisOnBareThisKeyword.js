@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/controlFlowAnalysisOnBareThisKeyword.ts] ////
-
 //// [controlFlowAnalysisOnBareThisKeyword.ts]
 declare function isBig(x: any): x is { big: true };
 function bigger(this: {}) {

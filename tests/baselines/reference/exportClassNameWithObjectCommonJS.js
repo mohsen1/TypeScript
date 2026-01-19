@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportClassNameWithObjectCommonJS.ts] ////
-
 //// [exportClassNameWithObjectCommonJS.ts]
 export class Object {}
 

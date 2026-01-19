@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/multiCallOverloads.ts] ////
-
 //// [multiCallOverloads.ts]
 interface ICallback {
     (x?: string):void;

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypesOfAny.ts] ////
-
 //// [subtypesOfAny.ts]
 // every type is a subtype of any, no errors expected
 
@@ -89,7 +87,7 @@ interface I14 {
 
 
 function f() { }
-namespace f {
+module f {
     export var bar = 1;
 }
 interface I15 {
@@ -99,7 +97,7 @@ interface I15 {
 
 
 class c { baz: string }
-namespace c {
+module c {
     export var bar = 1;
 }
 interface I16 {

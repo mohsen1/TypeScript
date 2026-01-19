@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/recursiveTypeInGenericConstraint.ts] ////
-
 //// [recursiveTypeInGenericConstraint.ts]
 class G<T> {
     x: G<G<T>>; // infinitely expanding type reference

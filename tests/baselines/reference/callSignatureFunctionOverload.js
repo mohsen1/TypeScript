@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/callSignatureFunctionOverload.ts] ////
-
 //// [callSignatureFunctionOverload.ts]
 var foo: {
     (name: string): string;

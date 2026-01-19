@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/parameterInitializerBeforeDestructuringEmit.ts] ////
-
-=== parameterInitializerBeforeDestructuringEmit.ts ===
+=== tests/cases/compiler/parameterInitializerBeforeDestructuringEmit.ts ===
 interface Foo {
 >Foo : Symbol(Foo, Decl(parameterInitializerBeforeDestructuringEmit.ts, 0, 0))
 

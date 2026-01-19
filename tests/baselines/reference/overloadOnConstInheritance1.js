@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstInheritance1.ts] ////
-
 //// [overloadOnConstInheritance1.ts]
 interface Base {
     addEventListener(x: string): any;

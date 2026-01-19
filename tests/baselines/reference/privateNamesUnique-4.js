@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesUnique-4.ts] ////
-
 //// [privateNamesUnique-4.ts]
 class A1 { }
 interface A2 extends A1 { }

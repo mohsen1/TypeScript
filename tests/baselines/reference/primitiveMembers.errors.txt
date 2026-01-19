@@ -1,10 +1,9 @@
-primitiveMembers.ts(5,3): error TS2339: Property 'toBAZ' does not exist on type 'number'.
-primitiveMembers.ts(11,1): error TS2322: Type 'Number' is not assignable to type 'number'.
+tests/cases/compiler/primitiveMembers.ts(5,3): error TS2339: Property 'toBAZ' does not exist on type 'number'.
+tests/cases/compiler/primitiveMembers.ts(11,1): error TS2322: Type 'Number' is not assignable to type 'number'.
   'number' is a primitive, but 'Number' is a wrapper object. Prefer using 'number' when possible.
-primitiveMembers.ts(21,10): error TS2872: This kind of expression is always truthy.
 
 
-==== primitiveMembers.ts (3 errors) ====
+==== tests/cases/compiler/primitiveMembers.ts (2 errors) ====
     var x = 5;
     var r = /yo/;
     r.source;
@@ -15,7 +14,7 @@ primitiveMembers.ts(21,10): error TS2872: This kind of expression is always trut
     x.toString();
     
     var n = 0;
-    declare var N: Number;
+    var N: Number;
     
     n = N;  // should not work, as 'number' has a different brand
     ~
@@ -31,8 +30,6 @@ primitiveMembers.ts(21,10): error TS2872: This kind of expression is always trut
     var b: Boolean = true;
     
     var n3 = 5 || {};
-             ~
-!!! error TS2872: This kind of expression is always truthy.
     
     
     class baz { public bar(): void { }; }

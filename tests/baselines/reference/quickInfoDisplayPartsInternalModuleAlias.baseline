@@ -1,72 +1,15 @@
-// === QuickInfo ===
-=== /tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts ===
-// namespace m.m1 {
-//     export class c {
-//     }
-// }
-// namespace m2 {
-//     import a1 = m;
-//            ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace a1
-// | import a1 = m
-// | ----------------------------------------------------------------------
-//     new a1.m1.c();
-//         ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace a1
-// | import a1 = m
-// | ----------------------------------------------------------------------
-//     import a2 = m.m1;
-//            ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace a2
-// | import a2 = m.m1
-// | ----------------------------------------------------------------------
-//     new a2.c();
-//         ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace a2
-// | import a2 = m.m1
-// | ----------------------------------------------------------------------
-//     export import a3 = m;
-//                   ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace m2.a3
-// | import m2.a3 = m
-// | ----------------------------------------------------------------------
-//     new a3.m1.c();
-//         ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace m2.a3
-// | import m2.a3 = m
-// | ----------------------------------------------------------------------
-//     export import a4 = m.m1;
-//                   ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace m2.a4
-// | import m2.a4 = m.m1
-// | ----------------------------------------------------------------------
-//     new a4.c();
-//         ^^
-// | ----------------------------------------------------------------------
-// | (alias) namespace m2.a4
-// | import m2.a4 = m.m1
-// | ----------------------------------------------------------------------
-// }
-
 [
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 72,
+      "position": 66,
       "name": "1"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "",
       "textSpan": {
-        "start": 72,
+        "start": 66,
         "length": 2
       },
       "displayParts": [
@@ -137,14 +80,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 88,
+      "position": 82,
       "name": "2"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "",
       "textSpan": {
-        "start": 88,
+        "start": 82,
         "length": 2
       },
       "displayParts": [
@@ -215,14 +158,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 110,
+      "position": 104,
       "name": "3"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 110,
+        "start": 104,
         "length": 2
       },
       "displayParts": [
@@ -301,14 +244,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 129,
+      "position": 123,
       "name": "4"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 129,
+        "start": 123,
         "length": 2
       },
       "displayParts": [
@@ -387,14 +330,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 155,
+      "position": 149,
       "name": "5"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 155,
+        "start": 149,
         "length": 2
       },
       "displayParts": [
@@ -481,14 +424,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 171,
+      "position": 165,
       "name": "6"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 171,
+        "start": 165,
         "length": 2
       },
       "displayParts": [
@@ -575,14 +518,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 200,
+      "position": 194,
       "name": "7"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 200,
+        "start": 194,
         "length": 2
       },
       "displayParts": [
@@ -677,14 +620,14 @@
   {
     "marker": {
       "fileName": "/tests/cases/fourslash/quickInfoDisplayPartsInternalModuleAlias.ts",
-      "position": 219,
+      "position": 213,
       "name": "8"
     },
-    "item": {
+    "quickInfo": {
       "kind": "alias",
       "kindModifiers": "export",
       "textSpan": {
-        "start": 219,
+        "start": 213,
         "length": 2
       },
       "displayParts": [

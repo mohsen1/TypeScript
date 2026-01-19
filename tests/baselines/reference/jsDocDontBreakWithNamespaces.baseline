@@ -1,34 +1,3 @@
-// === SignatureHelp ===
-=== /tests/cases/fourslash/jsDocDontBreakWithNamespaces.js ===
-// /**
-//  * @returns {module:@nodefuel/web~Webserver~wsServer#hello} Websocket server object
-//  */
-// function foo() { }
-// foo('');
-//       ^
-// | ----------------------------------------------------------------------
-// | foo(): any
-// | @returns Websocket server object
-// | ----------------------------------------------------------------------
-// 
-// /**
-//  * @type {module:xxxxx} */
-//  */
-// function bar() { }
-// bar('');
-//       ^
-// | ----------------------------------------------------------------------
-// | bar(): void
-// | ----------------------------------------------------------------------
-// 
-// /** @type {function(module:xxxx, module:xxxx): module:xxxxx} */
-// function zee() { }
-// zee('');
-//       ^
-// | ----------------------------------------------------------------------
-// | zee(**arg0: any**, arg1: any): any
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -36,7 +5,7 @@
       "position": 117,
       "name": "foo"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -108,7 +77,7 @@
       "position": 181,
       "name": "bar"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -170,7 +139,7 @@
       "position": 274,
       "name": "zee"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -212,58 +181,19 @@
               "kind": "space"
             }
           ],
-          "parameters": [
-            {
-              "name": "arg0",
-              "documentation": [],
-              "displayParts": [
-                {
-                  "text": "arg0",
-                  "kind": "parameterName"
-                },
-                {
-                  "text": ":",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "any",
-                  "kind": "keyword"
-                }
-              ],
-              "isOptional": false,
-              "isRest": false
-            },
-            {
-              "name": "arg1",
-              "documentation": [],
-              "displayParts": [
-                {
-                  "text": "arg1",
-                  "kind": "parameterName"
-                },
-                {
-                  "text": ":",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "any",
-                  "kind": "keyword"
-                }
-              ],
-              "isOptional": false,
-              "isRest": false
-            }
-          ],
+          "parameters": [],
           "documentation": [],
-          "tags": []
+          "tags": [
+            {
+              "name": "type",
+              "text": [
+                {
+                  "text": "{function(module:xxxx, module:xxxx): module:xxxxx}",
+                  "kind": "text"
+                }
+              ]
+            }
+          ]
         }
       ],
       "applicableSpan": {

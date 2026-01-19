@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/modFunctionCrash.ts] ////
-
 //// [modFunctionCrash.ts]
-declare namespace Q {
+declare module Q {
     function f(fn:()=>void); // typechecking the function type shouldnot crash the compiler
 }
 

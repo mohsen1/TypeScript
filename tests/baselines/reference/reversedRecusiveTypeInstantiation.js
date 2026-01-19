@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/reversedRecusiveTypeInstantiation.ts] ////
-
 //// [reversedRecusiveTypeInstantiation.ts]
 interface A<StringArgPos1, NumberArgPos2> {
    xPos1 : StringArgPos1

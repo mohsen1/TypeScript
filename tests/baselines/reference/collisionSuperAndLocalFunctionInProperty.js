@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/collisionSuperAndLocalFunctionInProperty.ts] ////
-
 //// [collisionSuperAndLocalFunctionInProperty.ts]
 function _super() { // No error
 } 

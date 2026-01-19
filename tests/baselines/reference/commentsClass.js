@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/commentsClass.ts] ////
-
 //// [commentsClass.ts]
 /** This is class c2 without constuctor*/
 class c2 {

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/objectTypePropertyAccess.ts] ////
-
 //// [objectTypePropertyAccess.ts]
 // Index notation should resolve to the type of a declared property with that same name
 class C {

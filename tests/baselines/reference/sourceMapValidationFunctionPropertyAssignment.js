@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationFunctionPropertyAssignment.ts] ////
-
 //// [sourceMapValidationFunctionPropertyAssignment.ts]
 var x = { n() { } };
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/ExportAssignments/parserExportAssignment7.ts] ////
-
 //// [parserExportAssignment7.ts]
 export class C {
 }

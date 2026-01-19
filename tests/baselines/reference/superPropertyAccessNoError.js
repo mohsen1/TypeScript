@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/superPropertyAccess/superPropertyAccessNoError.ts] ////
-
 //// [superPropertyAccessNoError.ts]
 //super.publicInstanceMemberFunction in constructor of derived class
 //super.publicInstanceMemberFunction in instance member function of derived class

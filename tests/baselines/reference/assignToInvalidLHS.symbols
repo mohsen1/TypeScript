@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/assignToInvalidLHS.ts] ////
-
-=== assignToInvalidLHS.ts ===
+=== tests/cases/compiler/assignToInvalidLHS.ts ===
 declare var y:any;
 >y : Symbol(y, Decl(assignToInvalidLHS.ts, 0, 11))
 

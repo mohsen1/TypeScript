@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/baseCheck.ts] ////
-
 //// [baseCheck.ts]
 class C { constructor(x: number, y: number) { } }
 class ELoc extends C {

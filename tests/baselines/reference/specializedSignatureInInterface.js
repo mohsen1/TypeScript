@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/specializedSignatureInInterface.ts] ////
-
 //// [specializedSignatureInInterface.ts]
 interface A {
   (key:string):void;

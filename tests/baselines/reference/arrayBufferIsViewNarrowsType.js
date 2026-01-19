@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayBufferIsViewNarrowsType.ts] ////
-
 //// [arrayBufferIsViewNarrowsType.ts]
 var obj: Object;
 if (ArrayBuffer.isView(obj)) {

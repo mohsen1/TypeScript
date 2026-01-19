@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/newOperator/newOperatorErrorCases_noImplicitAny.ts] ////
-
 //// [newOperatorErrorCases_noImplicitAny.ts]
 function fnNumber(this: void): number { return 90; }
 new fnNumber(); // Error

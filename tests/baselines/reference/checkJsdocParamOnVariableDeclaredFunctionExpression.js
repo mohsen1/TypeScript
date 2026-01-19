@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/checkJsdocParamOnVariableDeclaredFunctionExpression.ts] ////
-
 //// [0.js]
 // @ts-check
 /**

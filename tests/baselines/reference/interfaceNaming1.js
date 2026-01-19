@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/interfaceNaming1.ts] ////
-
 //// [interfaceNaming1.ts]
 interface { }
 interface interface{ }

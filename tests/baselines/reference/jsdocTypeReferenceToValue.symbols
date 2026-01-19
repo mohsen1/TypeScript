@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocTypeReferenceToValue.ts] ////
-
-=== foo.js ===
+=== tests/cases/conformance/jsdoc/foo.js ===
 /** @param {Image} image */
 function process(image) {
 >process : Symbol(process, Decl(foo.js, 0, 0))

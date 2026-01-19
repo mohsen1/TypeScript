@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/computedProperties/computedPropertyNamesSourceMap2_ES5.ts] ////
-
 //// [computedPropertyNamesSourceMap2_ES5.ts]
 var v = {
     ["hello"]() {

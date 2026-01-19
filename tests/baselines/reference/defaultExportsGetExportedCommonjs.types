@@ -1,12 +1,8 @@
-//// [tests/cases/conformance/es6/moduleExportsCommonjs/defaultExportsGetExportedCommonjs.ts] ////
-
-=== a.ts ===
+=== tests/cases/conformance/es6/moduleExportsCommonjs/a.ts ===
 export default class Foo {}
 >Foo : Foo
->    : ^^^
 
-=== b.ts ===
+=== tests/cases/conformance/es6/moduleExportsCommonjs/b.ts ===
 export default function foo() {}
 >foo : () => void
->    : ^^^^^^^^^^
 

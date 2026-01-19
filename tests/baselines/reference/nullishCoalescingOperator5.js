@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/nullishCoalescingOperator/nullishCoalescingOperator5.ts] ////
-
 //// [nullishCoalescingOperator5.ts]
 declare const a: string | undefined
 declare const b: string | undefined
@@ -46,7 +44,7 @@ a && (b ?? c);
 "use strict";
 var _a, _b, _c, _d;
 // should be a syntax error
-(a !== null && a !== void 0 ? a : b) || c;
+a !== null && a !== void 0 ? a : b || c;
 // should be a syntax error
 (_a = a || b) !== null && _a !== void 0 ? _a : c;
 // should be a syntax error

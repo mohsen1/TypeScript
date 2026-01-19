@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/readonlyMembers.ts] ////
-
 //// [readonlyMembers.ts]
 interface X {
     readonly a: number;
@@ -21,12 +19,7 @@ class C {
             this.a = 1;  // Error
             this.b = 1;  // Error
             this.c = 1;  // Error
-        };
-        (() => {
-            this.a = 1;  // Ok
-            this.b = 1;  // Ok
-            this.c = 1;  // Error
-        })();
+        }
     }
     foo() {
         this.a = 1;  // Error
@@ -64,11 +57,11 @@ N.a = 1;  // Error
 N.b = 1;
 N.c = 1;
 
-declare let xx: { readonly [x: string]: string };
+let xx: { readonly [x: string]: string };
 let s = xx["foo"];
 xx["foo"] = "abc";  // Error
 
-declare let yy: { readonly [x: number]: string, [x: string]: string };
+let yy: { readonly [x: number]: string, [x: string]: string };
 yy[1] = "abc";  // Error
 yy["foo"] = "abc";
 
@@ -88,11 +81,6 @@ var C = /** @class */ (function () {
             _this.b = 1; // Error
             _this.c = 1; // Error
         };
-        (function () {
-            _this.a = 1; // Ok
-            _this.b = 1; // Ok
-            _this.c = 1; // Error
-        })();
     }
     Object.defineProperty(C.prototype, "c", {
         get: function () { return 1; },
@@ -135,7 +123,9 @@ var N;
 N.a = 1; // Error
 N.b = 1;
 N.c = 1;
+var xx;
 var s = xx["foo"];
 xx["foo"] = "abc"; // Error
+var yy;
 yy[1] = "abc"; // Error
 yy["foo"] = "abc";

@@ -1,18 +1,16 @@
-//// [tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithNumberType.ts] ////
-
 //// [plusOperatorWithNumberType.ts]
 // + operator on number type
-declare var NUMBER: number;
+var NUMBER: number;
 var NUMBER1: number[] = [1, 2];
 
 function foo(): number { return 1; }
 
 class A {
-    public a!: number;
+    public a: number;
     static foo() { return 1; }
 }
-namespace M {
-    export var n: number = 0;
+module M {
+    export var n: number;
 }
 
 var objA = new A();
@@ -44,6 +42,8 @@ var ResultIsNumber11 = +(NUMBER + NUMBER);
 +objA.a, M.n;
 
 //// [plusOperatorWithNumberType.js]
+// + operator on number type
+var NUMBER;
 var NUMBER1 = [1, 2];
 function foo() { return 1; }
 var A = /** @class */ (function () {
@@ -54,7 +54,6 @@ var A = /** @class */ (function () {
 }());
 var M;
 (function (M) {
-    M.n = 0;
 })(M || (M = {}));
 var objA = new A();
 // number type var

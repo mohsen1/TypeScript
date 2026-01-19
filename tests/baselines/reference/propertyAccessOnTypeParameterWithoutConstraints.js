@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeParameters/typeParameterLists/propertyAccessOnTypeParameterWithoutConstraints.ts] ////
-
 //// [propertyAccessOnTypeParameterWithoutConstraints.ts]
 class C<T> {
     f() {

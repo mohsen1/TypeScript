@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/paramsOnlyHaveLiteralTypesWhenAppropriatelyContextualized.ts] ////
-
 //// [paramsOnlyHaveLiteralTypesWhenAppropriatelyContextualized.ts]
 // Using a homomorphic mapped type over `T`
 // Produces a lower-priority inference for `T` than other
@@ -32,8 +30,8 @@ appendToOptionalArray(foo, 'x', "no");  // should fail
 
 //// [paramsOnlyHaveLiteralTypesWhenAppropriatelyContextualized.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.appendToOptionalArray = appendToOptionalArray;
+exports.__esModule = true;
+exports.appendToOptionalArray = void 0;
 function appendToOptionalArray(object, key, value) {
     var array = object[key];
     if (array) {
@@ -43,6 +41,7 @@ function appendToOptionalArray(object, key, value) {
         object[key] = [value];
     }
 }
+exports.appendToOptionalArray = appendToOptionalArray;
 // e.g.
 var foo = {};
 appendToOptionalArray(foo, 'x', 123); // ok

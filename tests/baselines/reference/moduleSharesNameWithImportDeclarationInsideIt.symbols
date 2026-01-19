@@ -1,30 +1,28 @@
-//// [tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt.ts] ////
-
-=== moduleSharesNameWithImportDeclarationInsideIt.ts ===
-namespace Z.M {
+=== tests/cases/compiler/moduleSharesNameWithImportDeclarationInsideIt.ts ===
+module Z.M {
 >Z : Symbol(Z, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 0))
->M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 12))
+>M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 9))
 
     export function bar() {
->bar : Symbol(bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 15))
+>bar : Symbol(bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 12))
 
         return "";
     }
 }
-namespace A.M {
+module A.M {
 >A : Symbol(A, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 4, 1))
->M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 12))
+>M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 9))
 
     import M = Z.M;
->M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 15))
+>M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 12))
 >Z : Symbol(Z, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 0))
->M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 12))
+>M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 9))
 
     export function bar() {
 >bar : Symbol(bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 6, 19))
     }
     M.bar(); // Should call Z.M.bar
->M.bar : Symbol(M.bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 15))
->M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 15))
->bar : Symbol(M.bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 15))
+>M.bar : Symbol(M.bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 12))
+>M : Symbol(M, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 5, 12))
+>bar : Symbol(M.bar, Decl(moduleSharesNameWithImportDeclarationInsideIt.ts, 0, 12))
 }

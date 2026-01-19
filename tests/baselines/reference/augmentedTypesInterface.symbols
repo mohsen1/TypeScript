@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/augmentedTypesInterface.ts] ////
-
-=== augmentedTypesInterface.ts ===
+=== tests/cases/compiler/augmentedTypesInterface.ts ===
 // interface then interface
 
 interface i {

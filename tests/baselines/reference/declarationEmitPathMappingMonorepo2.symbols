@@ -1,13 +1,10 @@
-//// [tests/cases/compiler/declarationEmitPathMappingMonorepo2.ts] ////
+=== tests/cases/compiler/packages/core/src/index.d.ts ===
+export * from "./utils";
+export { default as SvgIcon } from "./SvgIcon";
+>default : Symbol(default, Decl(SvgIcon.d.ts, 7, 37))
+>SvgIcon : Symbol(SvgIcon, Decl(index.d.ts, 1, 8))
 
-=== packages/lab/src/index.ts ===
-import { createSvgIcon } from "@ts-bug/core/utils";
->createSvgIcon : Symbol(createSvgIcon, Decl(index.ts, 0, 8))
-
-export default createSvgIcon("Hello", "ArrowLeft");
->createSvgIcon : Symbol(createSvgIcon, Decl(index.ts, 0, 8))
-
-=== packages/core/src/SvgIcon.d.ts ===
+=== tests/cases/compiler/packages/core/src/SvgIcon.d.ts ===
 import { StyledComponentProps } from "@ts-bug/styles";
 >StyledComponentProps : Symbol(StyledComponentProps, Decl(SvgIcon.d.ts, 0, 8))
 
@@ -31,7 +28,7 @@ declare const SvgIcon: SomeInterface;
 export default SvgIcon;
 >SvgIcon : Symbol(SvgIcon, Decl(SvgIcon.d.ts, 7, 13))
 
-=== packages/core/src/utils.d.ts ===
+=== tests/cases/compiler/packages/core/src/utils.d.ts ===
 import SvgIcon from "./SvgIcon";
 >SvgIcon : Symbol(SvgIcon, Decl(utils.d.ts, 0, 6))
 
@@ -41,7 +38,7 @@ export function createSvgIcon(path: string, displayName: string): typeof SvgIcon
 >displayName : Symbol(displayName, Decl(utils.d.ts, 1, 43))
 >SvgIcon : Symbol(SvgIcon, Decl(utils.d.ts, 0, 6))
 
-=== packages/styles/src/index.d.ts ===
+=== tests/cases/compiler/packages/styles/src/index.d.ts ===
 export interface StyledComponentProps<ClassKey extends string> {
 >StyledComponentProps : Symbol(StyledComponentProps, Decl(index.d.ts, 0, 0))
 >ClassKey : Symbol(ClassKey, Decl(index.d.ts, 0, 38))
@@ -51,4 +48,11 @@ export interface StyledComponentProps<ClassKey extends string> {
 >Record : Symbol(Record, Decl(lib.es5.d.ts, --, --))
 >ClassKey : Symbol(ClassKey, Decl(index.d.ts, 0, 38))
 }
+
+=== tests/cases/compiler/packages/lab/src/index.ts ===
+import { createSvgIcon } from "@ts-bug/core/utils";
+>createSvgIcon : Symbol(createSvgIcon, Decl(index.ts, 0, 8))
+
+export default createSvgIcon("Hello", "ArrowLeft");
+>createSvgIcon : Symbol(createSvgIcon, Decl(index.ts, 0, 8))
 

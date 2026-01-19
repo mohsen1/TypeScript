@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxEmitAttributeWithPreserve.tsx] ////
-
-=== jsxEmitAttributeWithPreserve.tsx ===
+=== tests/cases/compiler/jsxEmitAttributeWithPreserve.tsx ===
 declare var React: any;
 >React : Symbol(React, Decl(jsxEmitAttributeWithPreserve.tsx, 0, 11))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/superCalls/derivedClassSuperCallsInNonConstructorMembers.ts] ////
-
 //// [derivedClassSuperCallsInNonConstructorMembers.ts]
 // error to use super calls outside a constructor
 

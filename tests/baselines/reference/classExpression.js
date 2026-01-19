@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/classExpression.ts] ////
-
 //// [classExpression.ts]
 var x = class C {
 }
@@ -9,7 +7,7 @@ var y = {
     }
 }
 
-namespace M {
+module M {
     var z = class C4 {
     }
 }

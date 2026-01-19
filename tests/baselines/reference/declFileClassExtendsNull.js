@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/declFileClassExtendsNull.ts] ////
-
 //// [declFileClassExtendsNull.ts]
 class ExtendsNull extends null {
 }

@@ -1,58 +1,3 @@
-// === SignatureHelp ===
-=== /tests/cases/fourslash/signatureHelpTypeArguments2.ts ===
-// /** some documentation
-//  * @template T some documentation 2
-//  * @template W
-//  * @template U,V others
-//  * @param a ok
-//  * @param b not ok
-//  */
-// function f<T, U, V, W>(a: number, b: string, c: boolean): void { }
-// f<;
-//   ^
-// | ----------------------------------------------------------------------
-// | f<**T**, U, V, W>(a: number, b: string, c: boolean): void
-// | some documentation
-// | @template T some documentation 2
-// | @template W
-// | @template U, V others
-// | @param a ok
-// | @param b not ok
-// | ----------------------------------------------------------------------
-// f<number, ;
-//           ^
-// | ----------------------------------------------------------------------
-// | f<T, **U**, V, W>(a: number, b: string, c: boolean): void
-// | some documentation
-// | @template T some documentation 2
-// | @template W
-// | @template U, V others
-// | @param a ok
-// | @param b not ok
-// | ----------------------------------------------------------------------
-// f<number, string, ;
-//                   ^
-// | ----------------------------------------------------------------------
-// | f<T, U, **V**, W>(a: number, b: string, c: boolean): void
-// | some documentation
-// | @template T some documentation 2
-// | @template W
-// | @template U, V others
-// | @param a ok
-// | @param b not ok
-// | ----------------------------------------------------------------------
-// f<number, string, boolean, ;
-//                            ^
-// | ----------------------------------------------------------------------
-// | f<T, U, V, **W**>(a: number, b: string, c: boolean): void
-// | some documentation
-// | @template T some documentation 2
-// | @template W
-// | @template U, V others
-// | @param a ok
-// | @param b not ok
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -60,7 +5,7 @@
       "position": 205,
       "name": "f0"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -268,7 +213,7 @@
               "text": [
                 {
                   "text": "W",
-                  "kind": "typeParameterName"
+                  "kind": "text"
                 }
               ]
             },
@@ -276,19 +221,7 @@
               "name": "template",
               "text": [
                 {
-                  "text": "U",
-                  "kind": "typeParameterName"
-                },
-                {
-                  "text": ",",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "V",
+                  "text": "U, V",
                   "kind": "typeParameterName"
                 },
                 {
@@ -353,7 +286,7 @@
       "position": 217,
       "name": "f1"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -561,7 +494,7 @@
               "text": [
                 {
                   "text": "W",
-                  "kind": "typeParameterName"
+                  "kind": "text"
                 }
               ]
             },
@@ -569,19 +502,7 @@
               "name": "template",
               "text": [
                 {
-                  "text": "U",
-                  "kind": "typeParameterName"
-                },
-                {
-                  "text": ",",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "V",
+                  "text": "U, V",
                   "kind": "typeParameterName"
                 },
                 {
@@ -646,7 +567,7 @@
       "position": 237,
       "name": "f2"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -854,7 +775,7 @@
               "text": [
                 {
                   "text": "W",
-                  "kind": "typeParameterName"
+                  "kind": "text"
                 }
               ]
             },
@@ -862,19 +783,7 @@
               "name": "template",
               "text": [
                 {
-                  "text": "U",
-                  "kind": "typeParameterName"
-                },
-                {
-                  "text": ",",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "V",
+                  "text": "U, V",
                   "kind": "typeParameterName"
                 },
                 {
@@ -939,7 +848,7 @@
       "position": 266,
       "name": "f3"
     },
-    "item": {
+    "signatureHelp": {
       "items": [
         {
           "isVariadic": false,
@@ -1147,7 +1056,7 @@
               "text": [
                 {
                   "text": "W",
-                  "kind": "typeParameterName"
+                  "kind": "text"
                 }
               ]
             },
@@ -1155,19 +1064,7 @@
               "name": "template",
               "text": [
                 {
-                  "text": "U",
-                  "kind": "typeParameterName"
-                },
-                {
-                  "text": ",",
-                  "kind": "punctuation"
-                },
-                {
-                  "text": " ",
-                  "kind": "space"
-                },
-                {
-                  "text": "V",
+                  "text": "U, V",
                   "kind": "typeParameterName"
                 },
                 {

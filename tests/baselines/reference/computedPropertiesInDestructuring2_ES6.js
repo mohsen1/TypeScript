@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/computedPropertiesInDestructuring2_ES6.ts] ////
-
 //// [computedPropertiesInDestructuring2_ES6.ts]
 let foo2 = () => "bar";
 let {[foo2()]: bar3} = {};

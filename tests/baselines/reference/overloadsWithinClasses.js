@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadsWithinClasses.ts] ////
-
 //// [overloadsWithinClasses.ts]
 class foo {
  

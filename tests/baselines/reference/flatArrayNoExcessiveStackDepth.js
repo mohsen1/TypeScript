@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/flatArrayNoExcessiveStackDepth.ts] ////
-
 //// [flatArrayNoExcessiveStackDepth.ts]
 // Repro from #43493
 

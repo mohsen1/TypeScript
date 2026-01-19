@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es7/exponentiationOperator/emitExponentiationOperatorInTemplateString2.ts] ////
-
 //// [emitExponentiationOperatorInTemplateString2.ts]
 var t1 = 10;
 var t2 = 10;

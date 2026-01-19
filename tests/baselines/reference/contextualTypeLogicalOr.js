@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypeLogicalOr.ts] ////
-
 //// [contextualTypeLogicalOr.ts]
 // Repro from #18005
 

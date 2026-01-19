@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleVisibilityTest3.ts] ////
-
 //// [moduleVisibilityTest3.ts]
-namespace _modes {
+module _modes {
  export interface IMode {
   
  }
@@ -13,7 +11,7 @@ namespace _modes {
 
 //_modes. // produces an internal error - please implement in derived class
 
-namespace editor {
+module editor {
  import modes = _modes;
  
  var i : modes.IMode;

@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/doNotemitTripleSlashComments.ts] ////
-
-=== file2.ts ===
+=== tests/cases/compiler/file2.ts ===
 /// <reference path="file1.ts" />
 
 
@@ -12,7 +10,7 @@ function bar() { }
 
 
 
-=== file0.ts ===
+=== tests/cases/compiler/file0.ts ===
 /// <reference path="file1.ts" />
 /// <reference path="file2.ts" />
 /// <amd-dependency path="/js/libs/hgn.js!app/templates/home" name="compiler"/>
@@ -26,7 +24,7 @@ var y = "hello";
 
 /// <reference path="file2.ts" />
 
-=== file1.ts ===
+=== tests/cases/compiler/file1.ts ===
 /// <reference path="file0.ts" />
 
 function foo() { }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticsInConstructorBodies.ts] ////
-
 //// [staticsInConstructorBodies.ts]
 class C {
 	constructor() {

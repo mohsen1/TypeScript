@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/covariance1.ts] ////
-
 //// [covariance1.ts]
-namespace M {
+module M {
 
     interface X { m1:number; }
     export class XX implements X { constructor(public m1:number) { } }

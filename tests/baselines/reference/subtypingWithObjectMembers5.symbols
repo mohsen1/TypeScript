@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembers5.ts] ////
-
-=== subtypingWithObjectMembers5.ts ===
+=== tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembers5.ts ===
 interface Base {
 >Base : Symbol(Base, Decl(subtypingWithObjectMembers5.ts, 0, 0))
 
@@ -18,11 +16,11 @@ interface Derived extends Base {
 
 // N and M have the same name, same accessibility, same optionality, and N is a subtype of M
 // foo properties are valid, bar properties cause errors in the derived class declarations
-namespace NotOptional {
+module NotOptional {
 >NotOptional : Symbol(NotOptional, Decl(subtypingWithObjectMembers5.ts, 6, 1))
 
     interface A {
->A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 10, 23))
+>A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 10, 20))
 
         foo: Base;
 >foo : Symbol(A.foo, Decl(subtypingWithObjectMembers5.ts, 11, 17))
@@ -31,7 +29,7 @@ namespace NotOptional {
 
     class B implements A {
 >B : Symbol(B, Decl(subtypingWithObjectMembers5.ts, 13, 5))
->A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 10, 23))
+>A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 10, 20))
 
         fooo: Derived; // error
 >fooo : Symbol(B.fooo, Decl(subtypingWithObjectMembers5.ts, 15, 26))
@@ -74,11 +72,11 @@ namespace NotOptional {
 }
 
 // same cases as above but with optional
-namespace Optional {
+module Optional {
 >Optional : Symbol(Optional, Decl(subtypingWithObjectMembers5.ts, 34, 1))
 
     interface A {
->A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 37, 20))
+>A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 37, 17))
 
         foo?: Base;
 >foo : Symbol(A.foo, Decl(subtypingWithObjectMembers5.ts, 38, 17))
@@ -87,7 +85,7 @@ namespace Optional {
 
     class B implements A {
 >B : Symbol(B, Decl(subtypingWithObjectMembers5.ts, 40, 5))
->A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 37, 20))
+>A : Symbol(A, Decl(subtypingWithObjectMembers5.ts, 37, 17))
 
         fooo: Derived; // weak type error
 >fooo : Symbol(B.fooo, Decl(subtypingWithObjectMembers5.ts, 42, 26))

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/controlFlow/controlFlowForOfStatement.ts] ////
-
 //// [controlFlowForOfStatement.ts]
 let obj: number[];
 let x: string | number | boolean | RegExp;

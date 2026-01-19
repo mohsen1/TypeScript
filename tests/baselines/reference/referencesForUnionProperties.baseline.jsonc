@@ -1,144 +1,185 @@
-// === findAllReferences ===
 // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
 // interface One {
-//     common: { /*FIND ALL REFS*/<|[|{| defId: 0, isDefinition: true |}a|]: number;|> };
+//     common: { /*FIND ALL REFS*/[|a|]: number; };
 // }
 // 
 // interface Base {
-// --- (line: 6) skipped ---
-
-// --- (line: 17) skipped ---
+//     a: string;
+//     b: string;
+// }
+// 
+// interface HasAOrB extends Base {
+//     a: string;
+//     b: string;
+// }
+// 
+// interface Two {
+//     common: HasAOrB;
+// }
 // 
 // var x : One | Two;
 // 
-// x.common.[|{| defId: 1 |}a|];
+// x.common.[|a|];
 
-  // === Definitions ===
-  // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
-  // interface One {
-  //     common: { /*FIND ALL REFS*/<|[|{| defId: 0 |}<|[|{| defId: 1 |}a|]|]: number;|>|> };
-  // }
-  // 
-  // interface Base {
-  // --- (line: 6) skipped ---
-
-  // === Details ===
-  [
-   {
-    "defId": 0,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) a: number",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "number",
-      "kind": "keyword"
-     }
+[
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) a: number",
+      "textSpan": {
+        "start": 30,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "number",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 30,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 30,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 30,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": true
+      }
     ]
-   },
-   {
-    "defId": 1,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) a: string | number",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "|",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "number",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) a: string | number",
+      "textSpan": {
+        "start": 30,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "|",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "number",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 30,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 232,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "isWriteAccess": false,
+        "isDefinition": false
+      }
     ]
-   }
-  ]
+  }
+]
 
-
-
-// === findAllReferences ===
 // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
 // interface One {
 //     common: { a: number; };
 // }
 // 
 // interface Base {
-//     /*FIND ALL REFS*/<|[|{| defId: 0, isDefinition: true |}a|]: string;|>
+//     /*FIND ALL REFS*/[|a|]: string;
 //     b: string;
 // }
 // 
 // interface HasAOrB extends Base {
-//     <|[|{| defId: 1 |}a|]: string;|>
+//     [|a|]: string;
 //     b: string;
 // }
 // 
@@ -148,200 +189,249 @@
 // 
 // var x : One | Two;
 // 
-// x.common.[|{| defId: 2 |}a|];
+// x.common.[|a|];
 
-  // === Definitions ===
-  // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
-  // interface One {
-  //     common: { <|[|{| defId: 2 |}a|]: number;|> };
-  // }
-  // 
-  // interface Base {
-  //     /*FIND ALL REFS*/<|[|{| defId: 0 |}a|]: string;|>
-  //     b: string;
-  // }
-  // 
-  // interface HasAOrB extends Base {
-  //     <|[|{| defId: 1 |}a|]: string;|>
-  //     b: string;
-  // }
-  // 
-  // --- (line: 15) skipped ---
-
-  // === Details ===
-  [
-   {
-    "defId": 0,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) Base.a: string",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "Base",
-      "kind": "interfaceName"
-     },
-     {
-      "text": ".",
-      "kind": "punctuation"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     }
+[
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) Base.a: string",
+      "textSpan": {
+        "start": 68,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "Base",
+          "kind": "interfaceName"
+        },
+        {
+          "text": ".",
+          "kind": "punctuation"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 68,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 68,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 68,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": true
+      }
     ]
-   },
-   {
-    "defId": 1,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) HasAOrB.a: string",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "HasAOrB",
-      "kind": "interfaceName"
-     },
-     {
-      "text": ".",
-      "kind": "punctuation"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) HasAOrB.a: string",
+      "textSpan": {
+        "start": 134,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "HasAOrB",
+          "kind": "interfaceName"
+        },
+        {
+          "text": ".",
+          "kind": "punctuation"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 134,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 134,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 134,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": false
+      }
     ]
-   },
-   {
-    "defId": 2,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) a: string | number",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "|",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "number",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) a: string | number",
+      "textSpan": {
+        "start": 30,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "|",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "number",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 30,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 232,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "isWriteAccess": false,
+        "isDefinition": false
+      }
     ]
-   }
-  ]
+  }
+]
 
-
-
-// === findAllReferences ===
 // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
 // interface One {
-//     common: { <|[|{| defId: 0 |}a|]: number;|> };
+//     common: { [|a|]: number; };
 // }
 // 
 // interface Base {
-//     <|[|{| defId: 1 |}a|]: string;|>
+//     [|a|]: string;
 //     b: string;
 // }
 // 
 // interface HasAOrB extends Base {
-//     <|[|{| defId: 2 |}a|]: string;|>
+//     [|a|]: string;
 //     b: string;
 // }
 // 
@@ -351,228 +441,299 @@
 // 
 // var x : One | Two;
 // 
-// x.common./*FIND ALL REFS*/[|{| defId: 3 |}a|];
+// x.common./*FIND ALL REFS*/[|a|];
 
-  // === Definitions ===
-  // === /tests/cases/fourslash/referencesForUnionProperties.ts ===
-  // interface One {
-  //     common: { <|[|{| defId: 0 |}<|[|{| defId: 3 |}a|]|]: number;|>|> };
-  // }
-  // 
-  // interface Base {
-  //     <|[|{| defId: 1 |}a|]: string;|>
-  //     b: string;
-  // }
-  // 
-  // interface HasAOrB extends Base {
-  //     <|[|{| defId: 2 |}a|]: string;|>
-  //     b: string;
-  // }
-  // 
-  // interface Two {
-  //     common: HasAOrB;
-  // }
-  // 
-  // var x : One | Two;
-  // 
-  // x.common./*FIND ALL REFS*/a;
-
-  // === Details ===
-  [
-   {
-    "defId": 0,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) a: number",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "number",
-      "kind": "keyword"
-     }
+[
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) a: number",
+      "textSpan": {
+        "start": 30,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "number",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 30,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 30,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 30,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": true
+      }
     ]
-   },
-   {
-    "defId": 1,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) Base.a: string",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "Base",
-      "kind": "interfaceName"
-     },
-     {
-      "text": ".",
-      "kind": "punctuation"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) Base.a: string",
+      "textSpan": {
+        "start": 68,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "Base",
+          "kind": "interfaceName"
+        },
+        {
+          "text": ".",
+          "kind": "punctuation"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 68,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 68,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 68,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": false
+      }
     ]
-   },
-   {
-    "defId": 2,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) HasAOrB.a: string",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "HasAOrB",
-      "kind": "interfaceName"
-     },
-     {
-      "text": ".",
-      "kind": "punctuation"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) HasAOrB.a: string",
+      "textSpan": {
+        "start": 134,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "HasAOrB",
+          "kind": "interfaceName"
+        },
+        {
+          "text": ".",
+          "kind": "punctuation"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 134,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 134,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "contextSpan": {
+          "start": 134,
+          "length": 10
+        },
+        "isWriteAccess": false,
+        "isDefinition": true
+      }
     ]
-   },
-   {
-    "defId": 3,
-    "containerKind": "",
-    "containerName": "",
-    "kind": "property",
-    "name": "(property) a: string | number",
-    "displayParts": [
-     {
-      "text": "(",
-      "kind": "punctuation"
-     },
-     {
-      "text": "property",
-      "kind": "text"
-     },
-     {
-      "text": ")",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "a",
-      "kind": "propertyName"
-     },
-     {
-      "text": ":",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "string",
-      "kind": "keyword"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "|",
-      "kind": "punctuation"
-     },
-     {
-      "text": " ",
-      "kind": "space"
-     },
-     {
-      "text": "number",
-      "kind": "keyword"
-     }
+  },
+  {
+    "definition": {
+      "containerKind": "",
+      "containerName": "",
+      "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+      "kind": "property",
+      "name": "(property) a: string | number",
+      "textSpan": {
+        "start": 30,
+        "length": 1
+      },
+      "displayParts": [
+        {
+          "text": "(",
+          "kind": "punctuation"
+        },
+        {
+          "text": "property",
+          "kind": "text"
+        },
+        {
+          "text": ")",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "a",
+          "kind": "propertyName"
+        },
+        {
+          "text": ":",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "string",
+          "kind": "keyword"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "|",
+          "kind": "punctuation"
+        },
+        {
+          "text": " ",
+          "kind": "space"
+        },
+        {
+          "text": "number",
+          "kind": "keyword"
+        }
+      ],
+      "contextSpan": {
+        "start": 30,
+        "length": 10
+      }
+    },
+    "references": [
+      {
+        "textSpan": {
+          "start": 232,
+          "length": 1
+        },
+        "fileName": "/tests/cases/fourslash/referencesForUnionProperties.ts",
+        "isWriteAccess": false,
+        "isDefinition": false
+      }
     ]
-   }
-  ]
+  }
+]

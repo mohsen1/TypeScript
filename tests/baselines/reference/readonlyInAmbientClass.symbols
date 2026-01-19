@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/readonlyInAmbientClass.ts] ////
-
-=== readonlyInAmbientClass.ts ===
+=== tests/cases/conformance/classes/constructorDeclarations/constructorParameters/readonlyInAmbientClass.ts ===
 declare class C{
 >C : Symbol(C, Decl(readonlyInAmbientClass.ts, 0, 0))
 

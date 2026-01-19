@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedRedeclarationInES6AMD.ts] ////
-
 //// [nestedRedeclarationInES6AMD.ts]
 function a() {
     {

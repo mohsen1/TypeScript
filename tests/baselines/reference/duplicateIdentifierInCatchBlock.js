@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/duplicateIdentifierInCatchBlock.ts] ////
-
 //// [duplicateIdentifierInCatchBlock.ts]
 var v;
 try { } catch (e) {

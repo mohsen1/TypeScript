@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/collisionCodeGenModuleWithMethodChildren.ts] ////
-
 //// [collisionCodeGenModuleWithMethodChildren.ts]
-namespace M {
+module M {
     export var x = 3;
     class c {
         fn(M, p = x) { }
     }
 }
 
-namespace M {
+module M {
     class d {
         fn2() {
             var M;
@@ -17,7 +15,7 @@ namespace M {
     }
 }
 
-namespace M {
+module M {
     class e {
         fn3() {
             function M() {
@@ -27,7 +25,7 @@ namespace M {
     }
 }
 
-namespace M { // Shouldnt bn _M
+module M { // Shouldnt bn _M
     class f {
         M() {
         }

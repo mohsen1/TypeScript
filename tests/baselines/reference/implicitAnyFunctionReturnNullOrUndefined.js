@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implicitAnyFunctionReturnNullOrUndefined.ts] ////
-
 //// [implicitAnyFunctionReturnNullOrUndefined.ts]
 // this should be an error
 function nullWidenFunction() { return null;}             // error at "nullWidenFunction"

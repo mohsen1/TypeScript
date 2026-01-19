@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/newOperator/newOperatorErrorCases.ts] ////
-
 //// [newOperatorErrorCases.ts]
 class C0 {
 
@@ -31,7 +29,7 @@ var b = new C0 32, ''; // Parse error
 // Generic construct expression with no parentheses
 var c1 = new T;
 var c1: T<{}>;
-var c2 = new T<string>;  // Ok
+var c2 = new T<string>; // Parse error
 
 
 // Construct expression of non-void returning function
@@ -64,7 +62,7 @@ var b = new C0;
 // Generic construct expression with no parentheses
 var c1 = new T;
 var c1;
-var c2 = new T; // Ok
+var c2 = new T; // Parse error
 // Construct expression of non-void returning function
 function fnNumber() { return 32; }
 var s = new fnNumber(); // Error

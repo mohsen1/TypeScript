@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseEmptyTupleNoException.ts] ////
-
 //// [promiseEmptyTupleNoException.ts]
 export async function get(): Promise<[]> {
   let emails = [];

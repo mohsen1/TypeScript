@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnGenericClassAndNonGenericClass.ts] ////
-
 //// [overloadOnGenericClassAndNonGenericClass.ts]
 class A { a; }
 class B { b; }

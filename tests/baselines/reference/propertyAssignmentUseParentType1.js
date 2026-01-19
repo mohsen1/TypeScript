@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/salsa/propertyAssignmentUseParentType1.ts] ////
-
 //// [propertyAssignmentUseParentType1.ts]
 interface N {
     (): boolean
@@ -18,7 +16,7 @@ ignoreJsdoc.extra = 111
 
 //// [propertyAssignmentUseParentType1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.ignoreJsdoc = exports.inlined = exports.interfaced = void 0;
 var interfaced = function () { return true; };
 exports.interfaced = interfaced;

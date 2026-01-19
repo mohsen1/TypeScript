@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveClassBaseType.ts] ////
-
 //// [recursiveClassBaseType.ts]
 // Repro from #44281
 

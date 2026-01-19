@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembersOptionality4.ts] ////
-
 //// [subtypingWithObjectMembersOptionality4.ts]
 // Base has required property, derived adds an optional property, no errors
 

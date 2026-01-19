@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Generics/parserGreaterThanTokenAmbiguity5.ts] ////
-
 //// [parserGreaterThanTokenAmbiguity5.ts]
 1 
 // before

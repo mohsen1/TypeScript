@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/module_augmentExistingVariable.ts] ////
-
 //// [module_augmentExistingVariable.ts]
 var console: any;
 
-namespace console {
+module console {
     export var x = 2;
 }
 

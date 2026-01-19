@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/newArrays.ts] ////
-
 //// [newArrays.ts]
-namespace M {
+module M {
 	class Foo {}
 	class Gar {
 		public fa: Foo[];

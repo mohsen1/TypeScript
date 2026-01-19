@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/optionalParameterProperty.ts] ////
-
 //// [optionalParameterProperty.ts]
 class C {
-    p: number = 0;
+    p: number;
 }
 
 class D extends C { 
@@ -30,7 +28,6 @@ var __extends = (this && this.__extends) || (function () {
 })();
 var C = /** @class */ (function () {
     function C() {
-        this.p = 0;
     }
     return C;
 }());

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/privacyTypeParameterOfFunction.ts] ////
-
 //// [privacyTypeParameterOfFunction.ts]
 class privateClass {
 }
@@ -136,11 +134,8 @@ function privateFunctionWithPublicTypeParametersWithoutExtends<T>() {
 
 //// [privacyTypeParameterOfFunction.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.publicClassWithWithPublicTypeParametersWithoutExtends = exports.publicClassWithWithPublicTypeParameters = exports.publicClassWithWithPrivateTypeParameters = exports.publicClass = void 0;
-exports.publicFunctionWithPrivateTypeParameters = publicFunctionWithPrivateTypeParameters;
-exports.publicFunctionWithPublicTypeParameters = publicFunctionWithPublicTypeParameters;
-exports.publicFunctionWithPublicTypeParametersWithoutExtends = publicFunctionWithPublicTypeParametersWithoutExtends;
+exports.__esModule = true;
+exports.publicFunctionWithPublicTypeParametersWithoutExtends = exports.publicClassWithWithPublicTypeParametersWithoutExtends = exports.publicFunctionWithPublicTypeParameters = exports.publicFunctionWithPrivateTypeParameters = exports.publicClassWithWithPublicTypeParameters = exports.publicClassWithWithPrivateTypeParameters = exports.publicClass = void 0;
 var privateClass = /** @class */ (function () {
     function privateClass() {
     }
@@ -211,8 +206,10 @@ var privateClassWithWithPublicTypeParameters = /** @class */ (function () {
 // TypeParameter_0_of_exported_function_has_or_is_using_private_type_1
 function publicFunctionWithPrivateTypeParameters() {
 }
+exports.publicFunctionWithPrivateTypeParameters = publicFunctionWithPrivateTypeParameters;
 function publicFunctionWithPublicTypeParameters() {
 }
+exports.publicFunctionWithPublicTypeParameters = publicFunctionWithPublicTypeParameters;
 function privateFunctionWithPrivateTypeParameters() {
 }
 function privateFunctionWithPublicTypeParameters() {
@@ -246,5 +243,6 @@ var privateClassWithWithPublicTypeParametersWithoutExtends = /** @class */ (func
 }());
 function publicFunctionWithPublicTypeParametersWithoutExtends() {
 }
+exports.publicFunctionWithPublicTypeParametersWithoutExtends = publicFunctionWithPublicTypeParametersWithoutExtends;
 function privateFunctionWithPublicTypeParametersWithoutExtends() {
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superPropertyAccess1.ts] ////
-
 //// [superPropertyAccess1.ts]
 class C {
     public foo() { }

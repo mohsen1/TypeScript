@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/superErrors.ts] ////
-
 //// [superErrors.ts]
 function foo() {
     // super in a non class context

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexer2.ts] ////
-
 //// [indexer2.ts]
 interface IHeapObjectProperty {}
 interface IDirectChildrenMap { 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstNoStringImplementation.ts] ////
-
 //// [overloadOnConstNoStringImplementation.ts]
 function x2(a: number, cb: (x: 'hi') => number);
 function x2(a: number, cb: (x: 'bye') => number);

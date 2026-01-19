@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveGenericSignatureInstantiation.ts] ////
-
 //// [recursiveGenericSignatureInstantiation.ts]
 function f6<T>(x: T) {
     return f6(x);

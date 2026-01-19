@@ -1,6 +1,7 @@
 //// [tests/cases/compiler/reexportWrittenCorrectlyInDeclaration.ts] ////
 
 //// [ThingA.ts]
+// https://github.com/Microsoft/TypeScript/issues/8612
 export class ThingA { } 
 
 //// [ThingB.ts]
@@ -19,8 +20,9 @@ export class Test {
 
 //// [ThingA.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.ThingA = void 0;
+// https://github.com/Microsoft/TypeScript/issues/8612
 var ThingA = /** @class */ (function () {
     function ThingA() {
     }
@@ -29,7 +31,7 @@ var ThingA = /** @class */ (function () {
 exports.ThingA = ThingA;
 //// [ThingB.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.ThingB = void 0;
 var ThingB = /** @class */ (function () {
     function ThingB() {
@@ -39,15 +41,22 @@ var ThingB = /** @class */ (function () {
 exports.ThingB = ThingB;
 //// [Things.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+var __createBinding = (this && this.__createBinding) || (Object.create ? (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    Object.defineProperty(o, k2, { enumerable: true, get: function() { return m[k]; } });
+}) : (function(o, m, k, k2) {
+    if (k2 === undefined) k2 = k;
+    o[k2] = m[k];
+}));
+exports.__esModule = true;
 exports.ThingB = exports.ThingA = void 0;
 var ThingA_1 = require("./ThingA");
-Object.defineProperty(exports, "ThingA", { enumerable: true, get: function () { return ThingA_1.ThingA; } });
+__createBinding(exports, ThingA_1, "ThingA");
 var ThingB_1 = require("./ThingB");
-Object.defineProperty(exports, "ThingB", { enumerable: true, get: function () { return ThingB_1.ThingB; } });
+__createBinding(exports, ThingB_1, "ThingB");
 //// [Test.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Test = void 0;
 var Test = /** @class */ (function () {
     function Test() {

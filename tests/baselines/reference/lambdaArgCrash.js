@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/lambdaArgCrash.ts] ////
-
 //// [lambdaArgCrash.ts]
 class Event {
 

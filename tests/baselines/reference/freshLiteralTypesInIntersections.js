@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/freshLiteralTypesInIntersections.ts] ////
-
 //// [freshLiteralTypesInIntersections.ts]
 // Repro from #19657
 

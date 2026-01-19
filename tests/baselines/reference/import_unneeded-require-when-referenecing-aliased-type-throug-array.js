@@ -19,7 +19,7 @@ var p = testData[0].name;
 //// [a.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     var testData;
     var p = testData[0].name;
 });

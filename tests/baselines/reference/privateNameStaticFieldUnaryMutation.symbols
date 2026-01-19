@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameStaticFieldUnaryMutation.ts] ////
-
-=== privateNameStaticFieldUnaryMutation.ts ===
+=== tests/cases/conformance/classes/members/privateNames/privateNameStaticFieldUnaryMutation.ts ===
 class C {
 >C : Symbol(C, Decl(privateNameStaticFieldUnaryMutation.ts, 0, 0))
 

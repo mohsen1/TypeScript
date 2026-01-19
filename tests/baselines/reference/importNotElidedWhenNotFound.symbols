@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/importNotElidedWhenNotFound.ts] ////
-
-=== importNotElidedWhenNotFound.ts ===
+=== tests/cases/compiler/importNotElidedWhenNotFound.ts ===
 import X from 'file';
 >X : Symbol(X, Decl(importNotElidedWhenNotFound.ts, 0, 6))
 

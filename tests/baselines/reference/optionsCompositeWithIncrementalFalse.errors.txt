@@ -2,6 +2,6 @@ error TS6379: Composite projects may not disable incremental compilation.
 
 
 !!! error TS6379: Composite projects may not disable incremental compilation.
-==== optionsCompositeWithIncrementalFalse.ts (0 errors) ====
+==== tests/cases/compiler/optionsCompositeWithIncrementalFalse.ts (0 errors) ====
     const x = "Hello World";
     

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Generics/parserGenericsInTypeContexts1.ts] ////
-
 //// [parserGenericsInTypeContexts1.ts]
 class C extends A<T> implements B<T> {
 }

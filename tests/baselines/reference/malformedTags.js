@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/salsa/malformedTags.ts] ////
-
 //// [myFile02.js]
 /**
  * Checks if `value` is classified as an `Array` object.

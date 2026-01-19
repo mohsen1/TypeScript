@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionLikeInParameterInitializer.ts] ////
-
 //// [functionLikeInParameterInitializer.ts]
 // error
 export function bar(func = () => foo) {
@@ -23,26 +21,26 @@ export function baz3(func = class { x = foo }) {
 
 //// [functionLikeInParameterInitializer.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.bar = bar;
-exports.baz1 = baz1;
-exports.baz2 = baz2;
-exports.baz3 = baz3;
+exports.__esModule = true;
+exports.baz3 = exports.baz2 = exports.baz1 = exports.bar = void 0;
 // error
 function bar(func) {
     if (func === void 0) { func = function () { return foo; }; }
     var foo = "in";
 }
+exports.bar = bar;
 // error
 function baz1(func) {
     if (func === void 0) { func = { f: function () { return foo; } }; }
     var foo = "in";
 }
+exports.baz1 = baz1;
 // error
 function baz2(func) {
     if (func === void 0) { func = function () { return foo; }; }
     var foo = "in";
 }
+exports.baz2 = baz2;
 // error
 function baz3(func) {
     if (func === void 0) { func = /** @class */ (function () {
@@ -53,3 +51,4 @@ function baz3(func) {
     }()); }
     var foo = "in";
 }
+exports.baz3 = baz3;

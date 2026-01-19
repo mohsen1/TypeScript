@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/optionsStrictPropertyInitializationStrict.ts] ////
-
 //// [optionsStrictPropertyInitializationStrict.ts]
 var x;
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/contextualTyping/parenthesizedContexualTyping3.ts] ////
-
 //// [parenthesizedContexualTyping3.ts]
 // Contextual typing for parenthesized substitution expressions in tagged templates.
 

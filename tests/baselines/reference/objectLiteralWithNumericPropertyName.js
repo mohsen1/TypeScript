@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLiteralWithNumericPropertyName.ts] ////
-
 //// [objectLiteralWithNumericPropertyName.ts]
 interface A {
     0: string;

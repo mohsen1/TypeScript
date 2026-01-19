@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloads23.ts] ////
-
 //// [functionOverloads23.ts]
 function foo(bar:(b:string)=>void);
 function foo(bar:(a:number)=>void);

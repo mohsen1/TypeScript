@@ -1,30 +1,28 @@
-//// [tests/cases/compiler/declarationEmitNameConflictsWithAlias.ts] ////
-
 //// [declarationEmitNameConflictsWithAlias.ts]
-export namespace C { export interface I { } }
+export module C { export interface I { } }
 export import v = C;
-export namespace M {
-    export namespace C { export interface I { } }
+export module M {
+    export module C { export interface I { } }
     export var w: v.I; // Gets emitted as C.I, which is the wrong interface
 }
 
 //// [declarationEmitNameConflictsWithAlias.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.M = void 0;
 var M;
 (function (M) {
-})(M || (exports.M = M = {}));
+})(M = exports.M || (exports.M = {}));
 
 
 //// [declarationEmitNameConflictsWithAlias.d.ts]
-export declare namespace C {
+export declare module C {
     interface I {
     }
 }
 export import v = C;
-export declare namespace M {
-    namespace C {
+export declare module M {
+    module C {
         interface I {
         }
     }

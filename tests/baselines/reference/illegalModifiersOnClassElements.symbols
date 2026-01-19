@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/illegalModifiersOnClassElements.ts] ////
-
-=== illegalModifiersOnClassElements.ts ===
+=== tests/cases/compiler/illegalModifiersOnClassElements.ts ===
 class C {
 >C : Symbol(C, Decl(illegalModifiersOnClassElements.ts, 0, 0))
 

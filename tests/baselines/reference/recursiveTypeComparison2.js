@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/recursiveTypeComparison2.ts] ////
-
 //// [recursiveTypeComparison2.ts]
 // Before fix this would cause compiler to hang (#1170)
 
-declare namespace Bacon {
+declare module Bacon {
     interface Event<T> {
     }
     interface Error<T> extends Event<T> {

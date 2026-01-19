@@ -1,7 +1,7 @@
 //// [tests/cases/compiler/privacyInterfaceExtendsClauseDeclFile.ts] ////
 
 //// [privacyInterfaceExtendsClauseDeclFile_externalModule.ts]
-export namespace publicModule {
+export module publicModule {
     export interface publicInterfaceInPublicModule {
     }
 
@@ -26,7 +26,7 @@ export namespace publicModule {
     }
 }
 
-namespace privateModule {
+module privateModule {
     export interface publicInterfaceInPrivateModule {
 
     }
@@ -71,7 +71,7 @@ export interface publicInterfaceImplementingFromPrivateModuleInterface extends p
 }
 
 //// [privacyInterfaceExtendsClauseDeclFile_GlobalFile.ts]
-namespace publicModuleInGlobal {
+module publicModuleInGlobal {
     export interface publicInterfaceInPublicModule {
     }
 
@@ -95,12 +95,12 @@ interface publicInterfaceImplementingPublicInterfaceInGlobal extends publicInter
 
 //// [privacyInterfaceExtendsClauseDeclFile_externalModule.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [privacyInterfaceExtendsClauseDeclFile_GlobalFile.js]
 
 
 //// [privacyInterfaceExtendsClauseDeclFile_externalModule.d.ts]
-export declare namespace publicModule {
+export declare module publicModule {
     export interface publicInterfaceInPublicModule {
     }
     interface privateInterfaceInPublicModule {
@@ -115,7 +115,7 @@ export declare namespace publicModule {
     }
     export {};
 }
-declare namespace privateModule {
+declare module privateModule {
     export interface publicInterfaceInPrivateModule {
     }
     interface privateInterfaceInPrivateModule {
@@ -140,7 +140,7 @@ export interface publicInterfaceImplementingFromPrivateModuleInterface extends p
 }
 export {};
 //// [privacyInterfaceExtendsClauseDeclFile_GlobalFile.d.ts]
-declare namespace publicModuleInGlobal {
+declare module publicModuleInGlobal {
     export interface publicInterfaceInPublicModule {
     }
     interface privateInterfaceInPublicModule {

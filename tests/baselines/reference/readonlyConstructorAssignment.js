@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/readonlyConstructorAssignment.ts] ////
-
 //// [readonlyConstructorAssignment.ts]
 // Tests that readonly parameter properties behave like regular readonly properties
 

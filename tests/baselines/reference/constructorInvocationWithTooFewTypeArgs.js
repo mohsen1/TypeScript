@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorInvocationWithTooFewTypeArgs.ts] ////
-
 //// [constructorInvocationWithTooFewTypeArgs.ts]
 class D<T, U> {
 

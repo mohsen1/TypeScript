@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectCreationExpressionInFunctionParameter.ts] ////
-
 //// [objectCreationExpressionInFunctionParameter.ts]
 class A {
     constructor(public a1: string) {

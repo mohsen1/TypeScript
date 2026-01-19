@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticInheritance.ts] ////
-
 //// [staticInheritance.ts]
 function doThing(x: { n: string }) { }
 class A {

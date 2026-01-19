@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayLiteralContextualType.ts] ////
-
 //// [arrayLiteralContextualType.ts]
 interface IAnimal {
     name: string;

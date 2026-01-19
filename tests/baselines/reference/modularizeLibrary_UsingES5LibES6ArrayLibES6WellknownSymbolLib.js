@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/modularizeLibrary_UsingES5LibES6ArrayLibES6WellknownSymbolLib.ts] ////
-
 //// [modularizeLibrary_UsingES5LibES6ArrayLibES6WellknownSymbolLib.ts]
 function f(x: number, y: number, z: number) {
     return Array.from(arguments);

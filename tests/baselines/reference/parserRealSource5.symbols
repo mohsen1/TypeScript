@@ -1,17 +1,15 @@
-//// [tests/cases/conformance/parser/ecmascript5/parserRealSource5.ts] ////
-
-=== parserRealSource5.ts ===
+=== tests/cases/conformance/parser/ecmascript5/parserRealSource5.ts ===
 // Copyright (c) Microsoft. All rights reserved. Licensed under the Apache License, Version 2.0. 
 // See LICENSE.txt in the project root for complete license information.
 
 ///<reference path='typescript.ts' />
 
-namespace TypeScript {
+module TypeScript {
 >TypeScript : Symbol(TypeScript, Decl(parserRealSource5.ts, 0, 0))
 
     // TODO: refactor indent logic for use in emit
     export class PrintContext {
->PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 
         public builder = "";
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
@@ -37,7 +35,7 @@ namespace TypeScript {
 
             this.indentAmt++;
 >this.indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
         }
 
@@ -46,7 +44,7 @@ namespace TypeScript {
 
             this.indentAmt--;
 >this.indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
         }
 
@@ -56,22 +54,22 @@ namespace TypeScript {
             if (this.builder.length > 0) {
 >this.builder.length : Symbol(String.length, Decl(lib.es5.d.ts, --, --))
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
 >length : Symbol(String.length, Decl(lib.es5.d.ts, --, --))
 
                 CompilerDiagnostics.Alert(this.builder);
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
             }
             var indentString = this.indentStrings[this.indentAmt];
 >indentString : Symbol(indentString, Decl(parserRealSource5.ts, 28, 15))
 >this.indentStrings : Symbol(PrintContext.indentStrings, Decl(parserRealSource5.ts, 9, 30))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentStrings : Symbol(PrintContext.indentStrings, Decl(parserRealSource5.ts, 9, 30))
 >this.indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
 
             if (indentString === undefined) {
@@ -85,28 +83,28 @@ namespace TypeScript {
 >i : Symbol(i, Decl(parserRealSource5.ts, 31, 24))
 >i : Symbol(i, Decl(parserRealSource5.ts, 31, 24))
 >this.indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
 >i : Symbol(i, Decl(parserRealSource5.ts, 31, 24))
 
                     indentString += this.indent1;
 >indentString : Symbol(indentString, Decl(parserRealSource5.ts, 28, 15))
 >this.indent1 : Symbol(PrintContext.indent1, Decl(parserRealSource5.ts, 8, 28))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indent1 : Symbol(PrintContext.indent1, Decl(parserRealSource5.ts, 8, 28))
                 }
                 this.indentStrings[this.indentAmt] = indentString;
 >this.indentStrings : Symbol(PrintContext.indentStrings, Decl(parserRealSource5.ts, 9, 30))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentStrings : Symbol(PrintContext.indentStrings, Decl(parserRealSource5.ts, 9, 30))
 >this.indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >indentAmt : Symbol(PrintContext.indentAmt, Decl(parserRealSource5.ts, 10, 44))
 >indentString : Symbol(indentString, Decl(parserRealSource5.ts, 28, 15))
             }
             this.builder += indentString;
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
 >indentString : Symbol(indentString, Decl(parserRealSource5.ts, 28, 15))
         }
@@ -117,7 +115,7 @@ namespace TypeScript {
 
             this.builder += s;
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
 >s : Symbol(s, Decl(parserRealSource5.ts, 39, 21))
         }
@@ -128,23 +126,23 @@ namespace TypeScript {
 
             this.builder += s;
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
 >s : Symbol(s, Decl(parserRealSource5.ts, 43, 25))
 
             this.outfile.WriteLine(this.builder);
 >this.outfile.WriteLine : Symbol(ITextWriter.WriteLine, Decl(lib.scripthost.d.ts, --, --))
 >this.outfile : Symbol(PrintContext.outfile, Decl(parserRealSource5.ts, 13, 21))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >outfile : Symbol(PrintContext.outfile, Decl(parserRealSource5.ts, 13, 21))
 >WriteLine : Symbol(ITextWriter.WriteLine, Decl(lib.scripthost.d.ts, --, --))
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
 
             this.builder = "";
 >this.builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
->this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>this : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >builder : Symbol(PrintContext.builder, Decl(parserRealSource5.ts, 7, 31))
         }
 
@@ -161,8 +159,8 @@ namespace TypeScript {
 
         var pc: PrintContext = <PrintContext>walker.state;
 >pc : Symbol(pc, Decl(parserRealSource5.ts, 52, 11))
->PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
->PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
+>PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >walker : Symbol(walker, Decl(parserRealSource5.ts, 51, 54))
 
         ast.print(pc);
@@ -190,8 +188,8 @@ namespace TypeScript {
 
         var pc: PrintContext = <PrintContext>walker.state;
 >pc : Symbol(pc, Decl(parserRealSource5.ts, 61, 11))
->PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
->PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 22))
+>PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
+>PrintContext : Symbol(PrintContext, Decl(parserRealSource5.ts, 5, 19))
 >walker : Symbol(walker, Decl(parserRealSource5.ts, 60, 55))
 
         pc.decreaseIndent();

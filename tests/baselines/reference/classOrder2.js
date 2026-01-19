@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/classOrder2.ts] ////
-
 //// [classOrder2.ts]
 class A extends B {
 

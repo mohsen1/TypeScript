@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/exportClassNameWithObjectAMD.ts] ////
-
 //// [exportClassNameWithObjectAMD.ts]
 export class Object {}
 

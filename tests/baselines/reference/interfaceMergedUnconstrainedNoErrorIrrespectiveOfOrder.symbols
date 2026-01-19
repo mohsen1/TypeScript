@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/interfaceMergedUnconstrainedNoErrorIrrespectiveOfOrder.ts] ////
-
-=== working.ts ===
+=== tests/cases/compiler/working.ts ===
 // minmal samples from #33395
 export namespace ns {
 >ns : Symbol(ns, Decl(working.ts, 0, 0))
@@ -26,7 +24,7 @@ export namespace ns {
 >T : Symbol(T, Decl(working.ts, 2, 23), Decl(working.ts, 5, 23))
     }
 }
-=== regression.ts ===
+=== tests/cases/compiler/regression.ts ===
 export namespace ns {
 >ns : Symbol(ns, Decl(regression.ts, 0, 0))
 

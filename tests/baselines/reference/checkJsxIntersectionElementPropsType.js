@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsx/checkJsxIntersectionElementPropsType.tsx] ////
-
 //// [checkJsxIntersectionElementPropsType.tsx]
 declare namespace JSX {
     interface ElementAttributesProperty { props: {}; }

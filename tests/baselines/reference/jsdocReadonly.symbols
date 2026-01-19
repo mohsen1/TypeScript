@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/jsdocReadonly.ts] ////
-
-=== jsdocReadonly.js ===
+=== tests/cases/conformance/jsdoc/jsdocReadonly.js ===
 class LOL {
 >LOL : Symbol(LOL, Decl(jsdocReadonly.js, 0, 0))
 

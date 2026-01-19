@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/pinnedComments1.ts] ////
-
-=== pinnedComments1.ts ===
+=== tests/cases/compiler/pinnedComments1.ts ===
 /*!=========
     Keep this pinned comment
    =========
@@ -10,5 +8,4 @@
 /*! pinned comment that need to be removed */
 class C {
 >C : C
->  : ^
 }

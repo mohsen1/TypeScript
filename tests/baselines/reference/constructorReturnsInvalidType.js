@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/constructorReturnsInvalidType.ts] ////
-
 //// [constructorReturnsInvalidType.ts]
 class X {
     constructor() {

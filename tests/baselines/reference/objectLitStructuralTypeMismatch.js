@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/objectLitStructuralTypeMismatch.ts] ////
-
 //// [objectLitStructuralTypeMismatch.ts]
 // Shouldn't compile
 var x: { a: number; } = { b: 5 };

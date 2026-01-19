@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/indexSignatures/multipleNumericIndexers.ts] ////
-
 //// [multipleNumericIndexers.ts]
 // Multiple indexers of the same type are an error
 

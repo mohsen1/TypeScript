@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/recursiveTypes/recursiveTypesUsedAsFunctionParameters.ts] ////
-
 //// [recursiveTypesUsedAsFunctionParameters.ts]
 class List<T> {
     data: T;

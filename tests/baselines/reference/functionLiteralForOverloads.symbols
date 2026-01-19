@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/specifyingTypes/typeLiterals/functionLiteralForOverloads.ts] ////
-
-=== functionLiteralForOverloads.ts ===
+=== tests/cases/conformance/types/specifyingTypes/typeLiterals/functionLiteralForOverloads.ts ===
 // basic uses of function literals with overloads
 
 var f: {

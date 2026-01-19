@@ -1,6 +1,8 @@
 //// [tests/cases/compiler/moduleResolution_packageJson_notAtPackageRoot.ts] ////
 
 //// [package.json]
+// Loads from a "fake" nested package.json, not from the one at the root.
+
 { "types": "types.d.ts" }
 
 //// [package.json]
@@ -15,4 +17,4 @@ import { x } from "foo/bar";
 
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

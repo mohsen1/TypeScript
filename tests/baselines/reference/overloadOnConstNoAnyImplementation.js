@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstNoAnyImplementation.ts] ////
-
 //// [overloadOnConstNoAnyImplementation.ts]
 function x1(a: number, cb: (x: 'hi') => number);
 function x1(a: number, cb: (x: 'bye') => number);

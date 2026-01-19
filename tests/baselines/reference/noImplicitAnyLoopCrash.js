@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noImplicitAnyLoopCrash.ts] ////
-
 //// [noImplicitAnyLoopCrash.ts]
 let foo = () => {};
 let bar;

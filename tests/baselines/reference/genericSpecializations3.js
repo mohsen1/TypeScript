@@ -1,30 +1,28 @@
-//// [tests/cases/compiler/genericSpecializations3.ts] ////
-
 //// [genericSpecializations3.ts]
 interface IFoo<T> {
     foo(x: T): T;
 }
 
-declare var iFoo: IFoo<number>;
+var iFoo: IFoo<number>;
 iFoo.foo(1);
 
 class IntFooBad implements IFoo<number> { // error
     foo(x: string): string { return null; }
 }
 
-declare var intFooBad: IntFooBad;
+var intFooBad: IntFooBad;
 
 class IntFoo implements IFoo<number> {
     foo(x: number): number { return null; }
 }
 
-declare var intFoo: IntFoo;
+var intFoo: IntFoo;
 
 class StringFoo2 implements IFoo<string> {
     foo(x: string): string { return null; }
 }
 
-declare var stringFoo2: StringFoo2;
+var stringFoo2: StringFoo2;
 stringFoo2.foo("hm");
 
 
@@ -38,6 +36,7 @@ class StringFoo3 implements IFoo<string> { // error
 var stringFoo3: StringFoo3;
 
 //// [genericSpecializations3.js]
+var iFoo;
 iFoo.foo(1);
 var IntFooBad = /** @class */ (function () {
     function IntFooBad() {
@@ -45,18 +44,21 @@ var IntFooBad = /** @class */ (function () {
     IntFooBad.prototype.foo = function (x) { return null; };
     return IntFooBad;
 }());
+var intFooBad;
 var IntFoo = /** @class */ (function () {
     function IntFoo() {
     }
     IntFoo.prototype.foo = function (x) { return null; };
     return IntFoo;
 }());
+var intFoo;
 var StringFoo2 = /** @class */ (function () {
     function StringFoo2() {
     }
     StringFoo2.prototype.foo = function (x) { return null; };
     return StringFoo2;
 }());
+var stringFoo2;
 stringFoo2.foo("hm");
 intFoo = stringFoo2; // error
 stringFoo2 = intFoo; // error

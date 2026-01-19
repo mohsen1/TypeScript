@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/implementsIncorrectlyNoAssertion.ts] ////
-
 //// [implementsIncorrectlyNoAssertion.ts]
 declare class Foo {
     x: string;

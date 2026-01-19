@@ -46,12 +46,12 @@ exports.default = 12;
 //// [index2.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.x = void 0;
-exports.default = foo;
-exports.bar = foo;
+exports.bar = exports.x = void 0;
 function foo() {
     return foo;
 }
+exports.default = foo;
+exports.bar = foo;
 exports.x = foo;
 //// [index3.js]
 "use strict";
@@ -84,11 +84,8 @@ var __extends = (this && this.__extends) || (function () {
         d.prototype = b === null ? Object.create(b) : (__.prototype = b.prototype, new __());
     };
 })();
-var __importDefault = (this && this.__importDefault) || function (mod) {
-    return (mod && mod.__esModule) ? mod : { "default": mod };
-};
 Object.defineProperty(exports, "__esModule", { value: true });
-var index3_1 = __importDefault(require("./index3"));
+var index3_1 = require("./index3");
 var Bar = /** @class */ (function (_super) {
     __extends(Bar, _super);
     function Bar() {
@@ -110,9 +107,9 @@ exports.default = 12;
 //// [index6.js]
 "use strict";
 Object.defineProperty(exports, "__esModule", { value: true });
-exports.default = func;
 // merge type alias and function (OK)
 function func() { }
+exports.default = func;
 ;
 /**
  * @typedef {string | number} default
@@ -120,7 +117,7 @@ function func() { }
 
 
 //// [index1.d.ts]
-declare const _default: 12;
+declare var _default: 12;
 export default _default;
 //// [index2.d.ts]
 export default function foo(): typeof foo;
@@ -140,7 +137,7 @@ declare class Bar extends Fab {
 import Fab from "./index3";
 //// [index5.d.ts]
 type _default = string | number;
-declare const _default: 12;
+declare var _default: 12;
 export default _default;
 //// [index6.d.ts]
 declare function func(): void;

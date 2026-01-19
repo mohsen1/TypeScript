@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/memberAccessOnConstructorType.ts] ////
-
 //// [memberAccessOnConstructorType.ts]
 var f: new () => void;
 f.arguments == 0;

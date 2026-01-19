@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/moduleAssignmentCompat3.ts] ////
-
 //// [moduleAssignmentCompat3.ts]
-namespace A {
+module A {
     export var x = 1;
 }
-namespace B {
+module B {
     export var x = "";
 }
 

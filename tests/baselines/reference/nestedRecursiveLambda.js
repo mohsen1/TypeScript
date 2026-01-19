@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedRecursiveLambda.ts] ////
-
 //// [nestedRecursiveLambda.ts]
 function f(a:any) {
 void (r =>(r => r));

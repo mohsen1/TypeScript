@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations-scopes2.ts] ////
-
 //// [letDeclarations-scopes2.ts]
 let global = 0;
 

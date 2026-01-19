@@ -1,6 +1,8 @@
 //// [tests/cases/compiler/moduleResolutionNoTsESM.ts] ////
 
 //// [x.ts]
+// ESM output
+
 export default 0;
 
 //// [y.tsx]
@@ -22,6 +24,7 @@ import z2 from "./z";
 
 
 //// [x.js]
+// ESM output
 export default 0;
 //// [y.jsx]
 export default 0;

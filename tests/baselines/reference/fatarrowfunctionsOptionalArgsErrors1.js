@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/fatarrowfunctionsOptionalArgsErrors1.ts] ////
-
 //// [fatarrowfunctionsOptionalArgsErrors1.ts]
 (arg1?, arg2) => 101;
 (...arg?) => 102;

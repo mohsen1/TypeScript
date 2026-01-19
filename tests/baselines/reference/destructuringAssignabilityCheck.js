@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/destructuring/destructuringAssignabilityCheck.ts] ////
-
 //// [destructuringAssignabilityCheck.ts]
 const [] = {}; // should be error
 const {} = undefined; // error correctly

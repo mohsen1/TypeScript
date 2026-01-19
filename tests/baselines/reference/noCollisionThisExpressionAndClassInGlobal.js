@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noCollisionThisExpressionAndClassInGlobal.ts] ////
-
 //// [noCollisionThisExpressionAndClassInGlobal.ts]
 class _this {
 }

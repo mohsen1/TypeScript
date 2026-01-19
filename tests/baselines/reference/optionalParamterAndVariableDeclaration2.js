@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/optionalParamterAndVariableDeclaration2.ts] ////
-
 //// [optionalParamterAndVariableDeclaration2.ts]
 class C {
     constructor(options?: number) {

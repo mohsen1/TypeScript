@@ -1,7 +1,7 @@
-restArgMissingName.ts(1,18): error TS1003: Identifier expected.
+tests/cases/compiler/restArgMissingName.ts(1,18): error TS1003: Identifier expected.
 
 
-==== restArgMissingName.ts (1 errors) ====
+==== tests/cases/compiler/restArgMissingName.ts (1 errors) ====
     function sum (...) {} 
                      ~
 !!! error TS1003: Identifier expected.

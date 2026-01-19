@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/noImplicitAnyLoopCrash.ts] ////
-
-=== noImplicitAnyLoopCrash.ts ===
+=== tests/cases/compiler/noImplicitAnyLoopCrash.ts ===
 let foo = () => {};
 >foo : Symbol(foo, Decl(noImplicitAnyLoopCrash.ts, 0, 3))
 

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfacesExtendingClasses/implementingAnInterfaceExtendingClassWithPrivates.ts] ////
-
 //// [implementingAnInterfaceExtendingClassWithPrivates.ts]
 class Foo {
     private x: string;

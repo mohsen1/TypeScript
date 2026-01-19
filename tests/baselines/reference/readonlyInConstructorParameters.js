@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/constructorParameters/readonlyInConstructorParameters.ts] ////
-
 //// [readonlyInConstructorParameters.ts]
 class C {
     constructor(readonly x: number) {}

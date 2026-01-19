@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/binaryOperators/logicalAndOperator/logicalAndOperatorStrictMode.ts] ////
-
 //// [logicalAndOperatorStrictMode.ts]
 const a = [0];
 const s = "";

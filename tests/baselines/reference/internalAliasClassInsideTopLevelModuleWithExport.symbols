@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/internalAliasClassInsideTopLevelModuleWithExport.ts] ////
-
-=== internalAliasClassInsideTopLevelModuleWithExport.ts ===
-export namespace x {
+=== tests/cases/compiler/internalAliasClassInsideTopLevelModuleWithExport.ts ===
+export module x {
 >x : Symbol(x, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 0))
 
     export class c {
->c : Symbol(c, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 20))
+>c : Symbol(c, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 17))
 
         foo(a: number) {
 >foo : Symbol(c.foo, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 1, 20))
@@ -20,7 +18,7 @@ export namespace x {
 export import xc = x.c;
 >xc : Symbol(xc, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 6, 1))
 >x : Symbol(x, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 0))
->c : Symbol(xc, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 20))
+>c : Symbol(xc, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 0, 17))
 
 export var cProp = new xc();
 >cProp : Symbol(cProp, Decl(internalAliasClassInsideTopLevelModuleWithExport.ts, 9, 10))

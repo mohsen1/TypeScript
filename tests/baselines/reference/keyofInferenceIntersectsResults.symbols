@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/typeRelationships/typeInference/keyofInferenceIntersectsResults.ts] ////
-
-=== keyofInferenceIntersectsResults.ts ===
+=== tests/cases/conformance/types/typeRelationships/typeInference/keyofInferenceIntersectsResults.ts ===
 interface X {
 >X : Symbol(X, Decl(keyofInferenceIntersectsResults.ts, 0, 0))
 

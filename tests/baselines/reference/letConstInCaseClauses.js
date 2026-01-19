@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letConstInCaseClauses.ts] ////
-
 //// [letConstInCaseClauses.ts]
 var x = 10;
 var y = 20;

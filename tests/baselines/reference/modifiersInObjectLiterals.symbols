@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/modifiersInObjectLiterals.ts] ////
-
-=== modifiersInObjectLiterals.ts ===
+=== tests/cases/compiler/modifiersInObjectLiterals.ts ===
 let data = {
 >data : Symbol(data, Decl(modifiersInObjectLiterals.ts, 0, 3))
 

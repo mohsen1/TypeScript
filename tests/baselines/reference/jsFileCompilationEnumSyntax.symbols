@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsFileCompilationEnumSyntax.ts] ////
-
-=== a.js ===
+=== tests/cases/compiler/a.js ===
 enum E { }
 >E : Symbol(E, Decl(a.js, 0, 0))
 

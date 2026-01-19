@@ -1,9 +1,9 @@
-index.ts(6,1): error TS2304: Cannot find name 'window'.
+tests/cases/compiler/index.ts(6,1): error TS2304: Cannot find name 'window'.
 
 
 ==== /node_modules/@typescript/lib-dom/index.d.ts (0 errors) ====
     interface ABC { abc: string }
-==== index.ts (1 errors) ====
+==== tests/cases/compiler/index.ts (1 errors) ====
     /// <reference lib="dom" />
     const a: ABC = { abc: "Hello" }
     
@@ -12,4 +12,3 @@ index.ts(6,1): error TS2304: Cannot find name 'window'.
     window.localStorage
     ~~~~~~
 !!! error TS2304: Cannot find name 'window'.
-    

@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/namespacesDeclaration2.ts] ////
-
 //// [namespacesDeclaration2.ts]
 namespace N {
     function S() {}
 }
-namespace M {
+module M {
     function F() {}
 }
 
@@ -33,7 +31,7 @@ var x;
 //// [namespacesDeclaration2.d.ts]
 declare namespace N {
 }
-declare namespace M {
+declare module M {
 }
 declare namespace ns {
     let f: number;

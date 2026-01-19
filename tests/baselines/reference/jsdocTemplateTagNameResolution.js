@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/jsdocTemplateTagNameResolution.ts] ////
-
 //// [file.js]
 /**
  * @template T
@@ -25,7 +23,7 @@ var y = "a";
 
 //// [file.d.ts]
 declare namespace x {
-    let a: number;
+    const a: number;
 }
 /** @type {Foo<typeof x, "a">} */
 declare const y: Foo<typeof x, "a">;

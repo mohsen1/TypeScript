@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/declFileModuleContinuation.ts] ////
-
 //// [declFileModuleContinuation.ts]
-namespace A.C {
+module A.C {
     export interface Z {
     }
 }
 
-namespace A.B.C {
+module A.B.C {
     export class W implements A.C.Z {
     }
 }
@@ -30,11 +28,11 @@ var A;
 
 
 //// [declFileModuleContinuation.d.ts]
-declare namespace A.C {
+declare module A.C {
     interface Z {
     }
 }
-declare namespace A.B.C {
+declare module A.B.C {
     class W implements A.C.Z {
     }
 }

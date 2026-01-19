@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/noCircularDefinitionOnExportOfPrivateInMergedNamespace.ts] ////
-
 //// [noCircularDefinitionOnExportOfPrivateInMergedNamespace.ts]
 const cat = 12;
 class Foo {}

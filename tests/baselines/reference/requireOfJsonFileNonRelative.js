@@ -21,10 +21,9 @@ if (x) {
     "b": "hello"
 }
 
-
 //// [out/file1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var b1 = require("b.json");
 var x = b1.a;
 var b2 = require("c.json");

@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/parseLinkTag.ts] ////
-
-=== parseLinkTag.ts ===
+=== tests/cases/conformance/jsdoc/parseLinkTag.ts ===
 /** trailing @link tag {@link */
 var x;
 >x : any
@@ -8,7 +6,6 @@ var x;
 /** @returns trailing @link tag {@link */
 function f() {
 >f : () => any
->  : ^^^^^^^^^
 
     return x
 >x : any

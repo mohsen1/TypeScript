@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/conditional/conditionalTypes2.ts] ////
-
 //// [conditionalTypes2.ts]
 interface Covariant<T> {
     foo: T extends string ? T : number;
@@ -345,10 +343,10 @@ declare function getFunction<T>(item: T): Extract<T, Function>;
 declare function f10<T>(x: T): void;
 declare function f11(x: string | (() => string) | undefined): void;
 declare function f12(x: string | (() => string) | undefined): void;
-type Foo = {
+declare type Foo = {
     foo: string;
 };
-type Bar = {
+declare type Bar = {
     bar: string;
 };
 declare function fooBar(x: {
@@ -359,7 +357,7 @@ declare function fooBat(x: {
     foo: string;
     bat: string;
 }): void;
-type Extract2<T, U, V> = T extends U ? T extends V ? T : never : never;
+declare type Extract2<T, U, V> = T extends U ? T extends V ? T : never : never;
 declare function f20<T>(x: Extract<Extract<T, Foo>, Bar>, y: Extract<T, Foo & Bar>, z: Extract2<T, Foo, Bar>): void;
 declare function f21<T>(x: Extract<Extract<T, Foo>, Bar>, y: Extract<T, Foo & Bar>, z: Extract2<T, Foo, Bar>): void;
 declare class Opt<T> {
@@ -383,79 +381,79 @@ interface B1<T> extends A1<T> {
 declare function toString1(value: object | Function): string;
 declare function toString2(value: Function): string;
 declare function foo<T>(value: T): void;
-type A<T, V, E> = T extends object ? {
+declare type A<T, V, E> = T extends object ? {
     [Q in {
         [P in keyof T]: T[P] extends V ? P : P;
     }[keyof T]]: A<T[Q], V, E>;
 } : T extends V ? T : never;
-type B<T, V> = T extends object ? {
+declare type B<T, V> = T extends object ? {
     [Q in {
         [P in keyof T]: T[P] extends V ? P : P;
     }[keyof T]]: B<T[Q], V>;
 } : T extends V ? T : never;
-type C<T, V, E> = {
+declare type C<T, V, E> = {
     [Q in {
         [P in keyof T]: T[P] extends V ? P : P;
     }[keyof T]]: C<T[Q], V, E>;
 };
-type A2<T, V, E> = T extends object ? T extends any[] ? T : {
+declare type A2<T, V, E> = T extends object ? T extends any[] ? T : {
     [Q in keyof T]: A2<T[Q], V, E>;
 } : T;
-type B2<T, V> = T extends object ? T extends any[] ? T : {
+declare type B2<T, V> = T extends object ? T extends any[] ? T : {
     [Q in keyof T]: B2<T[Q], V>;
 } : T;
-type C2<T, V, E> = T extends object ? {
+declare type C2<T, V, E> = T extends object ? {
     [Q in keyof T]: C2<T[Q], V, E>;
 } : T;
-type MaybeTrue<T extends {
+declare type MaybeTrue<T extends {
     b: boolean;
 }> = true extends T["b"] ? "yes" : "no";
-type T0 = MaybeTrue<{
+declare type T0 = MaybeTrue<{
     b: never;
 }>;
-type T1 = MaybeTrue<{
+declare type T1 = MaybeTrue<{
     b: false;
 }>;
-type T2 = MaybeTrue<{
+declare type T2 = MaybeTrue<{
     b: true;
 }>;
-type T3 = MaybeTrue<{
+declare type T3 = MaybeTrue<{
     b: boolean;
 }>;
-type Union = 'a' | 'b';
-type Product<A extends Union, B> = {
+declare type Union = 'a' | 'b';
+declare type Product<A extends Union, B> = {
     f1: A;
     f2: B;
 };
-type ProductUnion = Product<'a', 0> | Product<'b', 1>;
-type UnionComplement = {
+declare type ProductUnion = Product<'a', 0> | Product<'b', 1>;
+declare type UnionComplement = {
     [K in Union]: Exclude<Union, K>;
 };
-type UCA = UnionComplement['a'];
-type UCB = UnionComplement['b'];
-type UnionComplementComplement = {
+declare type UCA = UnionComplement['a'];
+declare type UCB = UnionComplement['b'];
+declare type UnionComplementComplement = {
     [K in Union]: Exclude<Union, Exclude<Union, K>>;
 };
-type UCCA = UnionComplementComplement['a'];
-type UCCB = UnionComplementComplement['b'];
-type ProductComplement = {
+declare type UCCA = UnionComplementComplement['a'];
+declare type UCCB = UnionComplementComplement['b'];
+declare type ProductComplement = {
     [K in Union]: Exclude<ProductUnion, {
         f1: K;
     }>;
 };
-type PCA = ProductComplement['a'];
-type PCB = ProductComplement['b'];
-type ProductComplementComplement = {
+declare type PCA = ProductComplement['a'];
+declare type PCB = ProductComplement['b'];
+declare type ProductComplementComplement = {
     [K in Union]: Exclude<ProductUnion, Exclude<ProductUnion, {
         f1: K;
     }>>;
 };
-type PCCA = ProductComplementComplement['a'];
-type PCCB = ProductComplementComplement['b'];
-type Hmm<T, U extends T> = U extends T ? {
+declare type PCCA = ProductComplementComplement['a'];
+declare type PCCB = ProductComplementComplement['b'];
+declare type Hmm<T, U extends T> = U extends T ? {
     [K in keyof U]: number;
 } : never;
-type What = Hmm<{}, {
+declare type What = Hmm<{}, {
     a: string;
 }>;
 declare const w: What;
@@ -464,7 +462,7 @@ declare function exportCommand<TResponse>(functionToCall: IExportCallback<TRespo
 interface IExportCallback<TResponse> {
     (response: IRootResponse<TResponse>): void;
 }
-type IRootResponse<TResponse> = TResponse extends IRecord ? IRecordResponse<TResponse> : IResponse<TResponse>;
+declare type IRootResponse<TResponse> = TResponse extends IRecord ? IRecordResponse<TResponse> : IResponse<TResponse>;
 interface IRecord {
     readonly Id: string;
 }
@@ -480,12 +478,12 @@ declare type GetPropertyNamesOfType<T, RestrictToType> = {
 declare type GetAllPropertiesOfType<T, RestrictToType> = Pick<T, GetPropertyNamesOfType<Required<T>, RestrictToType>>;
 declare function ff(x: Foo3<string>): void;
 declare function gg<T>(f: (x: Foo3<T>) => void): void;
-type Foo3<T> = T extends number ? {
+declare type Foo3<T> = T extends number ? {
     n: T;
 } : {
     x: T;
 };
-type Wat<K extends string> = {
+declare type Wat<K extends string> = {
     x: {
         y: 0;
         z: 1;
@@ -495,4 +493,4 @@ type Wat<K extends string> = {
         [P in K]: 0;
     };
 } ? true : false;
-type Huh = Wat<"y">;
+declare type Huh = Wat<"y">;

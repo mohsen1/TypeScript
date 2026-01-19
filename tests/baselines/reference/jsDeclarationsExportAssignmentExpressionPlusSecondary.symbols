@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsExportAssignmentExpressionPlusSecondary.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/jsdoc/declarations/index.js ===
 const Strings = {
 >Strings : Symbol(Strings, Decl(index.js, 0, 5))
 

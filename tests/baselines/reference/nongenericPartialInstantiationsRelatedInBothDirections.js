@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nongenericPartialInstantiationsRelatedInBothDirections.ts] ////
-
 //// [nongenericPartialInstantiationsRelatedInBothDirections.ts]
 interface Foo {
     a: number;

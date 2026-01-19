@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsxNamespaceImplicitImportJSXNamespaceFromConfigPickedOverGlobalOne.tsx] ////
-
 === /node_modules/react/index.d.ts ===
 export = React;
 >React : Symbol(React, Decl(index.d.ts, 1, 26))

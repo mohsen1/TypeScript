@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsdocParamTagOnPropertyInitializer.ts] ////
-
 === /a.js ===
 class Foo {
 >Foo : Symbol(Foo, Decl(a.js, 0, 0))

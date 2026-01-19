@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mixingStaticAndInstanceOverloads.ts] ////
-
 //// [mixingStaticAndInstanceOverloads.ts]
 class C1 {
     // ERROR

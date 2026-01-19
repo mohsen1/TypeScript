@@ -1,169 +1,3 @@
-// === QuickInfo ===
-=== /tests/cases/fourslash/quickInfoDisplayPartsClassAccessors.ts ===
-// class c {
-//     public get publicProperty() { return ""; }
-//                ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.publicProperty: string
-// | ----------------------------------------------------------------------
-//     public set publicProperty(x: string) { }
-//                ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.publicProperty: string
-// | ----------------------------------------------------------------------
-//     private get privateProperty() { return ""; }
-//                 ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.privateProperty: string
-// | ----------------------------------------------------------------------
-//     private set privateProperty(x: string) { }
-//                 ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.privateProperty: string
-// | ----------------------------------------------------------------------
-//     protected get protectedProperty() { return ""; }
-//                   ^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.protectedProperty: string
-// | ----------------------------------------------------------------------
-//     protected set protectedProperty(x: string) { }
-//                   ^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.protectedProperty: string
-// | ----------------------------------------------------------------------
-//     static get staticProperty() { return ""; }
-//                ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.staticProperty: string
-// | ----------------------------------------------------------------------
-//     static set staticProperty(x: string) { }
-//                ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.staticProperty: string
-// | ----------------------------------------------------------------------
-//     private static get  privateStaticProperty() { return ""; }
-//                         ^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.privateStaticProperty: string
-// | ----------------------------------------------------------------------
-//     private static set privateStaticProperty(x: string) { }
-//                        ^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.privateStaticProperty: string
-// | ----------------------------------------------------------------------
-//     protected static get protectedStaticProperty() { return ""; }
-//                          ^^^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (getter) c.protectedStaticProperty: string
-// | ----------------------------------------------------------------------
-//     protected static set protectedStaticProperty(x: string) { }
-//                          ^^^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (setter) c.protectedStaticProperty: string
-// | ----------------------------------------------------------------------
-//     method() {
-//         var x : string;
-//         x = this.publicProperty;
-//                  ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.publicProperty: string
-// | ----------------------------------------------------------------------
-//         x = this.privateProperty;
-//                  ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.privateProperty: string
-// | ----------------------------------------------------------------------
-//         x = this.protectedProperty;
-//                  ^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.protectedProperty: string
-// | ----------------------------------------------------------------------
-//         x = c.staticProperty;
-//               ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.staticProperty: string
-// | ----------------------------------------------------------------------
-//         x = c.privateStaticProperty;
-//               ^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.privateStaticProperty: string
-// | ----------------------------------------------------------------------
-//         x = c.protectedStaticProperty;
-//               ^^^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.protectedStaticProperty: string
-// | ----------------------------------------------------------------------
-//         this.publicProperty = "";
-//              ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.publicProperty: string
-// | ----------------------------------------------------------------------
-//         this.privateProperty = "";
-//              ^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.privateProperty: string
-// | ----------------------------------------------------------------------
-//         this.protectedProperty = "";
-//              ^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.protectedProperty: string
-// | ----------------------------------------------------------------------
-//         c.staticProperty = "";
-//           ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.staticProperty: string
-// | ----------------------------------------------------------------------
-//         c.privateStaticProperty = "";
-//           ^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.privateStaticProperty: string
-// | ----------------------------------------------------------------------
-//         c.protectedStaticProperty = "";
-//           ^^^^^^^^^^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.protectedStaticProperty: string
-// | ----------------------------------------------------------------------
-//     }
-// }
-// var cInstance = new c();
-// var y: string;
-// y = cInstance.publicProperty;
-//     ^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | var cInstance: c
-// | ----------------------------------------------------------------------
-//               ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.publicProperty: string
-// | ----------------------------------------------------------------------
-// y = c.staticProperty;
-//     ^
-// | ----------------------------------------------------------------------
-// | class c
-// | ----------------------------------------------------------------------
-//       ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.staticProperty: string
-// | ----------------------------------------------------------------------
-// cInstance.publicProperty = y;
-// ^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | var cInstance: c
-// | ----------------------------------------------------------------------
-//           ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.publicProperty: string
-// | ----------------------------------------------------------------------
-// c.staticProperty = y;
-// ^
-// | ----------------------------------------------------------------------
-// | class c
-// | ----------------------------------------------------------------------
-//   ^^^^^^^^^^^^^^
-// | ----------------------------------------------------------------------
-// | (property) c.staticProperty: string
-// | ----------------------------------------------------------------------
-
 [
   {
     "marker": {
@@ -171,8 +5,8 @@
       "position": 25,
       "name": "1"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
         "start": 25,
@@ -184,7 +18,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -229,8 +63,8 @@
       "position": 72,
       "name": "1s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
         "start": 72,
@@ -242,7 +76,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -287,8 +121,8 @@
       "position": 118,
       "name": "2"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "private",
       "textSpan": {
         "start": 118,
@@ -300,7 +134,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -345,8 +179,8 @@
       "position": 167,
       "name": "2s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "private",
       "textSpan": {
         "start": 167,
@@ -358,7 +192,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -403,8 +237,8 @@
       "position": 216,
       "name": "21"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "protected",
       "textSpan": {
         "start": 216,
@@ -416,7 +250,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -461,8 +295,8 @@
       "position": 269,
       "name": "21s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "protected",
       "textSpan": {
         "start": 269,
@@ -474,7 +308,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -519,8 +353,8 @@
       "position": 317,
       "name": "3"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "static",
       "textSpan": {
         "start": 317,
@@ -532,7 +366,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -577,8 +411,8 @@
       "position": 364,
       "name": "3s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "static",
       "textSpan": {
         "start": 364,
@@ -590,7 +424,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -635,8 +469,8 @@
       "position": 418,
       "name": "4"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "private,static",
       "textSpan": {
         "start": 418,
@@ -648,7 +482,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -693,8 +527,8 @@
       "position": 480,
       "name": "4s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "private,static",
       "textSpan": {
         "start": 480,
@@ -706,7 +540,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -751,8 +585,8 @@
       "position": 542,
       "name": "41"
     },
-    "item": {
-      "kind": "getter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "protected,static",
       "textSpan": {
         "start": 542,
@@ -764,7 +598,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "getter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -809,8 +643,8 @@
       "position": 608,
       "name": "41s"
     },
-    "item": {
-      "kind": "setter",
+    "quickInfo": {
+      "kind": "property",
       "kindModifiers": "protected,static",
       "textSpan": {
         "start": 608,
@@ -822,7 +656,7 @@
           "kind": "punctuation"
         },
         {
-          "text": "setter",
+          "text": "property",
           "kind": "text"
         },
         {
@@ -867,7 +701,7 @@
       "position": 703,
       "name": "5"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
@@ -925,7 +759,7 @@
       "position": 736,
       "name": "6"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "private",
       "textSpan": {
@@ -983,7 +817,7 @@
       "position": 770,
       "name": "61"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "protected",
       "textSpan": {
@@ -1041,7 +875,7 @@
       "position": 803,
       "name": "7"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "static",
       "textSpan": {
@@ -1099,7 +933,7 @@
       "position": 833,
       "name": "8"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "private,static",
       "textSpan": {
@@ -1157,7 +991,7 @@
       "position": 870,
       "name": "81"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "protected,static",
       "textSpan": {
@@ -1215,7 +1049,7 @@
       "position": 908,
       "name": "5s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
@@ -1273,7 +1107,7 @@
       "position": 942,
       "name": "6s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "private",
       "textSpan": {
@@ -1331,7 +1165,7 @@
       "position": 977,
       "name": "61s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "protected",
       "textSpan": {
@@ -1389,7 +1223,7 @@
       "position": 1011,
       "name": "7s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "static",
       "textSpan": {
@@ -1447,7 +1281,7 @@
       "position": 1042,
       "name": "8s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "private,static",
       "textSpan": {
@@ -1505,7 +1339,7 @@
       "position": 1080,
       "name": "81s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "protected,static",
       "textSpan": {
@@ -1563,7 +1397,7 @@
       "position": 1162,
       "name": "9"
     },
-    "item": {
+    "quickInfo": {
       "kind": "var",
       "kindModifiers": "",
       "textSpan": {
@@ -1605,7 +1439,7 @@
       "position": 1172,
       "name": "10"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
@@ -1663,7 +1497,7 @@
       "position": 1192,
       "name": "11"
     },
-    "item": {
+    "quickInfo": {
       "kind": "class",
       "kindModifiers": "",
       "textSpan": {
@@ -1693,7 +1527,7 @@
       "position": 1194,
       "name": "12"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "static",
       "textSpan": {
@@ -1751,7 +1585,7 @@
       "position": 1210,
       "name": "9s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "var",
       "kindModifiers": "",
       "textSpan": {
@@ -1793,7 +1627,7 @@
       "position": 1220,
       "name": "10s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "public",
       "textSpan": {
@@ -1851,7 +1685,7 @@
       "position": 1240,
       "name": "11s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "class",
       "kindModifiers": "",
       "textSpan": {
@@ -1881,7 +1715,7 @@
       "position": 1242,
       "name": "12s"
     },
-    "item": {
+    "quickInfo": {
       "kind": "property",
       "kindModifiers": "static",
       "textSpan": {

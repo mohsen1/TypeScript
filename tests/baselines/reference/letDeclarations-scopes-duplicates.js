@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/letDeclarations-scopes-duplicates.ts] ////
-
 //// [letDeclarations-scopes-duplicates.ts]
 // Errors: redeclaration
 let var1 = 0;

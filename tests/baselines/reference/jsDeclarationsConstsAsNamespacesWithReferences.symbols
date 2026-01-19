@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsConstsAsNamespacesWithReferences.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/jsdoc/declarations/index.js ===
 export const colors = {
 >colors : Symbol(colors, Decl(index.js, 0, 12))
 

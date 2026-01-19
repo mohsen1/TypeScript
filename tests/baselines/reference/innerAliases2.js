@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/innerAliases2.ts] ////
-
 //// [innerAliases2.ts]
-namespace _provider {
+module _provider {
                 export class UsefulClass {
                                 public foo() {
                                 }
                 }
 }
 
-namespace consumer {
+module consumer {
                 import provider = _provider;
                 
                 var g:provider.UsefulClass= null;

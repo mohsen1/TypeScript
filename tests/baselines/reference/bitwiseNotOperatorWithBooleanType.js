@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/bitwiseNotOperator/bitwiseNotOperatorWithBooleanType.ts] ////
-
 //// [bitwiseNotOperatorWithBooleanType.ts]
 // ~ operator on boolean type
 var BOOLEAN: boolean;
@@ -10,7 +8,7 @@ class A {
     public a: boolean;
     static foo() { return false; }
 }
-namespace M {
+module M {
     export var n: boolean;
 }
 

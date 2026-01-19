@@ -25,5 +25,5 @@ import * as b from './b.json';
     }
 })(function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
 });

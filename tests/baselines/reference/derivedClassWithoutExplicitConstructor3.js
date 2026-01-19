@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/constructorDeclarations/automaticConstructors/derivedClassWithoutExplicitConstructor3.ts] ////
-
 //// [derivedClassWithoutExplicitConstructor3.ts]
 // automatic constructors with a class hieararchy of depth > 2
 

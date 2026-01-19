@@ -1,14 +1,12 @@
-//// [tests/cases/compiler/instanceofOperator.ts] ////
-
 //// [instanceofOperator.ts]
 // Spec:
 // The instanceof operator requires the left operand to be of type Any or an object type, and the right 
 // operand to be of type Any or a subtype of the ‘Function’ interface type. The result is always of the 
 // Boolean primitive type.
 
-namespace test {
+module test {
     class Object { }
-    declare var obj: Object;
+    var obj: Object;
 
 
 
@@ -38,6 +36,7 @@ var test;
         }
         return Object;
     }());
+    var obj;
     4 instanceof null;
     // Error and should be error
     obj instanceof 4;

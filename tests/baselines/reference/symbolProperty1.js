@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/Symbols/symbolProperty1.ts] ////
-
 //// [symbolProperty1.ts]
 var s: symbol;
 var x = {

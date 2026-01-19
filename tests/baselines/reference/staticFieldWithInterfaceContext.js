@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/staticFieldWithInterfaceContext.ts] ////
-
 //// [staticFieldWithInterfaceContext.ts]
 interface I {
     x: { a: "a" };
@@ -29,49 +27,41 @@ let [ c11 = class { static x = { a: "a" } } ]: I[] = [class { static x = { a: "a
 
 
 //// [staticFieldWithInterfaceContext.js]
-var __setFunctionName = (this && this.__setFunctionName) || function (f, name, prefix) {
-    if (typeof name === "symbol") name = name.description ? "[".concat(name.description, "]") : "";
-    return Object.defineProperty(f, "name", { configurable: true, value: prefix ? "".concat(prefix, " ", name) : name });
-};
 var _a, _b, _c, _d, _e, _f, _g, _h, _j, _k, _l, _m, _o, _p, _q;
 var c = (_a = /** @class */ (function () {
         function class_1() {
         }
         return class_1;
     }()),
-    __setFunctionName(_a, "c"),
     // should typecheck the same as the last line
     _a.x = { a: "a" },
     _a);
 c.x = { a: "a" };
 var ex = "x";
-var c2 = (_b = /** @class */ (function () {
+var c2 = (_c = /** @class */ (function () {
         function class_2() {
         }
         return class_2;
     }()),
-    _c = ex,
-    __setFunctionName(_b, "c2"),
-    _b[_c] = { a: "a" },
-    _b);
+    _b = ex,
+    _c[_b] = { a: "a" },
+    _c);
 c[ex] = { a: "a" };
 function f(c) {
-    var _r;
-    if (c === void 0) { c = (_r = /** @class */ (function () {
+    var _a;
+    if (c === void 0) { c = (_a = /** @class */ (function () {
             function class_3() {
             }
             return class_3;
         }()),
-        __setFunctionName(_r, "c"),
-        _r.x = { a: "a" },
-        _r); }
+        _a.x = { a: "a" },
+        _a); }
 }
 var c3 = { c: (_d = /** @class */ (function () {
             function class_4() {
             }
             return class_4;
         }()),
-        __setFunctionName(_d, "c"),
         _d.x = { a: "a" },
         _d) }.c;
 var _r = {}.c, c4 = _r === void 0 ? (_e = /** @class */ (function () {
@@ -79,7 +69,6 @@ var _r = {}.c, c4 = _r === void 0 ? (_e = /** @class */ (function () {
         }
         return class_5;
     }()),
-    __setFunctionName(_e, "c4"),
     _e.x = { a: "a" },
     _e) : _r;
 var _s = { c: (_g = /** @class */ (function () {
@@ -87,14 +76,12 @@ var _s = { c: (_g = /** @class */ (function () {
             }
             return class_6;
         }()),
-        __setFunctionName(_g, "c"),
         _g.x = { a: "a" },
         _g) }.c, c5 = _s === void 0 ? (_f = /** @class */ (function () {
         function class_7() {
         }
         return class_7;
     }()),
-    __setFunctionName(_f, "c5"),
     _f.x = { a: "a" },
     _f) : _s;
 var c6 = [(_h = /** @class */ (function () {
@@ -116,7 +103,6 @@ var _t = [][0], c8 = _t === void 0 ? (_k = /** @class */ (function () {
         }
         return class_10;
     }()),
-    __setFunctionName(_k, "c8"),
     _k.x = { a: "a" },
     _k) : _t;
 var _u = [][0], c9 = _u === void 0 ? (_l = /** @class */ (function () {
@@ -124,7 +110,6 @@ var _u = [][0], c9 = _u === void 0 ? (_l = /** @class */ (function () {
         }
         return class_11;
     }()),
-    __setFunctionName(_l, "c9"),
     _l.x = { a: "a" },
     _l) : _u;
 var _v = [(_o = /** @class */ (function () {
@@ -138,7 +123,6 @@ var _v = [(_o = /** @class */ (function () {
         }
         return class_13;
     }()),
-    __setFunctionName(_m, "c10"),
     _m.x = { a: "a" },
     _m) : _v;
 var _w = [(_q = /** @class */ (function () {
@@ -152,6 +136,5 @@ var _w = [(_q = /** @class */ (function () {
         }
         return class_15;
     }()),
-    __setFunctionName(_p, "c11"),
     _p.x = { a: "a" },
     _p) : _w;

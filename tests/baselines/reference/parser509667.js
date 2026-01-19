@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/RegressionTests/parser509667.ts] ////
-
 //// [parser509667.ts]
 class Foo {
    f1() {

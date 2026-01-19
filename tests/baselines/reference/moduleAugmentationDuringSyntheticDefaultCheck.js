@@ -36,8 +36,8 @@ import moment = require("moment-timezone");
 
 //// [idx.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 //// [idx.test.js]
 "use strict";
 /// <reference path="./idx" />
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

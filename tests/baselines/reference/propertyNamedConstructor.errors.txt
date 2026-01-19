@@ -1,7 +1,7 @@
-propertyNamedConstructor.ts(2,3): error TS18006: Classes may not have a field named 'constructor'.
+tests/cases/conformance/classes/propertyMemberDeclarations/propertyNamedConstructor.ts(2,3): error TS18006: Classes may not have a field named 'constructor'.
 
 
-==== propertyNamedConstructor.ts (1 errors) ====
+==== tests/cases/conformance/classes/propertyMemberDeclarations/propertyNamedConstructor.ts (1 errors) ====
     class X1 {
       "constructor" = 3; // Error
       ~~~~~~~~~~~~~

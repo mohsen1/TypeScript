@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es6ModuleConstEnumDeclaration.ts] ////
-
 //// [es6ModuleConstEnumDeclaration.ts]
 export const enum e1 {
     a,
@@ -13,7 +11,7 @@ const enum e2 {
 }
 var x = e1.a;
 var y = e2.x;
-export namespace m1 {
+export module m1 {
     export const enum e3 {
         a,
         b,
@@ -29,7 +27,7 @@ export namespace m1 {
     var x2 = e3.a;
     var y2 = e4.x;
 }
-namespace m2 {
+module m2 {
     export const enum e5 {
         a,
         b,
@@ -48,20 +46,20 @@ namespace m2 {
 }
 
 //// [es6ModuleConstEnumDeclaration.js]
-var x = 0 /* e1.a */;
-var y = 0 /* e2.x */;
+var x = 0 /* a */;
+var y = 0 /* x */;
 export var m1;
 (function (m1) {
-    var x1 = 0 /* e1.a */;
-    var y1 = 0 /* e2.x */;
-    var x2 = 0 /* e3.a */;
-    var y2 = 0 /* e4.x */;
+    var x1 = 0 /* a */;
+    var y1 = 0 /* x */;
+    var x2 = 0 /* a */;
+    var y2 = 0 /* x */;
 })(m1 || (m1 = {}));
 var m2;
 (function (m2) {
-    var x1 = 0 /* e1.a */;
-    var y1 = 0 /* e2.x */;
-    var x2 = 0 /* e5.a */;
-    var y2 = 0 /* e6.x */;
-    var x3 = 0 /* m1.e3.a */;
+    var x1 = 0 /* a */;
+    var y1 = 0 /* x */;
+    var x2 = 0 /* a */;
+    var y2 = 0 /* x */;
+    var x3 = 0 /* a */;
 })(m2 || (m2 = {}));

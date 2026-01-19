@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/contextualTypingOfConditionalExpression2.ts] ////
-
 //// [contextualTypingOfConditionalExpression2.ts]
 class A {
     foo: number;

@@ -1,9 +1,6 @@
-//// [tests/cases/compiler/moduleWithTryStatement1.ts] ////
-
-=== moduleWithTryStatement1.ts ===
-namespace M {
+=== tests/cases/compiler/moduleWithTryStatement1.ts ===
+module M {
 >M : typeof M
->  : ^^^^^^^^
 
   try {
   }
@@ -13,7 +10,5 @@ namespace M {
 }
 var v = M;
 >v : typeof M
->  : ^^^^^^^^
 >M : typeof M
->  : ^^^^^^^^
 

@@ -1,17 +1,13 @@
-//// [tests/cases/conformance/es6/shorthandPropertyAssignment/objectLiteralShorthandPropertiesWithModuleES6.ts] ////
-
-=== objectLiteralShorthandPropertiesWithModuleES6.ts ===
-namespace m {
+=== tests/cases/conformance/es6/shorthandPropertyAssignment/objectLiteralShorthandPropertiesWithModuleES6.ts ===
+module m {
 >m : typeof m
->  : ^^^^^^^^
 
     export var x;
 >x : any
 }
 
-namespace m {
+module m {
 >m : typeof m
->  : ^^^^^^^^
 
     var z = x;
 >z : any
@@ -19,9 +15,7 @@ namespace m {
 
     var y = {
 >y : { a: any; x: any; }
->  : ^^^^^^^^^^^^^^^^^^^
 >{        a: x,        x    } : { a: any; x: any; }
->                             : ^^^^^^^^^^^^^^^^^^^
 
         a: x,
 >a : any

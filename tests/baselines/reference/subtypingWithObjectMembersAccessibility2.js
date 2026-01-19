@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/typeRelationships/subtypesAndSuperTypes/subtypingWithObjectMembersAccessibility2.ts] ////
-
 //// [subtypingWithObjectMembersAccessibility2.ts]
 // Derived member is private, base member is not causes errors
 
@@ -11,7 +9,7 @@ class Derived extends Base {
     bar: string;
 }
 
-namespace ExplicitPublic {
+module ExplicitPublic {
     class A {
         private foo: Base;
     }
@@ -37,7 +35,7 @@ namespace ExplicitPublic {
     }
 }
 
-namespace ImplicitPublic {
+module ImplicitPublic {
     class A {
         private foo: Base;
     }

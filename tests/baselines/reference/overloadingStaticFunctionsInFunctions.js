@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadingStaticFunctionsInFunctions.ts] ////
-
 //// [overloadingStaticFunctionsInFunctions.ts]
 function boo {
   static test()

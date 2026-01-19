@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureWithAccessibilityModifier.ts] ////
-
 //// [indexSignatureWithAccessibilityModifier.ts]
 interface I {
     [public x: string]: string;

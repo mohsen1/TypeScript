@@ -1,6 +1,8 @@
 //// [tests/cases/compiler/importPropertyFromMappedType.ts] ////
 
 //// [errors.d.ts]
+// #42957
+
 export = createHttpError;
 declare const createHttpError: createHttpError.NamedConstructors;
 declare namespace createHttpError {
@@ -13,4 +15,4 @@ import { NotFound } from './errors'
 
 //// [main.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;

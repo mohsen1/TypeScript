@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationClassWithDefaultConstructorAndExtendsClause.ts] ////
-
 //// [sourceMapValidationClassWithDefaultConstructorAndExtendsClause.ts]
 class AbstractGreeter {
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/limitDeepInstantiations.ts] ////
-
 //// [limitDeepInstantiations.ts]
 // Repro from #14837
 

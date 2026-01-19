@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/shebangBeforeReferences.ts] ////
-
-=== f.ts ===
+=== tests/cases/compiler/f.ts ===
 #!/usr/bin/env node
 
 /// <reference path="f.d.ts"/>
@@ -16,7 +14,7 @@ use(x);
 >use : Symbol(use, Decl(f.ts, 0, 0))
 >x : Symbol(x, Decl(f.ts, 5, 8))
 
-=== f.d.ts ===
+=== tests/cases/compiler/f.d.ts ===
 declare module "test" {
 >"test" : Symbol("test", Decl(f.d.ts, 0, 0))
 

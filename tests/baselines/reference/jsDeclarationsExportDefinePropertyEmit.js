@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/jsdoc/declarations/jsDeclarationsExportDefinePropertyEmit.ts] ////
-
 //// [index.js]
 Object.defineProperty(module.exports, "a", { value: function a() {} });
 
@@ -116,7 +114,7 @@ Object.defineProperty(module.exports, "j", { value: function j() { } });
 export function a(): void;
 export function b(): void;
 export namespace b {
-    let cat: string;
+    const cat: string;
 }
 /**
  * @param {number} a

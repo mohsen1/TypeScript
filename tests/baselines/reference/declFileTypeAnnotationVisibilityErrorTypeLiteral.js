@@ -1,10 +1,8 @@
-//// [tests/cases/compiler/declFileTypeAnnotationVisibilityErrorTypeLiteral.ts] ////
-
 //// [declFileTypeAnnotationVisibilityErrorTypeLiteral.ts]
-namespace m {
+module m {
     class private1 {
     }
-    namespace m2 {
+    module m2 {
         export class public1 {
         }
     }
@@ -66,10 +64,10 @@ var m;
 
 
 //// [declFileTypeAnnotationVisibilityErrorTypeLiteral.d.ts]
-declare namespace m {
+declare module m {
     class private1 {
     }
-    namespace m2 {
+    module m2 {
         class public1 {
         }
     }

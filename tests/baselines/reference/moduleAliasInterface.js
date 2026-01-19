@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/moduleAliasInterface.ts] ////
-
 //// [moduleAliasInterface.ts]
-namespace _modes {
+module _modes {
  export interface IMode {
   
  }
@@ -13,7 +11,7 @@ namespace _modes {
 
 // _modes. // produces an internal error - please implement in derived class
 
-namespace editor {
+module editor {
  import modes = _modes;
  
  var i : modes.IMode;
@@ -28,7 +26,7 @@ namespace editor {
 }
 
 import modesOuter = _modes;
-namespace editor2 {
+module editor2 {
  
  var i : modesOuter.IMode;
  
@@ -37,19 +35,19 @@ namespace editor2 {
   
  }
  
-  namespace Foo { export class Bar{} }
+  module Foo { export class Bar{} }
  
   class Bug2 {
       constructor(p1: Foo.Bar, p2: modesOuter.Mode) { }
   }
 }
 
-namespace A1 {
+module A1 {
     export interface A1I1 {}
     export class A1C1 {}
 }
 
-namespace B1 {
+module B1 {
     import A1Alias1 = A1;
     
     var i : A1Alias1.A1I1;   

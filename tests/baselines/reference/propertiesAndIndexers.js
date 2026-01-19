@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/propertiesAndIndexers.ts] ////
-
 //// [propertiesAndIndexers.ts]
 interface X { }
 interface Y {

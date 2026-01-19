@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/interfaces/declarationMerging/mergedInterfacesWithMultipleBases.ts] ////
-
-=== mergedInterfacesWithMultipleBases.ts ===
+=== tests/cases/conformance/interfaces/declarationMerging/mergedInterfacesWithMultipleBases.ts ===
 // merged interfaces behave as if all extends clauses from each declaration are merged together
 // no errors expected
 
@@ -62,11 +60,11 @@ var r = a.a;
 >a : Symbol(C.a, Decl(mergedInterfacesWithMultipleBases.ts, 3, 9))
 
 // generic interfaces in a module
-namespace M {
+module M {
 >M : Symbol(M, Decl(mergedInterfacesWithMultipleBases.ts, 27, 12))
 
     class C<T> {
->C : Symbol(C, Decl(mergedInterfacesWithMultipleBases.ts, 30, 13))
+>C : Symbol(C, Decl(mergedInterfacesWithMultipleBases.ts, 30, 10))
 >T : Symbol(T, Decl(mergedInterfacesWithMultipleBases.ts, 31, 12))
 
         a: T;
@@ -86,7 +84,7 @@ namespace M {
     interface A<T> extends C<T> {
 >A : Symbol(A, Decl(mergedInterfacesWithMultipleBases.ts, 37, 5), Decl(mergedInterfacesWithMultipleBases.ts, 41, 5))
 >T : Symbol(T, Decl(mergedInterfacesWithMultipleBases.ts, 39, 16), Decl(mergedInterfacesWithMultipleBases.ts, 43, 16))
->C : Symbol(C, Decl(mergedInterfacesWithMultipleBases.ts, 30, 13))
+>C : Symbol(C, Decl(mergedInterfacesWithMultipleBases.ts, 30, 10))
 >T : Symbol(T, Decl(mergedInterfacesWithMultipleBases.ts, 39, 16), Decl(mergedInterfacesWithMultipleBases.ts, 43, 16))
 
         y: T;

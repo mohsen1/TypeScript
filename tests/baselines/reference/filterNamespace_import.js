@@ -25,7 +25,7 @@ let n: ns.nested.NestedClass = { a: '' };
 
 //// [ns.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var ns;
 (function (ns) {
     var Class = /** @class */ (function () {
@@ -45,10 +45,10 @@ var ns;
         nested.NestedClass = NestedClass;
     })(nested = ns.nested || (ns.nested = {}));
 })(ns || (ns = {}));
-exports.default = ns;
+exports["default"] = ns;
 //// [a.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 ns.Class; // Error
 ns.Value; // Error
 var c;

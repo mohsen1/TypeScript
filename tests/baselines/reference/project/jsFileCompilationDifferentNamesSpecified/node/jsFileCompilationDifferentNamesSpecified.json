@@ -6,12 +6,10 @@
     "project": "DifferentNamesSpecified",
     "resolvedInputFiles": [
         "lib.es5.d.ts",
-        "lib.decorators.d.ts",
-        "lib.decorators.legacy.d.ts",
         "DifferentNamesSpecified/a.ts"
     ],
     "emittedFiles": [
-        "DifferentNamesSpecified/test.js",
-        "DifferentNamesSpecified/test.d.ts"
+        "test.js",
+        "test.d.ts"
     ]
 }

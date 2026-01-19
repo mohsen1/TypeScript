@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/ramdaToolsNoInfinite2.ts] ////
-
 //// [ramdaToolsNoInfinite2.ts]
 declare module "Any/Kind" {
     import { Extends } from "Any/Extends";

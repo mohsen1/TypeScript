@@ -1,11 +1,9 @@
-//// [tests/cases/compiler/nestedSelf.ts] ////
-
-=== nestedSelf.ts ===
-namespace M {
+=== tests/cases/compiler/nestedSelf.ts ===
+module M {
 >M : Symbol(M, Decl(nestedSelf.ts, 0, 0))
 
  export class C {
->C : Symbol(C, Decl(nestedSelf.ts, 0, 13))
+>C : Symbol(C, Decl(nestedSelf.ts, 0, 10))
 
    public n = 42;
 >n : Symbol(C.n, Decl(nestedSelf.ts, 1, 17))
@@ -16,7 +14,7 @@ namespace M {
 >map : Symbol(Array.map, Decl(lib.es5.d.ts, --, --))
 >x : Symbol(x, Decl(nestedSelf.ts, 3, 31))
 >this.n : Symbol(C.n, Decl(nestedSelf.ts, 1, 17))
->this : Symbol(C, Decl(nestedSelf.ts, 0, 13))
+>this : Symbol(C, Decl(nestedSelf.ts, 0, 10))
 >n : Symbol(C.n, Decl(nestedSelf.ts, 1, 17))
 >x : Symbol(x, Decl(nestedSelf.ts, 3, 31))
  }

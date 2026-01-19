@@ -1,12 +1,10 @@
-//// [tests/cases/compiler/generativeRecursionWithTypeOf.ts] ////
-
 //// [generativeRecursionWithTypeOf.ts]
 class C<T> {
     static foo(x: number) { }
     type: T;
 }
 
-namespace M {
+module M {
     export function f(x: typeof C) {   
         return new x<typeof x>();     
     }

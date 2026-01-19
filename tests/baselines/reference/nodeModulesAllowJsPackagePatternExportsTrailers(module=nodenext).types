@@ -1,182 +1,120 @@
-//// [tests/cases/conformance/node/allowJs/nodeModulesAllowJsPackagePatternExportsTrailers.ts] ////
-
-=== index.js ===
+=== tests/cases/conformance/node/allowJs/index.js ===
 // esm format file
 import * as cjsi from "inner/cjs/index.cjs";
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 import * as mjsi from "inner/mjs/index.mjs";
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 import * as typei from "inner/js/index.js";
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
 cjsi;
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 mjsi;
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 typei;
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
-=== index.mjs ===
+=== tests/cases/conformance/node/allowJs/index.mjs ===
 // esm format file
 import * as cjsi from "inner/cjs/index.cjs";
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 import * as mjsi from "inner/mjs/index.mjs";
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 import * as typei from "inner/js/index.js";
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
 cjsi;
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 mjsi;
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 typei;
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
-=== index.cjs ===
+=== tests/cases/conformance/node/allowJs/index.cjs ===
 // cjs format file
 import * as cjsi from "inner/cjs/index.cjs";
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 import * as mjsi from "inner/mjs/index.mjs";
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 import * as typei from "inner/js/index.js";
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
 cjsi;
 >cjsi : typeof cjsi
->     : ^^^^^^^^^^^
 
 mjsi;
->mjsi : typeof mjsi
->     : ^^^^^^^^^^^
+>mjsi : typeof cjsi.mjs
 
 typei;
->typei : typeof typei
->      : ^^^^^^^^^^^^
+>typei : typeof cjsi.mjs.type
 
-=== node_modules/inner/index.d.ts ===
-// cjs format file
-export const implicitCjsSource = true;
->implicitCjsSource : true
->                  : ^^^^
->true : true
->     : ^^^^
-
-=== node_modules/inner/test.d.ts ===
+=== tests/cases/conformance/node/allowJs/node_modules/inner/index.d.ts ===
 // cjs format file
 import * as cjs from "inner/cjs/index.cjs";
->cjs : typeof cjs
->    : ^^^^^^^^^^
+>cjs : any
 
 import * as mjs from "inner/mjs/index.mjs";
 >mjs : typeof mjs
->    : ^^^^^^^^^^
 
 import * as type from "inner/js/index.js";
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof mjs.cjs.type
 
 export { cjs };
->cjs : typeof cjs
->    : ^^^^^^^^^^
+>cjs : any
 
 export { mjs };
 >mjs : typeof mjs
->    : ^^^^^^^^^^
 
 export { type };
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof mjs.cjs.type
 
-=== node_modules/inner/index.d.mts ===
-// esm format file
-export const mjsSource = true;
->mjsSource : true
->          : ^^^^
->true : true
->     : ^^^^
-
-=== node_modules/inner/test.d.mts ===
+=== tests/cases/conformance/node/allowJs/node_modules/inner/index.d.mts ===
 // esm format file
 import * as cjs from "inner/cjs/index.cjs";
 >cjs : typeof cjs
->    : ^^^^^^^^^^
 
 import * as mjs from "inner/mjs/index.mjs";
->mjs : typeof mjs
->    : ^^^^^^^^^^
+>mjs : typeof cjs.mjs
 
 import * as type from "inner/js/index.js";
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof cjs.mjs.type
 
 export { cjs };
 >cjs : typeof cjs
->    : ^^^^^^^^^^
 
 export { mjs };
->mjs : typeof mjs
->    : ^^^^^^^^^^
+>mjs : typeof cjs.mjs
 
 export { type };
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof cjs.mjs.type
 
-=== node_modules/inner/index.d.cts ===
-// cjs format file
-export const cjsSource = true;
->cjsSource : true
->          : ^^^^
->true : true
->     : ^^^^
-
-=== node_modules/inner/test.d.cts ===
+=== tests/cases/conformance/node/allowJs/node_modules/inner/index.d.cts ===
 // cjs format file
 import * as cjs from "inner/cjs/index.cjs";
 >cjs : typeof cjs
->    : ^^^^^^^^^^
 
 import * as mjs from "inner/mjs/index.mjs";
->mjs : typeof mjs
->    : ^^^^^^^^^^
+>mjs : typeof cjs.mjs
 
 import * as type from "inner/js/index.js";
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof cjs.mjs.type
 
 export { cjs };
 >cjs : typeof cjs
->    : ^^^^^^^^^^
 
 export { mjs };
->mjs : typeof mjs
->    : ^^^^^^^^^^
+>mjs : typeof cjs.mjs
 
 export { type };
->type : typeof type
->     : ^^^^^^^^^^^
+>type : typeof cjs.mjs.type
 

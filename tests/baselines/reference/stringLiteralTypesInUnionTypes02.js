@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralTypesInUnionTypes02.ts] ////
-
 //// [stringLiteralTypesInUnionTypes02.ts]
 type T = string | "foo" | "bar" | "baz";
 
@@ -40,6 +38,6 @@ y = x;
 
 
 //// [stringLiteralTypesInUnionTypes02.d.ts]
-type T = string | "foo" | "bar" | "baz";
+declare type T = string | "foo" | "bar" | "baz";
 declare var x: "foo" | "bar" | "baz" | string;
 declare var y: T;

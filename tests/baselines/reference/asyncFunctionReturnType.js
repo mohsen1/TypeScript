@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asyncFunctionReturnType.ts] ////
-
 //// [asyncFunctionReturnType.ts]
 async function fAsync() {
     // Without explicit type annotation, this is just an array.

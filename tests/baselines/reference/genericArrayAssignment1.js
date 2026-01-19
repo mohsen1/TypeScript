@@ -1,10 +1,10 @@
-//// [tests/cases/compiler/genericArrayAssignment1.ts] ////
-
 //// [genericArrayAssignment1.ts]
-declare var s: string[];
-declare var n: number[];
+var s: string[];
+var n: number[];
 
 s = n;
 
 //// [genericArrayAssignment1.js]
+var s;
+var n;
 s = n;

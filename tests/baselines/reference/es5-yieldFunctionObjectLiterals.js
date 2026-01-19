@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-yieldFunctionObjectLiterals.ts] ////
-
 //// [es5-yieldFunctionObjectLiterals.ts]
 // mainly to verify indentation of emitted code
 

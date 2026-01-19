@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/conditionalTypeDiscriminatingLargeUnionRegularTypeFetchingSpeedReasonable.ts] ////
-
 //// [conditionalTypeDiscriminatingLargeUnionRegularTypeFetchingSpeedReasonable.ts]
 type BigUnion =
     {
@@ -8016,8 +8014,9 @@ export function makeThing<T extends BigUnion['name']>(
 
 //// [conditionalTypeDiscriminatingLargeUnionRegularTypeFetchingSpeedReasonable.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.makeThing = makeThing;
+exports.__esModule = true;
+exports.makeThing = void 0;
 function makeThing(name, children) {
     if (children === void 0) { children = []; }
 }
+exports.makeThing = makeThing;

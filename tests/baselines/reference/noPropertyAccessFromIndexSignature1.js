@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/additionalChecks/noPropertyAccessFromIndexSignature1.ts] ////
-
 //// [noPropertyAccessFromIndexSignature1.ts]
 interface A {
     foo: string

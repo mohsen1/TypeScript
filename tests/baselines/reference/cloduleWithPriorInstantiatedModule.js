@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/cloduleWithPriorInstantiatedModule.ts] ////
-
 //// [cloduleWithPriorInstantiatedModule.ts]
 // Non-ambient & instantiated module.
-namespace Moclodule {
+module Moclodule {
     export interface Someinterface {
         foo(): void;
     }
@@ -13,7 +11,7 @@ class Moclodule {
 }
 
 // Instantiated module.
-namespace Moclodule {
+module Moclodule {
     export class Manager {
     }
 }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/es5-umd3.ts] ////
-
 //// [es5-umd3.ts]
 export default class A
 {

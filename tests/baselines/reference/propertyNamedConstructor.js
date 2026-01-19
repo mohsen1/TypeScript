@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/propertyNamedConstructor.ts] ////
-
 //// [propertyNamedConstructor.ts]
 class X1 {
   "constructor" = 3; // Error

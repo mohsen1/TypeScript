@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/genericTypeReferencesRequireTypeArgs.ts] ////
-
-=== genericTypeReferencesRequireTypeArgs.ts ===
+=== tests/cases/compiler/genericTypeReferencesRequireTypeArgs.ts ===
 class C<T> {
 >C : Symbol(C, Decl(genericTypeReferencesRequireTypeArgs.ts, 0, 0))
 >T : Symbol(T, Decl(genericTypeReferencesRequireTypeArgs.ts, 0, 8))

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/arrayAssignmentTest3.ts] ////
-
 //// [arrayAssignmentTest3.ts]
 // The following gives no error
 // Michal saw no error if he used number instead of B, 

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/recursiveInheritance2.ts] ////
-
 //// [recursiveInheritance2.ts]
 interface A { (): B; };
 declare var a: A;

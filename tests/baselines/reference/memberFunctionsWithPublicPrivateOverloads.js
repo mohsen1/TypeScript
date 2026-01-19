@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/propertyMemberDeclarations/memberFunctionDeclarations/memberFunctionsWithPublicPrivateOverloads.ts] ////
-
 //// [memberFunctionsWithPublicPrivateOverloads.ts]
 class C {
     private foo(x: number);
@@ -58,10 +56,10 @@ class D<T> {
     protected static baz(x: any, y?: any) { }
 }
 
-declare var c: C;
+var c: C;
 var r = c.foo(1); // error
 
-declare var d: D<number>;
+var d: D<number>;
 var r2 = d.foo(2); // error
 
 //// [memberFunctionsWithPublicPrivateOverloads.js]
@@ -87,5 +85,7 @@ var D = /** @class */ (function () {
     D.baz = function (x, y) { };
     return D;
 }());
+var c;
 var r = c.foo(1); // error
+var d;
 var r2 = d.foo(2); // error

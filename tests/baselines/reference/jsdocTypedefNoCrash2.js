@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/jsdocTypedefNoCrash2.ts] ////
-
 //// [export.js]
 export type foo = 5;
 /**

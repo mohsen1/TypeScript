@@ -1,30 +1,28 @@
-//// [tests/cases/compiler/mixingFunctionAndAmbientModule1.ts] ////
-
 //// [mixingFunctionAndAmbientModule1.ts]
-namespace A {
-    declare namespace My {
+module A {
+    declare module My {
         export var x: number;
     }
     function My(s: string) { }
 }
 
-namespace B {
-    declare namespace My {
+module B {
+    declare module My {
         export var x: number;
     }
     function My(s: boolean);
     function My(s: any) { }
 }
 
-namespace C {
-    declare namespace My {
+module C {
+    declare module My {
         export var x: number;
     }
     declare function My(s: boolean);
 }
 
-namespace D {
-    declare namespace My {
+module D {
+    declare module My {
         export var x: number;
     }
     declare function My(s: boolean);
@@ -32,12 +30,12 @@ namespace D {
 }
 
 
-namespace E {
-    declare namespace My {
+module E {
+    declare module My {
         export var x: number;
     }
     declare function My(s: boolean);
-    declare namespace My {
+    declare module My {
         export var y: number;
     }
     declare function My(s: any);

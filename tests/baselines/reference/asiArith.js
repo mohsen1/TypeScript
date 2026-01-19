@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/asiArith.ts] ////
-
 //// [asiArith.ts]
 var x = 1;
 

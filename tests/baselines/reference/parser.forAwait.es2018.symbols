@@ -1,22 +1,18 @@
-//// [tests/cases/conformance/parser/ecmascript2018/forAwait/parser.forAwait.es2018.ts] ////
-
-=== topLevelWithDeclIsError.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/topLevelWithDeclIsError.ts ===
 for await (const x of y) {
 >x : Symbol(x, Decl(topLevelWithDeclIsError.ts, 0, 16))
 }
-=== topLevelWithExprIsError.ts ===
-
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/topLevelWithExprIsError.ts ===
 for await (x of y) {
-}
-=== forAwaitInWithDeclIsError.ts ===
+No type information for this code.}
+No type information for this code.=== tests/cases/conformance/parser/ecmascript2018/forAwait/forAwaitInWithDeclIsError.ts ===
 for await (const x in y) {
 >x : Symbol(x, Decl(forAwaitInWithDeclIsError.ts, 0, 16))
 }
-=== forAwaitInWithExprIsError.ts ===
-
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/forAwaitInWithExprIsError.ts ===
 for await (x in y) {
-}
-=== inFunctionDeclWithDeclIsError.ts ===
+No type information for this code.}
+No type information for this code.=== tests/cases/conformance/parser/ecmascript2018/forAwait/inFunctionDeclWithDeclIsError.ts ===
 function f5() {
 >f5 : Symbol(f5, Decl(inFunctionDeclWithDeclIsError.ts, 0, 0))
 
@@ -28,7 +24,7 @@ function f5() {
 >y : Symbol(y, Decl(inFunctionDeclWithDeclIsError.ts, 1, 7))
     }
 }
-=== inFunctionDeclWithExprIsError.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inFunctionDeclWithExprIsError.ts ===
 function f6() {
 >f6 : Symbol(f6, Decl(inFunctionDeclWithExprIsError.ts, 0, 0))
 
@@ -41,7 +37,7 @@ function f6() {
 >y : Symbol(y, Decl(inFunctionDeclWithExprIsError.ts, 1, 15))
     }
 }
-=== inAsyncFunctionWithDeclIsOk.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inAsyncFunctionWithDeclIsOk.ts ===
 async function f7() {
 >f7 : Symbol(f7, Decl(inAsyncFunctionWithDeclIsOk.ts, 0, 0))
 
@@ -53,7 +49,7 @@ async function f7() {
 >y : Symbol(y, Decl(inAsyncFunctionWithDeclIsOk.ts, 1, 7))
     }
 }
-=== inAsyncFunctionWithExprIsOk.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inAsyncFunctionWithExprIsOk.ts ===
 async function f8() {
 >f8 : Symbol(f8, Decl(inAsyncFunctionWithExprIsOk.ts, 0, 0))
 
@@ -66,7 +62,7 @@ async function f8() {
 >y : Symbol(y, Decl(inAsyncFunctionWithExprIsOk.ts, 1, 15))
     }
 }
-=== inAsyncGeneratorWithDeclIsOk.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inAsyncGeneratorWithDeclIsOk.ts ===
 async function* f9() {
 >f9 : Symbol(f9, Decl(inAsyncGeneratorWithDeclIsOk.ts, 0, 0))
 
@@ -78,7 +74,7 @@ async function* f9() {
 >y : Symbol(y, Decl(inAsyncGeneratorWithDeclIsOk.ts, 1, 7))
     }
 }
-=== inAsyncGeneratorWithExpressionIsOk.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inAsyncGeneratorWithExpressionIsOk.ts ===
 async function* f10() {
 >f10 : Symbol(f10, Decl(inAsyncGeneratorWithExpressionIsOk.ts, 0, 0))
 
@@ -91,7 +87,7 @@ async function* f10() {
 >y : Symbol(y, Decl(inAsyncGeneratorWithExpressionIsOk.ts, 1, 15))
     }
 }
-=== inGeneratorWithDeclIsError.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inGeneratorWithDeclIsError.ts ===
 function* f11() {
 >f11 : Symbol(f11, Decl(inGeneratorWithDeclIsError.ts, 0, 0))
 
@@ -103,7 +99,7 @@ function* f11() {
 >y : Symbol(y, Decl(inGeneratorWithDeclIsError.ts, 1, 7))
     }
 }
-=== inGeneratorWithExprIsError.ts ===
+=== tests/cases/conformance/parser/ecmascript2018/forAwait/inGeneratorWithExprIsError.ts ===
 function* f12() {
 >f12 : Symbol(f12, Decl(inGeneratorWithExprIsError.ts, 0, 0))
 

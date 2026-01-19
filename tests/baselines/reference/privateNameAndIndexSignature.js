@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNameAndIndexSignature.ts] ////
-
 //// [privateNameAndIndexSignature.ts]
 class A {
     [k: string]: any;

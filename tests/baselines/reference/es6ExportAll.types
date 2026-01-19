@@ -1,31 +1,23 @@
-//// [tests/cases/compiler/es6ExportAll.ts] ////
-
-=== server.ts ===
+=== tests/cases/compiler/server.ts ===
 export class c {
 >c : c
->  : ^
 }
 export interface i {
 }
-export namespace m {
+export module m {
 >m : typeof m
->  : ^^^^^^^^
 
     export var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 }
 export var x = 10;
 >x : number
->  : ^^^^^^
 >10 : 10
->   : ^^
 
-export namespace uninstantiated {
+export module uninstantiated {
 }
 
-=== client.ts ===
-
+=== tests/cases/compiler/client.ts ===
 export * from "server";
+No type information for this code.

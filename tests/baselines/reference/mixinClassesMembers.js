@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/mixinClassesMembers.ts] ////
-
 //// [mixinClassesMembers.ts]
 declare class C1 {
     public a: number;

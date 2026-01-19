@@ -1,9 +1,7 @@
-//// [tests/cases/compiler/module_augmentExistingAmbientVariable.ts] ////
-
 //// [module_augmentExistingAmbientVariable.ts]
 declare var console: any;
 
-namespace console {
+module console {
     export var x = 2;
 }
 

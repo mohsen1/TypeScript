@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/overloadOnConstNoStringImplementation2.ts] ////
-
 //// [overloadOnConstNoStringImplementation2.ts]
 interface I {
     x1(a: number, callback: (x: 'hi') => number);
@@ -16,7 +14,7 @@ class C implements I {
     }
 }
 
-declare var c: C;
+var c: C;
 c.x1(1, (x: 'hi') => { return 1; } );
 c.x1(1, (x: 'bye') => { return 1; } ); 
 c.x1(1, (x: string) => { return 1; } );
@@ -35,6 +33,7 @@ var C = /** @class */ (function () {
     };
     return C;
 }());
+var c;
 c.x1(1, function (x) { return 1; });
 c.x1(1, function (x) { return 1; });
 c.x1(1, function (x) { return 1; });

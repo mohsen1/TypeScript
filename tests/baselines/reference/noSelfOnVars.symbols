@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/noSelfOnVars.ts] ////
-
-=== noSelfOnVars.ts ===
+=== tests/cases/compiler/noSelfOnVars.ts ===
 function foo() {
 >foo : Symbol(foo, Decl(noSelfOnVars.ts, 0, 0))
 

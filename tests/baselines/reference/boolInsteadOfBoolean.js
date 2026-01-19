@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/boolean/boolInsteadOfBoolean.ts] ////
-
 //// [boolInsteadOfBoolean.ts]
 var x: bool;
 var a: boolean = x;

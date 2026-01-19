@@ -1,8 +1,6 @@
-//// [tests/cases/compiler/internalAliasInitializedModuleInsideTopLevelModuleWithoutExport.ts] ////
-
 //// [internalAliasInitializedModuleInsideTopLevelModuleWithoutExport.ts]
-export namespace a {
-    export namespace b {
+export module a {
+    export module b {
         export class c {
         }
     }
@@ -14,7 +12,7 @@ export var x: b.c = new b.c();
 //// [internalAliasInitializedModuleInsideTopLevelModuleWithoutExport.js]
 define(["require", "exports"], function (require, exports) {
     "use strict";
-    Object.defineProperty(exports, "__esModule", { value: true });
+    exports.__esModule = true;
     exports.x = exports.a = void 0;
     var a;
     (function (a) {
@@ -27,15 +25,15 @@ define(["require", "exports"], function (require, exports) {
             }());
             b.c = c;
         })(b = a.b || (a.b = {}));
-    })(a || (exports.a = a = {}));
+    })(a = exports.a || (exports.a = {}));
     var b = a.b;
     exports.x = new b.c();
 });
 
 
 //// [internalAliasInitializedModuleInsideTopLevelModuleWithoutExport.d.ts]
-export declare namespace a {
-    namespace b {
+export declare module a {
+    module b {
         class c {
         }
     }

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/spyComparisonChecking.ts] ////
-
 //// [spyComparisonChecking.ts]
 interface Spy {
     (...params: any[]): any;

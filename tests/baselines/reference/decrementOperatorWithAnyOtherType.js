@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/expressions/unaryOperators/decrementOperator/decrementOperatorWithAnyOtherType.ts] ////
-
 //// [decrementOperatorWithAnyOtherType.ts]
 // -- operator on any type
 
@@ -10,7 +8,7 @@ var obj = {x:1,y:null};
 class A {
     public a: any;
 }
-namespace M {
+module M {
     export var n: any;
 }
 var objA = new A();

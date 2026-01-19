@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/primitives/string/extendStringInterface.ts] ////
-
 //// [extendStringInterface.ts]
 interface String {
     doStuff(): string;

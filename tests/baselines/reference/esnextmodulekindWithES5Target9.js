@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/externalModules/esnext/esnextmodulekindWithES5Target9.ts] ////
-
 //// [esnextmodulekindWithES5Target9.ts]
 import d from "mod";
 

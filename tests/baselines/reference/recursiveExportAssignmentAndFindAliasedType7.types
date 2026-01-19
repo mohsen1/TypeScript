@@ -1,22 +1,16 @@
-//// [tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7.ts] ////
-
-=== recursiveExportAssignmentAndFindAliasedType7_moduleA.ts ===
-import moduleC = require("./recursiveExportAssignmentAndFindAliasedType7_moduleC");
+=== tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7_moduleA.ts ===
+import moduleC = require("recursiveExportAssignmentAndFindAliasedType7_moduleC");
 >moduleC : any
->        : ^^^
 
-import ClassB = require("./recursiveExportAssignmentAndFindAliasedType7_moduleB");
+import ClassB = require("recursiveExportAssignmentAndFindAliasedType7_moduleB");
 >ClassB : typeof ClassB
->       : ^^^^^^^^^^^^^
 
 export var b: ClassB; // This should result in type ClassB
 >b : ClassB
->  : ^^^^^^
 
-=== recursiveExportAssignmentAndFindAliasedType7_moduleC.ts ===
-import self = require("./recursiveExportAssignmentAndFindAliasedType7_moduleD");
+=== tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7_moduleC.ts ===
+import self = require("recursiveExportAssignmentAndFindAliasedType7_moduleD");
 >self : any
->     : ^^^
 
 var selfVar = self;
 >selfVar : any
@@ -24,32 +18,25 @@ var selfVar = self;
 
 export = selfVar;
 >selfVar : any
->        : ^^^
 
-=== recursiveExportAssignmentAndFindAliasedType7_moduleD.ts ===
-import self = require("./recursiveExportAssignmentAndFindAliasedType7_moduleE");
+=== tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7_moduleD.ts ===
+import self = require("recursiveExportAssignmentAndFindAliasedType7_moduleE");
 >self : any
->     : ^^^
 
 export = self;
 >self : any
->     : ^^^
 
-=== recursiveExportAssignmentAndFindAliasedType7_moduleE.ts ===
-import self = require("./recursiveExportAssignmentAndFindAliasedType7_moduleC");
+=== tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7_moduleE.ts ===
+import self = require("recursiveExportAssignmentAndFindAliasedType7_moduleC");
 >self : any
->     : ^^^
 
 export = self;
 >self : any
->     : ^^^
 
-=== recursiveExportAssignmentAndFindAliasedType7_moduleB.ts ===
+=== tests/cases/compiler/recursiveExportAssignmentAndFindAliasedType7_moduleB.ts ===
 class ClassB { }
 >ClassB : ClassB
->       : ^^^^^^
 
 export = ClassB;
 >ClassB : ClassB
->       : ^^^^^^
 

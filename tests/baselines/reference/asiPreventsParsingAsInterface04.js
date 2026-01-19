@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/interfaces/interfaceDeclarations/asiPreventsParsingAsInterface04.ts] ////
-
 //// [asiPreventsParsingAsInterface04.ts]
 var declare: boolean, interface: number, I: string;
 

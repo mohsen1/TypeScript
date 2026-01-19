@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/promiseTypeStrictNull.ts] ////
-
 //// [promiseTypeStrictNull.ts]
 declare var p: Promise<boolean>;
 declare var x: any;

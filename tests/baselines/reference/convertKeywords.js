@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/convertKeywords.ts] ////
-
 //// [convertKeywords.ts]
 var abstract;
 

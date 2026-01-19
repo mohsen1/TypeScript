@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/tuple/named/namedTupleMembers.ts] ////
-
 //// [namedTupleMembers.ts]
 export type Segment = [length: number, count: number];
 
@@ -82,10 +80,8 @@ export const argumentsOfG = f(...getArgsForInjection(g)); // captured arguments 
 
 //// [namedTupleMembers.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
-exports.argumentsOfG = exports.argumentsOfGAsFirstArgument = exports.val = exports.func = void 0;
-exports.useState = useState;
-exports.readSegment = readSegment;
+exports.__esModule = true;
+exports.argumentsOfG = exports.argumentsOfGAsFirstArgument = exports.val = exports.readSegment = exports.useState = exports.func = void 0;
 a = b;
 a = c;
 a = d;
@@ -102,9 +98,11 @@ exports.func = null;
 function useState(initial) {
     return null;
 }
+exports.useState = useState;
 function readSegment(_a) {
     var length = _a[0], count = _a[1];
 }
+exports.readSegment = readSegment;
 // documenting binding pattern behavior (currently does _not_ generate tuple names)
 exports.val = null;
 q = r;
@@ -116,8 +114,8 @@ exports.argumentsOfG = f.apply(void 0, getArgsForInjection(g)); // captured argu
 
 
 //// [namedTupleMembers.d.ts]
-export type Segment = [length: number, count: number];
-export type SegmentAnnotated = [
+export declare type Segment = [length: number, count: number];
+export declare type SegmentAnnotated = [
     /**
      * Size of message buffer segment handles
      */
@@ -127,16 +125,16 @@ export type SegmentAnnotated = [
      */
     count: number
 ];
-export type WithOptAndRest = [first: number, second?: number, ...rest: string[]];
-export type Func<T extends any[]> = (...x: T) => void;
+export declare type WithOptAndRest = [first: number, second?: number, ...rest: string[]];
+export declare type Func<T extends any[]> = (...x: T) => void;
 export declare const func: Func<SegmentAnnotated>;
 export declare function useState<T>(initial: T): [value: T, setter: (T: any) => void];
-export type Iter = Func<[step: number, iterations: number]>;
+export declare type Iter = Func<[step: number, iterations: number]>;
 export declare function readSegment([length, count]: [number, number]): void;
-export declare const val: Parameters<typeof readSegment>[0];
-export type RecursiveTupleA = [initial: string, next: RecursiveTupleA];
-export type RecursiveTupleB = [first: string, ptr: RecursiveTupleB];
-export type RecusiveRest = [first: string, ...rest: RecusiveRest[]];
-export type RecusiveRest2 = [string, ...RecusiveRest2[]];
+export declare const val: [number, number];
+export declare type RecursiveTupleA = [initial: string, next: RecursiveTupleA];
+export declare type RecursiveTupleB = [first: string, ptr: RecursiveTupleB];
+export declare type RecusiveRest = [first: string, ...rest: RecusiveRest[]];
+export declare type RecusiveRest2 = [string, ...RecusiveRest2[]];
 export declare const argumentsOfGAsFirstArgument: [[elem: object, index: number]];
 export declare const argumentsOfG: [elem: object, index: number];

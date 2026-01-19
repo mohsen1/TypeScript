@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es2018/invalidTaggedTemplateEscapeSequences.ts] ////
-
 //// [invalidTaggedTemplateEscapeSequences.ts]
 function tag (str: any, ...args: any[]): any {
   return str

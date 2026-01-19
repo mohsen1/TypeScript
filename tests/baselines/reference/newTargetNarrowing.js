@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/es6/newTarget/newTargetNarrowing.ts] ////
-
 //// [newTargetNarrowing.ts]
 function foo(x: true) { }
 

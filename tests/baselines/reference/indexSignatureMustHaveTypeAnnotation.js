@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/indexSignatureMustHaveTypeAnnotation.ts] ////
-
 //// [indexSignatureMustHaveTypeAnnotation.ts]
 interface I {
     // Used to be indexer, now it is a computed property

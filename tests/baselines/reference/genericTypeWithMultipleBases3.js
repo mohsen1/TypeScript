@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/genericTypeWithMultipleBases3.ts] ////
-
 //// [genericTypeWithMultipleBases3.ts]
 interface IA<T> {
 

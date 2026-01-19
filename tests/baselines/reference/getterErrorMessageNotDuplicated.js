@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/getterErrorMessageNotDuplicated.ts] ////
-
 //// [getterErrorMessageNotDuplicated.ts]
 interface Thing {
     get style(): Foo;

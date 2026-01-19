@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/scanner/ecmascript5/scannerStringLiterals.ts] ////
-
 //// [scannerStringLiterals.ts]
 ""
 " "

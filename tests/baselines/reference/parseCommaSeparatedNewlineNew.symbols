@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/parseCommaSeparatedNewlineNew.ts] ////
-
-=== parseCommaSeparatedNewlineNew.ts ===
-
+=== tests/cases/compiler/parseCommaSeparatedNewlineNew.ts ===
 (a,
-new)
+No type information for this code.new)
+No type information for this code.

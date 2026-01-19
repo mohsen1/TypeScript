@@ -1,6 +1,4 @@
-//// [tests/cases/conformance/types/spread/objectSpreadNegative.ts] ////
-
-=== objectSpreadNegative.ts ===
+=== tests/cases/conformance/types/spread/objectSpreadNegative.ts ===
 let o = { a: 1, b: 'no' }
 >o : Symbol(o, Decl(objectSpreadNegative.ts, 0, 3))
 >a : Symbol(a, Decl(objectSpreadNegative.ts, 0, 9))
@@ -16,7 +14,7 @@ class PrivateOptionalX {
 class PublicX {
 >PublicX : Symbol(PublicX, Decl(objectSpreadNegative.ts, 5, 1))
 
-    public x: number = 42;
+    public x: number;
 >x : Symbol(PublicX.x, Decl(objectSpreadNegative.ts, 6, 15))
 }
 declare let publicX: PublicX;

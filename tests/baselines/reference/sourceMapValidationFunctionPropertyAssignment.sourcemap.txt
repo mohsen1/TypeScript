@@ -5,7 +5,7 @@ sourceRoot:
 sources: sourceMapValidationFunctionPropertyAssignment.ts
 ===================================================================
 -------------------------------------------------------------------
-emittedFile:sourceMapValidationFunctionPropertyAssignment.js
+emittedFile:tests/cases/compiler/sourceMapValidationFunctionPropertyAssignment.js
 sourceFile:sourceMapValidationFunctionPropertyAssignment.ts
 -------------------------------------------------------------------
 >>>var x = { n: function () { } };

@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/missingReturnStatement1.ts] ////
-
 //// [missingReturnStatement1.ts]
 class Foo {
     foo(): number {

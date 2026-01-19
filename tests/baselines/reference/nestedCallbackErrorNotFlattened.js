@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/nestedCallbackErrorNotFlattened.ts] ////
-
 //// [nestedCallbackErrorNotFlattened.ts]
 type Cb<T> = {noAlias: () => T}["noAlias"]; // `"noAlias"` here prevents an alias symbol from being made
 // which means the comparison will definitely be structural, rather than by variance

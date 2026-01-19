@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/restParamModifier.ts] ////
-
 //// [restParamModifier.ts]
 class C {
     constructor(...public rest: string[]) {}

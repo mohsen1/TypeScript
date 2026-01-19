@@ -1,14 +1,14 @@
-clodulesDerivedClasses.ts(9,7): error TS2417: Class static side 'typeof Path' incorrectly extends base class static side 'typeof Shape'.
+tests/cases/compiler/clodulesDerivedClasses.ts(9,7): error TS2417: Class static side 'typeof Path' incorrectly extends base class static side 'typeof Shape'.
   Types of property 'Utils' are incompatible.
     Property 'convert' is missing in type 'typeof Path.Utils' but required in type 'typeof Shape.Utils'.
 
 
-==== clodulesDerivedClasses.ts (1 errors) ====
+==== tests/cases/compiler/clodulesDerivedClasses.ts (1 errors) ====
     class Shape {
         id: number;
     }
     
-    namespace Shape.Utils {
+    module Shape.Utils {
         export function convert(): Shape { return null;}
     }
     
@@ -17,12 +17,12 @@ clodulesDerivedClasses.ts(9,7): error TS2417: Class static side 'typeof Path' in
 !!! error TS2417: Class static side 'typeof Path' incorrectly extends base class static side 'typeof Shape'.
 !!! error TS2417:   Types of property 'Utils' are incompatible.
 !!! error TS2417:     Property 'convert' is missing in type 'typeof Path.Utils' but required in type 'typeof Shape.Utils'.
-!!! related TS2728 clodulesDerivedClasses.ts:6:21: 'convert' is declared here.
+!!! related TS2728 tests/cases/compiler/clodulesDerivedClasses.ts:6:21: 'convert' is declared here.
         name: string;
     
     }
     
-    namespace Path.Utils {
+    module Path.Utils {
         export function convert2(): Path {
             return null;
         }

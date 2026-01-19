@@ -1,6 +1,9 @@
 //// [tests/cases/compiler/moduleResolutionWithSymlinks.ts] ////
 
 //// [index.ts]
+// When symlinked files are in node_modules, they are resolved with realpath;
+// so a linked file does not create a duplicate SourceFile of the real one.
+
 export class MyClass { private x: number; }
 
 //// [index.ts]
@@ -38,7 +41,9 @@ tsc app.ts # Should write to library-a/index.js, library-b/index.js, and app.js
 
 //// [/src/library-a/index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+// When symlinked files are in node_modules, they are resolved with realpath;
+// so a linked file does not create a duplicate SourceFile of the real one.
+exports.__esModule = true;
 exports.MyClass = void 0;
 var MyClass = /** @class */ (function () {
     function MyClass() {
@@ -48,13 +53,13 @@ var MyClass = /** @class */ (function () {
 exports.MyClass = MyClass;
 //// [/src/library-b/index.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.MyClass2 = void 0;
 var library_a_1 = require("library-a");
-Object.defineProperty(exports, "MyClass2", { enumerable: true, get: function () { return library_a_1.MyClass; } });
+exports.MyClass2 = library_a_1.MyClass;
 //// [/src/app.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x;
 var y;
 x = y;

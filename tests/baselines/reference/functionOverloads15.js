@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/functionOverloads15.ts] ////
-
 //// [functionOverloads15.ts]
 function foo(foo:{a:string; b:number;}):string;
 function foo(foo:{a:string; b:number;}):number;

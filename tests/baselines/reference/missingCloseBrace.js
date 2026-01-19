@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/missingCloseBrace.ts] ////
-
 //// [missingCloseBrace.ts]
 function base_init() {
     {

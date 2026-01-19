@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/mapped/mappedTypeErrors2.ts] ////
-
 //// [mappedTypeErrors2.ts]
 // Repros from #17238
 
@@ -27,25 +25,25 @@ type T7<S extends 'a'|'b', L extends 'a'> = {[key in AB[S]]: true}[L];
 
 
 //// [mappedTypeErrors2.d.ts]
-type AB = {
+declare type AB = {
     a: 'a';
     b: 'a';
 };
-type T1<K extends keyof AB> = {
+declare type T1<K extends keyof AB> = {
     [key in AB[K]]: true;
 };
-type T2<K extends 'a' | 'b'> = T1<K>[K];
-type R = AB[keyof AB];
-type T3 = {
+declare type T2<K extends 'a' | 'b'> = T1<K>[K];
+declare type R = AB[keyof AB];
+declare type T3 = {
     [key in R]: true;
 };
-type T4<K extends 'a' | 'b'> = T3[K];
-type T5<S extends 'a' | 'b' | 'extra'> = {
+declare type T4<K extends 'a' | 'b'> = T3[K];
+declare type T5<S extends 'a' | 'b' | 'extra'> = {
     [key in AB[S]]: true;
 }[S];
-type T6<S extends 'a' | 'b', L extends 'a' | 'b'> = {
+declare type T6<S extends 'a' | 'b', L extends 'a' | 'b'> = {
     [key in AB[S]]: true;
 }[L];
-type T7<S extends 'a' | 'b', L extends 'a'> = {
+declare type T7<S extends 'a' | 'b', L extends 'a'> = {
     [key in AB[S]]: true;
 }[L];

@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/parser/ecmascript5/Generics/parserAmbiguityWithBinaryOperator2.ts] ////
-
 //// [parserAmbiguityWithBinaryOperator2.ts]
 function f() {
     var a, b, c;

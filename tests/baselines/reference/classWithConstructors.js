@@ -1,7 +1,5 @@
-//// [tests/cases/conformance/classes/members/constructorFunctionTypes/classWithConstructors.ts] ////
-
 //// [classWithConstructors.ts]
-namespace NonGeneric {
+module NonGeneric {
     class C {
         constructor(x: string) { }
     }
@@ -26,7 +24,7 @@ namespace NonGeneric {
     var d3 = new D(''); // ok
 }
 
-namespace Generics {
+module Generics {
     class C<T> {
         constructor(x: T) { }
     }

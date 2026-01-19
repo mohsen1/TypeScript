@@ -1,13 +1,11 @@
-//// [tests/cases/compiler/classImplementsImportedInterface.ts] ////
-
 //// [classImplementsImportedInterface.ts]
-namespace M1 {
+module M1 {
     export interface I {
         foo();
     }
 }
 
-namespace M2 {
+module M2 {
     import T = M1.I;
     class C implements T {
         foo() {}

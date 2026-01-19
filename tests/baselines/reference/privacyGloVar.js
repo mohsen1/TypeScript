@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privacyGloVar.ts] ////
-
 //// [privacyGloVar.ts]
-namespace m1 {
+module m1 {
     export class C1_public {
         private f1() {
         }

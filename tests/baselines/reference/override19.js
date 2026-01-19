@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/override/override19.ts] ////
-
 //// [override19.ts]
 type Foo = abstract new(...args: any) => any;
 declare function CreateMixin<C extends Foo, T extends Foo>(Context: C, Base: T): T & {

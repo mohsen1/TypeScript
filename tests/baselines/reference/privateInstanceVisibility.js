@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/privateInstanceVisibility.ts] ////
-
 //// [privateInstanceVisibility.ts]
-namespace Test {
+module Test {
  
     export class Example {
  

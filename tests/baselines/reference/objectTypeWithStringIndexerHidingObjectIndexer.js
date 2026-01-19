@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/members/objectTypeWithStringIndexerHidingObjectIndexer.ts] ////
-
 //// [objectTypeWithStringIndexerHidingObjectIndexer.ts]
 // object types can define string indexers that are more specific than the default 'any' that would be returned
 // no errors expected below 
@@ -11,20 +9,20 @@ var o = {};
 var r = o['']; // should be Object
 
 class C {
-    foo!: string;
+    foo: string;
     [x: string]: string;
 }
-declare var c: C;
+var c: C;
 var r2: string = c[''];
 
 interface I {
     bar: string;
     [x: string]: string;
 }
-declare var i: I;
+var i: I;
 var r3: string = i[''];
 
-declare var o2: {
+var o2: {
     baz: string;
     [x: string]: string;
 }
@@ -43,6 +41,9 @@ var C = /** @class */ (function () {
     }
     return C;
 }());
+var c;
 var r2 = c[''];
+var i;
 var r3 = i[''];
+var o2;
 var r4 = o2[''];

@@ -1,18 +1,18 @@
-plusOperatorWithBooleanType.ts(33,1): error TS2695: Left side of comma operator is unused and has no side effects.
+tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithBooleanType.ts(33,1): error TS2695: Left side of comma operator is unused and has no side effects.
 
 
-==== plusOperatorWithBooleanType.ts (1 errors) ====
+==== tests/cases/conformance/expressions/unaryOperators/plusOperator/plusOperatorWithBooleanType.ts (1 errors) ====
     // + operator on boolean type
-    declare var BOOLEAN: boolean;
+    var BOOLEAN: boolean;
     
     function foo(): boolean { return true; }
     
     class A {
-        public a!: boolean;
+        public a: boolean;
         static foo() { return false; }
     }
-    namespace M {
-        export var n: boolean = false;
+    module M {
+        export var n: boolean;
     }
     
     var objA = new A();

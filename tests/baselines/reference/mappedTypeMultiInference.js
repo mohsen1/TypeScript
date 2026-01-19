@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/mappedTypeMultiInference.ts] ////
-
 //// [mappedTypeMultiInference.ts]
 interface Style {
     flashy: any;
@@ -30,7 +28,7 @@ let x = mergeStyleSets(
 //       b: Style;
 //   }
 var x = mergeStyleSets({}, {
-    a: { flashy: true },
+    a: { flashy: true }
 }, {
-    b: { flashy: true },
+    b: { flashy: true }
 });

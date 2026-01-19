@@ -1,6 +1,4 @@
-//// [tests/cases/compiler/jsxFactoryAndJsxFragmentFactory.tsx] ////
-
-=== jsxFactoryAndJsxFragmentFactory.tsx ===
+=== tests/cases/compiler/jsxFactoryAndJsxFragmentFactory.tsx ===
 declare var h: any;
 >h : Symbol(h, Decl(jsxFactoryAndJsxFragmentFactory.tsx, 0, 11))
 

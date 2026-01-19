@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/stringLiteral/stringLiteralCheckedInIf02.ts] ////
-
 //// [stringLiteralCheckedInIf02.ts]
 type S = "a" | "b";
 type T = S[] | S;

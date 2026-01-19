@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/sourceMapValidationSwitch.ts] ////
-
 //// [sourceMapValidationSwitch.ts]
 var x = 10;
 switch (x) {

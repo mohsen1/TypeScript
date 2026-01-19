@@ -21,11 +21,6 @@ function computeCommonSourceDirectoryOfFilenames(integer) {
     return integer + 1 // pls pls pls
 }
 
-/** {@link https://hvad} */
-var see3 = true
-
-/** @typedef {number} Attempt {@link https://wat} {@linkcode I think lingcod is better} {@linkplain or lutefisk}*/
-
 
 //// [linkTagEmit1.js]
 /** @typedef {number} N */
@@ -41,9 +36,6 @@ var see3 = true
 function computeCommonSourceDirectoryOfFilenames(integer) {
     return integer + 1; // pls pls pls
 }
-/** {@link https://hvad} */
-var see3 = true;
-/** @typedef {number} Attempt {@link https://wat} {@linkcode I think lingcod is better} {@linkplain or lutefisk}*/
 
 
 //// [linkTagEmit1.d.ts]
@@ -58,12 +50,10 @@ var see3 = true;
  * @param {number} integer {@link Z}
  */
 declare function computeCommonSourceDirectoryOfFilenames(integer: number): number;
-/** {@link https://hvad} */
-declare var see3: boolean;
 type N = number;
 type D1 = {
     /**
-     * Just link to {@link NS.R} this time
+     * Just link to {@link NS.R } this time
      */
     e: 1;
     /**
@@ -72,7 +62,3 @@ type D1 = {
     m: 1;
 };
 type Z = number;
-/**
- * {@link https://wat} {@linkcode I think lingcod is better} {@linkplain or lutefisk}
- */
-type Attempt = number;

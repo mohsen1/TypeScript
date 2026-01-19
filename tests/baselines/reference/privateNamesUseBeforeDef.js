@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/classes/members/privateNames/privateNamesUseBeforeDef.ts] ////
-
 //// [privateNamesUseBeforeDef.ts]
 class A {
     #foo = this.#bar; // Error

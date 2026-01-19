@@ -1,7 +1,5 @@
-//// [tests/cases/compiler/assignToFn.ts] ////
-
 //// [assignToFn.ts]
-namespace M {
+module M {
     interface I {
 	f(n:number):boolean;
     }

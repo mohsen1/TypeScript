@@ -13,7 +13,7 @@ var x = (w1: WinJS) => { };
 
 //// [moduleInTypePosition1_0.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 exports.Promise = void 0;
 var Promise = /** @class */ (function () {
     function Promise() {
@@ -23,5 +23,5 @@ var Promise = /** @class */ (function () {
 exports.Promise = Promise;
 //// [moduleInTypePosition1_1.js]
 "use strict";
-Object.defineProperty(exports, "__esModule", { value: true });
+exports.__esModule = true;
 var x = function (w1) { };

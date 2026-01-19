@@ -1,11 +1,9 @@
-//// [tests/cases/conformance/types/nonPrimitive/nonPrimitiveNarrow.ts] ////
-
 //// [nonPrimitiveNarrow.ts]
 class Narrow {
-    narrowed!: boolean
+    narrowed: boolean
 }
 
-declare var a: object;
+var a: object
 
 if (a instanceof Narrow) {
     a.narrowed; // ok
@@ -16,7 +14,7 @@ if (typeof a === 'number') {
     a.toFixed(); // error, never
 }
 
-declare var b: object | null;
+var b: object | null
 
 if (typeof b === 'object') {
    b.toString(); // ok, object | null
@@ -31,6 +29,7 @@ var Narrow = /** @class */ (function () {
     }
     return Narrow;
 }());
+var a;
 if (a instanceof Narrow) {
     a.narrowed; // ok
     a = 123; // error
@@ -38,6 +37,7 @@ if (a instanceof Narrow) {
 if (typeof a === 'number') {
     a.toFixed(); // error, never
 }
+var b;
 if (typeof b === 'object') {
     b.toString(); // ok, object | null
 }

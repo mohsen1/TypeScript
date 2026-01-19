@@ -1,5 +1,3 @@
-//// [tests/cases/conformance/types/objectTypeLiteral/callSignatures/callSignaturesWithDuplicateParameters.ts] ////
-
 //// [callSignaturesWithDuplicateParameters.ts]
 // Duplicate parameter names are always an error
 

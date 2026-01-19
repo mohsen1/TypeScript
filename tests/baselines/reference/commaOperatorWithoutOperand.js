@@ -1,11 +1,9 @@
-//// [tests/cases/conformance/expressions/commaOperator/commaOperatorWithoutOperand.ts] ////
-
 //// [commaOperatorWithoutOperand.ts]
-declare var ANY: any;
-declare var BOOLEAN: boolean;
-declare var NUMBER: number;
-declare var STRING: string;
-declare var OBJECT: Object;
+var ANY: any;
+var BOOLEAN: boolean;
+var NUMBER: number;
+var STRING: string;
+var OBJECT: Object;
 
 // Expect to have compiler errors
 // Missing the second operand
@@ -26,6 +24,11 @@ declare var OBJECT: Object;
 ( , );
 
 //// [commaOperatorWithoutOperand.js]
+var ANY;
+var BOOLEAN;
+var NUMBER;
+var STRING;
+var OBJECT;
 // Expect to have compiler errors
 // Missing the second operand
 (ANY, );

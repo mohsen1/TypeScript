@@ -1,26 +1,24 @@
-//// [tests/cases/compiler/es6ModuleModuleDeclaration.ts] ////
-
 //// [es6ModuleModuleDeclaration.ts]
-export namespace m1 {
+export module m1 {
     export var a = 10;
     var b = 10;
-    export namespace innerExportedModule {
+    export module innerExportedModule {
         export var k = 10;
         var l = 10;
     }
-    export namespace innerNonExportedModule {
+    export module innerNonExportedModule {
         export var x = 10;
         var y = 10;
     }
 }
-namespace m2 {
+module m2 {
     export var a = 10;
     var b = 10;
-    export namespace innerExportedModule {
+    export module innerExportedModule {
         export var k = 10;
         var l = 10;
     }
-    export namespace innerNonExportedModule {
+    export module innerNonExportedModule {
         export var x = 10;
         var y = 10;
     }

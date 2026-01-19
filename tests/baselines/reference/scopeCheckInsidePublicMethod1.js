@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/scopeCheckInsidePublicMethod1.ts] ////
-
 //// [scopeCheckInsidePublicMethod1.ts]
 class C {
    static s;

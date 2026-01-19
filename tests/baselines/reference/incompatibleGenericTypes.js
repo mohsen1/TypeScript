@@ -1,5 +1,3 @@
-//// [tests/cases/compiler/incompatibleGenericTypes.ts] ////
-
 //// [incompatibleGenericTypes.ts]
 interface I1<T> {
 
