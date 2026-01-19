@@ -1,0 +1,12 @@
+[package]
+name = "ts-binder"
+version = "0.1.0"
+edition = "2021"
+description = "TypeScript binder implementation in Rust"
+
+[lib]
+path = "lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
