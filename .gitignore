@@ -63,6 +63,18 @@ tests/webTestServer.js
 tests/webTestServer.js.map
 tests/webhost/*.d.ts
 tests/webhost/webtsc.js
+# Rust/Cargo
+/target/
+Cargo.lock
+*.rlib
+*.rmeta
+**/*.rs.bk
+.cargo/registry/
+.cargo/git/
+
+# WASM build outputs
+/pkg/
+/wasm-pack.log
 wasm-demo/dist/
 wasm/pkg/
 wasm/target/

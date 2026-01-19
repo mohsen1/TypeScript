@@ -1,0 +1,18 @@
+[package]
+name = "tsrs-wasm"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+tsrs-core.workspace = true
+tsrs-parser.workspace = true
+wasm-bindgen.workspace = true
+
+[dev-dependencies]
+
+[features]
+default = []
