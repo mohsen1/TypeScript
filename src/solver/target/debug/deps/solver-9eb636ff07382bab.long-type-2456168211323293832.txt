@@ -1,0 +1,1 @@
+utility::UtilityTypes::<for<'a, 'b> fn(&'a Type, &'b Type) -> bool {utility::tests::simple_subtype}>::transform_string_literal::<&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&&{closure@utility.rs:423:43: 423:46}>
