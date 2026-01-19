@@ -76,6 +76,7 @@
         "unittests/publicApi.ts",
         "unittests/reuseProgramStructure.ts",
         "unittests/semver.ts",
+        "unittests/thinChecker.ts",
         "unittests/createMapShim.ts",
         "unittests/createSetShim.ts",
         "unittests/transform.ts",
