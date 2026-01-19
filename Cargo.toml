@@ -1,0 +1,23 @@
+[package]
+name = "ts-scanner"
+version = "0.1.0"
+edition = "2021"
+description = "Zero-copy TypeScript/JavaScript scanner in Rust"
+license = "MIT"
+repository = "https://github.com/example/ts-scanner"
+keywords = ["typescript", "javascript", "scanner", "lexer", "parser"]
+categories = ["parsing", "development-tools"]
+
+[lib]
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+
+[features]
+default = []
+
+[[test]]
+name = "scanner_tests"
+path = "tests/scanner_tests.rs"
