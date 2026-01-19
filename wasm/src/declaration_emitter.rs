@@ -23,12 +23,567 @@
 //!     add(n: number): this;
 //! }
 //! ```
+//!
+//! ## Features
+//!
+//! - **JSDoc preservation**: Preserves JSDoc comments in declaration output
+//! - **Visibility tracking**: Computes public API surface from exports
+//! - **Declaration merging**: Handles multiple declarations of the same name
 
+use crate::comments::{get_leading_comments_from_cache, is_jsdoc_comment};
 use crate::parser::syntax_kind_ext;
 use crate::parser::thin_node::{ThinNode, ThinNodeArena};
 use crate::parser::{NodeIndex, NodeList};
 use crate::scanner::SyntaxKind;
 use crate::source_writer::{SourcePosition, SourceWriter, source_position_from_offset};
+use std::collections::HashMap;
+
+// =============================================================================
+// Visibility Analysis
+// =============================================================================
+
+/// Represents the visibility of a declaration in the public API surface.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Visibility {
+    /// Exported and visible in the public API
+    Public,
+    /// Not exported, internal only
+    Private,
+    /// Re-exported from another module
+    ReExport,
+}
+
+/// Information about a declaration for visibility tracking.
+#[derive(Debug, Clone)]
+pub struct DeclarationInfo {
+    /// Name of the declaration
+    pub name: String,
+    /// Node index of the declaration
+    pub node_idx: NodeIndex,
+    /// Visibility level
+    pub visibility: Visibility,
+    /// Whether this is a type-only export
+    pub is_type_only: bool,
+    /// Declaration kind (function, class, interface, etc.)
+    pub kind: DeclarationKind,
+}
+
+/// Kind of declaration for categorization.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DeclarationKind {
+    Function,
+    Class,
+    Interface,
+    TypeAlias,
+    Enum,
+    Variable,
+    Namespace,
+    Module,
+}
+
+/// Visibility analyzer for computing public API surface.
+pub struct VisibilityAnalyzer<'a> {
+    arena: &'a ThinNodeArena,
+    /// Map from declaration name to its info
+    declarations: HashMap<String, Vec<DeclarationInfo>>,
+}
+
+impl<'a> VisibilityAnalyzer<'a> {
+    /// Create a new visibility analyzer.
+    pub fn new(arena: &'a ThinNodeArena) -> Self {
+        VisibilityAnalyzer {
+            arena,
+            declarations: HashMap::new(),
+        }
+    }
+
+    /// Analyze a source file and compute visibility for all declarations.
+    pub fn analyze(&mut self, root_idx: NodeIndex) {
+        let Some(root_node) = self.arena.get(root_idx) else {
+            return;
+        };
+        let Some(source_file) = self.arena.get_source_file(root_node) else {
+            return;
+        };
+
+        for &stmt_idx in &source_file.statements.nodes {
+            self.analyze_statement(stmt_idx);
+        }
+    }
+
+    fn analyze_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+
+        match stmt_node.kind {
+            k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                self.analyze_function_declaration(stmt_idx);
+            }
+            k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                self.analyze_class_declaration(stmt_idx);
+            }
+            k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                self.analyze_interface_declaration(stmt_idx);
+            }
+            k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                self.analyze_type_alias_declaration(stmt_idx);
+            }
+            k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                self.analyze_enum_declaration(stmt_idx);
+            }
+            k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                self.analyze_variable_statement(stmt_idx);
+            }
+            k if k == syntax_kind_ext::EXPORT_DECLARATION => {
+                self.analyze_export_declaration_with_nested(stmt_idx);
+            }
+            k if k == syntax_kind_ext::MODULE_DECLARATION => {
+                self.analyze_module_declaration(stmt_idx);
+            }
+            _ => {}
+        }
+    }
+
+    fn analyze_function_declaration(&mut self, func_idx: NodeIndex) {
+        let Some(func_node) = self.arena.get(func_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(func_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(func.name) {
+            let is_exported = self.has_export_modifier(&func.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: func_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: false,
+                kind: DeclarationKind::Function,
+            });
+        }
+    }
+
+    fn analyze_class_declaration(&mut self, class_idx: NodeIndex) {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(class_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(class.name) {
+            let is_exported = self.has_export_modifier(&class.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: class_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: false,
+                kind: DeclarationKind::Class,
+            });
+        }
+    }
+
+    fn analyze_interface_declaration(&mut self, iface_idx: NodeIndex) {
+        let Some(iface_node) = self.arena.get(iface_idx) else {
+            return;
+        };
+        let Some(iface) = self.arena.get_interface(iface_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(iface.name) {
+            let is_exported = self.has_export_modifier(&iface.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: iface_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: true,
+                kind: DeclarationKind::Interface,
+            });
+        }
+    }
+
+    fn analyze_type_alias_declaration(&mut self, alias_idx: NodeIndex) {
+        let Some(alias_node) = self.arena.get(alias_idx) else {
+            return;
+        };
+        let Some(alias) = self.arena.get_type_alias(alias_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(alias.name) {
+            let is_exported = self.has_export_modifier(&alias.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: alias_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: true,
+                kind: DeclarationKind::TypeAlias,
+            });
+        }
+    }
+
+    fn analyze_enum_declaration(&mut self, enum_idx: NodeIndex) {
+        let Some(enum_node) = self.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_data) = self.arena.get_enum(enum_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(enum_data.name) {
+            let is_exported = self.has_export_modifier(&enum_data.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: enum_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: false,
+                kind: DeclarationKind::Enum,
+            });
+        }
+    }
+
+    fn analyze_variable_statement(&mut self, stmt_idx: NodeIndex) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+        let Some(var_stmt) = self.arena.get_variable(stmt_node) else {
+            return;
+        };
+
+        let is_exported = self.has_export_modifier(&var_stmt.modifiers);
+
+        for &decl_list_idx in &var_stmt.declarations.nodes {
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+
+            if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
+                    for &decl_idx in &decl_list.declarations.nodes {
+                        if let Some(decl_node) = self.arena.get(decl_idx) {
+                            if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if let Some(name) = self.get_identifier_text(decl.name) {
+                                    self.add_declaration(DeclarationInfo {
+                                        name,
+                                        node_idx: decl_idx,
+                                        visibility: if is_exported {
+                                            Visibility::Public
+                                        } else {
+                                            Visibility::Private
+                                        },
+                                        is_type_only: false,
+                                        kind: DeclarationKind::Variable,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn analyze_export_declaration_with_nested(&mut self, export_idx: NodeIndex) {
+        let Some(export_node) = self.arena.get(export_idx) else {
+            return;
+        };
+        let Some(export) = self.arena.get_export_decl(export_node) else {
+            return;
+        };
+
+        // Check if export_clause is a nested declaration (export function, export class, etc.)
+        if !export.export_clause.is_none() {
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                match clause_node.kind {
+                    k if k == syntax_kind_ext::FUNCTION_DECLARATION => {
+                        // This is `export function foo() {}` - the export_clause IS the function
+                        self.analyze_exported_nested_function(export.export_clause);
+                        return;
+                    }
+                    k if k == syntax_kind_ext::CLASS_DECLARATION => {
+                        self.analyze_exported_nested_class(export.export_clause);
+                        return;
+                    }
+                    k if k == syntax_kind_ext::INTERFACE_DECLARATION => {
+                        self.analyze_exported_nested_interface(export.export_clause);
+                        return;
+                    }
+                    k if k == syntax_kind_ext::TYPE_ALIAS_DECLARATION => {
+                        self.analyze_exported_nested_type_alias(export.export_clause);
+                        return;
+                    }
+                    k if k == syntax_kind_ext::ENUM_DECLARATION => {
+                        self.analyze_exported_nested_enum(export.export_clause);
+                        return;
+                    }
+                    k if k == syntax_kind_ext::VARIABLE_STATEMENT => {
+                        self.analyze_exported_nested_variable(export.export_clause, export.is_type_only);
+                        return;
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        // Handle re-exports: export { Foo } from './other'
+        if !export.module_specifier.is_none() && !export.export_clause.is_none() {
+            if let Some(clause_node) = self.arena.get(export.export_clause) {
+                if clause_node.kind == syntax_kind_ext::NAMED_EXPORTS {
+                    if let Some(exports) = self.arena.get_named_imports(clause_node) {
+                        for &spec_idx in &exports.elements.nodes {
+                            if let Some(spec_node) = self.arena.get(spec_idx) {
+                                if let Some(spec) = self.arena.get_specifier(spec_node) {
+                                    if let Some(name) = self.get_identifier_text(spec.name) {
+                                        self.add_declaration(DeclarationInfo {
+                                            name,
+                                            node_idx: spec_idx,
+                                            visibility: Visibility::ReExport,
+                                            is_type_only: export.is_type_only || spec.is_type_only,
+                                            kind: DeclarationKind::Variable,
+                                        });
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn analyze_exported_nested_function(&mut self, func_idx: NodeIndex) {
+        let Some(func_node) = self.arena.get(func_idx) else {
+            return;
+        };
+        let Some(func) = self.arena.get_function(func_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(func.name) {
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: func_idx,
+                visibility: Visibility::Public,
+                is_type_only: false,
+                kind: DeclarationKind::Function,
+            });
+        }
+    }
+
+    fn analyze_exported_nested_class(&mut self, class_idx: NodeIndex) {
+        let Some(class_node) = self.arena.get(class_idx) else {
+            return;
+        };
+        let Some(class) = self.arena.get_class(class_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(class.name) {
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: class_idx,
+                visibility: Visibility::Public,
+                is_type_only: false,
+                kind: DeclarationKind::Class,
+            });
+        }
+    }
+
+    fn analyze_exported_nested_interface(&mut self, iface_idx: NodeIndex) {
+        let Some(iface_node) = self.arena.get(iface_idx) else {
+            return;
+        };
+        let Some(iface) = self.arena.get_interface(iface_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(iface.name) {
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: iface_idx,
+                visibility: Visibility::Public,
+                is_type_only: true,
+                kind: DeclarationKind::Interface,
+            });
+        }
+    }
+
+    fn analyze_exported_nested_type_alias(&mut self, alias_idx: NodeIndex) {
+        let Some(alias_node) = self.arena.get(alias_idx) else {
+            return;
+        };
+        let Some(alias) = self.arena.get_type_alias(alias_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(alias.name) {
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: alias_idx,
+                visibility: Visibility::Public,
+                is_type_only: true,
+                kind: DeclarationKind::TypeAlias,
+            });
+        }
+    }
+
+    fn analyze_exported_nested_enum(&mut self, enum_idx: NodeIndex) {
+        let Some(enum_node) = self.arena.get(enum_idx) else {
+            return;
+        };
+        let Some(enum_data) = self.arena.get_enum(enum_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(enum_data.name) {
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: enum_idx,
+                visibility: Visibility::Public,
+                is_type_only: false,
+                kind: DeclarationKind::Enum,
+            });
+        }
+    }
+
+    fn analyze_exported_nested_variable(&mut self, stmt_idx: NodeIndex, is_type_only: bool) {
+        let Some(stmt_node) = self.arena.get(stmt_idx) else {
+            return;
+        };
+        let Some(var_stmt) = self.arena.get_variable(stmt_node) else {
+            return;
+        };
+
+        for &decl_list_idx in &var_stmt.declarations.nodes {
+            let Some(decl_list_node) = self.arena.get(decl_list_idx) else {
+                continue;
+            };
+
+            if decl_list_node.kind == syntax_kind_ext::VARIABLE_DECLARATION_LIST {
+                if let Some(decl_list) = self.arena.get_variable(decl_list_node) {
+                    for &decl_idx in &decl_list.declarations.nodes {
+                        if let Some(decl_node) = self.arena.get(decl_idx) {
+                            if let Some(decl) = self.arena.get_variable_declaration(decl_node) {
+                                if let Some(name) = self.get_identifier_text(decl.name) {
+                                    self.add_declaration(DeclarationInfo {
+                                        name,
+                                        node_idx: decl_idx,
+                                        visibility: Visibility::Public,
+                                        is_type_only,
+                                        kind: DeclarationKind::Variable,
+                                    });
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fn analyze_module_declaration(&mut self, module_idx: NodeIndex) {
+        let Some(module_node) = self.arena.get(module_idx) else {
+            return;
+        };
+        let Some(module) = self.arena.get_module(module_node) else {
+            return;
+        };
+
+        if let Some(name) = self.get_identifier_text(module.name) {
+            let is_exported = self.has_export_modifier(&module.modifiers);
+            self.add_declaration(DeclarationInfo {
+                name,
+                node_idx: module_idx,
+                visibility: if is_exported {
+                    Visibility::Public
+                } else {
+                    Visibility::Private
+                },
+                is_type_only: false,
+                kind: DeclarationKind::Namespace,
+            });
+        }
+    }
+
+    fn add_declaration(&mut self, info: DeclarationInfo) {
+        self.declarations
+            .entry(info.name.clone())
+            .or_default()
+            .push(info);
+    }
+
+    fn get_identifier_text(&self, node_idx: NodeIndex) -> Option<String> {
+        let node = self.arena.get(node_idx)?;
+        let ident = self.arena.get_identifier(node)?;
+        Some(ident.escaped_text.clone())
+    }
+
+    fn has_export_modifier(&self, modifiers: &Option<NodeList>) -> bool {
+        if let Some(mods) = modifiers {
+            for &mod_idx in &mods.nodes {
+                if let Some(mod_node) = self.arena.get(mod_idx) {
+                    if mod_node.kind == SyntaxKind::ExportKeyword as u16 {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
+    /// Get all public declarations (exported).
+    pub fn get_public_declarations(&self) -> Vec<&DeclarationInfo> {
+        self.declarations
+            .values()
+            .flatten()
+            .filter(|d| d.visibility == Visibility::Public || d.visibility == Visibility::ReExport)
+            .collect()
+    }
+
+    /// Get declarations that should be merged (same name, same kind).
+    pub fn get_mergeable_declarations(&self) -> Vec<(&String, &Vec<DeclarationInfo>)> {
+        self.declarations
+            .iter()
+            .filter(|(_, infos)| infos.len() > 1)
+            .collect()
+    }
+
+    /// Check if a declaration name is exported.
+    pub fn is_exported(&self, name: &str) -> bool {
+        self.declarations.get(name).map_or(false, |infos| {
+            infos
+                .iter()
+                .any(|i| i.visibility == Visibility::Public || i.visibility == Visibility::ReExport)
+        })
+    }
+}
+
+// =============================================================================
+// Declaration Emitter
+// =============================================================================
 
 /// Declaration emitter for .d.ts files
 pub struct DeclarationEmitter<'a> {
@@ -38,6 +593,10 @@ pub struct DeclarationEmitter<'a> {
     source_map_text: Option<&'a str>,
     source_map_state: Option<SourceMapState>,
     pending_source_pos: Option<SourcePosition>,
+    /// Root node index for comment extraction
+    root_idx: Option<NodeIndex>,
+    /// Whether to preserve JSDoc comments
+    preserve_jsdoc: bool,
 }
 
 struct SourceMapState {
@@ -54,7 +613,14 @@ impl<'a> DeclarationEmitter<'a> {
             source_map_text: None,
             source_map_state: None,
             pending_source_pos: None,
+            root_idx: None,
+            preserve_jsdoc: false,
         }
+    }
+
+    /// Enable JSDoc comment preservation in output.
+    pub fn set_preserve_jsdoc(&mut self, preserve: bool) {
+        self.preserve_jsdoc = preserve;
     }
 
     pub fn set_source_map_text(&mut self, text: &'a str) {
@@ -76,6 +642,7 @@ impl<'a> DeclarationEmitter<'a> {
     pub fn emit(&mut self, root_idx: NodeIndex) -> String {
         self.reset_writer();
         self.indent_level = 0;
+        self.root_idx = Some(root_idx);
 
         let Some(root_node) = self.arena.get(root_idx) else {
             return String::new();
@@ -90,6 +657,73 @@ impl<'a> DeclarationEmitter<'a> {
         }
 
         self.writer.get_output().to_string()
+    }
+
+    /// Emit declaration with JSDoc preservation enabled.
+    pub fn emit_with_jsdoc(&mut self, root_idx: NodeIndex) -> String {
+        self.preserve_jsdoc = true;
+        self.emit(root_idx)
+    }
+
+    /// Emit JSDoc comment for a node if JSDoc preservation is enabled.
+    fn emit_jsdoc_for_node(&mut self, node_idx: NodeIndex) {
+        if !self.preserve_jsdoc {
+            return;
+        }
+
+        let Some(source_text) = self.source_map_text else {
+            return;
+        };
+
+        let Some(root_idx) = self.root_idx else {
+            return;
+        };
+
+        let Some(node) = self.arena.get(node_idx) else {
+            return;
+        };
+
+        // Get comments from the source file
+        let Some(root_node) = self.arena.get(root_idx) else {
+            return;
+        };
+        let Some(source_file) = self.arena.get_source_file(root_node) else {
+            return;
+        };
+        let comments = &source_file.comments;
+
+        // Get leading comments for this node position
+        let leading_comments = get_leading_comments_from_cache(comments, node.pos, source_text);
+
+        // Find the last JSDoc comment
+        for comment in leading_comments.iter().rev() {
+            if is_jsdoc_comment(comment, source_text) {
+                // Emit the JSDoc comment
+                let text = comment.get_text(source_text);
+                self.emit_jsdoc_text(text);
+                break;
+            }
+        }
+    }
+
+    /// Emit a JSDoc comment with proper indentation.
+    fn emit_jsdoc_text(&mut self, text: &str) {
+        let lines: Vec<&str> = text.lines().collect();
+        if lines.is_empty() {
+            return;
+        }
+
+        for (i, line) in lines.iter().enumerate() {
+            self.write_indent();
+            self.write_raw(line);
+            if i < lines.len() - 1 || text.ends_with('\n') {
+                self.write_line();
+            }
+        }
+        // Always end with a newline before the declaration
+        if !text.ends_with('\n') {
+            self.write_line();
+        }
     }
 
     fn emit_statement(&mut self, stmt_idx: NodeIndex) {
@@ -146,6 +780,9 @@ impl<'a> DeclarationEmitter<'a> {
             return;
         };
 
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(func_idx);
+
         // Check for export modifier
         let is_exported = self.has_export_modifier(&func.modifiers);
 
@@ -187,6 +824,9 @@ impl<'a> DeclarationEmitter<'a> {
         let Some(class) = self.arena.get_class(class_node) else {
             return;
         };
+
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(class_idx);
 
         let is_exported = self.has_export_modifier(&class.modifiers);
         let is_abstract = self.has_modifier(&class.modifiers, SyntaxKind::AbstractKeyword as u16);
@@ -414,6 +1054,9 @@ impl<'a> DeclarationEmitter<'a> {
             return;
         };
 
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(iface_idx);
+
         let is_exported = self.has_export_modifier(&iface.modifiers);
 
         self.write_indent();
@@ -550,6 +1193,9 @@ impl<'a> DeclarationEmitter<'a> {
             return;
         };
 
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(alias_idx);
+
         let is_exported = self.has_export_modifier(&alias.modifiers);
 
         self.write_indent();
@@ -581,6 +1227,9 @@ impl<'a> DeclarationEmitter<'a> {
         let Some(enum_data) = self.arena.get_enum(enum_node) else {
             return;
         };
+
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(enum_idx);
 
         let is_exported = self.has_export_modifier(&enum_data.modifiers);
         let is_const = self.has_modifier(&enum_data.modifiers, SyntaxKind::ConstKeyword as u16);
@@ -631,6 +1280,9 @@ impl<'a> DeclarationEmitter<'a> {
         let Some(var_stmt) = self.arena.get_variable(stmt_node) else {
             return;
         };
+
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(stmt_idx);
 
         let is_exported = self.has_export_modifier(&var_stmt.modifiers);
 
@@ -685,6 +1337,9 @@ impl<'a> DeclarationEmitter<'a> {
         let Some(export) = self.arena.get_export_decl(export_node) else {
             return;
         };
+
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(export_idx);
 
         if export.is_default_export {
             if !export.export_clause.is_none() {
@@ -1236,6 +1891,9 @@ impl<'a> DeclarationEmitter<'a> {
         let Some(module) = self.arena.get_module(module_node) else {
             return;
         };
+
+        // Emit JSDoc comment if preservation is enabled
+        self.emit_jsdoc_for_node(module_idx);
 
         let is_exported = self.has_export_modifier(&module.modifiers);
 

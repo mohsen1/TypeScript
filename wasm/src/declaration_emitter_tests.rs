@@ -460,3 +460,231 @@ export const origin: Point = { x: 0, y: 0 };"#;
         line_count
     );
 }
+
+// =============================================================================
+// JSDoc Preservation Tests
+// =============================================================================
+
+#[test]
+fn test_jsdoc_preservation_function() {
+    let source = r#"/**
+ * Adds two numbers together.
+ * @param a First number
+ * @param b Second number
+ * @returns The sum of a and b
+ */
+export function add(a: number, b: number): number { return a + b; }"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(source);
+    emitter.set_preserve_jsdoc(true);
+    let output = emitter.emit(root);
+
+    assert!(
+        output.contains("/**"),
+        "Should contain JSDoc comment: {}",
+        output
+    );
+    assert!(
+        output.contains("Adds two numbers"),
+        "Should preserve JSDoc content: {}",
+        output
+    );
+    assert!(
+        output.contains("@param a"),
+        "Should preserve @param tags: {}",
+        output
+    );
+}
+
+#[test]
+fn test_jsdoc_preservation_interface() {
+    let source = r#"/**
+ * Represents a point in 2D space.
+ */
+export interface Point {
+    x: number;
+    y: number;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(source);
+    emitter.set_preserve_jsdoc(true);
+    let output = emitter.emit(root);
+
+    assert!(
+        output.contains("/**"),
+        "Should contain JSDoc comment: {}",
+        output
+    );
+    assert!(
+        output.contains("2D space"),
+        "Should preserve JSDoc content: {}",
+        output
+    );
+}
+
+#[test]
+fn test_jsdoc_preservation_class() {
+    let source = r#"/**
+ * A simple calculator class.
+ * @example
+ * const calc = new Calculator();
+ */
+export class Calculator {
+    value: number;
+}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(source);
+    emitter.set_preserve_jsdoc(true);
+    let output = emitter.emit(root);
+
+    assert!(
+        output.contains("/**"),
+        "Should contain JSDoc comment: {}",
+        output
+    );
+    assert!(
+        output.contains("calculator class"),
+        "Should preserve JSDoc content: {}",
+        output
+    );
+}
+
+#[test]
+fn test_jsdoc_disabled_by_default() {
+    let source = r#"/**
+ * This comment should not appear.
+ */
+export function foo(): void {}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(source);
+    // Note: preserve_jsdoc is false by default
+    let output = emitter.emit(root);
+
+    assert!(
+        !output.contains("/**"),
+        "Should NOT contain JSDoc when disabled: {}",
+        output
+    );
+}
+
+#[test]
+fn test_emit_with_jsdoc_convenience() {
+    let source = r#"/**
+ * Test function.
+ */
+export function test(): void {}"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut emitter = DeclarationEmitter::new(&parser.arena);
+    emitter.set_source_map_text(source);
+    let output = emitter.emit_with_jsdoc(root);
+
+    assert!(
+        output.contains("/**"),
+        "emit_with_jsdoc should preserve JSDoc: {}",
+        output
+    );
+}
+
+// =============================================================================
+// Visibility Analyzer Tests
+// =============================================================================
+
+use crate::declaration_emitter::{DeclarationKind, Visibility, VisibilityAnalyzer};
+
+#[test]
+fn test_visibility_exported_function() {
+    let source = "export function add(a: number, b: number): number { return a + b; }";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut analyzer = VisibilityAnalyzer::new(&parser.arena);
+    analyzer.analyze(root);
+
+    assert!(
+        analyzer.is_exported("add"),
+        "add should be exported"
+    );
+}
+
+#[test]
+fn test_visibility_private_function() {
+    let source = "function privateFunc(): void {}";
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut analyzer = VisibilityAnalyzer::new(&parser.arena);
+    analyzer.analyze(root);
+
+    assert!(
+        !analyzer.is_exported("privateFunc"),
+        "privateFunc should not be exported"
+    );
+}
+
+#[test]
+fn test_visibility_multiple_declarations() {
+    let source = r#"
+export interface Foo { x: number; }
+export interface Foo { y: string; }
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut analyzer = VisibilityAnalyzer::new(&parser.arena);
+    analyzer.analyze(root);
+
+    let mergeable = analyzer.get_mergeable_declarations();
+    assert!(
+        !mergeable.is_empty(),
+        "Should find mergeable declarations for interface Foo"
+    );
+}
+
+#[test]
+fn test_visibility_public_declarations() {
+    let source = r#"
+export function foo(): void {}
+function bar(): void {}
+export class MyClass {}
+interface PrivateInterface {}
+"#;
+    let mut parser = ThinParserState::new("test.ts".to_string(), source.to_string());
+    let root = parser.parse_source_file();
+
+    let mut analyzer = VisibilityAnalyzer::new(&parser.arena);
+    analyzer.analyze(root);
+
+    let public_decls = analyzer.get_public_declarations();
+    let public_names: Vec<_> = public_decls.iter().map(|d| d.name.as_str()).collect();
+
+    assert!(
+        public_names.contains(&"foo"),
+        "foo should be in public declarations"
+    );
+    assert!(
+        public_names.contains(&"MyClass"),
+        "MyClass should be in public declarations"
+    );
+    assert!(
+        !public_names.contains(&"bar"),
+        "bar should NOT be in public declarations"
+    );
+    assert!(
+        !public_names.contains(&"PrivateInterface"),
+        "PrivateInterface should NOT be in public declarations"
+    );
+}
