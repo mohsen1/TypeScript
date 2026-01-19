@@ -1,0 +1,19 @@
+[package]
+name = "ts-parser"
+version = "0.1.0"
+edition = "2021"
+authors = ["TypeScript Team"]
+description = "A lightweight TypeScript parser in Rust"
+license = "Apache-2.0"
+
+[lib]
+name = "ts_parser"
+path = "src/lib.rs"
+
+[dependencies]
+
+[dev-dependencies]
+
+[profile.release]
+opt-level = 3
+lto = true
