@@ -7,22 +7,32 @@
 //! - Proper error recovery without budget resets
 //! - Enum and namespace type checking
 //! - JavaScript transform/emit
+//! - Intersection types and type compatibility
 
 pub mod binder;
 pub mod checker;
 pub mod parser;
+pub mod solver;
 pub mod thin_parser;
 pub mod transforms;
+pub mod types;
 
 pub use binder::{EnumBinder, EnumBindingError, EnumMemberSymbol, EnumSymbol};
 pub use checker::{
+    CompatibilityChecker, CompatibilityError, CompatibilityOptions, CompatibilityResult,
     EnumChecker, EnumDeclaration, EnumError, EnumMember, EnumMemberValue, EnumType,
     ExportVisibility, NamespaceChecker, NamespaceDeclaration, NamespaceError,
     NamespaceMember, NamespaceMemberKind, ResolvedNamespace,
+    is_subtype, is_assignable_relaxed, are_equivalent,
 };
 pub use parser::error_recovery::{ErrorRecovery, RecoveryStrategy, SyncPoint};
+pub use solver::{IntersectionSolver, intersect_types, intersect_all, is_empty_intersection};
 pub use thin_parser::{AstNode, ParseError, Scanner, ThinParser, Token, TokenKind};
 pub use transforms::{EnumTransformOptions, EnumTransformer, JsOutput};
+pub use types::{
+    Type, ObjectType, Property, FunctionType, TypeParameter, Parameter,
+    create_intersection, flatten_intersection, merge_object_types,
+};
 
 /// Parse TypeScript source code and return the AST
 ///

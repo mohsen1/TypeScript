@@ -2,9 +2,14 @@
 //!
 //! Contains type checking implementations for TypeScript constructs.
 
+pub mod compatibility;
 pub mod enums;
 pub mod namespaces;
 
+pub use compatibility::{
+    CompatibilityChecker, CompatibilityError, CompatibilityOptions, CompatibilityResult,
+    is_subtype, is_assignable_relaxed, are_equivalent, get_excess_properties, get_missing_properties,
+};
 pub use enums::{
     EnumChecker, EnumDeclaration, EnumError, EnumMember, EnumMemberValue, EnumType,
     compute_enum_values, parse_string_enum_member, validate_ambient_enum, validate_string_enum,
