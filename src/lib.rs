@@ -4,6 +4,7 @@
 pub mod tokens;
 pub mod scanner;
 pub mod scanner_impl;
+pub mod builtins;
 
 pub use tokens::{keyword_from_str, Span, Token, TokenKind};
 pub use scanner::{LanguageVariant, Scanner, ScriptTarget, TokenFlags};
@@ -22,6 +23,21 @@ pub use scanner_impl::{
     Precedence,
     ScanResult,
     TokenIterator,
+};
+pub use builtins::{
+    Type,
+    TypeParameter,
+    ParameterDeclaration,
+    PropertySignature,
+    MethodSignature,
+    InterfaceDeclaration,
+    TypeAliasDeclaration,
+    VariableDeclaration,
+    FunctionDeclaration,
+    LibDeclarations,
+    LibLoader,
+    LibLoaderConfig,
+    LibFile,
 };
 
 #[cfg(test)]
