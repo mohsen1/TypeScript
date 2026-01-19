@@ -6826,17 +6826,26 @@ impl ThinParserState {
                     self.scanner.restore_state(snapshot);
                     self.current_token = current_token;
 
-                    let has_following_expression = !matches!(
+                    // Outside async context, 'await' can be used as an identifier.
+                    // We should only emit TS1109 if 'await' is followed by a token that
+                    // would REQUIRE an expression to follow (like in 'await;' where
+                    // someone might have forgotten to add the awaited expression).
+                    //
+                    // However, tokens like CloseBracketToken, CommaToken, ColonToken mean
+                    // 'await' is being used as a complete expression (identifier reference),
+                    // which is valid - the type checker will emit TS2304 if it's undefined.
+                    //
+                    // Only EqualsGreaterThanToken is special: 'await =>' looks like a malformed
+                    // arrow function parameter, so we emit TS1109 there.
+                    // SemicolonToken is ambiguous - could be 'await;' (statement) which is
+                    // valid for 'await' as identifier, or could be missing operand for await.
+                    // To avoid false positives, don't emit error for semicolon either.
+                    let needs_expression_expected_error = matches!(
                         next_token,
-                        SyntaxKind::SemicolonToken
-                            | SyntaxKind::CloseBracketToken
-                            | SyntaxKind::CommaToken
-                            | SyntaxKind::ColonToken
-                            | SyntaxKind::EqualsGreaterThanToken
-                            | SyntaxKind::EndOfFileToken
+                        SyntaxKind::EqualsGreaterThanToken
                     );
 
-                    if !has_following_expression {
+                    if needs_expression_expected_error {
                         use crate::checker::types::diagnostics::diagnostic_codes;
                         self.error_expression_expected();
                     }
