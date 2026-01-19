@@ -77,6 +77,7 @@
         "unittests/reuseProgramStructure.ts",
         "unittests/semver.ts",
         "unittests/thinChecker.ts",
+        "unittests/declarationEmitter.ts",
         "unittests/createMapShim.ts",
         "unittests/createSetShim.ts",
         "unittests/transform.ts",
