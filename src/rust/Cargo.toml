@@ -2,11 +2,15 @@
 name = "ts-binder"
 version = "0.1.0"
 edition = "2021"
-description = "TypeScript binder implementation in Rust"
+description = "TypeScript binder and config implementation in Rust"
 
 [dependencies]
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+glob = "0.3"
 
 [dev-dependencies]
+tempfile = "3"
 
 [lib]
 path = "lib.rs"
