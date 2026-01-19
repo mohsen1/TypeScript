@@ -79,6 +79,7 @@
         "unittests/thinChecker.ts",
         "unittests/declarationEmitter.ts",
         "unittests/diagnosticsSystem.ts",
+        "unittests/templateLiteralTypes.ts",
         "unittests/createMapShim.ts",
         "unittests/createSetShim.ts",
         "unittests/transform.ts",
