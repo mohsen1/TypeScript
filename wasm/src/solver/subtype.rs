@@ -721,8 +721,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if let Some(expanded) = self.try_expand_application(*app_id) {
                     self.check_subtype(expanded, target)
                 } else {
-                    // Can't expand - assume not a subtype
-                    SubtypeResult::False
+                    // Fallback: use the evaluator to try expanding the application type.
+                    // This handles cases where the resolver doesn't have type params but
+                    // the evaluator can extract them from the type itself.
+                    let expanded = self.evaluate_type(source);
+                    if expanded != source {
+                        self.check_subtype(expanded, target)
+                    } else {
+                        // Can't expand - assume not a subtype
+                        SubtypeResult::False
+                    }
                 }
             }
 
@@ -731,8 +739,16 @@ impl<'a, R: TypeResolver> SubtypeChecker<'a, R> {
                 if let Some(expanded) = self.try_expand_application(*app_id) {
                     self.check_subtype(source, expanded)
                 } else {
-                    // Can't expand - assume not a subtype
-                    SubtypeResult::False
+                    // Fallback: use the evaluator to try expanding the application type.
+                    // This handles cases where the resolver doesn't have type params but
+                    // the evaluator can extract them from the type itself.
+                    let expanded = self.evaluate_type(target);
+                    if expanded != target {
+                        self.check_subtype(source, expanded)
+                    } else {
+                        // Can't expand - assume not a subtype
+                        SubtypeResult::False
+                    }
                 }
             }
 

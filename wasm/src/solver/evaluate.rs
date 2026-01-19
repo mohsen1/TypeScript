@@ -181,40 +181,14 @@ impl<'a, R: TypeResolver> TypeEvaluator<'a, R> {
     /// Evaluate a type, resolving any meta-types if possible.
     /// Returns the evaluated type (may be the same if no evaluation needed).
     ///
-    /// # TODO: Application Type Expansion (Worker 2 - Redux test fix)
-    ///
-    /// **Problem**: `Application(Ref(sym), args)` types (like `Reducer<S, A>`) are not
-    /// being expanded to their instantiated form. This causes diagnostics to show
-    /// `Ref(5)<error>` instead of the actual type.
-    ///
-    /// **Current Behavior**: Application types pass through unchanged at line ~202.
-    /// This means when comparing a function type against `Reducer<S, A>`, the
-    /// Application type is not expanded to its underlying function type.
-    ///
-    /// **Observed Diagnostics in redux test**:
-    /// - `Type '(state: undefined | Ref(5)<error>, action: Ref(6)<error>) => any'
-    ///    is not assignable to type 'Ref(1)<Ref(5)<error>, Ref(6)<error>>'`
-    /// - `Ref(5)`, `Ref(6)`, `Ref(7)` etc. should be expanded to actual types
-    ///
-    /// **Fix Approach**: Add a case for `TypeKey::Application(app_id)`:
-    /// 1. Get the base type from the Application
-    /// 2. If base is a `Ref(sym)`, resolve it using `self.resolver.resolve_ref(sym, ...)`
-    /// 3. Get the type parameters from the resolved type (type alias or interface)
-    /// 4. Create a substitution map: type_params[i] -> args[i]
-    /// 5. Instantiate the resolved type body with the substitution
-    /// 6. Return the instantiated type
-    ///
-    /// **Example**:
-    /// ```text
-    /// // Given: type Reducer<S, A> = (state: S | undefined, action: A) => S
-    /// // And: Application(Ref(Reducer), [number, AnyAction])
-    /// // Should expand to: (state: number | undefined, action: AnyAction) => number
-    /// ```
-    ///
-    /// **Related Files**:
-    /// - `instantiate.rs` - Has substitution logic for type parameters
-    /// - `thin_checker.rs:2900-2918` - Type alias resolution with type params
-    /// - `lower.rs:856-868` - `lower_type_alias_declaration` with params
+    /// This handles:
+    /// - Conditional types (T extends U ? X : Y)
+    /// - Index access types (T[K])
+    /// - Mapped types ({ [K in keyof T]: ... })
+    /// - KeyOf types (keyof T)
+    /// - Type queries (typeof x)
+    /// - Application types (Generic<Args>) - expanded via `evaluate_application`
+    /// - Ref types (resolved to their structural form)
     pub fn evaluate(&self, type_id: TypeId) -> TypeId {
         // Fast path for intrinsics
         if type_id.is_intrinsic() {
@@ -4774,6 +4748,46 @@ pub fn evaluate_mapped(interner: &dyn TypeDatabase, mapped: &MappedType) -> Type
 pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     let evaluator = TypeEvaluator::new(interner);
     evaluator.evaluate_keyof(operand)
+}
+
+/// Expand an Application type to its structural form.
+///
+/// This function handles generic type applications like `Array<T>`, `Promise<T>`,
+/// and user-defined generic types by:
+/// 1. Resolving the base type reference
+/// 2. Getting type parameters from the base or extracting from the body
+/// 3. Instantiating the body with the provided type arguments
+/// 4. Recursively expanding nested applications
+///
+/// Returns the expanded type, or the original type if expansion is not possible.
+///
+/// This is a convenience wrapper around TypeEvaluator that can be used when
+/// a resolver is available for symbol resolution.
+pub fn expand_application_type<R: super::subtype::TypeResolver>(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    resolver: &R,
+) -> TypeId {
+    let evaluator = TypeEvaluator::with_resolver(interner, resolver);
+    evaluator.evaluate(type_id)
+}
+
+/// Try to expand an Application type, returning None if expansion fails.
+///
+/// This is useful when you need to know whether the expansion succeeded,
+/// rather than getting back the original type unchanged.
+pub fn try_expand_application_type<R: super::subtype::TypeResolver>(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    resolver: &R,
+) -> Option<TypeId> {
+    let evaluator = TypeEvaluator::with_resolver(interner, resolver);
+    let expanded = evaluator.evaluate(type_id);
+    if expanded != type_id {
+        Some(expanded)
+    } else {
+        None
+    }
 }
 
 // Re-enabled evaluate tests - verifying API compatibility
