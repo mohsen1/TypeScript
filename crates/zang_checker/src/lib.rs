@@ -15,6 +15,7 @@
 //! - `types`: Type representations
 
 pub mod assignability;
+pub mod async_checker;
 pub mod binder;
 pub mod checker;
 pub mod context;
@@ -24,10 +25,12 @@ pub mod imports;
 pub mod inference;
 pub mod modules;
 pub mod narrowing;
+pub mod promise;
 pub mod transforms;
 pub mod types;
 
 pub use assignability::{AssignabilityChecker, AssignabilityResult, RelationshipCache};
+pub use async_checker::AsyncChecker;
 pub use binder::Binder;
 pub use checker::{TypeChecker, CheckResult};
 pub use context::CheckContext;
@@ -37,5 +40,6 @@ pub use imports::{ImportChecker, ImportBinding, ImportResolution, ModuleResoluti
 pub use inference::{InferenceContext, TypeInferrer};
 pub use modules::{ModuleBinder, ModuleScope, ModuleSymbol};
 pub use narrowing::{NarrowingContext, TypeNarrower};
-pub use transforms::{ModuleTransformer, ModuleFormat, TransformOptions};
+pub use promise::PromiseChecker;
+pub use transforms::{ModuleTransformer, ModuleFormat, TransformOptions, AsyncTransformer, AsyncTransformOptions};
 pub use types::ResolvedType;
