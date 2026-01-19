@@ -721,6 +721,8 @@ pub struct TypeParameterNode {
     pub name: Identifier,
     pub constraint: Option<Box<TypeNode>>,
     pub default: Option<Box<TypeNode>>,
+    /// Whether this type parameter has the `const` modifier
+    pub is_const: bool,
 }
 
 /// Type node

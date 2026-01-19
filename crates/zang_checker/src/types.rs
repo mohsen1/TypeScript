@@ -152,6 +152,8 @@ pub struct TypeParameterType {
     pub constraint: Option<Box<ResolvedType>>,
     /// Default type
     pub default: Option<Box<ResolvedType>>,
+    /// Whether this type parameter has the `const` modifier
+    pub is_const: bool,
 }
 
 /// Type reference
