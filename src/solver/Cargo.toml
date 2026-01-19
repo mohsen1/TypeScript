@@ -1,0 +1,14 @@
+[package]
+name = "typescript-solver"
+version = "0.1.0"
+edition = "2021"
+description = "Type solver for TypeScript type checking - includes generics, conditional types, mapped types, and utility types"
+license = "Apache-2.0"
+
+[lib]
+name = "solver"
+path = "mod.rs"
+
+[dependencies]
+
+[dev-dependencies]
