@@ -6,6 +6,7 @@
 //! - Assertion functions (asserts x is T)
 //! - Type predicates and discriminated union narrowing
 //! - Control flow analysis for type narrowing
+//! - Const assertions and literal widening
 //!
 //! # Type Guards
 //!
@@ -54,13 +55,44 @@
 //!     // shape is narrowed to { kind: "circle"; radius: number }
 //! }
 //! ```
+//!
+//! # Const Assertions
+//!
+//! Const assertions preserve literal types and make values readonly:
+//!
+//! ```ignore
+//! // Without as const - type is string[]
+//! const arr = ["a", "b", "c"];
+//!
+//! // With as const - type is readonly ["a", "b", "c"]
+//! const arr = ["a", "b", "c"] as const;
+//!
+//! // Objects become readonly with literal property types
+//! const obj = { x: 10 } as const; // { readonly x: 10 }
+//! ```
+//!
+//! # Literal Widening
+//!
+//! Fresh literal types widen to their base types in certain contexts:
+//!
+//! ```ignore
+//! const x = "hello"; // type is "hello" (literal)
+//! let y = "hello";   // type is string (widened)
+//!
+//! // Literals don't widen in const contexts
+//! const obj = { x: 10 } as const; // x stays as 10, not number
+//! ```
 
 pub mod assertions;
+pub mod const_assertions;
 pub mod predicates;
 pub mod type_defs;
 pub mod type_guards;
+pub mod widening;
 
 pub use assertions::*;
+pub use const_assertions::*;
 pub use predicates::*;
 pub use type_defs::*;
 pub use type_guards::*;
+pub use widening::*;

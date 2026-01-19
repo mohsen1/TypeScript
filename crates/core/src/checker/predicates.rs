@@ -8,6 +8,7 @@
 use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 
+#[allow(unused_imports)]
 use super::type_defs::{Type, ObjectType, PropertySignature, CallSignature, ParameterSignature};
 use super::type_guards::{TypeGuardEvaluator, TypeGuardResult};
 
