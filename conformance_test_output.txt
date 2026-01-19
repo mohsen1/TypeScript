@@ -1,5 +1,0 @@
-npm error Missing script: "test:conformance"
-npm error
-npm error To see a list of scripts, run:
-npm error   npm run
-npm error A complete log of this run can be found in: /Users/mohsenazimi/.npm/_logs/2026-01-14T17_25_01_942Z-debug-0.log
