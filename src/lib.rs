@@ -8,6 +8,7 @@
 //! - Enum and namespace type checking
 //! - JavaScript transform/emit
 //! - Intersection types and type compatibility
+//! - Union type discrimination and exhaustiveness checking
 
 pub mod binder;
 pub mod checker;
@@ -21,12 +22,17 @@ pub use binder::{EnumBinder, EnumBindingError, EnumMemberSymbol, EnumSymbol};
 pub use checker::{
     CompatibilityChecker, CompatibilityError, CompatibilityOptions, CompatibilityResult,
     EnumChecker, EnumDeclaration, EnumError, EnumMember, EnumMemberValue, EnumType,
+    ExhaustivenessChecker, ExhaustivenessResult, ExhaustivenessWarning, SwitchCase,
     ExportVisibility, NamespaceChecker, NamespaceDeclaration, NamespaceError,
     NamespaceMember, NamespaceMemberKind, ResolvedNamespace,
-    is_subtype, is_assignable_relaxed, are_equivalent,
+    UnionChecker, DiscriminantProperty, DiscriminatedUnionInfo, NarrowingResult,
+    is_subtype, is_assignable_relaxed, are_equivalent, assert_never_check,
 };
 pub use parser::error_recovery::{ErrorRecovery, RecoveryStrategy, SyncPoint};
-pub use solver::{IntersectionSolver, intersect_types, intersect_all, is_empty_intersection};
+pub use solver::{
+    IntersectionSolver, intersect_types, intersect_all, is_empty_intersection,
+    UnionSolver, UnionSolverOptions, union_types, union_all, normalize_union,
+};
 pub use thin_parser::{AstNode, ParseError, Scanner, ThinParser, Token, TokenKind};
 pub use transforms::{EnumTransformOptions, EnumTransformer, JsOutput};
 pub use types::{
