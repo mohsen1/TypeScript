@@ -4638,6 +4638,46 @@ pub fn evaluate_keyof(interner: &dyn TypeDatabase, operand: TypeId) -> TypeId {
     evaluator.evaluate_keyof(operand)
 }
 
+/// Expand an Application type to its structural form.
+///
+/// This function handles generic type applications like `Array<T>`, `Promise<T>`,
+/// and user-defined generic types by:
+/// 1. Resolving the base type reference
+/// 2. Getting type parameters from the base or extracting from the body
+/// 3. Instantiating the body with the provided type arguments
+/// 4. Recursively expanding nested applications
+///
+/// Returns the expanded type, or the original type if expansion is not possible.
+///
+/// This is a convenience wrapper around TypeEvaluator that can be used when
+/// a resolver is available for symbol resolution.
+pub fn expand_application_type<R: super::subtype::TypeResolver>(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    resolver: &R,
+) -> TypeId {
+    let evaluator = TypeEvaluator::with_resolver(interner, resolver);
+    evaluator.evaluate(type_id)
+}
+
+/// Try to expand an Application type, returning None if expansion fails.
+///
+/// This is useful when you need to know whether the expansion succeeded,
+/// rather than getting back the original type unchanged.
+pub fn try_expand_application_type<R: super::subtype::TypeResolver>(
+    interner: &dyn TypeDatabase,
+    type_id: TypeId,
+    resolver: &R,
+) -> Option<TypeId> {
+    let evaluator = TypeEvaluator::with_resolver(interner, resolver);
+    let expanded = evaluator.evaluate(type_id);
+    if expanded != type_id {
+        Some(expanded)
+    } else {
+        None
+    }
+}
+
 // Re-enabled evaluate tests - verifying API compatibility
 #[cfg(test)]
 #[path = "evaluate_tests.rs"]

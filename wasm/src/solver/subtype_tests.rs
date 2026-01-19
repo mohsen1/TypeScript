@@ -26988,3 +26988,217 @@ fn test_intrinsic_to_literal_fails() {
         other => panic!("Expected TypeMismatch, got {:?}", other),
     }
 }
+
+/// Test Application type expansion in assignability checking.
+///
+/// This tests that generic type applications like `Box<string>` properly expand
+/// during assignability checks to their structural form.
+#[test]
+fn test_application_type_expansion_box_string_to_structural() {
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<string> = Application(Ref(1), [string])
+    let box_string = interner.application(box_ref, vec![TypeId::STRING]);
+
+    // Create structural equivalent: { value: string }
+    let structural = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Set up resolver with both body type and type parameters
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
+
+    // Test assignability: Box<string> should be assignable to { value: string }
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    assert!(
+        checker.is_subtype_of(box_string, structural),
+        "Box<string> should be assignable to {{ value: string }}"
+    );
+
+    // Also test reverse: { value: string } should be assignable to Box<string>
+    let mut checker2 = SubtypeChecker::with_resolver(&interner, &env);
+    assert!(
+        checker2.is_subtype_of(structural, box_string),
+        "{{ value: string }} should be assignable to Box<string>"
+    );
+}
+
+/// Test Application to Application assignability.
+///
+/// Two Application types with the same base and compatible args should be assignable.
+#[test]
+fn test_application_to_application_same_base() {
+    let interner = TypeInterner::new();
+
+    // Create Ref(1) for some generic type
+    let base_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: GenericType<string>
+    let app1 = interner.application(base_ref, vec![TypeId::STRING]);
+
+    // Create another Application with same base and args
+    let app2 = interner.application(base_ref, vec![TypeId::STRING]);
+
+    // Should be assignable (same base, same args)
+    let mut checker = SubtypeChecker::new(&interner);
+    assert!(
+        checker.is_subtype_of(app1, app2),
+        "GenericType<string> should be assignable to GenericType<string>"
+    );
+}
+
+/// Test Application types with different type arguments.
+#[test]
+fn test_application_different_args_not_assignable() {
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box type alias
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Application: Box<string>
+    let box_string = interner.application(box_ref, vec![TypeId::STRING]);
+
+    // Create Application: Box<number>
+    let box_number = interner.application(box_ref, vec![TypeId::NUMBER]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param]);
+
+    // Box<string> should NOT be assignable to Box<number>
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    assert!(
+        !checker.is_subtype_of(box_string, box_number),
+        "Box<string> should NOT be assignable to Box<number>"
+    );
+}
+
+/// Test nested Application type expansion.
+///
+/// Tests that `Wrapper<Box<string>>` expands correctly through multiple layers.
+#[test]
+fn test_nested_application_expansion() {
+    let interner = TypeInterner::new();
+
+    // Define type parameter T
+    let t_name = interner.intern_string("T");
+    let t_param = TypeParamInfo {
+        name: t_name,
+        constraint: None,
+        default: None,
+    };
+    let t_type = interner.intern(TypeKey::TypeParameter(t_param.clone()));
+
+    // Define: type Box<T> = { value: T }
+    let value_name = interner.intern_string("value");
+    let box_body = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(1) for Box
+    let box_ref = interner.reference(SymbolRef(1));
+
+    // Create Box<string>
+    let box_string = interner.application(box_ref, vec![TypeId::STRING]);
+
+    // Define: type Wrapper<T> = { wrapped: T }
+    let wrapped_name = interner.intern_string("wrapped");
+    let wrapper_body = interner.object(vec![PropertyInfo {
+        name: wrapped_name,
+        type_id: t_type,
+        write_type: t_type,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Create Ref(2) for Wrapper
+    let wrapper_ref = interner.reference(SymbolRef(2));
+
+    // Create Wrapper<Box<string>>
+    let wrapper_box_string = interner.application(wrapper_ref, vec![box_string]);
+
+    // Expected structural type: { wrapped: { value: string } }
+    let inner_structural = interner.object(vec![PropertyInfo {
+        name: value_name,
+        type_id: TypeId::STRING,
+        write_type: TypeId::STRING,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+    let outer_structural = interner.object(vec![PropertyInfo {
+        name: wrapped_name,
+        type_id: inner_structural,
+        write_type: inner_structural,
+        optional: false,
+        readonly: false,
+        is_method: false,
+    }]);
+
+    // Set up resolver
+    let mut env = TypeEnvironment::new();
+    env.insert_with_params(SymbolRef(1), box_body, vec![t_param.clone()]);
+    env.insert_with_params(SymbolRef(2), wrapper_body, vec![t_param]);
+
+    // Wrapper<Box<string>> should be assignable to { wrapped: { value: string } }
+    let mut checker = SubtypeChecker::with_resolver(&interner, &env);
+    assert!(
+        checker.is_subtype_of(wrapper_box_string, outer_structural),
+        "Wrapper<Box<string>> should be assignable to {{ wrapped: {{ value: string }} }}"
+    );
+}
