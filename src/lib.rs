@@ -5,6 +5,9 @@ pub mod tokens;
 pub mod scanner;
 pub mod scanner_impl;
 pub mod builtins;
+pub mod checker;
+pub mod types;
+pub mod binder;
 
 pub use tokens::{keyword_from_str, Span, Token, TokenKind};
 pub use scanner::{LanguageVariant, Scanner, ScriptTarget, TokenFlags};
@@ -38,6 +41,38 @@ pub use builtins::{
     LibLoader,
     LibLoaderConfig,
     LibFile,
+};
+pub use checker::{
+    SymbolType,
+    UniqueSymbolId,
+    WellKnownSymbol,
+    SymbolDeclarationFlags,
+    SymbolAssignability,
+    SymbolIndexSignature,
+    SymbolIndexValueType,
+    SymbolProperty,
+    SymbolNarrowingContext,
+    SymbolTypeofResult,
+    SymbolComputedProperty,
+    SymbolInTemplateLiteral,
+    SymbolRegistry,
+};
+pub use types::{
+    UniqueSymbolType,
+    UniqueSymbolFactory,
+    UniqueSymbolPredicate,
+    ConstSymbolDeclaration,
+    TypeofUniqueSymbol,
+    TypeofResultType,
+};
+pub use binder::{
+    SymbolBindingContext,
+    BoundSymbol,
+    SymbolScope,
+    SymbolDeclarationKind,
+    SymbolPropertyDeclaration,
+    SymbolIndexSignatureDeclaration,
+    ComputedPropertyAnalysis,
 };
 
 #[cfg(test)]
