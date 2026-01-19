@@ -31,6 +31,7 @@
 pub mod node_kind;
 pub mod thin_node;
 pub mod ast;
+pub mod checker;
 
 // Re-export commonly used types at crate root
 pub use node_kind::NodeKind;
@@ -43,6 +44,17 @@ pub use thin_node::{
 pub use ast::{
     AstArena, AstBuilder, StatementBuilder, ExpressionBuilder, TypeBuilder,
     Span,
+};
+
+// Re-export type checker components
+pub use checker::{
+    TypeChecker, CheckerOptions,
+    TypeId, TypeFlags,
+    SignatureId, Signature, SignatureFlags, SignatureStore,
+    Parameter, ParameterFlags, TypeParameter,
+    FunctionChecker, FunctionContext, FunctionCheckResult, FunctionError,
+    CallChecker, CallContext, CallCheckResult, CallError, Argument,
+    OverloadResolver, OverloadResolutionResult,
 };
 
 /// Parser configuration options.

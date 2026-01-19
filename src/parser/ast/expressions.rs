@@ -2,7 +2,7 @@
 //!
 //! All TypeScript expression AST node types.
 
-use super::arena::{AstArena, NodeId, Span, StringId};
+use super::arena::{AstArena, NodeId, Span};
 use super::nodes::NodeKind;
 
 /// Helper to create expression nodes in the arena
