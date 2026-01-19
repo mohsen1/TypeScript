@@ -30,12 +30,19 @@
 
 pub mod node_kind;
 pub mod thin_node;
+pub mod ast;
 
 // Re-export commonly used types at crate root
 pub use node_kind::NodeKind;
 pub use thin_node::{
     AstView, ChildrenRef, ModifierFlags, NodeArena, NodeFlags, NodeId, StringId, StringInterner,
     TextSpan, ThinNode,
+};
+
+// Re-export AST builders
+pub use ast::{
+    AstArena, AstBuilder, StatementBuilder, ExpressionBuilder, TypeBuilder,
+    Span,
 };
 
 /// Parser configuration options.
