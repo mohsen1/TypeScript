@@ -3455,13 +3455,20 @@ impl ThinNodeArena {
         }
     }
 
-    /// Get unary expression data (prefix or postfix).
+    /// Get unary expression data (prefix, postfix, delete, typeof, void).
     /// Returns None if node is not a unary expression or has no data.
     #[inline]
     pub fn get_unary_expr(&self, node: &ThinNode) -> Option<&UnaryExprData> {
-        use super::syntax_kind_ext::{POSTFIX_UNARY_EXPRESSION, PREFIX_UNARY_EXPRESSION};
+        use super::syntax_kind_ext::{
+            DELETE_EXPRESSION, POSTFIX_UNARY_EXPRESSION, PREFIX_UNARY_EXPRESSION,
+            TYPE_OF_EXPRESSION, VOID_EXPRESSION,
+        };
         if node.has_data()
-            && (node.kind == PREFIX_UNARY_EXPRESSION || node.kind == POSTFIX_UNARY_EXPRESSION)
+            && (node.kind == PREFIX_UNARY_EXPRESSION
+                || node.kind == POSTFIX_UNARY_EXPRESSION
+                || node.kind == DELETE_EXPRESSION
+                || node.kind == TYPE_OF_EXPRESSION
+                || node.kind == VOID_EXPRESSION)
         {
             self.unary_exprs.get(node.data_index as usize)
         } else {
@@ -3817,6 +3824,28 @@ impl ThinNodeArena {
         use super::syntax_kind_ext::EXPORT_ASSIGNMENT;
         if node.has_data() && node.kind == EXPORT_ASSIGNMENT {
             self.export_assignments.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get import attributes data (import assertions).
+    #[inline]
+    pub fn get_import_attributes(&self, node: &ThinNode) -> Option<&ImportAttributesData> {
+        use super::syntax_kind_ext::IMPORT_ATTRIBUTES;
+        if node.has_data() && node.kind == IMPORT_ATTRIBUTES {
+            self.import_attributes.get(node.data_index as usize)
+        } else {
+            None
+        }
+    }
+
+    /// Get import attribute data (individual assertion).
+    #[inline]
+    pub fn get_import_attribute(&self, node: &ThinNode) -> Option<&ImportAttributeData> {
+        use super::syntax_kind_ext::IMPORT_ATTRIBUTE;
+        if node.has_data() && node.kind == IMPORT_ATTRIBUTE {
+            self.import_attribute.get(node.data_index as usize)
         } else {
             None
         }
@@ -4755,7 +4784,8 @@ impl NodeAccess for ThinNodeArena {
                     children.push(data.right);
                 }
             }
-            PREFIX_UNARY_EXPRESSION | POSTFIX_UNARY_EXPRESSION => {
+            PREFIX_UNARY_EXPRESSION | POSTFIX_UNARY_EXPRESSION | DELETE_EXPRESSION
+            | TYPE_OF_EXPRESSION | VOID_EXPRESSION => {
                 if let Some(data) = self.get_unary_expr(node) {
                     children.push(data.operand);
                 }
@@ -5072,6 +5102,17 @@ impl NodeAccess for ThinNodeArena {
                 if let Some(data) = self.get_export_assignment(node) {
                     add_opt_list(&mut children, &data.modifiers);
                     children.push(data.expression);
+                }
+            }
+            IMPORT_ATTRIBUTES => {
+                if let Some(data) = self.get_import_attributes(node) {
+                    add_list(&mut children, &data.elements);
+                }
+            }
+            IMPORT_ATTRIBUTE => {
+                if let Some(data) = self.get_import_attribute(node) {
+                    children.push(data.name);
+                    children.push(data.value);
                 }
             }
 
