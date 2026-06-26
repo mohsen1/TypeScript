@@ -1483,6 +1483,7 @@ export function isInstantiatedModule(node: ModuleDeclaration, preserveConstEnums
 }
 
 /** @internal */
+// Returns a TypeChecker object literal (lines ~1610–1956) after initializing globals; see `return checker` at line 2412.
 export function createTypeChecker(host: TypeCheckerHost): TypeChecker {
     // Why var? It avoids TDZ checks in the runtime which can be costly.
     // See: https://github.com/microsoft/TypeScript/issues/52924
